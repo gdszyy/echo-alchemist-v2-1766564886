@@ -2384,7 +2384,15 @@ export const game_system = {
         // 否则子弹拖尾、火焰波、贪婪转盘等 Sprite 会孤立残留在场上不消失。
         if (Array.isArray(this.projectiles)) {
             for (const p of this.projectiles) {
-                if (p && typeof p.releasePixiResources === 'function') p.releasePixiResources();
+                if (!p) continue;
+                if (typeof p.releasePixiResources === 'function') p.releasePixiResources();
+                // [击杀清场拖尾残留修复] 本方法常在「击杀最后一个敌人」时由 combat_damageEnemy
+                // 在子弹自身 update() 内部触发（见 combat_system.js activeCount===0 分支）。
+                // 届时主循环仍持有该击杀子弹的局部引用，紧接着会调用它的 draw()。若只释放资源而
+                // 不标记 destroyed/失活，draw() 守卫会放行并重新创建拖尾/光晕 Sprite，而该子弹已不在
+                // 任何数组中 → 永久孤立残留。故此处标记销毁，令后续 draw() 早退。
+                p.active = false;
+                p.destroyed = true;
             }
         }
         if (Array.isArray(this.fireWaves)) {
