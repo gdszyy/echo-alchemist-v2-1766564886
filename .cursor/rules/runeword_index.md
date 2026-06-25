@@ -56,12 +56,14 @@
 ## 1.6 技能系统总览（技能来源扩展）
 
 > **数据来源**：`src/config.js` → `SKILL_DB`（共 19 个技能）。
-> **核心入口**：`combat_recomputeActiveSkills()`（`src/combat_system.js`）—— 统一把四类来源
-> 求并集写入 `this.activeSkills`，并维护 `skill_point` 槽与技能栏/SP 面板显隐。
-> 任意来源变化（放符文 / 拾遗物 / 商店买 / 局开始）都应调用它。
+> **核心入口**：`combat_recomputeActiveSkills(opts)`（`src/combat_system.js`）—— 计算四类来源
+> 并集（技能池 `unlockedSkills`）→ 维护装配（`equippedSkillIds`，≤4）→ 推导 `activeSkills`（技能栏内容）
+> → 维护 `skill_point` 槽与技能栏/SP/编辑器入口显隐。任意来源变化（放符文/拾遗物/商店买/局开始）都应调用它。
 
 技能效果分发：原 6 个走 `combat_activateSkill` 的 if/else 链；新增 13 个集中在
 `combat_activateSkillExtended(skill, p, method)`（同文件），由前者末尾兜底调用。
+
+### 技能来源（4 类，共 19 个）
 
 | 来源 (`source`) | 解锁条件 | 数量 | 技能 |
 |---|---|---|---|
@@ -70,8 +72,14 @@
 | `relic` | 拥有 `unlockRelic` 遗物（`effect:'unlock_skill'`） | 3 | 引力坍缩(`relic_gravity_core`)、时滞冻结(`relic_chrono_shard`)、不死鸟祝福(`relic_phoenix_feather`) |
 | `shop` | 局内商店购买（写入 `purchasedSkillIds`，`shopPrice` 定价） | 3 | 陨石轰击、棱镜超载、财富打击 |
 
-状态字段：`activeSkills`（运行时并集，不持久化）、`purchasedSkillIds`（持久化于局存档）、
-`_activeRunewordIds`（由 `ui_updateRuneGrid` 写入的当前激活词条集合）。
+### 技能装配（loadout）
+
+- **技能池 `unlockedSkills`**：四类来源并集，可超过 4 个。**装备 `equippedSkillIds`**：玩家选择进入战斗技能栏的子集（≤ `CONFIG.gameplay.maxEquippedSkills`，默认 4，受锁定的 2×2 布局约束）。`activeSkills` = 池中已装备项（按装备顺序），即技能栏渲染/可释放的内容。
+- **自动装备**：新解锁技能若有空位则自动装备；满 4 个时进池不装备，并**强制弹出技能编辑器**（`ui_openSkillEditor({forced:true})`）让玩家取舍。
+- **卸下可重装**：编辑器里「卸下」的技能仍留在池中，可随时重装；用 `_seenSkillIds`（上次池快照）避免把手动卸下的技能反复自动装回。词条技能随符文重排动态增减，离开池时自动从装备中剔除。
+- **编辑器 UI**：`src/ui/rune_launcher.js` 的 `ui_openSkillEditor / ui_closeSkillEditor / ui_renderSkillEditor / ui_toggleEquipSkill`；DOM 为 `index.html#skill-editor-overlay` + 顶栏入口 `#skill-editor-open-btn`；样式在 `src/styles/bitmap_ui.css`。入口按钮随时可开。
+
+状态字段（均持久化于局存档）：`equippedSkillIds`、`purchasedSkillIds`、`_seenSkillIds`、`_activeRunewordIds`；`unlockedSkills`/`activeSkills` 为运行时派生不持久化。
 
 ## 2. 词条 effectId 与实现位置速查
 

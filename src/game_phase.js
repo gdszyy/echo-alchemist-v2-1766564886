@@ -789,11 +789,12 @@ export const game_phase = {
 
         // [技能来源扩展] 进入钉盘前先重算技能并集（基础技能保证 activeSkills 非空、skill_point 槽常驻）
         if (typeof this.combat_recomputeActiveSkills === 'function') {
-            this.combat_recomputeActiveSkills();
+            this.combat_recomputeActiveSkills({ allowEditorPopup: false });
         }
         // [unlock_slot 遗物 + slot_count_up] 在模块外额外创建特殊槽
         let effectiveSlots = [...(this.unlockedSlots || [])];
-        if (!this.activeSkills || this.activeSkills.length === 0) {
+        // [技能装配] skill_point 槽取决于「技能池」是否非空（而非当前装备数），玩家卸光技能仍保留 SP 来源
+        if (!this.unlockedSkills || this.unlockedSkills.length === 0) {
             effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
         }
         const effectiveSlotCount = Math.min(this.slotCount || 0, effectiveSlots.length > 0 ? this.slotCount : 0);
@@ -1336,11 +1337,11 @@ export const game_phase = {
 
         // [技能来源扩展] 进入钉盘前先重算技能并集（基础技能保证 activeSkills 非空、skill_point 槽常驻）
         if (typeof this.combat_recomputeActiveSkills === 'function') {
-            this.combat_recomputeActiveSkills();
+            this.combat_recomputeActiveSkills({ allowEditorPopup: false });
         }
-        // [技能系统迭代] 动态过滤 skill_point 槽：仅当玩家有已解锁技能时才生成技能点槽
+        // [技能系统迭代] 动态过滤 skill_point 槽：只要技能池非空就生成技能点槽（与装备数无关）
         let effectiveSlots = [...this.unlockedSlots];
-        if (!this.activeSkills || this.activeSkills.length === 0) {
+        if (!this.unlockedSkills || this.unlockedSkills.length === 0) {
             effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
         }
         const effectiveSlotCount = Math.min(this.slotCount, effectiveSlots.length > 0 ? this.slotCount : 0);

@@ -336,71 +336,102 @@ export const combat_system = {
     },
 
     /**
-     * combat_recomputeActiveSkills - 统一重算「当前局内已解锁技能列表」
+     * combat_recomputeActiveSkills - 重算技能池并维护装配（loadout）
      *
-     * [技能来源扩展] activeSkills 现在是四类来源的并集：
-     *   1. 基础技能 (source:'base')              —— 每局常驻，保证 SP 永远有去处
-     *   2. 词条解锁 (unlockRuneword 命中激活词条)  —— 由 ui_updateRuneGrid 写入 this._activeRunewordIds
-     *   3. 遗物解锁 (unlockRelic 命中 ownedRelics)
-     *   4. 商店购买 (技能 id 命中 purchasedSkillIds)
+     * [技能装配系统] 区分两层：
+     *   - this.unlockedSkills：四类来源（基础/词条/遗物/商店）的并集 = 玩家已解锁的「技能池」，可超过 4 个。
+     *   - this.equippedSkillIds：玩家选择装备到战斗技能栏的子集（≤ maxEquippedSkills，默认 4）。
+     *   - this.activeSkills：池中 id ∈ equippedSkillIds 的技能（按装备顺序），即技能栏实际渲染/可释放的列表。
      *
-     * 任何来源发生变化（放置符文 / 拾取遗物 / 商店购买 / 局开始）都应调用本方法。
-     * 同时负责维护 skill_point 槽的增删与技能栏 / SP 面板的显隐刷新。
+     * 装配规则：
+     *   - 新解锁的技能若有空位 → 自动装备；若已满 4 个 → 进入池但不装备，并触发技能编辑器强制弹出。
+     *   - 玩家在编辑器里「卸下」的技能仍留在池中（不丢失），可随时重新装备。
+     *   - 词条技能随符文重排动态增减；离开池的技能会自动从装配中剔除。
+     *   - 通过 this._seenSkillIds 记录上次池快照，避免把玩家手动卸下的技能反复自动装回。
      *
-     * @returns {boolean} activeSkills 是否发生了变化
+     * 任何来源变化（放符文 / 拾遗物 / 商店购买 / 局开始）都应调用本方法。
+     *
+     * @param {object} [opts]
+     * @param {boolean} [opts.allowEditorPopup=true] 是否允许在装备已满又有新解锁时自动弹出编辑器
+     * @returns {boolean} 装配后的 activeSkills 是否发生变化
      */
-    combat_recomputeActiveSkills() {
+    combat_recomputeActiveSkills(opts = {}) {
+        const allowEditorPopup = opts.allowEditorPopup !== false;
         const rwIds = this._activeRunewordIds instanceof Set ? this._activeRunewordIds : new Set();
         const owned = Array.isArray(this.ownedRelics) ? this.ownedRelics : [];
         const purchased = Array.isArray(this.purchasedSkillIds) ? this.purchasedSkillIds : [];
 
-        const result = [];
+        // —— 1. 计算技能池（四类来源并集） ——
+        const pool = [];
         for (const sk of SKILL_DB) {
             if (!sk || !sk.id) continue;
             let unlocked = false;
             if (sk.source === 'base') unlocked = true;
             else if (sk.unlockRuneword && rwIds.has(sk.unlockRuneword)) unlocked = true;
             else if (sk.unlockRelic && owned.includes(sk.unlockRelic)) unlocked = true;
-            // 商店购买可解锁任意被标记为 shop 的技能（也允许作为兜底解锁路径）
+            // 商店购买可解锁任意被标记的技能（也作为兜底解锁路径）
             if (!unlocked && purchased.includes(sk.id)) unlocked = true;
-            if (unlocked) result.push(sk);
+            if (unlocked) pool.push(sk);
         }
-
-        // [技能来源扩展] 显示优先级：战斗技能栏受锁定的 2×2（4 格）布局限制，
-        // 让玩家「主动投入」获得的技能（商店/遗物/词条）优先占据有限的可见槽，
-        // 常驻的基础技能作为兜底排在最后（数量超 4 时才会被挤出可见区）。
+        // 自动装备时的优先级：商店 > 遗物 > 词条 > 基础（让主动投入的技能优先占位）
         const sourceRank = { shop: 0, relic: 1, runeword: 2, base: 3 };
-        result.sort((a, b) => (sourceRank[a.source] ?? 2) - (sourceRank[b.source] ?? 2));
+        pool.sort((a, b) => (sourceRank[a.source] ?? 2) - (sourceRank[b.source] ?? 2));
+        this.unlockedSkills = pool;
+        const poolIds = new Set(pool.map(s => s.id));
 
+        // —— 2. 装配维护 ——
+        const cap = (CONFIG.gameplay && CONFIG.gameplay.maxEquippedSkills) || 4;
+        if (!Array.isArray(this.equippedSkillIds)) this.equippedSkillIds = [];
+        // 2a. 剔除已离开池的技能（如撤下符文导致词条技能消失）
+        this.equippedSkillIds = this.equippedSkillIds.filter(id => poolIds.has(id));
+        // 2b. 自动装备「本次新出现」的技能（相对上次池快照），尊重玩家手动卸下的选择
+        const prevSeen = this._seenSkillIds instanceof Set ? this._seenSkillIds : new Set();
+        const equippedSet = new Set(this.equippedSkillIds);
+        let overflowNewCount = 0;
+        for (const sk of pool) {
+            if (prevSeen.has(sk.id) || equippedSet.has(sk.id)) continue; // 旧技能或已装备的不处理
+            if (this.equippedSkillIds.length < cap) {
+                this.equippedSkillIds.push(sk.id);
+                equippedSet.add(sk.id);
+            } else {
+                overflowNewCount++; // 装备已满，新技能进池但需玩家手动取舍
+            }
+        }
+        this._seenSkillIds = new Set(poolIds);
+
+        // —— 3. 由装配推导 activeSkills（技能栏实际内容，按装备顺序） ——
+        const result = this.equippedSkillIds
+            .map(id => pool.find(s => s.id === id))
+            .filter(Boolean);
         const prev = Array.isArray(this.activeSkills) ? this.activeSkills : [];
         const changed = prev.length !== result.length || result.some((s, i) => (prev[i] && prev[i].id) !== s.id);
         this.activeSkills = result;
 
-        // —— 维护 skill_point 槽：仅当有任意已解锁技能时才保留 ——
+        // —— 4. 维护 skill_point 槽：只要技能池非空就保留 ——
         if (!Array.isArray(this.unlockedSlots)) this.unlockedSlots = [];
-        const hasSkills = result.length > 0;
-        if (hasSkills && !this.unlockedSlots.includes('skill_point')) {
+        const hasPool = pool.length > 0;
+        if (hasPool && !this.unlockedSlots.includes('skill_point')) {
             this.unlockedSlots.push('skill_point');
             if ((this.slotCount || 0) < this.unlockedSlots.length) {
                 this.slotCount = this.unlockedSlots.length;
             }
-        } else if (!hasSkills && this.unlockedSlots.includes('skill_point')) {
+        } else if (!hasPool && this.unlockedSlots.includes('skill_point')) {
             this.unlockedSlots = this.unlockedSlots.filter(t => t !== 'skill_point');
             this.slotCount = Math.max(1, this.unlockedSlots.length);
         }
 
-        // —— 刷新技能栏 / SP 面板（DOM 与 UI 在不可用时安全跳过）——
+        // —— 5. 刷新技能栏 / SP 面板 / 编辑器入口（DOM 不可用时安全跳过） ——
         if (this.ui && typeof this.ui.updateSkillBar === 'function') {
             this.ui.updateSkillBar(this.skillPoints || 0, this.activeSkills);
         }
         if (typeof document !== 'undefined') {
             const skillBar = document.getElementById('skill-bar');
             if (skillBar) {
-                skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
+                skillBar.style.display = (this.phase === 'combat' && this.activeSkills.length > 0) ? 'flex' : 'none';
             }
             const spPanel = document.getElementById('sp-panel');
             if (spPanel) {
-                if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkills) {
+                if ((this.phase === 'gathering' || this.phase === 'combat') && hasPool) {
                     spPanel.style.opacity = '1';
                     spPanel.style.pointerEvents = 'auto';
                 } else {
@@ -408,6 +439,30 @@ export const combat_system = {
                     spPanel.style.pointerEvents = 'none';
                 }
             }
+            // 编辑器入口按钮：技能池非空且处于 gathering/combat 阶段时显示
+            const editBtn = document.getElementById('skill-editor-open-btn');
+            if (editBtn) {
+                const show = hasPool && (this.phase === 'gathering' || this.phase === 'combat');
+                editBtn.style.display = show ? 'inline-flex' : 'none';
+                editBtn.textContent = `✎ 技能 ${this.equippedSkillIds.length}/${cap}`;
+                if (editBtn.dataset.bound !== 'true') {
+                    editBtn.dataset.bound = 'true';
+                    editBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (typeof this.ui_openSkillEditor === 'function') this.ui_openSkillEditor();
+                    });
+                }
+            }
+            // 编辑器若正开着，同步刷新内容
+            if (typeof this.ui_renderSkillEditor === 'function') {
+                const ov = document.getElementById('skill-editor-overlay');
+                if (ov && ov.classList.contains('is-open')) this.ui_renderSkillEditor();
+            }
+        }
+
+        // —— 6. 新解锁但装备已满 → 强制弹出技能编辑器让玩家取舍 ——
+        if (overflowNewCount > 0 && allowEditorPopup && typeof this.ui_openSkillEditor === 'function') {
+            this.ui_openSkillEditor({ forced: true });
         }
 
         return changed;

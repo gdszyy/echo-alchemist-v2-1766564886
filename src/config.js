@@ -1004,6 +1004,7 @@ const CONFIG = {
         eliteFragmentDropChance: 0.80,
         bossFragmentDrop: 8,            // Boss 击杀必掉
         maxSkillPoints: 3,  // 技能点上限
+        maxEquippedSkills: 4,  // [技能装配] 战斗技能栏可同时装备的技能上限（受 2×2 布局约束）
         skillChargeHitGain: 0.03,       // 命中获得的技能充能
         skillChargeKillGain: 0.10,      // 击杀获得的技能充能
         skillChargeRetainRatio: 0.35,   // 充能衰减后保留到实际条的比例
