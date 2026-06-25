@@ -1,9 +1,9 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-24 | 总行数: 11431 | 函数数: 181 | 语言: javascript
+> 自动生成于 2026-06-25 | 总行数: 11525 | 函数数: 181 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 10 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 11 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -22,7 +22,7 @@
 | _initTexture | method | `_initTexture(width, height)` |  |
 | applyExplosionKnockback | method | `applyExplosionKnockback(cx, cy, radius = 100, maxOffset = 12)` |  |
 | _tickExplosionKnockback | method | `_tickExplosionKnockback(timeScale)` |  |
-| update | method | `update(timeScale, game)` |  |
+| update | method | `update(timeScale, game)` | ⚠️ 巨型函数，见 @section 导航 |
 | addSwordCrack | method | `addSwordCrack(relPos, angle)` |  |
 | updateTempParticles | method | `updateTempParticles(timeScale)` |  |
 | advance | method | `advance(amount)` |  |
@@ -196,6 +196,10 @@
 ## 巨型函数内部节点 (@section 标记)
 
 ### constructor
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
+### update
 
 > **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 

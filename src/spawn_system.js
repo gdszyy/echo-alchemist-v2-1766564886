@@ -4,7 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, showToast,
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, AffixSkillVFX, showToast,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { getThemeSegment } from './utils/math_utils.js';
@@ -1810,6 +1810,253 @@ export const spawn_system = {
         }
     },
 
+    /**
+     * @method spawn_createAssimilationPulse
+     * @description 弹珠同化/变异专用脉冲特效 — "能量汇聚→释放" 两阶段动画。
+     * @param {number} x - 位置 X。
+     * @param {number} y - 位置 Y。
+     * @param {string} color - 属性颜色。
+     * @param {object} opts - { isMutation: boolean, isMirror: boolean }
+     */
+    spawn_createAssimilationPulse(x, y, color, opts = {}) {
+        const quality = this.perfQualityLevel || 'high';
+        const isLow = quality === 'low';
+        const isMid = quality === 'medium';
+        // @perf-impact: assimilation pulse - mist+spark+ember 粒子组合，受既有预算限制
+        const mirrorMult = opts.isMirror ? 0.5 : 1;
+        const mutationMult = opts.isMutation ? 2 : 1;
+
+        // Phase 1: 汇聚 — mist 粒子从外围向中心飞入
+        if (!isLow) {
+            const mistCount = Math.round((isMid ? 2 : 4) * mirrorMult);
+            const gatherRadius = 25;
+            for (let i = 0; i < mistCount; i++) {
+                const angle = (i / mistCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+                const spawnX = x + Math.cos(angle) * gatherRadius;
+                const spawnY = y + Math.sin(angle) * gatherRadius;
+                const m = this.spawn_createParticle(spawnX, spawnY, color, 'mist');
+                if (m && m.vel) {
+                    // 速度指向中心
+                    m.vel.x = -Math.cos(angle) * 2.5;
+                    m.vel.y = -Math.sin(angle) * 2.5;
+                    m.size *= 0.7;
+                }
+            }
+        }
+
+        // Phase 2: 释放 — spark 紧密径向扩散
+        const sparkCount = Math.round((isLow ? 4 : (isMid ? 6 : 8)) * mutationMult * mirrorMult);
+        for (let i = 0; i < sparkCount; i++) {
+            const angle = (i / sparkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+            const speed = 1.5 + Math.random() * 2.0;
+            const p = this.spawn_createParticle(x, y, color, 'spark');
+            if (p && p.vel) {
+                p.vel.x = Math.cos(angle) * speed;
+                p.vel.y = Math.sin(angle) * speed;
+                p.size *= 0.6 + Math.random() * 0.5;
+            }
+        }
+
+        // 高质量时附加 ember 温暖光点
+        if (!isLow && !isMid && !opts.isMirror) {
+            const e = this.spawn_createParticle(x, y, color, 'ember');
+            if (e && e.vel) {
+                e.vel.x = (Math.random() - 0.5) * 0.8;
+                e.vel.y = -0.6 - Math.random() * 0.4;
+            }
+        }
+
+        // 变异事件附加冲击波
+        if (opts.isMutation) {
+            this.spawn_createShockwave(x, y, color);
+        }
+    },
+
+    /**
+     * @method spawn_createSlotBurst
+     * @description 槽位奖励触发专用爆发 — 上扬式庆祝喷射，干净明亮。
+     * @param {number} x - 位置 X。
+     * @param {number} y - 位置 Y。
+     * @param {string} color - 槽位类型颜色。
+     * @param {object} opts - { intensity: number } 倍率(默认1.0, 高价值槽位用1.3)
+     */
+    spawn_createSlotBurst(x, y, color, opts = {}) {
+        const quality = this.perfQualityLevel || 'high';
+        const isLow = quality === 'low';
+        const isMid = quality === 'medium';
+        const intensity = opts.intensity || 1.0;
+        // @perf-impact: slot burst - spark+ember 上扬粒子，无 smoke，受既有预算限制
+        const sparkCount = Math.round((isLow ? 5 : (isMid ? 7 : 10)) * intensity);
+
+        // spark 向上锥形喷射（126度锥体）
+        for (let i = 0; i < sparkCount; i++) {
+            const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.7;
+            const speed = (3.0 + Math.random() * 3.5) * intensity;
+            const p = this.spawn_createParticle(x, y, color, 'spark');
+            if (p && p.vel) {
+                p.vel.x = Math.cos(angle) * speed;
+                p.vel.y = Math.sin(angle) * speed;
+                p.gravity = -0.12; // 反重力：向上飘而非下落
+                p.size *= 0.7 + Math.random() * 0.6;
+            }
+        }
+
+        // ember 金色闪光上飘
+        if (!isLow) {
+            const emberCount = isMid ? 1 : Math.round(3 * intensity);
+            for (let i = 0; i < emberCount; i++) {
+                const e = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 12,
+                    y + (Math.random() - 0.5) * 8,
+                    color, 'ember'
+                );
+                if (e && e.vel) {
+                    e.vel.x = (Math.random() - 0.5) * 1.5;
+                    e.vel.y = -2.0 - Math.random() * 1.5;
+                }
+            }
+        }
+    },
+
+    /**
+     * @method spawn_createImpactBlast
+     * @description 子弹/爆炸物冲击专用爆破 — 高速、有方向、带碎片弹片。
+     * @param {number} x - 位置 X。
+     * @param {number} y - 位置 Y。
+     * @param {string} color - 爆炸颜色。
+     * @param {object} opts - { impactDirection: Vec2, withShockwave: boolean, isOvercharge: boolean }
+     */
+    spawn_createImpactBlast(x, y, color, opts = {}) {
+        const quality = this.perfQualityLevel || 'high';
+        const isLow = quality === 'low';
+        const isMid = quality === 'medium';
+        const overchargeBonus = opts.isOvercharge ? 4 : 0;
+        // @perf-impact: impact blast - spark+shard+smoke 高速爆破，受既有预算限制
+        const sparkCount = (isLow ? 5 : (isMid ? 8 : 12)) + overchargeBonus;
+
+        // 方向偏置角度（若有 impactDirection）
+        let biasAngle = 0;
+        if (opts.impactDirection) {
+            biasAngle = Math.atan2(opts.impactDirection.y, opts.impactDirection.x);
+        }
+
+        // spark 高速扩散
+        for (let i = 0; i < sparkCount; i++) {
+            const baseAngle = (i / sparkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+            // 有方向时偏向前方
+            const angle = opts.impactDirection
+                ? biasAngle + (baseAngle - Math.PI) * 0.6
+                : baseAngle;
+            const speed = 4.0 + Math.random() * 4.5;
+            const p = this.spawn_createParticle(x, y, color, 'spark');
+            if (p && p.vel) {
+                p.vel.x = Math.cos(angle) * speed;
+                p.vel.y = Math.sin(angle) * speed;
+                p.size *= 1.0 + Math.random() * 0.8;
+            }
+        }
+
+        // shard 碎片弹片（中高质量）
+        if (!isLow) {
+            const shardCount = isMid ? 2 : 4;
+            for (let i = 0; i < shardCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2.0 + Math.random() * 3.0;
+                const s = this.spawn_createParticle(x, y, 'rgba(180,170,160,0.8)', 'shard');
+                if (s && s.vel) {
+                    s.vel.x = Math.cos(angle) * speed;
+                    s.vel.y = Math.sin(angle) * speed - 1.5;
+                }
+            }
+        }
+
+        // smoke 后坐烟雾（仅高质量）
+        if (!isLow && !isMid) {
+            const smokeCount = 3;
+            for (let i = 0; i < smokeCount; i++) {
+                const smokeAngle = opts.impactDirection
+                    ? biasAngle + Math.PI + (Math.random() - 0.5) * 0.8
+                    : Math.random() * Math.PI * 2;
+                const sm = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 6,
+                    y + (Math.random() - 0.5) * 6,
+                    'rgba(30, 20, 16, 0.45)', 'smoke'
+                );
+                if (sm && sm.vel) {
+                    sm.vel.x = Math.cos(smokeAngle) * 0.6;
+                    sm.vel.y = Math.sin(smokeAngle) * 0.6 - 0.3;
+                    sm.size *= 0.9;
+                }
+            }
+        }
+
+        if (opts.withShockwave) {
+            this.spawn_createShockwave(x, y, color);
+        }
+    },
+
+    /**
+     * @method spawn_createSkillIgnition
+     * @description 技能激活/buff 施加专用特效 — 能量聚集→点燃爆发 + 冲击波环。
+     * @param {number} x - 位置 X。
+     * @param {number} y - 位置 Y。
+     * @param {string} color - 技能颜色。
+     * @param {object} opts - { skillType: string }
+     */
+    spawn_createSkillIgnition(x, y, color, opts = {}) {
+        const quality = this.perfQualityLevel || 'high';
+        const isLow = quality === 'low';
+        const isMid = quality === 'medium';
+        // @perf-impact: skill ignition - mist+spark+ember+shockwave 组合，受既有预算限制
+
+        // Phase 1: 聚集 — mist 从较大半径向中心汇入
+        if (!isLow) {
+            const mistCount = isMid ? 3 : 6;
+            const gatherRadius = 35;
+            for (let i = 0; i < mistCount; i++) {
+                const angle = (i / mistCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+                const spawnX = x + Math.cos(angle) * gatherRadius;
+                const spawnY = y + Math.sin(angle) * gatherRadius;
+                const m = this.spawn_createParticle(spawnX, spawnY, color, 'mist');
+                if (m && m.vel) {
+                    m.vel.x = -Math.cos(angle) * 2.5;
+                    m.vel.y = -Math.sin(angle) * 2.5;
+                    m.size *= 0.85;
+                }
+            }
+        }
+
+        // Phase 2: 点燃 — spark 中速径向扩散
+        const sparkCount = isLow ? 4 : (isMid ? 6 : 8);
+        for (let i = 0; i < sparkCount; i++) {
+            const angle = (i / sparkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+            const speed = 2.5 + Math.random() * 2.5;
+            const p = this.spawn_createParticle(x, y, color, 'spark');
+            if (p && p.vel) {
+                p.vel.x = Math.cos(angle) * speed;
+                p.vel.y = Math.sin(angle) * speed;
+                p.size *= 0.7 + Math.random() * 0.5;
+            }
+        }
+
+        // ember 上飘点燃感（中高质量）
+        if (!isLow) {
+            const emberCount = isMid ? 1 : 2;
+            for (let i = 0; i < emberCount; i++) {
+                const e = this.spawn_createParticle(x, y, color, 'ember');
+                if (e && e.vel) {
+                    e.vel.x = (Math.random() - 0.5) * 1.2;
+                    e.vel.y = -1.0 - Math.random() * 0.8;
+                }
+            }
+        }
+
+        // 固定附加冲击波（高质量/中质量）
+        if (!isLow) {
+            this.spawn_createShockwave(x, y, color);
+        }
+    },
+
 /**
      * @method createShockwave
      * @description 创建冲击波特效。
@@ -1845,6 +2092,22 @@ export const spawn_system = {
         // @perf-impact: Greedy wheel battle VFX - capped by greedyWheelEffectLimit and drawn flat in low quality
         if (this.greedyWheelEffects.length >= (_budget.greedyWheelEffectLimit ?? 6)) return;
         this.greedyWheelEffects.push(new GreedyWheelEffect(x, y, mode, quality));
+    },
+
+    /**
+     * @method spawn_createAffixSkillVFX
+     * @description 创建词条技能释放特效（三幕式：预兆→爆发→余韵）
+     * @param {number} x - 特效中心 X 坐标
+     * @param {number} y - 特效中心 Y 坐标
+     * @param {string} skillType - 技能类型（berserk/shield/regen/haste/jump/clone/devour）
+     * @param {object} opts - 可选参数 { intensity, isBoss, isElite, perfTier }
+     */
+    spawn_createAffixSkillVFX(x, y, skillType, opts = {}) {
+        if (!this.affixSkillVFXList) this.affixSkillVFXList = [];
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        if (this.affixSkillVFXList.length >= (_budget.affixSkillVFXLimit ?? 12)) return;
+        opts.perfTier = opts.perfTier || this.perfQualityLevel || 'high';
+        this.affixSkillVFXList.push(new AffixSkillVFX(x, y, skillType, opts));
     },
 
 // ---  createHitFeedback ---

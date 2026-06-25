@@ -666,8 +666,14 @@ class Projectile {
     }
 
     onHit(enemy, allEnemies) {
-        // [Bullet Glow V2] 命中闪光脉冲：触发 6 帧光照增强
-        this._bulletGlowHitFlash = 6;
+        // [Bullet Glow V2] 命中闪光脉冲：触发 6 帧光照增强（受三档配置门控）
+        {
+            const _perfQ = Projectile.resolvePerfQuality();
+            const _perfTier = CONFIG.performance && CONFIG.performance[_perfQ];
+            if (_perfTier && _perfTier.bulletGlowHitFlash) {
+                this._bulletGlowHitFlash = 6;
+            }
+        }
 
         // ─────────────────────────────────────────────────────────────────────
         // [词条 Hook] 元素聚变（elemental_fusion）——火/冰状态标记
@@ -877,8 +883,8 @@ class Projectile {
         if (typeof game.spawn_createShockwave === 'function') {
             game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
         }
-        if (typeof game.spawn_createExplosion === 'function') {
-            game.spawn_createExplosion(this.pos.x, this.pos.y, '#fbbf24');
+        if (typeof game.spawn_createImpactBlast === 'function') {
+            game.spawn_createImpactBlast(this.pos.x, this.pos.y, '#fbbf24', {isOvercharge: true});
         }
         if (typeof game.spawn_createFloatingText === 'function') {
             game.spawn_createFloatingText(this.pos.x, this.pos.y - 24, `💥${dmg}`, '#fbbf24');

@@ -4,7 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, PierceCutEffect, CollectionBeam,
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, SwordScar, BladeStormVortex, showToast,
+    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, SwordScar, BladeStormVortex, AffixSkillVFX, showToast,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { UIManager, TrainingGround, TruthBook } from './systems.js';
@@ -22,7 +22,7 @@ import {
     shockwave_pixiDestroy, energyOrb_pixiDestroy,
     slashEffect_pixiDestroy, pierceCutEffect_pixiDestroy,
     swordScar_pixiDestroy, bladeStormVortex_pixiDestroy,
-    floatingText_pixiDestroy,
+    floatingText_pixiDestroy, affixSkillVFX_pixiDestroy,
     pixiCleanupAllEffects,
 } from './render/pixi_effect_adapter.js';
 import { calcCombatLauncherGeometry, calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
@@ -1939,7 +1939,7 @@ phase_gathering_getRandomPegType() {
                 if (shouldFreeze && !(e.affixes && e.affixes.includes('siege'))) {
                     e.isFrozenCurrentTurn = true;
                     e.frozenCount = (e.frozenCount || 0) + 1;
-                    this.spawn_createExplosion(e.pos.x, e.pos.y, '#06b6d4');
+                    this.spawn_createSkillIgnition(e.pos.x, e.pos.y, '#06b6d4');
                     audio.playEffect('freeze');
                 } else {
                     e.isFrozenCurrentTurn = false;
@@ -3113,6 +3113,19 @@ phase_gathering_getRandomPegType() {
                 }
             }
 
+            // [词条技能特效] 更新和绘制 AffixSkillVFX
+            if (this.affixSkillVFXList) {
+                for (let i = this.affixSkillVFXList.length - 1; i >= 0; i--) {
+                    const vfx = this.affixSkillVFXList[i];
+                    vfx.update(timeScale);
+                    vfx.draw(this.ctx);
+                    if (vfx.dead) {
+                        if (vfx._pixi) { affixSkillVFX_pixiDestroy(vfx._pixi); vfx._pixi = null; }
+                        this.affixSkillVFXList.splice(i, 1);
+                    }
+                }
+            }
+
             {
                 const arr = this.particles;
                 const counts = this.particleCounts;
@@ -4000,6 +4013,18 @@ phase_gathering_getRandomPegType() {
             if (!orb.active) {
                 if (orb._pixi) { energyOrb_pixiDestroy(orb._pixi); orb._pixi = null; }
                 this.energyOrbs.splice(i, 1);
+            }
+        }
+        // [词条技能特效] 更新和绘制 AffixSkillVFX（研磨阶段）
+        if (this.affixSkillVFXList) {
+            for (let i = this.affixSkillVFXList.length - 1; i >= 0; i--) {
+                const vfx = this.affixSkillVFXList[i];
+                vfx.update(timeScale);
+                vfx.draw(this.ctx);
+                if (vfx.dead) {
+                    if (vfx._pixi) { affixSkillVFX_pixiDestroy(vfx._pixi); vfx._pixi = null; }
+                    this.affixSkillVFXList.splice(i, 1);
+                }
             }
         }
         // 繪製粒子（两指针原地压缩，归还对象池；同步 particleCounts）

@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 3454 | 函数数: 54 | 语言: javascript
+> 自动生成于 2026-06-25 | 总行数: 3717 | 函数数: 59 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -37,9 +37,14 @@
 | spawn_pushParticleWithLimit | method | `spawn_pushParticleWithLimit(p)` |  |
 | spawn_spawnBullet | method | `spawn_spawnBullet(x, y, vel, recipe, shotId = null, isLast = false)` | ⚠️ 巨型函数，见 @section 导航 |
 | spawn_createExplosion | method | `spawn_createExplosion(x, y, color)` |  |
+| spawn_createAssimilationPulse | method | `spawn_createAssimilationPulse(x, y, color, opts = {})` |  |
+| spawn_createSlotBurst | method | `spawn_createSlotBurst(x, y, color, opts = {})` |  |
+| spawn_createImpactBlast | method | `spawn_createImpactBlast(x, y, color, opts = {})` |  |
+| spawn_createSkillIgnition | method | `spawn_createSkillIgnition(x, y, color, opts = {})` |  |
 | spawn_createShockwave | method | `spawn_createShockwave(x, y, color = null)` |  |
 | spawn_createHealWave | method | `spawn_createHealWave(x, y, range = 120)` |  |
 | spawn_createGreedyWheelEffect | method | `spawn_createGreedyWheelEffect(x, y, mode = 'prelude')` |  |
+| spawn_createAffixSkillVFX | method | `spawn_createAffixSkillVFX(x, y, skillType, opts = {})` |  |
 | spawn_createHitFeedback | method | `spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {})` |  |
 | spawn_triggerLevelUpEvent | method | `spawn_triggerLevelUpEvent(uiX, uiY, session = this.currentSession)` |  |
 | spawn_scheduleNextBoss | method | `spawn_scheduleNextBoss(extraDelay = 0)` |  |

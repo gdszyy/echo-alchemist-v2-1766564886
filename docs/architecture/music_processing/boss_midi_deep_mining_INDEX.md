@@ -25,12 +25,12 @@
 |---|---|---|---|---|---|---|
 | **M-01** | 熔炉守卫·伊格尼斯 ignis | `熔炉之门` | Bass / Drums / FX / Percussion / Synth | `ignis` | `boss_music_design.md` §3.1 → 「深挖 v2」 | ✅ 完成（tom 四踩+温压脉冲+倒挂弧模态线） |
 | **M-02** | 霜晶缝合怪·格拉西斯 glacies | `Glacies 冰骨` | Backing Vocals / Bass / Drums / FX / Synth | `glacies` | §3.2 → 「深挖 v2」 | ✅ 完成（保 kick 叠高 tom shimmer+大三度玻璃铃+b2 缝合 stutter+八度落差 bass） |
-| **M-03** | 裂变母体·米克罗 mikro | `微裂母体` | Backing Vocals / Bass / Drums / FX / Guitar / Synth / Vocals | `mikro` | §3.3 → 「深挖 v2」 | ⬜ 待办 |
-| **M-04** | 贪婪之渊·噬神者 devourer | `贪渊吞王` | Bass / Drums / FX / Synth | `devourer` | §3.4 → 「深挖 v2」 | ⬜ 待办 |
-| M-05 | 翠绿共生体·维里迪斯 viridis | `Viridis 之茧` | Bass / Drums / FX / Percussion / Synth | `viridis` | §3.5 → 「深挖 v2」 | ⬜ 待办（大 Boss，本批不做） |
-| M-06 | 雷霆幻影·特斯拉 tesla | `特斯拉雷影` | Bass / Drums / FX / Percussion / Synth | `tesla` | §3.6 → 「深挖 v2」 | ⬜ 待办（大 Boss） |
-| M-07 | 混沌融合体·奇美拉 chimera | `混沌奇美拉` | Bass / Drums / FX / Percussion / Synth | `chimera` | §3.7 → 「深挖 v2」 | ⬜ 待办（大 Boss） |
-| M-08 | 永恒回声·奥罗波罗斯 ouroboros | `衔尾终环` | Bass / Drums / FX / Percussion / Synth / Woodwinds | `ouroboros` | §3.8 → 「深挖 v2」 | ⬜ 待办（大 Boss·终） |
+| **M-03** | 裂变母体·米克罗 mikro | `微裂母体` | Backing Vocals / Bass / Drums / FX / Guitar / Synth / Vocals | `mikro` | §3.3 → 「深挖 v2」 | ✅ 完成（八度分身散射+b5 加速颗粒机关枪+闷音吉他 chug） |
+| **M-04** | 贪婪之渊·噬神者 devourer | `贪渊吞王` | Bass / Drums / FX / Synth | `devourer` | §3.4 → 「深挖 v2」 | ✅ 完成（半拍抽鼓+双八度 16 分 sub 雪崩+b2/b3 引力拖拽+高五度虚空颤音） |
+| **M-05** | 翠绿共生体·维里迪斯 viridis | `Viridis 之茧` | Bass / Drums / FX / Percussion / Synth | `viridis` | §3.5 → 「深挖 v2」 | ✅ 完成（呼吸滤波 pad + 部落有机打击 + 狂暴反向退层出毒液 acid） |
+| M-06 | 雷霆幻影·特斯拉 tesla | `特斯拉雷影` | Bass / Drums / FX / Percussion / Synth | `tesla` | §3.6 → 「深挖 v2」 | ✅ 完成 |
+| M-07 | 混沌融合体·奇美拉 chimera | `混沌奇美拉` | Bass / Drums / FX / Percussion / Synth | `chimera` | §3.7 → 「深挖 v2」 | ✅ 完成 |
+| M-08 | 永恒回声·奥罗波罗斯 ouroboros | `衔尾终环` | Bass / Drums / FX / Percussion / Synth / Woodwinds | `ouroboros` | §3.8 → 「深挖 v2」 | ✅ 完成（b2/b5/6 三音等权循环+echo 尾接衔尾+rage 木管顶腔；唯一 Woodwinds 分轨、133 最慢、222s 最长） |
 
 > 本批（用户指定）：先做完 4 个 mini（M-01..M-04）再停下评审，然后做 4 个大 Boss（M-05..M-08）。
 
@@ -73,6 +73,35 @@
 | `sig.chimeOff` | `_scheduleSignatures` | M-02 glacies | 新增句法 | 反拍冰锥叮（s%4===1） |
 | `sig.stitchVox` | `_scheduleSignatures` | M-02 glacies | 新增句法 | 狂暴 s∈{6,12} 各 `stitchN` 连 b2 缝合 stutter |
 | `bassFill:'frostMid'/'frostDrop'` | `_scheduleBass` | M-02 glacies | 新增句法 | bass 八度落差：calm 中音 pedal `_noteFreq(12)` → rage 跌低八度 `_noteFreq(0)`+b3 冰裂 |
+| `playGuitarChug(t,deg,gain)` | 方法（playChime 后） | M-03 mikro | 新增声部 | 棕榈闷音吉他：锯齿过低通 + 噪声拨片 → leadBus（唯一吉他音色） |
+| `_fissionStutter(t,freq,base,span)` | 方法（_vocalChop 后） | M-03 mikro | 新增声部 | b5 加速颗粒机关枪：grain 数随 intensity 翻倍、间隔渐缩=越分越快 |
+| `sig.octaveScatter` | `_scheduleSignatures` | M-03 mikro | 新增句法 | 同一动机同时炸 `note/note±12`=克隆到低/中/高八度（reg2/3/6） |
+| `sig.fissionStutter` | `_scheduleSignatures` | M-03 mikro | 新增句法 | 狂暴每 8 分触发一串增殖颗粒（替代旧 generic vocalChop） |
+| `sig.guitarChug` | `_scheduleSignatures` | M-03 mikro | 新增句法 | 狂暴 16 分闷音 chug 锁根 |
+| `playVoidFifth(t,dur,gain)` | 方法（playGuitarChug 后） | M-04 devourer | 新增声部 | 高音区纯五度虚空泛音：失谐双正弦(×1.006) 短颤 → fxBus 进混响 |
+| `bassFill:'abyss'` | `_scheduleBass` | M-04 devourer | 新增句法 | 常态 8 分巨 sub pedal（`s%2===0` 锁根 + `I>0.5` 补 b 拍） |
+| `bassFill:'abyssRoll'` | `_scheduleBass` | M-04 devourer | 新增句法 | 狂暴双八度 16 分 sub 雪崩 + b2(s7)/b3(s11) 引力拖拽 + `s%4===0` 叠中八度 |
+| `sig.voidTremolo` | `_scheduleSignatures` | M-04 devourer | 新增句法 | 每步 `playVoidFifth`（s%2 强长 / 余拍弱短）= 五度 8 分微颤铺底 |
+| `profile.kickHalf:true` | profile（devourer） | M-04 devourer | 调参 | 半拍稀疏 kick（仅 s0/s8），把鼓让位给 bass 深渊（「抽鼓」实测） |
+| `playBreathPad(t,freq,dur,gain)` | 方法（playVoidFifth 后） | M-05 viridis | 新增声部 | 呼吸 pad：失谐双锯→低通，0.6Hz 慢 LFO 调 cutoff = 活体膨胀收缩→droneBus |
+| `playSquelch(t,freq,dur,gain)` | 方法 | M-05 viridis | 新增声部 | 毒液 acid：锯齿过 Q=14 共振低通 + cutoff 快速下扫 = 303「yow」→leadBus |
+| `playWoodblock(t,gain)` | 方法 | M-05 viridis | 新增声部 | 有机木鱼/三角铁 accent：极短三角高音咔→drumBus（还原 OTri/HiWdblk/MuConga） |
+| `bassFill:'sporeDrone'` | `_scheduleBass` | M-05 viridis | 新增句法 | F 低根切分 drone（重音 s0/s4/s6/s9/s14）+ rage b7 下沉腐坏邻音 |
+| `sig.breathDrone` | `_scheduleSignatures` | M-05 viridis | 新增句法（段落反转） | 呼吸 pad：calm 厚而双八度 / rage 变薄+更失谐（drone 狂暴退场，与众反向） |
+| `sig.venomSquelch` | `_scheduleSignatures` | M-05 viridis | 新增句法 | 仅 rage 触发毒液 acid（deg2=G 慢扫）= 被催熟的毒 |
+| `sig.organicPerc` | `_scheduleSignatures` | M-05 viridis | 新增句法 | 部落律动：沙锤 8 分底色 + 木鱼/三角散点（rage 加密），取代电子四踩 |
+| `playZap(t,freq,gain)` | 方法（playWoodblock 后） | M-06 tesla | 新增声部 | 放电 stab：方+锯失谐高频，pitch 快速下扎 + 带通噪声「啪」瞬态→leadBus（FX deg2=G 规律脉冲） |
+| `playArcCrackle(t,gain)` | 方法 | M-06 tesla | 新增声部 | 电弧静电噼啪：高通(4.2k)噪声切 4 颗粒、幅度抖动=电火花残影→hatBus（仅 rage） |
+| `sig.teslaArc` | `_scheduleSignatures` | M-06 tesla | 新增句法 | 放电脉冲：拍头(s%4===0)强 zap + 拍中(s%4===2)弱 ghost；rage 反拍塞电弧噼啪 |
+| `sig.teslaRoll` | `_scheduleSignatures` | M-06 tesla | 新增句法（仅 rage） | 滚动双 tom 残影：offbeat hi/lo 交替 + 反拍(s%4===3)再叠 lo tom=电压击穿 |
+| `playChaosDrift(t,freq,dur,gain,drift)` | 方法（playArcCrackle 后） | M-07 chimera | 新增声部 | 双根失稳 howl：双锯在 E↔D# 间 pitch 漂移 + detune LFO 摇摆=身份崩塌→leadBus |
+| `drumMode:'chaosTom'` | `_scheduleStep` 鼓分支 | M-07 chimera | 新增鼓机模式 | HiTom2 主导滚动高 tom 取代四踩 kick（实测 Kick:1/HiTom2:126）；rage 叠反拍低 tom + 满 16 分滚 |
+| `sig.chaosFlux` | `_scheduleSignatures` | M-07 chimera | 新增句法 | 每小节头 E↔D# 漂移 howl；rage 半拍再来一记从 maj7(D#)起=导音夺权 |
+| `driftCycle` / `sig.burstImpact`（沿用） | profile / `_onBarStart` | M-07 chimera | 保留复用 | 逐相位根音 E↔D# 漂移 + rage 每 6 小节 impact() 爆裂（受击全场爆炸） |
+| `playEchoCry(t,freq,dur,gain,echoT)` | 方法（playChaosDrift 后） | M-08 ouroboros | 新增声部 | 三音循环动机带回声交接：锯波过 bandpass 扫频 + 按 echoT 自身复触一次=一句尾接下一句头(衔尾)→fxBus |
+| `playReed(t,freq,dur,gain)` | 方法（playEchoCry 后） | M-08 ouroboros | 新增声部 | 木管顶腔：triangle+sine 八度叠 + 5.5Hz vibrato + bandpass 慢起慢落=rage 木管哀鸣（唯一 Woodwinds 分轨）→leadBus |
+| `sig.fxCycle`（改用 playEchoCry） | `_scheduleSignatures` | M-08 ouroboros | 改造句法 | ouroboros 专用走 playEchoCry，循环 `_fxCycleDeg=[1,6,9]`(b2/b5/6 实测三音) + 按 fxPeriod 算 echoT 尾接=三音等权轮回 |
+| `sig.windCry` | `_scheduleSignatures` | M-08 ouroboros | 新增句法 | rage 专属：s0 起 deg37 + s10 起 deg47 木管长音=狂暴才登场的顶腔哀鸣 |
 
 ---
 

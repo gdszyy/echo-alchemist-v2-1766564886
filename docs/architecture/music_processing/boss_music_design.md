@@ -189,6 +189,33 @@
 - **lead/synth**：忙碌高音 pluck(reg F5、~3.23 音/秒) → stab 频次高、`delaySend` + 重反馈把单 stab 复制成回声串(= 分身)。
 - **常态 / 狂暴（分段实测）**：**狂暴签名 = 机关枪式人声碎切**——VOX 247 个音全砸在 **b5 三全音(B，相对 F)**、每个 ~0.04 拍、约 63 音/秒 = stutter/颗粒切片群集（正是「分身/散射」听感）。→ 引擎狂暴解锁一条三全音上的超高频 stutter 层（短包络 + 重 ping-pong delay），密度阶梯整体拉满。
 
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-03）**
+
+> 上一轮只取中位 BPM + 音级直方图；这一轮把 **7 条分轨**（BackVox / Bass / Drums / FX / Guitar / Synth / Vocals，全场最多）逐条按 16 分栅格解析。
+> 完整性：7 分轨全过校验（0 截断，div=480，format-1）。全局：165–175 BPM、中位 173（**全场最快**）、root F、约 197s。
+
+关键发现（裂变母体 = 「一个变多个」的复制母题）：
+
+1. **Vocals 是颗粒机关枪，死锁 b5 三全音**。246 音、**63.49 音/秒**（全场最密）、锁 B4=b5、vel 满、中位时值 0.04 拍——一颗三全音被绞成颗粒群，是「裂变/散射」最直观的声学体现（仅狂暴）。
+2. **Synth 把同一根音「克隆」到多个八度**。680 音、deg 1:582 主导，但 register **同时散落 reg3:202 / reg2:198 / reg6:180**——同一个音不同八度齐发 = 分身。常态偏 reg6（高），狂暴坍到 reg3（低）。
+3. **新增 Guitar 闷音 chug**（上一轮完全没提）。staccato 棕榈闷音、deg1 锁根、vel 满、reg4——电气 swarm 的「体」，mikro 是 8 boss 里**唯一带吉他**者（仅狂暴）。
+4. **Bass 忙碌近-16 分 + maj7/b7 chromatic glitch**。deg 1:558 主导 + 7:60 / b7:48 / b3 / b2 半音邻音，calm 3.22 → rage 4.67 音/秒。
+5. **Drums 常态是 glitch perc（n27 blip）、狂暴才加回四踩 kick + open-hat**；另有 BackVox（deg4）二层人声答句（「分身」回应）。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playGuitarChug` | 新增声部 | 棕榈闷音吉他：锯齿芯过低通 + 噪声拨片瞬态 → leadBus（全 8 boss 唯一吉他音色） |
+| `_fissionStutter` | 新增声部 | b5 加速颗粒机关枪：grain 数随 intensity 翻倍（1→2→4 分裂）、间隔渐缩=越分越快 |
+| `sig.octaveScatter` | 新增句法 | 同一 lead 动机同时炸 `note / note±12` = 克隆到低/中/高八度（还原 reg2/3/6 散落） |
+| `sig.fissionStutter` | 新增句法 | 狂暴每 8 分触发一串增殖颗粒（**替代**旧 generic `vocalChop`，更密更躁） |
+| `sig.guitarChug` | 新增句法 | 狂暴 16 分闷音 chug 锁根（电气 swarm 体） |
+
+**辨识度**：mikro 是全 8 Boss 里**唯一「八度分身散射 + 加速颗粒裂变 + 吉他 chug」**者，与 ignis（炉腔 tom）/ glacies（玻璃铃 + 缝合）完全不同的「增殖/散射」语汇。验证：node 烟测确认 calm `kick=4 / screech=6(八度散射) / bass=8`，rage `kick=4 / screech=6 / bass=12 / ooh=96(机关枪颗粒) / guitar=12`，与「多八度分身 + b5 加速颗粒 + 吉他 chug」设计一致。
+
+**撞味提醒**：b5 三全音是 mikro 的**颗粒签名**；后续大 Boss chimera 也涉三全音，但 chimera 走「音高漂移 / detune 失稳」，与 mikro 的「密集颗粒增殖」语汇分开，不撞。另：`_fissionStutter` 取代了 glacies 曾共用过的 `vocalChop` 通用句法，二者各自独立。
+
 ---
 
 ### 3.4 贪婪之渊·噬神者 devourer（bounce / laser，mini）
@@ -216,6 +243,31 @@
 - **鼓**：自始至终**极疏**(常态 ~0.51 音/秒，狂暴几乎不加鼓)——压迫感全靠 bass 与空腔，不靠鼓点。
 - **lead/synth**：纯五度(A#)高音区(reg A#5)颤音铺底(medDur 0.12) → drone/tremolo 型 + 空腔混响。
 - **常态 / 狂暴（分段实测）**：常态「深渊静默」靠稀疏 + 巨 sub pedal；狂暴不加鼓不加旋律，而是**低频 16 分 sub 雪崩**吞掉一切(8.44 音/秒、锁 Eb1) → 引擎狂暴只动 bass 密度与 sub 权重，鼓/lead 基本不动，制造「被低频吞没」的窒息感。
+
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-04）**
+
+> 上一轮只取中位 BPM + 音级直方图；这一轮把 **4 条分轨**（Bass / Drums / FX / Synth）逐条按 16 分栅格解析。
+> 完整性：4 分轨全过校验（0 截断，div=480，format-1）。全局：134–144 BPM、中位 **141（全场最慢最重）**、root D#/Eb、约 243s。
+
+关键发现（噬神者 = 「被低频吞没」的引力深渊）：
+
+1. **Bass 是全曲主体，近乎死锁根音的 16 分雪崩**。1687 音、**9.31 音/秒**、deg 1 近乎全锁 + 半音邻音 b2:49 / b3:6（= 下坠的引力拖拽，不是旋律），register **对半劈成 reg2:873 / reg4:814** = 同一根音在两个八度齐砸 → 「双八度 sub 墙」。段落 calm 4.69 → rage **11.59 音/秒**，靠密度翻倍而非换音制造狂暴。
+2. **Drums 极疏，仅维持四踩骨架**。1.14 音/秒（全场最疏之一），CHat 四踩打底，压迫感**完全不靠鼓**——这是 devourer 与其它 boss 最大的节奏差异（别人加鼓，它抽鼓）。
+3. **FX 与 Synth 都死锁纯五度(A#)高音区**。deg **5 纯五度**、reg6（高），Synth onset 呈 `█▃█▃█▃…` 的**8 分颤音**铺底 = 深渊上方一层惨白的空腔泛音，与底部 sub 墙形成「上下撕开」的空旷恐怖。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playVoidFifth` | 新增声部 | 高音区纯五度「虚空泛音」：失谐双正弦(×1.006 拍频)短颤 → fxBus 进混响，还原 FX/Synth 的 reg6 五度颤音铺底 |
+| `bassFill:'abyss'` | 新增句法 | 常态 8 分巨 sub pedal：`s%2===0` 锁根，`I>0.5` 再补稀疏 b 拍 = 深渊静默下的心跳 |
+| `bassFill:'abyssRoll'` | 新增句法 | 狂暴**双八度 16 分 sub 雪崩**：每步低八度根音 + b2(s7)/b3(s11) 引力拖拽半音 + `s%4===0` 叠中八度=还原 reg2/reg4 双层 |
+| `sig.voidTremolo` | 新增句法 | 每步触发 `playVoidFifth`（`s%2===0` 强而长 / 余拍弱而短）= 上方五度 8 分微颤，对位底部 sub 墙 |
+| `profile.kickHalf:true` | 调参 | 半拍稀疏 kick（s0/s8 仅两下），把鼓让位给 bass 深渊——与「抽鼓」实测一致 |
+
+**辨识度**：devourer 是全 8 Boss 里**唯一「半拍抽鼓 + 双八度 16 分 sub 雪崩 + 高五度虚空颤音」**者——别人靠加层变狂，它靠**抽掉鼓、让低频吞没一切**变狂，节奏语汇与众相反。验证：node 烟测确认 calm `kick=2 / bass=8(8 分 pedal) / void=16`，rage `kick=2 / bass=20(16 分雪崩+双八度) / void=16`，与「稀疏半 kick + 低频雪崩 + 五度虚空颤音」设计一致。
+
+**撞味提醒**：root D#/Eb 与 glacies、ouroboros 同根族——glacies 靠大三度玻璃铃(145) + b2 缝合，ouroboros 靠三音循环动机(133、最慢)，devourer 靠**双八度低频 16 分 sub 雪崩 + 抽鼓**(141)，三者织体完全不同。devourer 的五度颤音是「空腔泛音」铺底，非旋律，不与任何 lead-boss 撞。
 
 ---
 
@@ -246,6 +298,35 @@
 - **常态 / 狂暴（分段实测）**：viridis **不靠模式突变**——常态↔狂暴都是 F drone + 六度 pad + 沙锤；狂暴只是 bass 从锁拍转更均匀滚动 16 分、鼓填得更满(密度上移)。→ 引擎狂暴只推 intensity / 密度阶梯与 build 时长，保持催眠有机感，不换调式不换音色（「活体缓慢扩张」）。
 - **撞味提醒**：root F 与 mikro、tesla 同；viridis 靠**大六度 drone**(147 BPM) 区分，mikro 靠 maj7 + 三全音人声(173)、tesla 靠 b6 小调 + 16 分驱动(150)，三者调色/速度/织体都不同，不撞。
 
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-05）**
+
+> 上一轮把 viridis 压成「F drone + 六度 pad + 沙锤」，听感偏静。这一轮把 **5 条分轨**逐条按 16 分栅格解析，发现它真正的识别点是**「呼吸 + 腐坏」的段落反转**，上一轮整段没抓到。
+> 完整性：5 分轨全过校验（0 截断，div=480，format-1）。全局：144–149 BPM、中位 **147**、root **F**、约 210s。
+
+关键发现（维里迪斯 = 「活体呼吸 → 腐坏出毒」的有机体）：
+
+1. **Synth 是一条近乎连续的「呼吸」悬浮 pad**。606 音、deg **6 大六度(D) 全锁**、reg3、onset `▇█▇▇▇▇▇▇▆▇▇▆█▇▇▇`（几乎每个 16 分都有，但靠 vel/时值微动呼吸）——这不是旋律，是一层挂在六度上的活体长音。**关键：calm 3.87 → rage 1.96 音/秒**，pad 在狂暴**反而变薄**（别的 boss 狂暴加层，它退层）。
+2. **Bass 是 F 低根 drone，但有切分呼吸**。590 音、deg 1:570 锁根、reg2(F1)、onset `▅▅▃▁▅▄▇▂▃█▃▂▄▄█▁`（重音落在 s9/s14，非平铺），calm≈rage（2.67→2.96）几乎不变=稳定的地基。
+3. **FX 是慢扫毒液 acid，只在 rage 冒头**。仅 31 音、medDur **2.34 拍**（超长慢扫=滤波 squelch）、deg 2(G)、reg4–5，**calm 2 音 → rage 29 音**——毒味是被「催熟」出来的。
+4. **打击是有机部落色，不是电子四踩**。n82 沙锤/maraca 主导(512) + 散点 LoTom/LoTom2/MuConga/OTri(三角)/HiWdblk(木鱼)，外加**第二条 Percussion 分轨只在 rage** 补 Kick+Snare(各 20/10)。
+5. **段落逻辑反转**：常态=厚呼吸 pad + 沙锤律动（生）；狂暴=pad 腐坏退层 + 毒液 acid 上升 + 打击加密（腐）。还原 Suno 串「the organism overgrowing and turning toxic」。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playBreathPad` | 新增声部 | 呼吸 pad：失谐双锯→低通，cutoff 由 0.6Hz 慢 LFO 调制 = 活体膨胀-收缩「呼吸」→droneBus（calm 叠高八度更厚） |
+| `playSquelch` | 新增声部 | 毒液 acid squelch：锯齿过 Q=14 共振低通 + cutoff 快速下扫 = 303「yow」→leadBus（仅 rage 冒头） |
+| `playWoodblock` | 新增声部 | 有机木鱼/三角铁 accent：极短三角高音咔→drumBus（还原 OTri/HiWdblk/MuConga 部落散点） |
+| `bassFill:'sporeDrone'` | 新增句法 | F 低根切分 drone（重音 s0/s4/s6/s9/s14），rage 补 b7 下沉邻音=「腐坏」摇摆 |
+| `sig.breathDrone`（段落反转） | 新增句法 | 呼吸 pad：**calm 厚而双八度 / rage 变薄+更失谐**（drone 在狂暴退场，与众反向） |
+| `sig.venomSquelch` | 新增句法 | **仅 rage** 触发毒液 acid（deg2=G 慢扫），每拍半一记=被催熟的毒 |
+| `sig.organicPerc` | 新增句法 | 部落律动：沙锤 8 分底色 + 木鱼/三角散点（rage 加密），取代呆板电子四踩 |
+
+**辨识度**：viridis 是全 8 Boss 里**唯一「呼吸滤波 pad + 部落有机打击 + 狂暴反向退层出毒」**者——别人狂暴=加，它狂暴=腐（drone 退、毒升）。验证：node 烟测确认 calm `kick=4 / bass=5 / breath=4(双八度厚) / shaker=8 / wood=3`、无毒；rage `breath=2(变薄) / bass=6(+b7 腐) / squelch=4(毒) / wood=5(加密)`，与「呼吸→腐坏」设计一致。
+
+**撞味提醒**：root F 与 mikro、tesla 同——mikro 是 maj7 + 三全音颗粒(173、最快)、tesla 是 b6 小调 16 分驱动(150)、viridis 是**大六度呼吸 pad + 部落打击(147)**，三者调色/速度/织体完全不同。viridis 的 acid squelch 与 ouroboros 的 fxCycle 也不撞：前者慢扫毒液、后者三音循环动机。
+
 ---
 
 ### 3.6 雷霆幻影·特斯拉 tesla（cryo / bounce，大 Boss）
@@ -273,6 +354,34 @@
 - **鼓**：hat 主导——常态 **n44 踏镲 78 次**最重 + n38 军鼓 + 四踩 kick；狂暴加 **n45 tom 40 + n50** 并打碎成反拍 → 「连击/电闪」感来自 hat 密 + tom 滚。
 - **lead/synth**：常态稀疏(0.87/s，deg 1/5/4)；狂暴密度翻倍并加 **b5 三全音 + 7 + 2** 张力(1.76/s) → 引擎 lead 走高频琶音连击、狂暴解锁 b5/7。
 - **常态 / 狂暴（分段实测）**：常态稳态八分 groove；狂暴 = bass 16 分驱动满格 + 鼓加 tom 反拍 + synth 上三全音/7 度 + perc 爆发(3.82/s) → 引擎用 intensity 拉满 + bass 阶梯满格 + 解锁 tom/perc 层表达「电压击穿」。
+
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-06）**
+
+> 上一轮把 tesla 压成「八分 groove → 16 分驱动」，识别点只剩"快"，但跟其他快 boss 撞。这一轮把 **5 条分轨**逐条按 16 分栅格解析，发现它真正的签名是 **FX 那条「规律放电脉冲」+ Drums 那条「滚动双 tom 残影」**——上一轮把这两条最有辨识度的层都揉进泛化的 hat/tom 里丢了。
+> 完整性：5 分轨全过校验（0 截断，div=480，format-1）。全局：148–153 BPM、中位 **150**、root **F**、约 177s。
+
+关键发现（特斯拉 = 「高压放电脉冲 + 快到出残影」的相位幻影）：
+
+1. **FX 是一条规律的「放电 stab」脉冲，这才是签名**。216 音、deg **2(G) 全锁**、reg4、onset `█▂▄ █▂▃ █▁▄ █▁▄`——每拍头一记强 stab + 拍中弱 ghost，像电容**规律充放电**。不是随机 zap，是有节拍栅格的脉冲。
+2. **Drums 是「滚动双 tom 残影」**。HiTom2:49 + LoTom2:34 **近乎连续**地交替滚动（占了鼓轨主体），外加 Snare:96 / PedHat:77 / Vibslap:15。双 tom 高低交替的连滚 = 「快到出残影」的听感来源，不是普通四踩。
+3. **Bass 是中音区(reg4)旋律 arp，不是低 drone**。389 音、onset `▆▃▆▂█▃▄▃▅▃▆▃▆▃▆▃`、deg 1:389/4:79/b6:78/2:20/b3:19/b7:13——围绕 root/4/b6 跑句的中音琶音，比上一轮"低八分律动"亮、更有动势。
+4. **Synth lead 含 b5 三全音相位失稳**。deg 1:133/2:47/4:39/5:36/**b5:22**/b6:20、reg4–5——b5 三全音是「相位/幻影」的张力来源，狂暴解锁。
+5. **段落逻辑**：常态=放电脉冲 + 中音 arp + 干净 lead；狂暴=PedHat 四踩压满 + Vibslap + bass 16 分驱动 + 滚动双 tom 全开 + b5 失稳 → 「过充失控的电暴」。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playZap` | 新增声部 | 放电 stab：方+锯失谐高频，pitch 快速下扎(freq*2→freq) + 带通噪声「啪」瞬态→leadBus（还原 FX deg2=G 规律脉冲） |
+| `playArcCrackle` | 新增声部 | 电弧静电噼啪：高通(4.2k)噪声切成 4 颗粒、幅度抖动=电火花残影→hatBus（仅 rage 填间隙） |
+| `sig.teslaArc` | 新增句法 | 放电脉冲：拍头(s%4===0)强 zap + 拍中(s%4===2)弱 ghost = 电容规律充放电；rage 反拍(s%2===1)塞电弧噼啪 |
+| `sig.teslaRoll`（仅 rage） | 新增句法 | 滚动双 tom 残影：offbeat hi/lo 交替(s%4===1 用 hi 300/否则 lo 150) + 反拍(s%4===3)再叠 lo tom=电压击穿 |
+| `bassFill` 常态`offbeat`/狂暴`driving16` | 句法切换 | 常态中音 arp(reg4 旋律 pattern `[null,0,0,8,…]`) → 狂暴 16 分驱动满格锁根 |
+| `leadNotes` 狂暴解锁 b5 | 音高 | 狂暴 `[18,23,12,19]`，18=上八度+b5 三全音=相位失稳 |
+
+**辨识度**：tesla 是全 8 Boss 里**唯一「规律放电脉冲 stab + 滚动双 tom 残影」**者——签名不在"快"，而在 FX 那条带节拍栅格的电容充放电脉冲 + 双 tom 连滚。验证：node 烟测确认 calm `kick=4 / bass=8(中音 arp) / zap=8(放电脉冲)`、无 crackle/tom；rage `bass=16(16分驱动) / zap=8 / crackle=8(电弧填间隙) / tom=12(滚动双 tom 残影)`，与「常态脉冲→狂暴电暴」设计一致。
+
+**撞味提醒**：root F 与 mikro、viridis 同——但 tesla 靠 **FX 放电脉冲 + 双 tom 残影 + b5 三全音(150)** 区分；mikro 是 maj7+三全音颗粒(173、最快)、viridis 是大六度呼吸 pad+部落打击(147)。tesla 的 zap stab(短脉冲)与 chimera 的 burstImpact(爆冲)、ouroboros 的 fifthStab(纯五度)织体不同，不撞。
 
 ---
 
@@ -303,6 +412,35 @@
 - **常态 / 狂暴（分段实测）**：常态 E 为根、D# 作色；狂暴 **D# 反客为主压过 E**（导音夺权）= 听感「身份崩塌」。→ 引擎狂暴把根音漂移幅度/频率拉大 + `impact` 不定时穿插 + synth 上三全音，制造混沌融合。
 - **撞味提醒**：root E 与 ignis 同；但 chimera 靠 **E↔D# 半音失稳**（188 BPM），ignis 靠 **E 弗里几亚 b2/b5**（146 BPM），机制与速度都不同，不撞。
 
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-07）**
+
+> 上一轮把 chimera 的失稳压进 `driftCycle`（逐相位根音偷偷 -1）+ 一条带 maj7 的 bass pattern，听感上"乱"但说不清乱在哪。这一轮把 **5 条分轨**逐条按 16 分栅格解析，发现它真正的签名是 **bass 的「root 与 maj7(导音) 互搏」+ 几乎全 tom 没有 kick 的鼓**——这两点上一轮都被泛化掉了。
+> 完整性：5 分轨全过校验（0 截断，div=480，format-1）。全局：185–191 BPM、中位 **188（全场最快）**、root **E**、约 **100s（最短）**。
+
+关键发现（奇美拉 = 「root 与导音 D# 互相夺权 → 身份崩塌」的混沌拼接体）：
+
+1. **Bass 是一场「root E ↔ maj7 D# 的夺权战」，这才是签名**。415 音、4.22 音/秒、deg 1:228 / **7:155(maj7=D#)** / b2:19。按时间切两段：**前段 D# 反超 root（7:153 vs 1:59、reg3）**，后段 **root E 收复（1:169 vs 7:2、reg4，并冒 b2:15 半音邻音）**——root 和它下方半音的导音 D# 一直在抢「谁是根」，这是别的 boss 都没有的「双根打架」。
+2. **鼓几乎没有 kick，是 HiTom2 主导的滚动高 tom**。147 音里 **HiTom2(50):126** 压倒性主导，**Kick 只有 1 下**，外加 LoTom2 + note33（仅 rage 的低 conga，16 下）。→ chimera 的脉冲来自滚动高 tom，不是四踩。
+3. **FX 是稀疏的超长爆裂 swell**。仅 12 音、deg1(E)、reg4、medDur **9.56 拍**（超长）、onset `▄ ██▄▄█  ▄  █`（不规律）=「随时炸开的暴力脉冲」（对应受击全场爆炸）。
+4. **Synth 叠 b5 三全音**。101 音、deg 1:69 / **b5:12(三全音 Bb)** / 5 / 6 / b3，reg4–5；calm 密(3.31/s 带 b5)→rage 疏(0.97/s)。b5 与 bass 的 maj7 叠在一起=最大不和谐的「拼接体」。
+5. **Percussion 的 Snare 12 下全在 rage**=狂暴才补上的 backbeat。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playChaosDrift` | 新增声部 | 双根失稳 howl：双锯在 **E↔D# 间缓慢 pitch 漂移**(linearRamp 来回) + detune LFO 摇摆=身份崩塌→leadBus（drift 参数 calm 窄 1 / rage 宽 2） |
+| `drumMode:'chaosTom'` | 新增鼓机模式 | **HiTom2 主导滚动高 tom 取代四踩 kick**（实测 Kick:1/HiTom2:126）：s%4 高 tom 脉冲(音高逐拍下行) + 八分 ghost；rage 叠反拍低 tom + 满 16 分 tom 滚 |
+| `sig.chaosFlux` | 新增句法 | 每小节头一记 E↔D# 漂移 howl；**rage 半拍再来一记从 maj7(deg11=D#)起=导音夺权** + 漂得更宽更频 |
+| （沿用）`driftCycle` | 保留 | 逐相位根音 E↔D# 漂移（calm `[0,0,-1,0]` 偶夹 D# / rage `[-1,0,-1,-1]` 多 D#）=和声层持续失稳 |
+| （沿用）`sig.burstImpact` | 保留 | rage 每 6 小节(bar%6===2)触发 `impact()` 爆裂 boom=受击全场爆炸的「随时炸开」 |
+
+> 段落映射说明：报告按**时间**切的 calm/rage 显示「前 D#→后 E」；引擎把「D# 导音夺权」映射到**狂暴**（berserk=身份崩塌更剧烈），与 Suno 串「gone fully berserk」一致——两者表达的是同一个 E↔D# 失稳轴，只是方向取最戏剧的那一面。
+
+**辨识度**：chimera 是全 8 Boss 里**唯一「root 与 maj7 导音互搏 + 几乎无 kick 的滚动高 tom + 双根漂移 howl」**者（188 最快、100s 最短）。验证：node 烟测确认 calm `kick=0(无四踩) / tom=8(滚动高 tom) / drift=1(双根 howl) / bass=8`；rage `tom=20(满 16 分 tom 滚) / drift=2(含 maj7 夺权那记) / bass=12`，与「失稳→崩塌」设计一致。
+
+**撞味提醒**：root E 与 ignis 同——但 chimera 是 **E↔D# 导音夺权 + chaosTom 无 kick 高 tom 滚(188)**；ignis 是 **E 弗里几亚 b2/b5 + furnaceTom 低炉腔 tom 四踩(146)**。两者鼓都「无 kick」却完全不同：chimera 高 tom 乱滚、ignis 低 tom 规整四踩。chaosDrift 漂移 howl 与 viridis 呼吸 pad、tesla zap 均不撞。
+
 ---
 
 ### 3.8 永恒回声·奥罗波罗斯 ouroboros（pierce/cryo/lightning，大 Boss·终）
@@ -332,6 +470,37 @@
 - **FX/签名（核心）**：**b2 / b5 / 6 三音等权循环动机**(常态各 ~80 次、reg A3) → 用 `_rootCycle`/动机轮转让这三音逐句轮替 + `delaySend` + 高反馈做「回声交接」(一句尾接下一句头 = 衔尾)。
 - **常态 / 狂暴（分段实测）**：常态 = 三音动机缓慢轮转 + D# pedal；狂暴 = **同一 b2/b5/6 动机密度 ×3.7 加速到 6.11/s** 吞掉空间 + synth 五度短 stab → 引擎狂暴不换素材，只把 FX 动机触发密度/反馈拉满 + `finalCue` 收束，做「永恒回声自噬」高潮，build 最长。
 - **撞味提醒**：root D# 与 glacies、devourer 同；ouroboros 靠**三音循环动机(133 BPM、最慢)** 区分，glacies 靠大三度玻璃铃(145) + b2 缝合人声、devourer 靠低频 16 分 sub 雪崩(141)，织体完全不同。三全音(b5)与 ignis 也不撞：此处是循环动机一员，非 ignis 的 Phrygian 定音。
+
+**深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-08）**
+
+> 上一轮 ouroboros 只有「D# pedal + FX 循环」的泛化描述，听不出「衔尾」在哪。这一轮把 **6 条分轨**（唯一带 Woodwinds 木管的 boss）逐条按 16 分栅格解析，发现它真正的签名是 **FX 的「b2/b5/6 三音严格等权轮回」+ rage 才登场的木管顶腔**——前者上一轮被压成一句话、后者整条分轨上一轮根本没提。
+> 完整性：6 分轨全过校验（0 截断，div=480，format-1）。全局：130–135 BPM、中位 **133（全场最慢）**、root **D#/Eb**、约 **222s（全场最长）**。
+
+关键发现（奥罗波罗斯 = 「同一三音动机永恒轮回 + 回声交接」的吞尾终曲）：
+
+1. **FX 是「b2/b5/6 三音严格等权循环」，这才是签名**。667 音（全场最密 FX）、deg **b2:202 / b5:197 / 6:194**——三音近乎完美等权；按时间切到 rage 段更是 **101/101/101 精确相等**，reg4–5、onset `▇▆▇▆▆▃█▅█▃▇▆█▇▇▄`（满栅格密铺）=「同一动机三音不断轮替、首尾相接」的衔尾本体。
+2. **bass 是几乎纯 D# pedal**。326 音、deg **1:312 / 5:14**，reg4 主 + reg2 副（低八度加厚）=锁根 pedal，把空间全让给 FX 轮回。
+3. **鼓是 shaker 主导、calm 疏 → rage 密**。note82(reg6 shaker):189 压倒性主导 + OpenTri:20 + LoTom2:11 + Tamb:11；calm 稀 → rage 铺满=终曲张力靠织体密度，不是换鼓色。
+4. **synth：calm 稀长音(deg 1/5/b6/b7/b2) → rage 转 reg3 密集五度**。310 音、deg 1:171 / 5:102 / b6 / b7 / b2；rage 掉到低八度铺密 power-fifth=终段顶住高潮。
+5. **唯一带 Woodwinds 木管分轨，且只在 rage 出现**。5 音、deg b2:3 / 7:2、reg5、onset `█ ▄    ▄ ▄`=狂暴才浮出的木管哀鸣顶腔（全 8 boss 独有）。
+6. **Percussion 3 音一次性**=rage 单次撞击点缀。
+
+→ 引擎丰富落点 v2（已落 `dark_psy_engine_demo.html`，大胆改动）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `playEchoCry` | 新增声部 | 三音循环动机带「回声交接」：锯波过 bandpass(扫频 4×→1.4×)，**自身按 echoT 复触一次(0.45 衰减)**，echoT=一个 fxPeriod 的时长=一句尾接下一句头(衔尾)→fxBus |
+| `playReed` | 新增声部 | 木管顶腔：triangle+sine 八度叠 + 5.5Hz vibrato + bandpass，慢起慢落长音=rage 木管哀鸣（对应唯一 Woodwinds 分轨）→leadBus |
+| `sig.fxCycle`（改用 playEchoCry） | 改造句法 | fxCycle 分支 ouroboros 专用改走 `playEchoCry`，循环 `_fxCycleDeg=[1,6,9]`(b2/b5/6 实测三音) + 按 fxPeriod 算 echoT 做尾接=三音等权轮回 |
+| `sig.windCry` | 新增句法 | **rage 专属**：s0 起 deg37(高 D#) + s10 起 deg47 的木管长音=狂暴才登场的顶腔哀鸣 |
+| （沿用）`bassFill:'pedal'` | 保留 | D# pedal 锁根，calm 疏(I=0.4 → bass4) / rage 满(I=0.9 → bass16) |
+| （沿用）`sig.fifthStab` | 保留 | rage s4/s12 五度 power stab=synth 转密集五度那一层 |
+
+> 段落映射说明：calm `fxPeriod=8`(三音慢轮、bass4、无 stab/reed) → rage `fxPeriod=2`(同一三音动机密度 ×4 加速 + fifthStab + windCry 木管)；不换素材、只把 FX 轮回密度/反馈与顶腔拉满=「永恒回声自噬」高潮，与实测 rage 段三音 101/101/101 精确等权一致。
+
+**辨识度**：ouroboros 是全 8 Boss 里**唯一「b2/b5/6 三音严格等权 + echo 尾接衔尾 + rage 木管顶腔」**者（133 最慢、222s 最长、唯一 Woodwinds 分轨）。验证：node 烟测确认 calm `kick=4(四踩) / bass=4(D# pedal 疏) / echocry=2(period8 慢轮) / 无 stab/reed`；rage `bass=16(pedal 满) / echocry=8(period2 密度激增) / screech=2(五度 stab) / reed=2(木管顶腔)`，与「永恒回声→自噬高潮」设计一致。
+
+**撞味提醒**：root D# 与 glacies、devourer 同；ouroboros 靠**三音等权循环 + 回声尾接(133 最慢)** 区分，glacies 靠大三度玻璃铃(145)、devourer 靠 16 分 sub 雪崩(141)。b5 三全音与 ignis 不撞：此处是三音循环一员、非 ignis 的 Phrygian 定音。木管 reed 与 tesla zap、chimera drift howl、viridis 呼吸 pad 音色完全不同。
 
 ---
 

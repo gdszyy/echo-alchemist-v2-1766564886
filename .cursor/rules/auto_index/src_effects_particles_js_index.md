@@ -1,6 +1,6 @@
 # src\effects\particles.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 3436 | 函数数: 80 | 语言: javascript
+> 自动生成于 2026-06-25 | 总行数: 3840 | 函数数: 99 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -52,6 +52,25 @@
 | constructor | method | `constructor(enemy)` |  |
 | update | method | `update(pos, temp, timeScale)` |  |
 | _updateEmbers | method | `_updateEmbers(timeScale)` |  |
+| draw | method | `draw(ctx)` |  |
+| _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
+| destroy | method | `destroy()` |  |
+| constructor | method | `constructor(enemy, duration = 2500)` |  |
+| refresh | method | `refresh(duration = 2500)` |  |
+| update | method | `update(pos, timeScale)` |  |
+| _spawnArc | method | `_spawnArc()` |  |
+| draw | method | `draw(ctx)` |  |
+| _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
+| destroy | method | `destroy()` |  |
+| constructor | method | `constructor(enemy, stacks = 1)` |  |
+| addStacks | method | `addStacks(stacks)` |  |
+| update | method | `update(pos, timeScale)` |  |
+| draw | method | `draw(ctx)` |  |
+| _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
+| destroy | method | `destroy()` |  |
+| constructor | method | `constructor(enemy, windLevel = 1)` |  |
+| refresh | method | `refresh(windLevel = 1)` |  |
+| update | method | `update(pos, timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
 | destroy | method | `destroy()` |  |

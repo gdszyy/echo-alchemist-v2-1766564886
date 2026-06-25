@@ -6,6 +6,7 @@ import {
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, PierceCutEffect, CollectionBeam,
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, showToast, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
+    ElectrocuteEffect, VenomEffect, WindMarkEffect,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -168,8 +169,8 @@ export const combat_system = {
                 // 3. 处理 [爆破属性] 开关
                 if (p.forceExplosive) nextAmmo.explosive = true;
                 
-                // 4. 视觉反馈
-                this.spawn_createExplosion(this.width/2, this.height - 80, p.explosionColor);
+                // 4. 视觉反馈：技能点燃
+                this.spawn_createSkillIgnition(this.width/2, this.height - 80, p.explosionColor);
                 this.ui_updateAmmoUI(); 
                 this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
             // @section:skill_effect_apply - 技能效果应用（伤害/增益/召唤）
@@ -241,7 +242,7 @@ export const combat_system = {
                 nextAmmo.bounce = (nextAmmo.bounce || 0) + p.bounceBonus;
                 // 将每次弹跳额外伤害存入弹珠定义，供 projectile.js 读取
                 nextAmmo._kineticBurstDmg = (nextAmmo._kineticBurstDmg || 0) + p.flatDamagePerBounce;
-                this.spawn_createExplosion(this.width/2, this.height - 80, p.particleColor);
+                this.spawn_createSkillIgnition(this.width/2, this.height - 80, p.particleColor);
                 this.ui_updateAmmoUI();
                 this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.particleColor);
                 try { audio.playPowerup(3); } catch(e2) {}
@@ -316,7 +317,7 @@ export const combat_system = {
                 nextAmmo.lightning = (nextAmmo.lightning || 0) + p.lightningStacks;
                 // 标记强制触发元素聚变判定
                 nextAmmo._forceFusion = p.forceFusion;
-                this.spawn_createExplosion(this.width/2, this.height - 80, p.explosionColor);
+                this.spawn_createSkillIgnition(this.width/2, this.height - 80, p.explosionColor);
                 this.ui_updateAmmoUI();
                 this.spawn_createFloatingText(this.width/2, this.height - 120, p.floatText, p.explosionColor);
                 try { audio.playPowerup(4); } catch(e2) {}
@@ -1910,6 +1911,12 @@ export const combat_system = {
             }
             // 标记本回合被闪电命中（供元素聚变使用）
             enemy._lightningHitThisRound = true;
+            // [ElectrocuteEffect] 闪电命中时附加/刷新持续电弧视觉特效
+            if (enemy._electrocuteEffect) {
+                enemy._electrocuteEffect.refresh();
+            } else {
+                enemy._electrocuteEffect = new ElectrocuteEffect(enemy);
+            }
             if (typeof enemy._isTeslaConductor === 'function' && enemy._isTeslaConductor() && typeof enemy._applyTeslaConductorCharge === 'function') {
                 const teslaCfg = CONFIG.balance.bossConfigs && CONFIG.balance.bossConfigs.tesla;
                 enemy._applyTeslaConductorCharge(
@@ -1966,6 +1973,15 @@ export const combat_system = {
                 }
             }
         }
+        // --- [元素视觉特效] 风元素命中 → WindMarkEffect ---
+        if ((config.wind || 0) > 0) {
+            const windLevel = config.wind;
+            if (enemy._windMarkEffect) {
+                enemy._windMarkEffect.refresh(windLevel);
+            } else {
+                enemy._windMarkEffect = new WindMarkEffect(enemy, windLevel);
+            }
+        }
         // --- [符文词条 Hook] 专注射击 (focused_fire) - 暴击判定 ---
         // 读取配方中由任务 A 写入的 _critChance 和 _critDamage 字段
         let isCrit = false;
@@ -1984,6 +2000,12 @@ export const combat_system = {
             const stacks = Math.floor((config.venom || 0) * inheritRatio) + onHitBonus;
             if (stacks > 0 && typeof enemy.applyVenom === 'function') {
                 enemy.applyVenom(stacks);
+                // [元素视觉特效] 毒液命中 → VenomEffect 持续滴液
+                if (enemy._venomEffect) {
+                    enemy._venomEffect.addStacks(stacks);
+                } else {
+                    enemy._venomEffect = new VenomEffect(enemy, stacks);
+                }
                 if (this.spawn_createFloatingText) {
                     this.spawn_createFloatingText(hitX, hitY - 14, `☠️+${stacks}`, '#84cc16');
                 }
@@ -2350,10 +2372,9 @@ export const combat_system = {
                 const explodeDmg = baseFireDmg * pyroCfg.damageMult * meltdownMult * pyroResMult;
                 
                 if (explodeDmg >= 1) {
-                    // --- 1. 视觉特效 (参考爆炸子弹) ---
+                    // --- 1. 视觉特效 (冲击爆破) ---
                     this.spawn_createShockwave(enemy.pos.x, enemy.pos.y, '#f97316'); // 橙色冲击波
-                    for(let i=0; i<10; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, '#fdba74', 'spark');
-                    for(let i=0; i<5; i++) this.spawn_createParticle(enemy.pos.x, enemy.pos.y, 'rgba(0,0,0,0.5)', 'smoke');
+                    this.spawn_createImpactBlast(enemy.pos.x, enemy.pos.y, '#fdba74');
                     audio.playExplosion();
                     this.combat_applyExplosionKnockback(enemy.pos.x, enemy.pos.y, pyroCfg.radius, 10);
 
@@ -2744,20 +2765,10 @@ export const combat_system = {
 
             // --- 2. 播放视觉特效 ---
             // 生成带有属性颜色的 Shockwave
-            this.spawn_createShockwave(projectile.pos.x, projectile.pos.y, theme.waveColor); 
-            
-            // 生成对应的爆炸粒子群
-            const particleCount = 12; // 爆炸产生的粒子数量
-            for(let i=0; i < particleCount; i++) { 
-                this.spawn_createParticle(projectile.pos.x, projectile.pos.y, theme.particleColor, theme.particleMode); 
-            }
+            this.spawn_createShockwave(projectile.pos.x, projectile.pos.y, theme.waveColor);
 
-            // 如果是火焰爆炸，额外加一点黑烟，增加质感
-            if (config.pyro > 0) {
-                for(let i=0; i<5; i++) {
-                    this.spawn_createParticle(projectile.pos.x, projectile.pos.y, 'rgba(0,0,0,0.5)', 'smoke');
-                }
-            }
+            // 生成冲击爆破粒子（含碎片和烟雾）
+            this.spawn_createImpactBlast(projectile.pos.x, projectile.pos.y, theme.particleColor);
             
             // 播放音效
             audio.playExplosion();

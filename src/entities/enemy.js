@@ -17,7 +17,7 @@
  */
 import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
-import { Particle, BurnEffect } from '../effects/particles.js';
+import { Particle, BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect } from '../effects/particles.js';
 import { getUiBitmap, DEFENSE_ICON_MAP } from '../bitmap_icons.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
@@ -937,6 +937,33 @@ class Enemy {
         if (this.temp < 20 && this._burnEffect) {
             this._burnEffect.destroy();
             this._burnEffect = null;
+        }
+
+        // [ElectrocuteEffect] 持续电弧视觉特效生命周期
+        if (this._electrocuteEffect) {
+            this._electrocuteEffect.update(this.pos, timeScale);
+            if (!this._electrocuteEffect.active) {
+                this._electrocuteEffect.destroy();
+                this._electrocuteEffect = null;
+            }
+        }
+
+        // [VenomEffect] 持续毒液视觉特效生命周期
+        if (this._venomEffect) {
+            this._venomEffect.update(this.pos, timeScale);
+            if (!this._venomEffect.active) {
+                this._venomEffect.destroy();
+                this._venomEffect = null;
+            }
+        }
+
+        // [WindMarkEffect] 持续风场视觉特效生命周期
+        if (this._windMarkEffect) {
+            this._windMarkEffect.update(this.pos, timeScale);
+            if (!this._windMarkEffect.active) {
+                this._windMarkEffect.destroy();
+                this._windMarkEffect = null;
+            }
         }
     }
 
@@ -3011,7 +3038,13 @@ class Enemy {
         let actionCount = 1;
         
         // [改动] 狂暴词条：触发时行动两次（仅非移动行动）；haste 不再影响行动次数
-        if (this.actionName === '狂暴') actionCount = 2;
+        if (this.actionName === '狂暴') {
+            actionCount = 2;
+            game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'berserk', {
+                intensity: Math.min(1, (this.temp || 0) / 100),
+                isBoss: this.type === 'boss', isElite: this.isElite
+            });
+        }
 
         // Boss 行为差异化：根据 bossType 修改行动次数
         if (this.type === 'boss' && this.bossType) {
@@ -3047,6 +3080,9 @@ class Enemy {
                     this.hp = Math.min(this.maxHp, this.hp + heal);
                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 30, `+${heal}`, '#4ade80');
                     game.spawn_createParticle(this.pos.x, this.pos.y, '#4ade80', 'spark');
+                    game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'regen', {
+                        isBoss: this.type === 'boss', isElite: this.isElite
+                    });
                     if (typeof this._viridisRecordHeal === 'function') this._viridisRecordHeal(game, 1);
                     audio.playEffect('regen');
                 }
@@ -3086,6 +3122,9 @@ class Enemy {
                     game.spawn_createHealWave(this.pos.x, this.pos.y, range);
                     // 额外一圈粉色冲击波增强打击感
                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
+                    game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'regen', {
+                        isBoss: this.type === 'boss', isElite: this.isElite
+                    });
                 }
             }
 
@@ -3124,6 +3163,9 @@ class Enemy {
                      game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR!', '#ef4444');
                      game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist');
                      game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+                     game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'devour', {
+                         isBoss: this.type === 'boss', isElite: this.isElite
+                     });
                      audio.playEffect('split');
                  }
             }
@@ -3131,6 +3173,9 @@ class Enemy {
             // --- 4. 增殖 ---
             if(this.actionName === '增殖') {
                 game.spawn_triggerCloneSpawn(this);
+                game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'clone', {
+                    isBoss: this.type === 'boss', isElite: this.isElite
+                });
             }
 
             // --- 5. [V2 hive] 孵化巢：周期性孵化弱小幼体 ---
@@ -3205,6 +3250,9 @@ class Enemy {
                         this.bumpOffsetY = -30;
                         game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
+                        game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'jump', {
+                            isBoss: this.type === 'boss', isElite: this.isElite
+                        });
                         audio.playEffect('split');
                         // [Glacies] 落地后在战斗场内追加霜缝，不再影响钉盘 Peg
                         if (this._isGlaciesBoss && this._isGlaciesBoss()) {
@@ -3227,6 +3275,9 @@ class Enemy {
             // [改动] haste 词条：仅额外触发一次移动，不重复结算其他词条
             if (this.affixes.includes('haste')) {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+                game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'haste', {
+                    isBoss: this.type === 'boss', isElite: this.isElite
+                });
                 _doMove();
             }
         }
@@ -3318,6 +3369,9 @@ class Enemy {
                     game.spawn_createHealWave(this.pos.x, this.pos.y, range);
                     // 额外一圈粉色冲击波增强打击感
                     game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
+                    game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'regen', {
+                        isBoss: this.type === 'boss', isElite: this.isElite
+                    });
                 }
             }
 
@@ -6727,6 +6781,21 @@ class Enemy {
             this._burnEffect.draw(ctx);
         }
 
+        // [ElectrocuteEffect] 持续电弧视觉特效（世界坐标空间）
+        if (this._electrocuteEffect) {
+            this._electrocuteEffect.draw(ctx);
+        }
+
+        // [VenomEffect] 持续毒液视觉特效（世界坐标空间）
+        if (this._venomEffect) {
+            this._venomEffect.draw(ctx);
+        }
+
+        // [WindMarkEffect] 持续风场视觉特效（世界坐标空间）
+        if (this._windMarkEffect) {
+            this._windMarkEffect.draw(ctx);
+        }
+
         // === Layer 6.8: 遗物标记敌人专属金边 (Relic Reward Border) ===
         // @perf-impact: 遗物金边使用 shadowBlur + createRadialGradient + 流光描边，已通过 rewardHaloEnabled/rewardRuneCount/rewardCrystalCount 三档门控。
         // [V3] 奖励敌人当前只承载 relic；旧 chaos/pure 字段不再进入视觉标记入口。
@@ -8295,6 +8364,10 @@ class Enemy {
             this.active = false;
             // [BurnEffect] 死亡时销毁持续燃烧特效，释放 PixiJS 资源
             if (this._burnEffect) { this._burnEffect.destroy(); this._burnEffect = null; }
+            // [ElementEffects] 死亡时销毁所有持续元素特效
+            if (this._electrocuteEffect) { this._electrocuteEffect.destroy(); this._electrocuteEffect = null; }
+            if (this._venomEffect) { this._venomEffect.destroy(); this._venomEffect = null; }
+            if (this._windMarkEffect) { this._windMarkEffect.destroy(); this._windMarkEffect = null; }
 
             // --- [B2] Boss 专属死亡爆炸粒子 ---
             if (this.type === 'boss' && this.bossType && typeof game !== 'undefined') {

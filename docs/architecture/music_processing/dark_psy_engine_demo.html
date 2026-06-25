@@ -342,6 +342,10 @@ class MusicEngine {
     if(this._drumMode==='tribalTom'){ // 深挖 v2(ignis)：炉腔低 tom 四踩取代 kick；喷发段叠 tom 连击爆发
       if(s%4===0){ this.playFurnaceTom(t); this.duck(t); }
       if(this.section==='rage'){ if(s%4===2) this.playFurnaceTom(t,0.7); if(this._bar%2===1 && s>=12) this.playTom(t,205-(s-12)*22,0.62); }
+    } else if(this._drumMode==='chaosTom'){ // 深挖 v2(chimera)：HiTom2 主导滚动高 tom 取代四踩(实测 Kick:1 / HiTom2:126)；rage 叠反拍低 tom + 满 16 分滚=混沌
+      if(s%4===0){ this.playTom(t,360-(s>>2)*36,0.6); this.duck(t); }   // 高 tom 四踩脉冲，音高逐拍下行=滚动残响
+      else if(s%2===0) this.playTom(t,300,0.30);                        // 八分 ghost 高 tom
+      if(this.section==='rage'){ if(s%4===2) this.playTom(t,150,0.5); if(s%2===1 && this.intensity>0.7) this.playTom(t,250,0.26); }
     } else if(kickOn){ this.playKick(t); this.duck(t); }
     if(this._heatPulse){ const dense=this.section==='rage'; if(dense?(s%2===0):(s%8===0)) this.playHeat(t,dense?0.6:0.42); } // 定根温压脉冲：calm 拍头疏→rage 八分密
     if(this._modalLine){ const ml=this._modalLine;                 // 模态张力线：calm 反拍 8 分密集 Phrygian；rage collapse 回根 stab
@@ -349,7 +353,7 @@ class MusicEngine {
       else if(s%2===1){ const d=ml[((this._bar*8)+((s-1)>>1))%ml.length]; this.playModal(t,this._noteFreq(12+d),0.26,0.32); } }
     if(this.threat>0.2){ const hb=this.threat<0.4?8:this.threat<0.65?4:this.threat<0.85?2:1; if(s%hb===0) this._heartbeat(t,0.3+this.threat*0.5); } // 加速心跳：越近越急促
     // 8 小节末 Tom 连打 fill（参考 DrumFillMidHighCue）：高强度铺满末拍16分下行；低强度退化为切分 kick
-    if(this._drumMode!=='tribalTom'){ // tribalTom 自带 tom 连击，避免双层叠打
+    if(this._drumMode!=='tribalTom' && this._drumMode!=='chaosTom'){ // tribalTom/chaosTom 自带 tom 连击且无 kick，避免双层叠打/混回 kick
       if(this._bar%8===7 && this.intensity>0.5 && s>=12) this.playTom(t,220-(s-12)*26,0.6);
       else if(this._bar%8===7 && s===14) this.playKick(t,0.7);
     }
@@ -509,6 +513,89 @@ class MusicEngine {
       const ng=c.createGain(); ng.gain.setValueAtTime(0.3*gain,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.02);
       src.connect(bp); bp.connect(ng); ng.connect(this.leadBus); src.start(t); src.stop(t+0.03); }
   }
+  playVoidFifth(t,dur=0.16,gain=0.16){ // 深渊高纯五度颤音床（devourer Synth+FX 实测：纯五度 A#、reg6、短 tremolo）：失谐双正弦高音→fxBus 进混响出「空腔 shimmer」
+    const c=this.ctx, f=this._noteFreq(43); // A#（纯五度 + 三八度）
+    const o=c.createOscillator(), o2=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o2.type='sine'; o.frequency.value=f; o2.frequency.value=f*1.006;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.01); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(g); o2.connect(g); g.connect(this.fxBus); o.start(t); o2.start(t); o.stop(t+dur+0.02); o2.stop(t+dur+0.02);
+  }
+  playBreathPad(t,freq,dur=1.6,gain=0.18){ // viridis 呼吸 pad（Synth 实测：悬浮大六度 D、reg3、近乎连续 16 分长音）：失谐双锯→低通，cutoff 由慢 LFO 调制=活体「呼吸」膨胀收缩→droneBus
+    const c=this.ctx, o=c.createOscillator(), o2=c.createOscillator(), lp=c.createBiquadFilter(), g=c.createGain();
+    o.type='sawtooth'; o2.type='sawtooth'; o.frequency.value=freq; o2.frequency.value=freq*1.012; // 轻失谐摇摆=venom wobble
+    lp.type='lowpass'; lp.Q.value=4; lp.frequency.value=freq*4;
+    const lfo=c.createOscillator(), lg=c.createGain(); lfo.type='sine'; lfo.frequency.value=0.6; lg.gain.value=freq*2.6; // 慢呼吸 LFO 扫 cutoff
+    lfo.connect(lg); lg.connect(lp.frequency);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+dur*0.4); g.gain.exponentialRampToValueAtTime(0.001,t+dur); // 呼吸包络
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(this.droneBus);
+    o.start(t); o2.start(t); lfo.start(t); o.stop(t+dur+0.05); o2.stop(t+dur+0.05); lfo.stop(t+dur+0.05);
+  }
+  playSquelch(t,freq,dur=0.5,gain=0.32){ // viridis 毒液 acid squelch（FX 实测：deg2=G、慢扫 medDur 2.34拍、rage 才冒头）：锯齿过高 Q 共振低通，cutoff 快速下扫=303「yow」→leadBus
+    const c=this.ctx, o=c.createOscillator(), lp=c.createBiquadFilter(), g=c.createGain();
+    o.type='sawtooth'; o.frequency.value=freq;
+    lp.type='lowpass'; lp.Q.value=14; lp.frequency.setValueAtTime(freq*9,t); lp.frequency.exponentialRampToValueAtTime(freq*1.5,t+dur); // 共振扫降=酸味
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(lp); lp.connect(g); g.connect(this.leadBus); o.start(t); o.stop(t+dur+0.02);
+  }
+  playWoodblock(t,gain=0.3){ // viridis 有机木鱼/三角铁 accent（Drums 实测：OTri/HiWdblk/MuConga 散点，非电子四踩）：极短三角高音咔→drumBus
+    const c=this.ctx, o=c.createOscillator(), g=c.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(1180,t); o.frequency.exponentialRampToValueAtTime(880,t+0.02);
+    g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05);
+    o.connect(g); g.connect(this.drumBus); o.start(t); o.stop(t+0.06);
+  }
+  playZap(t,freq,gain=0.34){ // tesla 放电 stab（FX 实测：deg2=G、reg4、规律 4 步脉冲）：方+锯失谐高频，pitch 快速下扎 + 带通噪声「啪」瞬态→leadBus
+    const c=this.ctx, o=c.createOscillator(), o2=c.createOscillator(), bp=c.createBiquadFilter(), g=c.createGain();
+    o.type='square'; o2.type='sawtooth'; o.frequency.setValueAtTime(freq*2,t); o.frequency.exponentialRampToValueAtTime(freq,t+0.03); o2.frequency.value=freq*2.01;
+    bp.type='bandpass'; bp.frequency.value=freq*3; bp.Q.value=3;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.003); g.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+    o.connect(bp); o2.connect(bp); bp.connect(g); g.connect(this.leadBus); o.start(t); o2.start(t); o.stop(t+0.1); o2.stop(t+0.1);
+    if(this.sm.noiseBuffer){ const src=c.createBufferSource(); src.buffer=this.sm.noiseBuffer; // 放电「啪」高频瞬态
+      const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=3000;
+      const ng=c.createGain(); ng.gain.setValueAtTime(0.4*gain,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.03);
+      src.connect(hp); hp.connect(ng); ng.connect(this.leadBus); src.start(t); src.stop(t+0.04); }
+  }
+  playArcCrackle(t,gain=0.2){ // tesla 电弧静电噼啪（残影/相位）：高通噪声切成 4 颗粒、幅度抖动=电火花→hatBus
+    if(!this.sm.noiseBuffer) return;
+    const c=this.ctx, src=c.createBufferSource(); src.buffer=this.sm.noiseBuffer;
+    const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=4200;
+    const g=c.createGain(), amp=[0.9,0.45,0.75,0.4];
+    g.gain.setValueAtTime(0.0001,t);
+    for(let i=0;i<4;i++){ const tt=t+i*0.012; g.gain.setValueAtTime(gain*amp[i],tt); g.gain.exponentialRampToValueAtTime(0.001,tt+0.008); }
+    src.connect(hp); hp.connect(g); g.connect(this.hatBus); src.start(t); src.stop(t+0.06);
+  }
+  playChaosDrift(t,freq,dur=1.2,gain=0.26,drift=1){ // chimera 双根失稳 howl（实测 bass 一段 D#(maj7) 153 反超 E 59=导音夺权）：双锯在 E↔D# 间缓慢 pitch 漂移 + detune 摇摆=身份崩塌→leadBus
+    const c=this.ctx, o=c.createOscillator(), o2=c.createOscillator(), lp=c.createBiquadFilter(), g=c.createGain();
+    const lo=freq*Math.pow(2,-drift/12);                                  // 下滑 drift 半音=漂到 D#(导音)
+    o.type='sawtooth'; o2.type='sawtooth';
+    o.frequency.setValueAtTime(freq,t); o.frequency.linearRampToValueAtTime(lo,t+dur*0.5); o.frequency.linearRampToValueAtTime(freq,t+dur); // E→D#→E 来回=双根拉锯
+    o2.frequency.setValueAtTime(freq*1.008,t); o2.frequency.linearRampToValueAtTime(lo*0.992,t+dur*0.5); o2.frequency.linearRampToValueAtTime(freq*1.008,t+dur);
+    lp.type='lowpass'; lp.Q.value=6; lp.frequency.value=freq*5;
+    const lfo=c.createOscillator(), lg=c.createGain(); lfo.type='sine'; lfo.frequency.value=5+drift*4; lg.gain.value=freq*0.06*drift; // detune 摇摆 LFO=失稳颤
+    lfo.connect(lg); lg.connect(o.detune);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.06); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(this.leadBus);
+    o.start(t); o2.start(t); lfo.start(t); o.stop(t+dur+0.05); o2.stop(t+dur+0.05); lfo.stop(t+dur+0.05);
+  }
+  playEchoCry(t,freq,dur=0.5,gain=0.44,echoT=0.4){ // ouroboros 三音循环动机的「回声衔尾」：一记共振 cry + 一次衰减回声(延迟=动机周期)落在下一句头上=首尾相接的永恒回声→fxBus
+    const c=this.ctx;
+    for(let k=0;k<2;k++){ const tt=t+k*echoT, gg=gain*(k?0.45:1);                 // k=0 本体 / k=1 半衰回声接到下一句头
+      const o=c.createOscillator(), bp=c.createBiquadFilter(), g=c.createGain();
+      o.type='sawtooth'; o.frequency.value=freq;
+      bp.type='bandpass'; bp.frequency.setValueAtTime(freq*4,tt); bp.frequency.exponentialRampToValueAtTime(freq*1.4,tt+dur); bp.Q.value=8;
+      g.gain.setValueAtTime(0.0001,tt); g.gain.exponentialRampToValueAtTime(gg,tt+0.02); g.gain.exponentialRampToValueAtTime(0.001,tt+dur);
+      o.connect(bp); bp.connect(g); g.connect(this.fxBus); o.start(tt); o.stop(tt+dur+0.02);
+    }
+  }
+  playReed(t,freq,dur=1.6,gain=0.2){ // ouroboros 终曲木管悲鸣（Woodwinds 分轨实测：仅 rage、b2+maj7、高位）：三角芯 + 八度正弦泛音 + 慢颤音 vibrato=管乐气息→leadBus
+    const c=this.ctx, o=c.createOscillator(), o2=c.createOscillator(), bp=c.createBiquadFilter(), g=c.createGain();
+    o.type='triangle'; o2.type='sine'; o.frequency.value=freq; o2.frequency.value=freq*2;
+    bp.type='bandpass'; bp.frequency.value=freq*2.2; bp.Q.value=2;
+    const vib=c.createOscillator(), vg=c.createGain(); vib.type='sine'; vib.frequency.value=5.5; vg.gain.value=freq*0.012; // 慢颤音=气声
+    vib.connect(vg); vg.connect(o.frequency); vg.connect(o2.frequency);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+dur*0.25); g.gain.setValueAtTime(gain,t+dur*0.6); g.gain.exponentialRampToValueAtTime(0.001,t+dur); // 慢起+保持+落
+    o.connect(bp); o2.connect(bp); bp.connect(g); g.connect(this.leadBus);
+    o.start(t); o2.start(t); vib.start(t); o.stop(t+dur+0.05); o2.stop(t+dur+0.05); vib.stop(t+dur+0.05);
+  }
   drumFill(){ // Tom 连打 fill（参考 DrumFillMidHighCue）：八分铺垫→后半16分加速下行冲刺
     if(this.sm.muted) return;
     const eighth=60/this.bpm/2, sixteenth=eighth/2; let t=this.ctx.currentTime+0.02;
@@ -533,21 +620,21 @@ class MusicEngine {
       mikro:{ bpm:173, rootHz:43.65, rootCycle:[0,0,0,0], bassPatterns:[[null,0,10,0,null,11,0,7,null,0,10,0,null,7,0,11]], padChord:[0,3,7,11], leadNotes:[12,23,12,18], allowLead:true, allowOoh:false, // 深挖 v2：F + maj7/b7 chromatic glitch；裂变=同一动机多八度增殖(分身) + b5 加速颗粒机关枪 + 闷音吉他 swarm
         calm:{ intensity:0.6, bassFill:'offbeat', sig:{ octaveScatter:true } },                                                                       // 常态：高八度 synth 动机 + 八度分身散射，chromatic offbeat bass
         rage:{ intensity:1.0, bpm:175, bassFill:'offbeat', sig:{ octaveScatter:true, fissionStutter:true, fissDeg:6, fissBase:4, fissPeriod:2, guitarChug:true } } }, // 狂暴：b5 加速颗粒机关枪 + 闷音吉他 16 分 chug + 八度分身全开（fission 全爆发）
-      devourer:{ bpm:141, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,3,7,12], allowLead:false, allowOoh:false, shaker:false, kickHalf:true, // D# 巨型 sub，狂暴 16 分雪崩吞没
-        calm:{ intensity:0.35, bassFill:'pedal' },
-        rage:{ intensity:0.95, bassFill:'avalanche', sig:{ impactOnEnter:true } } },
-      viridis:{ bpm:147, rootHz:43.65, rootCycle:[0,0,0,0], padChord:[0,9,12,9], allowLead:false, allowOoh:true, // F + 大六度悬浮 pad，缓慢扩张
-        calm:{ intensity:0.5, bassFill:'pedal' },
-        rage:{ intensity:0.85, bpm:151, bassFill:'driving16' } },
-      tesla:{ bpm:150, rootHz:43.65, rootCycle:[0,0,0,0], bassPatterns:[[null,0,0,8,null,0,5,0,null,0,8,0,null,5,0,0]], padChord:[0,3,7,12], allowLead:true, allowOoh:false, // F 自然小调 b6，狂暴 tom 击穿
-        calm:{ intensity:0.55, bassFill:'offbeat', leadNotes:[12,19,17,12] },
-        rage:{ intensity:1.0, bpm:156, bassFill:'driving16', leadNotes:[18,23,12,19], sig:{ tomRoll:true } } },
-      chimera:{ bpm:188, rootHz:41.2, rootCycle:[0,0,-1,0], bassPatterns:[[null,0,0,0,null,0,11,0,null,0,0,0,null,7,0,6]], padChord:[0,3,6,12], allowLead:true, allowOoh:false, // E↔D# 半音失稳，最快 188
-        calm:{ intensity:0.6, bassFill:'offbeat', driftCycle:[0,0,-1,0], leadNotes:[18,12,18,15] },
-        rage:{ intensity:1.0, bassFill:'offbeat', driftCycle:[-1,0,-1,-1], leadNotes:[18,15,18,18], sig:{ burstImpact:true } } },
-      ouroboros:{ bpm:133, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,1,9,6], allowLead:false, allowOoh:false, fxCycleDeg:[1,6,9], // D# pedal + b2/b5/6 三音循环，最慢 133
-        calm:{ intensity:0.4, bassFill:'pedal', sig:{ fxCycle:true, fxPeriod:8 } },
-        rage:{ intensity:0.9, bpm:138, bassFill:'pedal', sig:{ fxCycle:true, fxPeriod:2, fifthStab:true } } },
+      devourer:{ bpm:141, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,3,7,12], allowLead:false, allowOoh:false, shaker:false, kickHalf:true, // 深挖 v2：D#，全场最慢最重；双八度 sub 雪崩(reg2+reg4) + b2/b3 引力下拽 + 高纯五度颤音「空腔」
+        calm:{ intensity:0.35, bassFill:'abyss', sig:{ voidTremolo:true } },                                    // 常态：低 sub 8 分 pedal + 高五度颤音空腔（深渊静默）
+        rage:{ intensity:0.95, bassFill:'abyssRoll', sig:{ voidTremolo:true, impactOnEnter:true } } },          // 狂暴：双八度 16 分 sub 雪崩 + 引力下拽，颤音空腔续存（被低频吞没）
+      viridis:{ bpm:147, rootHz:43.65, rootCycle:[0,0,0,0], padChord:[0,9,12,9], allowLead:false, allowOoh:false, // 深挖 v2：F + 悬浮大六度(D) pad；活体「呼吸」滤波 drone + 部落有机打击 + rage 毒液 acid 冒头（段落反转：drone 腐坏退场→毒上升）
+        calm:{ intensity:0.5, bassFill:'sporeDrone', sig:{ breathDrone:true, organicPerc:true } },                                       // 常态：厚呼吸 pad(双八度) + 沙锤部落律动 + F 切分 drone，无毒
+        rage:{ intensity:0.85, bpm:151, bassFill:'sporeDrone', sig:{ breathDrone:true, venomSquelch:true, organicPerc:true } } },        // 狂暴：呼吸 pad 变薄+失谐(腐坏) + 毒液 acid squelch 冒头 + 打击加密
+      tesla:{ bpm:150, rootHz:43.65, rootCycle:[0,0,0,0], bassPatterns:[[null,0,0,8,null,0,5,0,null,0,8,0,null,5,0,0]], padChord:[0,3,7,12], allowLead:true, allowOoh:false, // 深挖 v2：F 自然小调；高压「放电脉冲」(FX deg2 stab 规律 4 步) + 滚动双 tom 残影 + b5 三全音相位失稳 lead；reg4 中音 arp bass(root/4/b6)
+        calm:{ intensity:0.55, bassFill:'offbeat', leadNotes:[12,19,17,12], sig:{ teslaArc:true } },                                  // 常态：放电脉冲打底 + 中音 arp bass + 干净 lead
+        rage:{ intensity:1.0, bpm:156, bassFill:'driving16', leadNotes:[18,23,12,19], sig:{ teslaArc:true, teslaRoll:true } } },     // 狂暴：放电叠电弧噼啪 + 滚动双 tom 残影 + b5 三全音相位失稳(18=8ve+b5)
+      chimera:{ bpm:188, rootHz:41.2, rootCycle:[0,0,-1,0], bassPatterns:[[null,0,0,0,null,0,11,0,null,0,0,0,null,7,0,6]], padChord:[0,3,6,12], drumMode:'chaosTom', allowLead:true, allowOoh:false, // 深挖 v2：E↔D# 半音失稳(导音夺权) + HiTom2 滚动鼓(实测 Kick:1) + 双根漂移 howl，最快 188
+        calm:{ intensity:0.6, bassFill:'offbeat', driftCycle:[0,0,-1,0], leadNotes:[18,12,18,15], sig:{ chaosFlux:true } },                     // 常态：E 微漂 + 双根 howl 暗示失稳
+        rage:{ intensity:1.0, bassFill:'offbeat', driftCycle:[-1,0,-1,-1], leadNotes:[18,15,18,18], sig:{ chaosFlux:true, burstImpact:true } } }, // 狂暴：D# 夺权(导音) + howl 漂更宽 + 不定时爆裂
+      ouroboros:{ bpm:133, rootHz:38.9, rootCycle:[0,0,0,0], padChord:[0,1,9,6], allowLead:false, allowOoh:false, fxCycleDeg:[1,6,9], // 深挖 v2：D# pedal + b2/b5/6 三音等权循环(回声衔尾) + 终曲木管悲鸣，最慢 133
+        calm:{ intensity:0.4, bassFill:'pedal', sig:{ fxCycle:true, fxPeriod:8 } },                                   // 常态：三音动机缓慢轮转(period8)，回声尾接=永恒回声
+        rage:{ intensity:0.9, bpm:138, bassFill:'pedal', sig:{ fxCycle:true, fxPeriod:2, fifthStab:true, windCry:true } } }, // 狂暴：动机收紧 period2 密度飙升 + 五度 power stab + 木管悲鸣 topline
     };
   }
   applyBossProfile(bossId,opts={}){ // 套用 boss profile；opts.section 默认 'calm'；返回 false=无此 boss（回退通用逻辑）
@@ -613,15 +700,29 @@ class MusicEngine {
         else if(s%4===2) this.playBass(t,this._noteFreq(3));        // b3 冰裂
         else if(s%2===1 && I>0.8) this.playBass(t,this._noteFreq(0));
         return;
+      case 'abyss': // devourer 常态：低 sub 8 分 pedal（巨口低鸣，死锁根）
+        if(s%2===0) this.playBass(t,this._noteFreq(0));
+        else if(I>0.5 && s%4===3) this.playBass(t,this._noteFreq(0));
+        return;
+      case 'abyssRoll': // devourer 狂暴：双八度 16 分 sub 雪崩 + b2/b3 引力下拽（实测 reg2+reg4、b2:45/b3:6、11.6 音/秒、死锁根）
+        { const drag=(s===7)?1:((s===11)?3:0);                     // 偶发滑到 b2/b3 邻音=引力拉拽
+          this.playBass(t,this._noteFreq(drag));                   // 低 sub 满 16 分
+          if(s%4===0) this.playBass(t,this._noteFreq(12)); }       // 拍头叠中八度=巨口加倍（reg2+reg4）
+        return;
+      case 'sporeDrone': // viridis：F 低根 drone，切分句法实测 syncopation（重音 s0/s4/s6/s9/s14）；rage 补 b7 下沉邻音=「腐坏」摇摆
+        if(s===0||s===4||s===6||s===9||s===14) this.playBass(t,this._noteFreq(0));
+        else if(I>0.7 && s===11) this.playBass(t,this._noteFreq(-2)); // b7 below = 下沉腐味
+        return;
       default:{ const off=this._activePattern[s];
         if(off!==null&&off!==undefined && this._bassStepActive(s)) this.playBass(t,this._noteFreq(off)); }
     }
   }
   _scheduleSignatures(s,t,phrase){ // Boss 签名行为（每 step，仅 profile 模式）
     const sig=this._sig; if(!sig) return;
-    if(sig.fxCycle && this._fxCycleDeg && s%(sig.fxPeriod||4)===0){ // FX 三音循环动机(ouroboros)：狂暴 period 收紧→密度飙升
+    if(sig.fxCycle && this._fxCycleDeg && s%(sig.fxPeriod||4)===0){ // FX 三音等权循环动机(ouroboros b2/b5/6)：狂暴 period 收紧→密度飙升；回声衔尾首尾相接
       const deg=this._fxCycleDeg[this._fxCycleIdx%this._fxCycleDeg.length]; this._fxCycleIdx++;
-      this.playScreech(t,this._noteFreq(12+deg),0.5);
+      const echoT=(60/this.bpm/4)*(sig.fxPeriod||4);                 // 回声延迟=动机周期=尾接下一句头(衔尾)
+      this.playEchoCry(t,this._noteFreq(12+deg),0.5,0.42,echoT);
     }
     if(sig.vocalChop && s%(sig.chopStep||4)===2){ // 机关枪人声碎切(mikro 三全音/glacies b2 缝合)
       const deg=(sig.chopDeg!==undefined)?sig.chopDeg:6;
@@ -635,6 +736,7 @@ class MusicEngine {
     if(sig.chimeOff && s%4===1) this.playChime(t,0.24); // 冰锥 chime 反拍叮(glacies)
     if(sig.stitchVox && (s===6||s===12)){ const n=sig.stitchN||4, dt=(60/this.bpm/4)/n; for(let i=0;i<n;i++) this.playStitch(t+i*dt,0.4); } // b2 缝合 stutter(glacies 狂暴：缝合怪机械咬针)
     if(sig.fifthStab && (s===4||s===12)) this.playScreech(t,this._noteFreq(19),0.18); // 五度 power stab(ouroboros 狂暴)
+    if(sig.windCry && this.section==='rage' && (s===0||s===10)) this.playReed(t,this._noteFreq((s===0)?37:47),(s===0)?1.8:1.2,0.2); // ouroboros 终曲木管悲鸣(Woodwinds 仅 rage：b2→maj7 高位长音 topline)
     if(sig.tomRoll && s%4===3) this.playTom(t,150,0.5); // 反拍 tom 滚(tesla 狂暴：电压击穿)
     if(sig.woodAccent && (s===6||s===14)) this.playWood(t,0.5); // 木鱼 accent(ignis 喷发：HiWdblk 实测)
     if(sig.octaveScatter && (s===4||s===10)){ // 八度分身散射(mikro：同一动机同时炸在低/中/高八度=克隆到不同八度，实测 reg2/3/6)
@@ -645,6 +747,31 @@ class MusicEngine {
       this._fissionStutter(t,this._noteFreq(24+(sig.fissDeg!==undefined?sig.fissDeg:6)),sig.fissBase||4);
     if(sig.guitarChug && this.intensity>0.6){ // 闷音吉他 16 分 chug 锁根(mikro 狂暴：电气 swarm 体)
       if(s%2===0) this.playGuitarChug(t,0,0.5); else if(s%4===3) this.playGuitarChug(t,0,0.32);
+    }
+    if(sig.voidTremolo){ if(s%2===0) this.playVoidFifth(t,0.14,0.16); else this.playVoidFifth(t,0.10,0.07); } // 高纯五度 8 分颤音床(devourer：空腔 shimmer，强弱交替)
+    if(sig.breathDrone && (s===0||s===8)){ // viridis 呼吸 pad(悬浮大六度 D)：calm 厚而双八度、rage 变薄+更失谐=「活体腐坏」（drone 在 rage 反而退场）
+      const calm=this.section!=='rage', g=calm?0.2:0.12, dur=calm?1.7:1.3;
+      this.playBreathPad(t,this._noteFreq(9),dur,g); if(calm) this.playBreathPad(t,this._noteFreq(21),dur*0.9,g*0.6); // calm 叠高八度 pad 更厚
+    }
+    if(sig.venomSquelch && this.section==='rage' && s%4===2) this.playSquelch(t,this._noteFreq(14),0.5,0.3); // viridis 狂暴：毒液 acid 冒头(deg2=G 慢扫)，每拍半触发
+    if(sig.organicPerc){ // viridis 部落有机律动：沙锤底色 + 木鱼/三角散点（取代电子四踩的呆板，还原 OTri/HiWdblk/MuConga）
+      if(s%2===0) this.playShaker(t);
+      if(s===3||s===10||s===13) this.playWoodblock(t,0.28);
+      if(this.section==='rage' && (s===6||s===14)) this.playWoodblock(t,0.32); // rage 加密
+    }
+    if(sig.teslaArc){ // tesla 放电脉冲(FX deg2=G 实测：规律 4 步 stab)：拍头强放电 + 拍中弱 ghost；rage 间隙塞电弧噼啪
+      if(s%4===0) this.playZap(t,this._noteFreq(14),0.34);          // 拍头放电(deg2 上八度 G)
+      else if(s%4===2) this.playZap(t,this._noteFreq(14),0.18);     // 弱 ghost
+      if(this.section==='rage' && s%2===1) this.playArcCrackle(t,0.2); // 狂暴：电弧静电填满间隙
+    }
+    if(sig.teslaRoll){ // tesla 滚动双 tom 残影(Drums 实测：HiTom2+LoTom2 近乎连续)：hi/lo 交替 offbeat，反拍叠 lo
+      if(s%2===1) this.playTom(t,(s%4===1)?300:150,0.4);            // hi/lo 交替
+      if(this.section==='rage' && s%4===3) this.playTom(t,150,0.5); // 反拍再叠 lo tom=电压击穿
+    }
+    if(sig.chaosFlux){ // chimera 双根失稳 howl(实测 bass 一段 D# maj7 反超 root E=导音夺权)：每小节头一记 E↔D# 漂移；rage 漂更宽更频
+      const rage=this.section==='rage';
+      if(s===0) this.playChaosDrift(t,this._noteFreq(12),rage?1.0:1.5,rage?0.3:0.22,rage?2:1); // 小节头长漂移(中八度 E)
+      if(rage && s===8) this.playChaosDrift(t,this._noteFreq(11),0.8,0.26,2);                  // 狂暴半拍再来一记从 maj7(11=D#)起=导音夺权
     }
   }
   _vocalChop(t,freq,n=6,span=0.3){ // 人声碎切 stutter：一颗音切 n 个超短 ooh 走 leadBus

@@ -36,7 +36,8 @@ import {
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
     GreedyWheelEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
-    MuzzleFlashV2, FiringBurst
+    MuzzleFlashV2, FiringBurst, AffixSkillVFX,
+    BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -2336,11 +2337,9 @@ class DropBall {
                                 peg.level = 1;
                             }
 
-                            // 强化变异瞬间特效：冲击波 + 大型爆破 + 高亮浮动文字
+                            // 强化变异瞬间特效：汇聚脉冲 + 高亮浮动文字
                             const mutColor = CONFIG.colors[rule.result] || '#ffffff';
-                            game.spawn_createShockwave(peg.pos.x, peg.pos.y, mutColor);
-                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, mutColor);
-                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, mutColor); // 双重爆破增强视觉冲击
+                            game.spawn_createAssimilationPulse(peg.pos.x, peg.pos.y, mutColor, {isMutation: true});
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 30, '✨ MUTATION!', mutColor);
                             audio.playMagic();
 
@@ -2350,7 +2349,7 @@ class DropBall {
                                 if (mirrorPeg && mirrorPeg.type !== rule.result) {
                                     mirrorPeg.type = rule.result;
                                     mirrorPeg.level = 1;
-                                    game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, CONFIG.colors[rule.result]);
+                                    game.spawn_createAssimilationPulse(mirrorPeg.pos.x, mirrorPeg.pos.y, CONFIG.colors[rule.result], {isMirror: true});
                                 }
                             }
                         } else {
@@ -2366,8 +2365,8 @@ class DropBall {
                     else if (rule.type === 'upgrade') {
                         const success = peg.upgrade();
                         if (success) {
-                            // 升级成功特效
-                            game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
+                            // 升级成功特效：汇聚脉冲
+                            game.spawn_createAssimilationPulse(peg.pos.x, peg.pos.y, '#fbbf24');
                             game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, `Lv${peg.level} 剑意!`, '#fbbf24');
                             audio.playPowerup(peg.level + 3); // 音调更高
 
@@ -2377,7 +2376,7 @@ class DropBall {
                                 if (mirrorPeg && mirrorPeg.level < peg.level) {
                                     mirrorPeg.level = peg.level;
                                     mirrorPeg.type = peg.type;
-                                    game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, '#fbbf24');
+                                    game.spawn_createAssimilationPulse(mirrorPeg.pos.x, mirrorPeg.pos.y, '#fbbf24', {isMirror: true});
                                 }
                             }
                         } else {
@@ -2404,7 +2403,7 @@ class DropBall {
 	                    // [新增] 同化钉子特效：爆炸 + 浮动文字
 	                    const attrColor = this.def.getColor();
 	                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
-	                    game.spawn_createExplosion(peg.pos.x, peg.pos.y, attrColor);
+	                    game.spawn_createAssimilationPulse(peg.pos.x, peg.pos.y, attrColor);
 						game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
 	                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
 	                    
@@ -2416,7 +2415,7 @@ class DropBall {
                             const mirrorPeg = game.pegs[peg.mirrorIdx];
                             if (mirrorPeg && mirrorPeg.type !== ballType) {
                                 mirrorPeg.type = ballType;
-                                game.spawn_createExplosion(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor);
+                                game.spawn_createAssimilationPulse(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor, {isMirror: true});
                                 game.spawn_createParticle(mirrorPeg.pos.x, mirrorPeg.pos.y, attrColor);
                             }
                         }
@@ -2638,7 +2637,7 @@ class DropBall {
                                         wheel.x, wheel.y - wheel.radius - 30,
                                         `属性 x${multiplier}!`, color || '#fbbf24'
                                     );
-                                    _game.spawn_createExplosion(wheel.x, wheel.y, color || '#fbbf24');
+                                    _game.spawn_createSlotBurst(wheel.x, wheel.y, color || '#fbbf24');
                                     _game.ui_renderRecipeHUD();
                                 } else if (multiplier === 0) {
                                     _game.spawn_createFloatingText(
@@ -2726,24 +2725,24 @@ class DropBall {
                         if (typeof slot.tryActivate !== 'function') slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
-                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
+                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
                         } else if (slot.type === 'multicast') {
                             if (this.session.multicastAdded.indexOf(slot) === -1) { 
-                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
+                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
                                     game.combat_updateMulticastDisplay(2);
                             }
                         } else if (slot.type === 'split') {
                             if (this.canTriggerSplitSlot) {
                                 this.active = false; 
                                 this.stopSound(); // 
-                                audio.playPowerup(); game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSplit); 
+                                audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotSplit);
                                 return { action: 'split', pos: this.pos, vel: this.vel, def: this.def };
                             }
                         } else if (slot.type === 'relic') {
                             this.active = false; 
                             this.stopSound(); // 
                             audio.playPowerup(); 
-                            game.spawn_createExplosion(slot.x, slot.y, '#facc15'); 
+                            game.spawn_createSlotBurst(slot.x, slot.y, '#facc15', {intensity: 1.3});
                             return { type: 'slot', slotType: 'relic', pos: this.pos };
                         } else if (slot.type === 'skill_point') {
                             // 1. 標記槽位被擊中 (立即消失)
@@ -2751,7 +2750,7 @@ class DropBall {
 
                             // 2. 播放原地音效與爆炸 (立即反饋)
                             audio.playPowerup();
-                            game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotSkill); 
+                            game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotSkill);
                             showToast("技能點獲取!");
 
                             // --- [新增] 引導動畫邏輯 ---
@@ -2824,7 +2823,7 @@ class DropBall {
                             
                             if (currentAttrs.length === 0) {
                                 audio.playEffect('bump');
-                                game.spawn_createExplosion(slot.x, slot.y, '#ffffff');
+                                game.spawn_createSlotBurst(slot.x, slot.y, '#ffffff');
                                 showToast("无属性可复制");
                                 game.phase_gathering_attemptComplete(); 
                                 return { type: 'slot', slotType: 'wheel', pos: this.pos };
@@ -2832,7 +2831,7 @@ class DropBall {
 
                             // [修改] 觸發轉盤
                             audio.playPowerup(); 
-                            game.spawn_createExplosion(slot.x, slot.y, CONFIG.colors.slotWheel); 
+                            game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotWheel);
                             showToast("命運輪盤啟動!");
 
                             // [修改] 使用屏幕中心坐標 (game.width/2, game.height/2)
@@ -2861,7 +2860,7 @@ class DropBall {
                                 
                                 // 文字提示位置也改為屏幕中間
                                 game.spawn_createFloatingText(wheelX, wheelY + 80, `${attrName} +${addCount}!`, "#fff");
-                                game.spawn_createExplosion(wheelX, wheelY, '#fff');
+                                game.spawn_createSlotBurst(wheelX, wheelY, '#fff');
                                 audio.playPowerup(5);
                                 game.ui_renderRecipeHUD();
                                 game.isWheelSpinning = false;
@@ -2888,7 +2887,7 @@ class DropBall {
                             this.portalCooldown = Math.max(this.portalCooldown, 14);
                             if (slot.spinVisual !== false) slot._spinAngle += 0.45;
                             audio.playPowerup();
-                            game.spawn_createExplosion(midX, midY, CONFIG.colors.slotLauncher || '#22d3ee');
+                            game.spawn_createSlotBurst(midX, midY, CONFIG.colors.slotLauncher || '#22d3ee');
                             if (game.spawn_createFloatingText) {
                                 game.spawn_createFloatingText(midX, midY - 16, '高速发射!', CONFIG.colors.slotLauncher || '#22d3ee');
                             }
@@ -2909,7 +2908,7 @@ class DropBall {
                             this.portalCooldown = Math.max(this.portalCooldown, 16);
                             if (slot.spinVisual !== false) slot._spinAngle += 0.75;
                             audio.playPowerup();
-                            game.spawn_createExplosion(midX, midY, CONFIG.colors.slotEnergyWheel || '#fde047');
+                            game.spawn_createSlotBurst(midX, midY, CONFIG.colors.slotEnergyWheel || '#fde047', {intensity: 1.3});
                             if (game.spawn_createFloatingText) {
                                 game.spawn_createFloatingText(midX, midY - 18, `连射能量 +${targets.length}`, CONFIG.colors.slotEnergyWheel || '#fde047');
                             }
@@ -3056,8 +3055,8 @@ class DropBall {
                                 // 设置短暂冷却，防止同一弹珠在同一钉子上连续触发
                                 this._mirrorAxisCooldown = 20; // 20帧冷却
 
-                                // 触发视觉特效
-                                game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#fbbf24');
+                                // 触发视觉特效：镜像裂分脉冲
+                                game.spawn_createAssimilationPulse(peg.pos.x, peg.pos.y, '#fbbf24', {isMutation: true});
                                 game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 28, '镜像裂分!', '#fbbf24');
                                 audio.playPowerup();
 
@@ -3170,7 +3169,7 @@ class DropBall {
                                 this.active = false;
                                 this.stopSound();
                                 audio.playPowerup();
-                                game.spawn_createExplosion(peg.pos.x, peg.pos.y, '#60a5fa');
+                                game.spawn_createSlotBurst(peg.pos.x, peg.pos.y, '#60a5fa');
                                 game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '🔁回响分裂!', '#60a5fa');
                                 return { action: 'split', pos: this.pos, vel: this.vel, def: this.def };
                             }
@@ -3401,7 +3400,7 @@ class DropBall {
                                 ghost.pos.x, ghost.pos.y - 20,
                                 '回响!', '#c084fc'
                             );
-                            _game.spawn_createExplosion(ghost.pos.x, ghost.pos.y, '#a855f7');
+                            _game.spawn_createSlotBurst(ghost.pos.x, ghost.pos.y, '#a855f7');
                             _game.ui_renderRecipeHUD();
                         }
                     }
@@ -4453,7 +4452,7 @@ class CloneSpore {
             this.progress = 1;
             this.active = false;
             this.onLand(); // 落地，呼叫回調生成敵人
-            game.spawn_createExplosion(this.end.x, this.end.y, '#a855f7'); // 落地特效
+            game.spawn_createImpactBlast(this.end.x, this.end.y, '#a855f7'); // 落地爆破
             audio.playPowerup();
         }
 
@@ -5442,6 +5441,8 @@ export {
     RewardDropEffect,
     MuzzleFlashV2,
     FiringBurst,
+    AffixSkillVFX,
+    BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect,
     Player,
     RuneLoot,
     FieldLootItem,

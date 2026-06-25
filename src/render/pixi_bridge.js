@@ -22,6 +22,7 @@
  */
 
 import { CONFIG } from '../config.js';
+import { filterUpdateAll, filterDestroyAll } from './pixi_filter_manager.js';
 
 // ─── 模块级状态 ────────────────────────────────────────────────
 
@@ -574,6 +575,152 @@ function _initEffectTextures() {
         g.fillStyle = gr; g.beginPath(); g.arc(h, h, h, 0, Math.PI * 2); g.fill();
         _effectTextures.bulletGlow = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
     }
+
+    // ─── [元素视觉] 6 张元素专属纹理 ──────────────────────────────
+
+    // frostHex: 六角雪花模板，白色线条，用于 Cryo 共鸣冰裂纹
+    {
+        const s = 64, h = 32;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        g.strokeStyle = 'rgba(207, 250, 254, 0.9)';
+        g.lineWidth = 1.5;
+        g.lineCap = 'round';
+        for (let i = 0; i < 6; i++) {
+            const a = i * Math.PI / 3;
+            g.beginPath();
+            g.moveTo(h, h);
+            g.lineTo(h + Math.cos(a) * h * 0.85, h + Math.sin(a) * h * 0.85);
+            g.stroke();
+            // 小分叉
+            const bx = h + Math.cos(a) * h * 0.55, by = h + Math.sin(a) * h * 0.55;
+            for (const da of [-0.5, 0.5]) {
+                g.beginPath();
+                g.moveTo(bx, by);
+                g.lineTo(bx + Math.cos(a + da) * h * 0.25, by + Math.sin(a + da) * h * 0.25);
+                g.stroke();
+            }
+        }
+        _effectTextures.frostHex = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
+
+    // electricArc: 短弧段，白色中心→紫色边缘，用于 Lightning 电弧碎片
+    {
+        const s = 32, w2 = 16, h2 = 8;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        const gr = g.createLinearGradient(0, h2, s, h2);
+        gr.addColorStop(0, 'rgba(192, 132, 252, 0)');
+        gr.addColorStop(0.3, 'rgba(192, 132, 252, 0.6)');
+        gr.addColorStop(0.5, 'rgba(255, 255, 255, 0.9)');
+        gr.addColorStop(0.7, 'rgba(192, 132, 252, 0.6)');
+        gr.addColorStop(1, 'rgba(192, 132, 252, 0)');
+        g.strokeStyle = gr;
+        g.lineWidth = 3;
+        g.lineCap = 'round';
+        g.beginPath();
+        g.moveTo(2, h2 + 2);
+        g.quadraticCurveTo(w2, h2 - 6, s - 2, h2 + 1);
+        g.stroke();
+        _effectTextures.electricArc = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
+
+    // venomDrip: 泪滴形绿色渐变，用于 Venom 持续效果滴落
+    {
+        const s = 48, h2 = 24;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        // 泪滴形状（上尖下圆）
+        const gr = g.createRadialGradient(h2, h2 + 4, 0, h2, h2 + 4, h2 * 0.7);
+        gr.addColorStop(0, 'rgba(200, 255, 180, 0.9)');
+        gr.addColorStop(0.4, 'rgba(132, 204, 22, 0.7)');
+        gr.addColorStop(1, 'rgba(74, 222, 128, 0)');
+        g.fillStyle = gr;
+        g.beginPath();
+        g.moveTo(h2, 2); // 顶部尖点
+        g.quadraticCurveTo(s - 4, h2, h2, s - 4); // 右侧弧线
+        g.quadraticCurveTo(4, h2, h2, 2); // 左侧弧线
+        g.fill();
+        _effectTextures.venomDrip = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
+
+    // windVortex: 环形翡翠弧线辐射，用于 Wind 持续效果风场标记
+    {
+        const s = 128, h2 = 64;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        g.strokeStyle = 'rgba(52, 211, 153, 0.6)';
+        g.lineWidth = 2;
+        g.lineCap = 'round';
+        // 4 条旋转弧线
+        for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2;
+            g.beginPath();
+            g.arc(h2, h2, h2 * 0.7, a, a + Math.PI * 0.4);
+            g.stroke();
+            g.beginPath();
+            g.arc(h2, h2, h2 * 0.45, a + 0.3, a + 0.3 + Math.PI * 0.3);
+            g.stroke();
+        }
+        // 中心微弱径向渐变
+        const gr = g.createRadialGradient(h2, h2, 0, h2, h2, h2 * 0.3);
+        gr.addColorStop(0, 'rgba(52, 211, 153, 0.15)');
+        gr.addColorStop(1, 'rgba(52, 211, 153, 0)');
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(h2, h2, h2 * 0.3, 0, Math.PI * 2); g.fill();
+        _effectTextures.windVortex = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
+
+    // starBurst: 四角金色辐射线，用于 Scatter 命中星爆
+    {
+        const s = 64, h2 = 32;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        g.strokeStyle = 'rgba(250, 204, 21, 0.8)';
+        g.lineWidth = 2;
+        g.lineCap = 'round';
+        // 4 条主辐射线
+        for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2;
+            const gr = g.createLinearGradient(h2, h2, h2 + Math.cos(a) * h2 * 0.9, h2 + Math.sin(a) * h2 * 0.9);
+            gr.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+            gr.addColorStop(0.5, 'rgba(250, 204, 21, 0.6)');
+            gr.addColorStop(1, 'rgba(250, 204, 21, 0)');
+            g.strokeStyle = gr;
+            g.beginPath();
+            g.moveTo(h2, h2);
+            g.lineTo(h2 + Math.cos(a) * h2 * 0.9, h2 + Math.sin(a) * h2 * 0.9);
+            g.stroke();
+        }
+        // 4 条短辅辐射线（45°偏移）
+        g.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+        g.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2 + Math.PI / 4;
+            g.beginPath();
+            g.moveTo(h2, h2);
+            g.lineTo(h2 + Math.cos(a) * h2 * 0.5, h2 + Math.sin(a) * h2 * 0.5);
+            g.stroke();
+        }
+        _effectTextures.starBurst = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
+
+    // echoRipple: 3 圈蓝色同心圆波纹，用于 Echo 回响触发
+    {
+        const s = 128, h2 = 64;
+        const c = new OffscreenCanvas(s, s);
+        const g = c.getContext('2d');
+        const radii = [h2 * 0.35, h2 * 0.6, h2 * 0.85];
+        const alphas = [0.7, 0.45, 0.2];
+        for (let i = 0; i < 3; i++) {
+            g.strokeStyle = `rgba(96, 165, 250, ${alphas[i]})`;
+            g.lineWidth = 2.5 - i * 0.5;
+            g.beginPath();
+            g.arc(h2, h2, radii[i], 0, Math.PI * 2);
+            g.stroke();
+        }
+        _effectTextures.echoRipple = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+    }
 }
 
 /**
@@ -691,6 +838,9 @@ export function pixiTick(shakeX, shakeY) {
         gameContainer.y = shakeY || 0;
     }
 
+    // 更新所有活跃滤镜（动画参数、衰减等）
+    filterUpdateAll(16);
+
     pixiApp.renderer.render(pixiApp.stage);
 }
 
@@ -729,6 +879,9 @@ export function pixiSetVisibility(hidden) {
 export function pixiDestroy() {
     if (!pixiApp) return;
     _active = false;
+
+    // 清理所有活跃滤镜
+    filterDestroyAll();
 
     // 清理所有 ParticleContainer
     for (const key of Object.keys(_particleContainers)) {

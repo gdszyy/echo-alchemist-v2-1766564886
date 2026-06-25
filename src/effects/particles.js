@@ -40,6 +40,9 @@ import {
     muzzleFlashV2_pixiCreate, muzzleFlashV2_pixiSync, muzzleFlashV2_pixiDestroy,
     firingBurst_pixiCreate, firingBurst_pixiSync, firingBurst_pixiDestroy,
     burnEffect_pixiCreate, burnEffect_pixiSync, burnEffect_pixiDestroy,
+    electrocuteEffect_pixiCreate, electrocuteEffect_pixiSync, electrocuteEffect_pixiDestroy,
+    venomEffect_pixiCreate, venomEffect_pixiSync, venomEffect_pixiDestroy,
+    windMarkEffect_pixiCreate, windMarkEffect_pixiSync, windMarkEffect_pixiDestroy,
     affixSkillVFX_pixiCreate, affixSkillVFX_pixiSync, affixSkillVFX_pixiDestroy,
 } from '../render/pixi_effect_adapter.js';
 
@@ -1470,8 +1473,406 @@ class BurnEffect {
         for (const e of this._embers) e.active = false;
     }
 }
+
+// ==================== 持续电弧特效 ====================
 /**
- * IceWave - 冰冻状态死亡时的冰晶爆炸波
+ * ElectrocuteEffect - 敌人被闪电命中后的持续电弧视觉特效
+ *
+ * 附着在 lightning 命中的敌人身上，持续 2-3 秒（每次命中刷新计时器）。
+ * 3-5 条随机锯齿电弧在敌人表面闪烁，每 100-200ms 重新随机路径。
+ *
+ * @perf-impact: 持续电弧特效 - 每敌人 1 Graphics（电弧路径重绘频率 5-10Hz）
+ */
+class ElectrocuteEffect {
+    /**
+     * @param {object} enemy - 敌人实例引用
+     * @param {number} [duration=2500] - 持续时间（毫秒）
+     */
+    constructor(enemy, duration = 2500) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this._pixi = null;
+
+        this.timer = duration;       // 剩余时间（毫秒）
+        this.maxTimer = duration;
+        this.intensity = 1.0;
+
+        // 电弧路径池（最多 5 条）
+        this._arcs = Array.from({ length: 5 }, () => ({
+            points: [],
+            life: 0,
+            maxLife: 0,
+            active: false,
+        }));
+        this._arcTimer = 0;          // 下次生成电弧的倒计时（毫秒）
+        this._arcInterval = 120;     // 电弧重绘间隔（毫秒）
+    }
+
+    /** 刷新持续时间（每次 lightning 命中调用） */
+    refresh(duration = 2500) {
+        this.timer = Math.max(this.timer, duration);
+        this.maxTimer = Math.max(this.maxTimer, duration);
+    }
+
+    update(pos, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+
+        const dtMs = timeScale * 16.67; // 近似毫秒
+        this.timer -= dtMs;
+        this.intensity = Math.max(0, Math.min(1, this.timer / (this.maxTimer * 0.3)));
+
+        // 电弧生命周期
+        this._arcTimer -= dtMs;
+        for (const arc of this._arcs) {
+            if (arc.active) {
+                arc.life -= dtMs;
+                if (arc.life <= 0) arc.active = false;
+            }
+        }
+
+        // 生成新电弧
+        if (this._arcTimer <= 0 && this.intensity > 0.05) {
+            this._spawnArc();
+            this._arcTimer = this._arcInterval + Math.random() * 80;
+        }
+    }
+
+    _spawnArc() {
+        const arc = this._arcs.find(a => !a.active);
+        if (!arc) return;
+
+        const w = this.width, h = this.height;
+        const segments = 3 + Math.floor(Math.random() * 3); // 3-5 段
+        const points = [];
+
+        // 起点：敌人表面随机位置
+        let px = (Math.random() - 0.5) * w * 0.8;
+        let py = (Math.random() - 0.5) * h * 0.8;
+        points.push({ x: px, y: py });
+
+        for (let i = 0; i < segments; i++) {
+            px += (Math.random() - 0.5) * w * 0.4;
+            py += (Math.random() - 0.5) * h * 0.4;
+            points.push({ x: px, y: py });
+        }
+
+        arc.points = points;
+        arc.life = 80 + Math.random() * 120; // 80-200ms
+        arc.maxLife = arc.life;
+        arc.active = true;
+    }
+
+    draw(ctx) {
+        if (this.intensity < 0.01) return;
+
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = electrocuteEffect_pixiCreate(this);
+            if (this._pixi) { electrocuteEffect_pixiSync(this, this._pixi); return; }
+        }
+
+        this._drawCanvas2D(ctx);
+    }
+
+    _drawCanvas2D(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (const arc of this._arcs) {
+            if (!arc.active || arc.points.length < 2) continue;
+            const alpha = (arc.life / arc.maxLife) * this.intensity;
+
+            // 外辉光
+            ctx.strokeStyle = `rgba(192, 132, 252, ${alpha * 0.4})`;
+            ctx.lineWidth = 4;
+            ctx.shadowColor = '#c084fc';
+            ctx.shadowBlur = _sb(8 * this.intensity);
+            ctx.beginPath();
+            ctx.moveTo(arc.points[0].x, arc.points[0].y);
+            for (let i = 1; i < arc.points.length; i++) {
+                ctx.lineTo(arc.points[i].x, arc.points[i].y);
+            }
+            ctx.stroke();
+
+            // 核心白线
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(arc.points[0].x, arc.points[0].y);
+            for (let i = 1; i < arc.points.length; i++) {
+                ctx.lineTo(arc.points[i].x, arc.points[i].y);
+            }
+            ctx.stroke();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    destroy() {
+        if (this._pixi) { electrocuteEffect_pixiDestroy(this._pixi); this._pixi = null; }
+        for (const a of this._arcs) a.active = false;
+    }
+
+    get active() { return this.timer > 0; }
+}
+
+// ==================== 持续毒液特效 ====================
+/**
+ * VenomEffect - 敌人被毒液命中后的持续渗流视觉特效
+ *
+ * 附着在 venom 命中的敌人身上，持续时间与 venom DoT 同步。
+ * 2-3 条绿色毒液沿敌人表面缓慢流淌 + 底部滴落粒子。
+ *
+ * @perf-impact: 持续毒液特效 - 每敌人 1 Graphics + 1-2 venom 粒子
+ */
+class VenomEffect {
+    /**
+     * @param {object} enemy - 敌人实例引用
+     * @param {number} [stacks=1] - 毒素层数（影响视觉密度）
+     */
+    constructor(enemy, stacks = 1) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this._pixi = null;
+
+        this.stacks = Math.min(10, stacks);
+        this.timer = 3000 + stacks * 500; // 持续时间随层数增加
+        this.maxTimer = this.timer;
+        this.intensity = 1.0;
+        this.time = Math.random() * 100;
+
+        // 毒液路径池（最多 3 条）
+        this._drips = Array.from({ length: 3 }, (_, i) => ({
+            startX: (Math.random() - 0.5) * 0.6,
+            progress: Math.random() * 0.3,
+            speed: 0.15 + Math.random() * 0.1,
+            wobble: Math.random() * Math.PI * 2,
+            active: i < Math.min(3, 1 + Math.floor(stacks / 2)),
+        }));
+    }
+
+    /** 追加毒素层数（每次 venom 命中调用） */
+    addStacks(stacks) {
+        this.stacks = Math.min(10, this.stacks + stacks);
+        this.timer = Math.max(this.timer, 3000 + this.stacks * 500);
+        this.maxTimer = this.timer;
+        // 激活更多滴流
+        const activeCount = Math.min(3, 1 + Math.floor(this.stacks / 2));
+        for (let i = 0; i < this._drips.length; i++) {
+            if (i < activeCount) this._drips[i].active = true;
+        }
+    }
+
+    update(pos, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+        this.time += 0.03 * timeScale;
+
+        const dtMs = timeScale * 16.67;
+        this.timer -= dtMs;
+        this.intensity = Math.max(0, Math.min(1, this.timer / (this.maxTimer * 0.25)));
+
+        // 毒液路径流动
+        for (const drip of this._drips) {
+            if (!drip.active) continue;
+            drip.progress += drip.speed * timeScale * 0.02;
+            if (drip.progress > 1.0) {
+                drip.progress = 0;
+                drip.startX = (Math.random() - 0.5) * 0.6;
+                drip.wobble = Math.random() * Math.PI * 2;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (this.intensity < 0.01) return;
+
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = venomEffect_pixiCreate(this);
+            if (this._pixi) { venomEffect_pixiSync(this, this._pixi); return; }
+        }
+
+        this._drawCanvas2D(ctx);
+    }
+
+    _drawCanvas2D(ctx) {
+        const w = this.width, h = this.height;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (const drip of this._drips) {
+            if (!drip.active) continue;
+
+            const alpha = this.intensity * 0.6;
+            const pathLen = h * 0.7;
+            const sx = drip.startX * w;
+            const sy = -h * 0.35;
+            const ey = sy + pathLen * drip.progress;
+            const wobX = Math.sin(this.time * 2 + drip.wobble) * w * 0.05;
+
+            // 毒液路径
+            ctx.strokeStyle = `rgba(132, 204, 22, ${alpha})`;
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = '#84cc16';
+            ctx.shadowBlur = _sb(4 * this.intensity);
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.bezierCurveTo(
+                sx + wobX, sy + pathLen * 0.3,
+                sx - wobX, sy + pathLen * 0.6,
+                sx + wobX * 0.5, ey
+            );
+            ctx.stroke();
+
+            // 毒液滴落点
+            if (drip.progress > 0.7) {
+                const dotAlpha = (drip.progress - 0.7) / 0.3 * alpha;
+                ctx.fillStyle = `rgba(200, 255, 180, ${dotAlpha})`;
+                ctx.beginPath();
+                ctx.arc(sx + wobX * 0.5, ey, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    destroy() {
+        if (this._pixi) { venomEffect_pixiDestroy(this._pixi); this._pixi = null; }
+        for (const d of this._drips) d.active = false;
+    }
+
+    get active() { return this.timer > 0; }
+}
+
+// ==================== 持续风场特效 ====================
+/**
+ * WindMarkEffect - 敌人被风属性命中后的旋转风场标记
+ *
+ * 附着在 wind 命中的敌人身上，持续 1.5 秒（每次命中刷新）。
+ * 底层旋转风环 + 上层弧形风线围绕敌人旋转。
+ *
+ * @perf-impact: 持续风场特效 - 每敌人 1 Sprite（windVortex 纹理）+ 1 Graphics（风线）
+ */
+class WindMarkEffect {
+    /**
+     * @param {object} enemy - 敌人实例引用
+     * @param {number} [windLevel=1] - 风属性层数（影响风线数量）
+     */
+    constructor(enemy, windLevel = 1) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this._pixi = null;
+
+        this.timer = 1500;           // 持续时间（毫秒）
+        this.maxTimer = 1500;
+        this.intensity = 1.0;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.windLevel = windLevel;
+
+        // 风线数量：每 2 层 +1，最多 5 条
+        this._bladeCount = Math.min(5, 2 + Math.floor(windLevel / 2));
+        this._bladeSeeds = Array.from({ length: 5 }, () => ({
+            offset: Math.random() * Math.PI * 2,
+            radius: 0.5 + Math.random() * 0.2,
+            span: 0.3 + Math.random() * 0.25,
+            speed: 0.8 + Math.random() * 0.4,
+        }));
+    }
+
+    /** 刷新持续时间 + 更新风属性层数 */
+    refresh(windLevel = 1) {
+        this.timer = 1500;
+        this.maxTimer = 1500;
+        this.windLevel = Math.max(this.windLevel, windLevel);
+        this._bladeCount = Math.min(5, 2 + Math.floor(this.windLevel / 2));
+    }
+
+    update(pos, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+
+        const dtMs = timeScale * 16.67;
+        this.timer -= dtMs;
+        this.intensity = Math.max(0, Math.min(1, this.timer / (this.maxTimer * 0.3)));
+        this.rotation += 1.8 * timeScale * 0.05; // 旋转速度
+    }
+
+    draw(ctx) {
+        if (this.intensity < 0.01) return;
+
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = windMarkEffect_pixiCreate(this);
+            if (this._pixi) { windMarkEffect_pixiSync(this, this._pixi); return; }
+        }
+
+        this._drawCanvas2D(ctx);
+    }
+
+    _drawCanvas2D(ctx) {
+        const w = this.width, h = this.height;
+        const baseR = Math.max(w, h) * 0.55;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 底层：旋转风环（微弱）
+        const ringAlpha = this.intensity * 0.2;
+        ctx.strokeStyle = `rgba(52, 211, 153, ${ringAlpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR, this.rotation, this.rotation + Math.PI * 1.5);
+        ctx.stroke();
+
+        // 上层：弧形风线
+        for (let i = 0; i < this._bladeCount; i++) {
+            const seed = this._bladeSeeds[i];
+            const angle = this.rotation * seed.speed + seed.offset;
+            const r = baseR * seed.radius;
+            const alpha = this.intensity * 0.5;
+
+            ctx.strokeStyle = `rgba(209, 250, 229, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#34d399';
+            ctx.shadowBlur = _sb(4 * this.intensity);
+            ctx.beginPath();
+            ctx.arc(0, 0, r, angle, angle + seed.span);
+            ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    destroy() {
+        if (this._pixi) { windMarkEffect_pixiDestroy(this._pixi); this._pixi = null; }
+    }
+
+    get active() { return this.timer > 0; }
+}
  * 表现为蓝白色冰晶碎片扩散环 + 冰雾扩散
  */
 class IceWave {
@@ -3422,6 +3823,9 @@ export {
     LightningBolt,
     FireWave,
     BurnEffect,
+    ElectrocuteEffect,
+    VenomEffect,
+    WindMarkEffect,
     IceWave,
     DeathExplosion,
     HealWave,

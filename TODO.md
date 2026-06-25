@@ -202,3 +202,61 @@ Phase C（Boss 专属）─── 依赖 Phase B 框架完成
 | **阶段五** 文档收尾 | 更新 performance.md / perf-optimization-index.md / 流程洞察 | ⬜ 待开始 |
 
 **预期收益**：桌面 high 档同场景 avgFps 提升 ≥ 40%；GC 频率从 ~8-15 次/5分钟降至 ≤ 2 次。
+
+---
+
+## 阶段七：元素视觉重做 ✨ Phase 1 已完成
+
+> 让 11 种元素属性在战斗中拥有"一眼可辨"的视觉身份，充分利用 PixiJS WebGL 管线。
+> 完整设计方案见 [`docs/element_visual_redesign.md`](docs/element_visual_redesign.md)。
+> PIXI Filter 基础设施已就绪：[`src/render/pixi_filter_manager.js`](src/render/pixi_filter_manager.js)。
+
+### 已完成 — Phase 1：持续效果类基础
+
+| 交付物 | 文件 | 状态 |
+| :--- | :--- | :--- |
+| ElectrocuteEffect 类 + 适配器 | particles.js + pixi_effect_adapter.js | ✅ |
+| VenomEffect 类 + 适配器 | particles.js + pixi_effect_adapter.js | ✅ |
+| WindMarkEffect 类 + 适配器 | particles.js + pixi_effect_adapter.js | ✅ |
+| 6 张预烘焙元素纹理 | pixi_bridge.js | ✅ |
+| enemy.js 全生命周期接入 | enemy.js | ✅ |
+| combat_system.js 命中 Hook × 3 | combat_system.js | ✅ |
+| PIXI Filter 管理器 | pixi_filter_manager.js (新建) | ✅ |
+| entities.js re-export 桥接 | entities.js | ✅ |
+
+### Phase 2：弹体与命中增强（1-2 轮）⬜ 待开始
+
+| # | 任务 | 涉及文件 | 优先级 |
+| :--- | :--- | :--- | :--- |
+| 2.1 | **Pyro 微调**：BurnEffect 共鸣时弧线 6→8、色温升高；三阶共鸣地面灼烧印记；ember_fuse 增加小型 FireWave 扩散环 | particles.js / pixi_effect_adapter.js | P1 |
+| 2.2 | **Cryo 微调**：冰封壳施加 ColorMatrixFilter 冷蓝偏移；共鸣时冰裂纹→六角雪花；三阶共鸣冰棱锥体 | enemy.js / pixi_filter_manager.js | P1 |
+| 2.3 | **Lightning 弹体增强**：共鸣时弧数量 +2、全白闪光概率 20%→40%；三阶链式闪电分叉树状 | projectile.js / particles.js | P1 |
+| 2.4 | **Venom 命中增强**：命中粒子数 1-4→2-6、尺寸 +20%；共鸣时粒子变为向上毒泡 | combat_system.js | P1 |
+| 2.5 | **Wind 弹体增强**：月牙轨道半径随 wind 层数扩大；共鸣时风刃变双刃交错 60° | projectile.js | P1 |
+| 2.6 | **Laser 命中灼点**：命中留下 0.5s 灼烧光点（复用 muzzleCore 纹理）；三阶共鸣十字准星 | particles.js / pixi_effect_adapter.js | P2 |
+| 2.7 | **Bounce 重做**：弹跳动能弧线（贝塞尔 + 2 层 glow）+ 弹跳计数标记；三阶双螺旋 + 绿色 Shockwave | particles.js / combat_system.js | P0 |
+| 2.8 | **Pierce 增强**：穿透路径红色裂痕线连接被穿透敌人（1s 衰减）；三阶 PierceCutEffect ×1.5 | particles.js | P2 |
+| 2.9 | **Scatter 重做**：星爆标记（4-6 条辐射线 + spark）；三阶金色残影 | particles.js / combat_system.js | P0 |
+| 2.10 | **Overcharge 增强**：弹体脉冲电场（5%概率电弧）；双环爆炸（二级冲击波延迟 100ms）；三阶全屏闪光 | particles.js | P1 |
+| 2.11 | **Echo 重做**：扩散声波波纹（3 圈同心圆依次扩散）；幽灵弹蓝色残影；三阶声波特效 | particles.js | P0 |
+
+### Phase 3：共鸣全局视觉（1 轮）⬜ 待开始
+
+| # | 任务 | 涉及文件 | 优先级 |
+| :--- | :--- | :--- | :--- |
+| 3.1 | **共鸣脉冲基础设施**：在 `_effectContainer` 顶层创建全屏 Sprite/Graphics，监听 `resonance:activated` EventBus 事件 | pixi_bridge.js / event_bus.js | P1 |
+| 3.2 | **6 元素专属脉冲**：pyro 热浪内缩 / cryo 冰霜扩散 / lightning 白闪 / venom 毒雾渗入 / wind 风线旋转 / laser 十字闪烁 | pixi_filter_manager.js (presetResonancePulse) | P1 |
+| 3.3 | **各元素共鸣层级视觉升级**：cryo 雪花图案 / pyro 地面灼烧 / lightning 分叉树 / venom 荧光黄绿 + 毒雾 | particles.js / pixi_effect_adapter.js | P2 |
+
+### Phase 4：PIXI Filter 实战接入（0.5-1 轮）⬜ 待开始
+
+> 基础设施（pixi_filter_manager.js）已就绪，本阶段将预设滤镜实际接入游戏效果。
+
+| # | 任务 | 对应滤镜 API | 优先级 |
+| :--- | :--- | :--- | :--- |
+| 4.1 | **Cryo 冰封壳 ColorMatrixFilter**：对 temp ≤ -100 的敌人施加冷蓝色偏移 | `presetCryoTint()` + `filterApply()` | P1 |
+| 4.2 | **Pyro BurnEffect 暖调滤镜**：对 BurnEffect auraSprite 施加暖红增强 | `presetPyroTint()` + `filterApply()` | P1 |
+| 4.3 | **Lightning 电弧脉冲滤镜**：对 ElectrocuteEffect 施加高频亮度振荡 | `presetLightningPulse()` + `filterApply()` | P2 |
+| 4.4 | **自定义 Heat Haze Shader**：pyro 高温区域正弦波位移扭曲 | `createHeatHazeFilter()` | P2 |
+| 4.5 | **自定义 Frost Overlay Shader**：cryo 冰封区域冰晶噪声 + 边缘光晕 | `createFrostOverlayFilter()` | P2 |
+| 4.6 | **全局 Bloom/Glow 后处理**（可选）：对 pixiApp.stage 施加 BlurFilter 叠加 | `createBlurFilter()` | P3 |

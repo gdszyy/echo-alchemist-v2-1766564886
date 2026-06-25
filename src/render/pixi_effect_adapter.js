@@ -1573,6 +1573,240 @@ export function burnEffect_pixiDestroy(pixi) {
     }
 }
 
+// ─── ElectrocuteEffect 适配器 ────────────────────────────────────
+
+/**
+ * 为 ElectrocuteEffect 创建 PixiJS 显示对象
+ * @param {object} ee ElectrocuteEffect 实例
+ * @returns {{ gfx: PIXI.Graphics }}
+ */
+export function electrocuteEffect_pixiCreate(ee) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    return { gfx };
+}
+
+/**
+ * 同步 ElectrocuteEffect 状态到 PixiJS 显示对象
+ * @param {object} ee ElectrocuteEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function electrocuteEffect_pixiSync(ee, pixi) {
+    const { gfx } = pixi;
+    if (!gfx) return;
+
+    if (ee.intensity < 0.01) {
+        gfx.clear();
+        return;
+    }
+
+    gfx.clear();
+    for (const arc of ee._arcs) {
+        if (!arc.active || arc.points.length < 2) continue;
+        const alpha = (arc.life / arc.maxLife) * ee.intensity;
+
+        // 外层辉光（宽、淡紫色）
+        gfx.lineStyle(4, 0xC084FC, Math.max(0, alpha * 0.3));
+        gfx.moveTo(ee.x + arc.points[0].x, ee.y + arc.points[0].y);
+        for (let i = 1; i < arc.points.length; i++) {
+            gfx.lineTo(ee.x + arc.points[i].x, ee.y + arc.points[i].y);
+        }
+
+        // 中层
+        gfx.lineStyle(2.5, 0xC084FC, Math.max(0, alpha * 0.6));
+        gfx.moveTo(ee.x + arc.points[0].x, ee.y + arc.points[0].y);
+        for (let i = 1; i < arc.points.length; i++) {
+            gfx.lineTo(ee.x + arc.points[i].x, ee.y + arc.points[i].y);
+        }
+
+        // 核心白线
+        gfx.lineStyle(1.5, 0xFFFFFF, Math.max(0, alpha * 0.7));
+        gfx.moveTo(ee.x + arc.points[0].x, ee.y + arc.points[0].y);
+        for (let i = 1; i < arc.points.length; i++) {
+            gfx.lineTo(ee.x + arc.points[i].x, ee.y + arc.points[i].y);
+        }
+    }
+}
+
+/**
+ * 销毁 ElectrocuteEffect 的 PixiJS 显示对象
+ */
+export function electrocuteEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
+// ─── VenomEffect 适配器 ──────────────────────────────────────────
+
+/**
+ * 为 VenomEffect 创建 PixiJS 显示对象
+ * @param {object} ve VenomEffect 实例
+ * @returns {{ gfx: PIXI.Graphics }}
+ */
+export function venomEffect_pixiCreate(ve) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    return { gfx };
+}
+
+/**
+ * 同步 VenomEffect 状态到 PixiJS 显示对象
+ * @param {object} ve VenomEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function venomEffect_pixiSync(ve, pixi) {
+    const { gfx } = pixi;
+    if (!gfx) return;
+
+    if (ve.intensity < 0.01) {
+        gfx.clear();
+        return;
+    }
+
+    const w = ve.width, h = ve.height;
+    gfx.clear();
+
+    for (const drip of ve._drips) {
+        if (!drip.active) continue;
+
+        const alpha = ve.intensity * 0.5;
+        const pathLen = h * 0.7;
+        const sx = ve.x + drip.startX * w;
+        const sy = ve.y - h * 0.35;
+        const ey = sy + pathLen * drip.progress;
+        const wobX = Math.sin(ve.time * 2 + drip.wobble) * w * 0.05;
+
+        // 毒液路径辉光（外层）
+        gfx.lineStyle(4, 0x84CC16, Math.max(0, alpha * 0.3));
+        gfx.moveTo(sx, sy);
+        gfx.bezierCurveTo(
+            sx + wobX, sy + pathLen * 0.3,
+            sx - wobX, sy + pathLen * 0.6,
+            sx + wobX * 0.5, ey
+        );
+
+        // 核心线
+        gfx.lineStyle(2, 0xC8FFB4, Math.max(0, alpha * 0.7));
+        gfx.moveTo(sx, sy);
+        gfx.bezierCurveTo(
+            sx + wobX, sy + pathLen * 0.3,
+            sx - wobX, sy + pathLen * 0.6,
+            sx + wobX * 0.5, ey
+        );
+
+        // 滴落点
+        if (drip.progress > 0.7) {
+            const dotAlpha = (drip.progress - 0.7) / 0.3 * alpha;
+            gfx.beginFill(0xC8FFB4, Math.max(0, dotAlpha * 0.8));
+            gfx.drawCircle(sx + wobX * 0.5, ey, 3);
+            gfx.endFill();
+        }
+    }
+}
+
+/**
+ * 销毁 VenomEffect 的 PixiJS 显示对象
+ */
+export function venomEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
+// ─── WindMarkEffect 适配器 ───────────────────────────────────────
+
+/**
+ * 为 WindMarkEffect 创建 PixiJS 显示对象
+ * @param {object} wm WindMarkEffect 实例
+ * @returns {{ ringSprite: PIXI.Sprite, gfx: PIXI.Graphics }}
+ */
+export function windMarkEffect_pixiCreate(wm) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    // 底层风环 Sprite（复用 windVortex 纹理）
+    const windTex = pixiGetEffectTexture('windVortex');
+    const ringSprite = windTex ? new PIXI.Sprite(windTex) : null;
+    if (ringSprite) {
+        ringSprite.anchor.set(0.5);
+        ringSprite.blendMode = PIXI.BLEND_MODES.ADD;
+        container.addChild(ringSprite);
+    }
+
+    // 上层风线 Graphics
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    return { ringSprite, gfx };
+}
+
+/**
+ * 同步 WindMarkEffect 状态到 PixiJS 显示对象
+ * @param {object} wm WindMarkEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function windMarkEffect_pixiSync(wm, pixi) {
+    const { ringSprite, gfx } = pixi;
+
+    if (wm.intensity < 0.01) {
+        if (ringSprite) ringSprite.alpha = 0;
+        if (gfx) gfx.clear();
+        return;
+    }
+
+    const w = wm.width, h = wm.height;
+    const baseR = Math.max(w, h) * 0.55;
+
+    // 风环 Sprite 同步
+    if (ringSprite) {
+        ringSprite.x = wm.x;
+        ringSprite.y = wm.y;
+        const scale = baseR * 2.2;
+        ringSprite.width = scale;
+        ringSprite.height = scale;
+        ringSprite.rotation = wm.rotation;
+        ringSprite.alpha = wm.intensity * 0.25;
+    }
+
+    // 风线 Graphics 同步
+    if (gfx) {
+        gfx.clear();
+        for (let i = 0; i < wm._bladeCount; i++) {
+            const seed = wm._bladeSeeds[i];
+            const angle = wm.rotation * seed.speed + seed.offset;
+            const r = baseR * seed.radius;
+            const alpha = wm.intensity * 0.45;
+
+            // 外层辉光
+            gfx.lineStyle(3, 0x34D399, Math.max(0, alpha * 0.3));
+            gfx.arc(wm.x, wm.y, r, angle, angle + seed.span);
+
+            // 核心线
+            gfx.lineStyle(1.5, 0xD1FAE5, Math.max(0, alpha * 0.7));
+            gfx.arc(wm.x, wm.y, r, angle, angle + seed.span);
+        }
+    }
+}
+
+/**
+ * 销毁 WindMarkEffect 的 PixiJS 显示对象
+ */
+export function windMarkEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.ringSprite) { pixi.ringSprite.destroy(); pixi.ringSprite = null; }
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
 // ─── 全局 PixiJS 特效清理 ──────────────────────────────────────
 
 /**
@@ -1586,16 +1820,258 @@ export function burnEffect_pixiDestroy(pixi) {
  *
  * @param {object} game - Game 实例（含 iceWaves / fireWaves / collectionBeams / particles 等数组）
  */
-// AffixSkillVFX adapter placeholder.
-// Kept as no-op until the owning visual class is wired in; this preserves
-// module import integrity for particles.js during the staged PixiJS migration.
-export function affixSkillVFX_pixiCreate() {
-    return null;
+// ─── AffixSkillVFX 适配器 ──────────────────────────────────────
+
+/**
+ * 为 AffixSkillVFX 实例创建 PixiJS 显示对象
+ * 使用 PIXI.Graphics 程序化绘制词条技能特效
+ * 粒子通过 game.spawn_createParticle 独立管理（不在此适配器内）
+ * @param {AffixSkillVFX} vfx - AffixSkillVFX 实例
+ * @returns {{ gfx: PIXI.Graphics, glowSprite: PIXI.Sprite|null }|null}
+ */
+export function affixSkillVFX_pixiCreate(vfx) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    // Optional glow sprite based on skill type
+    let glowSprite = null;
+    const glowTexName = {
+        regen: 'healGlow', devour: 'vortexGlow', berserk: 'fireRing',
+        shield: 'shockwaveRing', jump: 'shockwaveRing', clone: 'vortexGlow',
+    }[vfx.skillType];
+    if (glowTexName) {
+        const tex = pixiGetEffectTexture(glowTexName);
+        if (tex) {
+            glowSprite = new PIXI.Sprite(tex);
+            glowSprite.anchor.set(0.5);
+            glowSprite.blendMode = PIXI.BLEND_MODES.ADD;
+            container.addChild(glowSprite);
+        }
+    }
+
+    return { gfx, glowSprite, skillType: vfx.skillType };
 }
 
-export function affixSkillVFX_pixiSync() {}
+/**
+ * 每帧同步 AffixSkillVFX 状态到 PixiJS 显示对象
+ * Graphics 根据 skillType 和当前阶段绘制不同的程序化图形
+ */
+export function affixSkillVFX_pixiSync(vfx, pixi) {
+    const { gfx, glowSprite } = pixi;
+    if (!gfx) return;
 
-export function affixSkillVFX_pixiDestroy() {}
+    gfx.clear();
+    if (vfx.life <= 0) {
+        if (glowSprite) glowSprite.alpha = 0;
+        return;
+    }
+
+    const x = vfx.x;
+    const y = vfx.y;
+    const alpha = vfx._gfxData.alpha;
+    const scale = vfx._gfxData.scale;
+    const rotation = vfx._gfxData.rotation;
+    const phase = vfx.phase;
+
+    // Update glow sprite
+    if (glowSprite) {
+        glowSprite.x = x;
+        glowSprite.y = y;
+        const glowSize = 80 * scale;
+        glowSprite.width = glowSize;
+        glowSprite.height = glowSize;
+        glowSprite.alpha = alpha * 0.5;
+        glowSprite.rotation = rotation * 0.3;
+    }
+
+    // Draw per-type graphics
+    switch (vfx.skillType) {
+    case 'berserk': {
+        // Jagged flame silhouette from bottom
+        const segments = vfx._gfxData.flameSegments || 8;
+        const baseY = y + 20;
+        const flameHeight = 40 * scale * vfx.intensity;
+        // Three-pass glow: outer -> mid -> core
+        for (let pass = 0; pass < 3; pass++) {
+            const widths = [8, 4, 1.5];
+            const alphas = [alpha * 0.3, alpha * 0.6, alpha * 0.9];
+            const colors = [0xEF4444, 0xF97316, 0xFBBF24];
+            gfx.lineStyle(widths[pass], colors[pass], alphas[pass]);
+            gfx.moveTo(x - 20 * scale, baseY);
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const px = x - 20 * scale + t * 40 * scale;
+                const jag = (i % 2 === 0) ? -flameHeight : -flameHeight * 0.5;
+                const flicker = Math.sin(rotation * 3 + i * 1.7) * 5 * scale;
+                gfx.lineTo(px, baseY + jag + flicker);
+            }
+            gfx.lineTo(x + 20 * scale, baseY);
+        }
+        break;
+    }
+    case 'shield': {
+        // Hexagonal shield outline
+        const radius = 30 * scale;
+        const sides = 6;
+        for (let pass = 0; pass < 3; pass++) {
+            const widths = [6, 3, 1];
+            const alphas = [alpha * 0.25, alpha * 0.55, alpha * 0.85];
+            const colors = [0x93C5FD, 0x93C5FD, 0xFFFFFF];
+            gfx.lineStyle(widths[pass], colors[pass], alphas[pass]);
+            for (let i = 0; i <= sides; i++) {
+                const angle = (i / sides) * Math.PI * 2 + rotation * 0.3;
+                const px = x + Math.cos(angle) * radius;
+                const py = y + Math.sin(angle) * radius;
+                if (i === 0) gfx.moveTo(px, py);
+                else gfx.lineTo(px, py);
+            }
+        }
+        // Pulsing hex nodes during burst
+        if (phase === 'burst') {
+            gfx.lineStyle(0);
+            gfx.beginFill(0x93C5FD, alpha * 0.8);
+            for (let i = 0; i < sides; i++) {
+                const angle = (i / sides) * Math.PI * 2 + rotation * 0.3;
+                const px = x + Math.cos(angle) * radius;
+                const py = y + Math.sin(angle) * radius;
+                gfx.drawCircle(px, py, 3 * scale);
+            }
+            gfx.endFill();
+        }
+        break;
+    }
+    case 'regen': {
+        // Vertical liquid column (three-pass)
+        const colHeight = 35 * scale;
+        const colWidth = 8 * scale;
+        for (let pass = 0; pass < 3; pass++) {
+            const widths = [colWidth * 2, colWidth, colWidth * 0.3];
+            const alphas = [alpha * 0.2, alpha * 0.5, alpha * 0.8];
+            const colors = [0x4ADE80, 0x86EFAC, 0xFFFFFF];
+            gfx.lineStyle(widths[pass], colors[pass], alphas[phase === 'burst' ? 1 : 0]);
+            gfx.moveTo(x, y + 15);
+            gfx.lineTo(x, y + 15 - colHeight);
+        }
+        // Rising bubble outlines during burst
+        if (phase === 'burst' && vfx.perfTier === 'high') {
+            gfx.lineStyle(1, 0x4ADE80, alpha * 0.4);
+            for (let i = 0; i < 3; i++) {
+                const by = y + 10 - (vfx._burstProgress * colHeight + i * 12);
+                const bx = x + Math.sin(rotation * 2 + i * 2) * 6 * scale;
+                gfx.drawCircle(bx, by, 2 + Math.random());
+            }
+        }
+        break;
+    }
+    case 'haste': {
+        // Horizontal speed streaks (three-pass)
+        const streakLen = 35 * scale;
+        for (let i = 0; i < 3; i++) {
+            const sy = y + (i - 1) * 6 * scale;
+            const fadeAlpha = alpha * (1 - i * 0.25);
+            for (let pass = 0; pass < 3; pass++) {
+                const widths = [5, 2.5, 0.8];
+                const alphas = [fadeAlpha * 0.2, fadeAlpha * 0.5, fadeAlpha * 0.8];
+                const colors = [0xFACC15, 0xFDE047, 0xFFFFFF];
+                gfx.lineStyle(widths[pass], colors[pass], alphas[pass]);
+                gfx.moveTo(x - streakLen, sy);
+                gfx.lineTo(x + 5, sy);
+            }
+        }
+        // Elite/Boss zigzag electric arc
+        if (vfx.isElite || vfx.isBoss) {
+            gfx.lineStyle(1.5, 0xA78BFA, alpha * 0.6);
+            gfx.moveTo(x - streakLen * 0.8, y - 8);
+            gfx.lineTo(x - streakLen * 0.4, y + 5);
+            gfx.lineTo(x - streakLen * 0.1, y - 5);
+            gfx.lineTo(x + 3, y + 3);
+        }
+        break;
+    }
+    case 'jump': {
+        // Spring coil at bottom (telegraph: compressed, burst: extended)
+        const springY = y + 22;
+        const compression = phase === 'telegraph' ? (1 - vfx._telegraphProgress * 0.7) : 1.0;
+        const springHeight = 15 * scale * compression;
+        gfx.lineStyle(2, 0x2DD4BF, alpha * 0.7);
+        for (let i = 0; i < 4; i++) {
+            const segY = springY - (i / 3) * springHeight;
+            const segX = x + (i % 2 === 0 ? -8 : 8) * scale;
+            if (i === 0) gfx.moveTo(x, springY);
+            gfx.lineTo(segX, segY);
+        }
+        gfx.lineTo(x, springY - springHeight);
+        // Landing shockwave ring (burst phase only)
+        if (phase === 'burst') {
+            const ringRadius = vfx._burstProgress * 30 * scale;
+            gfx.lineStyle(2, 0x38BDF8, alpha * 0.5 * (1 - vfx._burstProgress));
+            gfx.drawCircle(x, y, ringRadius);
+        }
+        break;
+    }
+    case 'clone': {
+        // Cell division: two circles separating
+        const separation = phase === 'telegraph'
+            ? vfx._telegraphProgress * 8 * scale
+            : (8 + vfx._burstProgress * 15) * scale;
+        for (let pass = 0; pass < 3; pass++) {
+            const widths = [5, 2.5, 0.8];
+            const alphas = [alpha * 0.2, alpha * 0.5, alpha * 0.8];
+            const colors = [0xC084FC, 0xD8B4FE, 0xFFFFFF];
+            gfx.lineStyle(widths[pass], colors[pass], alphas[pass]);
+            gfx.drawCircle(x - separation, y, 12 * scale);
+            gfx.drawCircle(x + separation, y, 12 * scale);
+        }
+        // Connecting strand during telegraph
+        if (phase === 'telegraph') {
+            gfx.lineStyle(1.5, 0xD8B4FE, alpha * 0.6);
+            gfx.moveTo(x - separation, y);
+            gfx.lineTo(x + separation, y);
+        }
+        break;
+    }
+    case 'devour': {
+        // Rotating spiral arms (four arms converging to center)
+        const arms = 4;
+        const armRadius = 35 * scale;
+        for (let pass = 0; pass < 3; pass++) {
+            const widths = [6, 3, 1];
+            const alphas = [alpha * 0.25, alpha * 0.5, alpha * 0.75];
+            const colors = [0x991B1B, 0xDC2626, 0xFFFFFF];
+            gfx.lineStyle(widths[pass], colors[pass], alphas[pass]);
+            for (let a = 0; a < arms; a++) {
+                const baseAngle = (a / arms) * Math.PI * 2 + rotation;
+                gfx.moveTo(
+                    x + Math.cos(baseAngle) * armRadius,
+                    y + Math.sin(baseAngle) * armRadius
+                );
+                // Quadratic curve toward center
+                const midAngle = baseAngle + 0.5;
+                const midR = armRadius * 0.5;
+                gfx.quadraticCurveTo(
+                    x + Math.cos(midAngle) * midR,
+                    y + Math.sin(midAngle) * midR,
+                    x, y
+                );
+            }
+        }
+        break;
+    }
+    }
+}
+
+/**
+ * 销毁 AffixSkillVFX 的 PixiJS 显示对象
+ */
+export function affixSkillVFX_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+    if (pixi.glowSprite) { pixi.glowSprite.destroy(); pixi.glowSprite = null; }
+}
 
 export function pixiCleanupAllEffects(game) {
     if (!game) return;
@@ -1614,6 +2090,7 @@ export function pixiCleanupAllEffects(game) {
         ['floatingTexts',       floatingText_pixiDestroy],
         ['_muzzleFlashesV2',    muzzleFlashV2_pixiDestroy],
         ['_firingBursts',       firingBurst_pixiDestroy],
+        ['affixSkillVFXList',   affixSkillVFX_pixiDestroy],
     ];
 
     for (const [arrName, destroyFn] of arrayDestroyMap) {
