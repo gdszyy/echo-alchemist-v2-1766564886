@@ -3030,7 +3030,9 @@ class Enemy {
     }
 
     // --- [核心修改] 第二步：执行动作 (Execute Action) ---
-    executeTurnAction(game) {
+    // options.skipMove=true 时只结算词条行动，不进行移动/跳跃（用于狂暴即时反击等场景）
+    executeTurnAction(game, options = {}) {
+        const skipMove = !!options.skipMove;
         if (this._consumeBossVulnerabilityExposedTurn(game)) return;
 
         // @section:enemy_action_audio - 敌人行动音效分发：regen/split/freeze 按词缀类型路由
@@ -3203,6 +3205,15 @@ class Enemy {
             }
         }
 
+        // [skipMove] 仅结算词条行动、跳过所有移动/跳跃与移动冷却逻辑
+        // 用于 Boss 进入狂暴时的「立刻行动但不移动」即时反击
+        if (skipMove) {
+            this.hasActedThisTurn = true;
+            this._overloadDamageThisTurn = 0;
+            this._overloadBonusThisTurn = 0;
+            return;
+        }
+
         // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
         // [Boss 移动冷却逻辑]
         // 狂暴模式下：每回合必定移动（_moveCooldown 始终为 0）
@@ -3291,6 +3302,28 @@ class Enemy {
         this.hasActedThisTurn = true;
         this._overloadDamageThisTurn = 0;
         this._overloadBonusThisTurn = 0;
+    }
+
+    /**
+     * @method triggerImmediateAction
+     * @description 立刻触发一次自身行动（仅本敌人，不移动、不影响其他敌人）。
+     *   用于 Boss 进入狂暴时的即时反击：只结算自身词条行动一次，
+     *   不进行移动/跳跃。冻结状态下不触发。
+     *   注意：此方法在玩家战斗阶段调用，所设置的 hasActedThisTurn 会在
+     *   phase_enemy_startLogic 中被重置，因此不影响 Boss 后续敌人回合的正常行动。
+     * @param {Object} game - 游戏主对象
+     */
+    triggerImmediateAction(game) {
+        if (!this.active) return;
+        if (this.isFrozenCurrentTurn) return;
+        // 清除可能残留的「狂暴」动作标记，确保本次只行动一次（不被 actionName==='狂暴' 翻倍）
+        const prevActionName = this.actionName;
+        const prevActionIcon = this.actionIcon;
+        this.actionName = '';
+        this.actionIcon = '';
+        this.executeTurnAction(game, { skipMove: true });
+        this.actionName = prevActionName;
+        this.actionIcon = prevActionIcon;
     }
 
     performTurnActionAndMove(game) {
