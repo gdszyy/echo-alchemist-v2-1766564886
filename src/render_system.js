@@ -569,6 +569,11 @@ export const render_system = {
         const chargeProgress = Math.max(0, Math.min(1, visual.chargeProgress || 0));
         const reloadProgress = Math.max(0, Math.min(1, visual.reloadProgress || 0));
         const recoilY = visual.isReloading ? Math.sin(reloadProgress * Math.PI) * 4 * bodyScale : 0;
+        // [reload-reveal] 发射后下一发弹药信息的“装填成形”进度：reloadProgress 0→1 期间
+        // 整组信号（读数 / 弹仓 / 弹药本体）随之淡入，而不是瞬间出现。easeOutCubic 让收尾更顺。
+        const revealT = visual.isReloading
+            ? (1 - Math.pow(1 - reloadProgress, 3))
+            : 1;
         const chamberX = 0;
         const chamberY = 7 * bodyScale + recoilY;
         const magazine = {
@@ -586,6 +591,7 @@ export const render_system = {
 
         const drawDamageReadout = () => {
             ctx.save();
+            ctx.globalAlpha *= revealT;
             const value = String(profile.damage);
             const maxValueWidth = 23 * bodyScale;
             let valueSize = 10 * bodyScale;
@@ -612,7 +618,7 @@ export const render_system = {
 
         const drawBurstReadout = () => {
             ctx.save();
-            ctx.globalAlpha = 0.96;
+            ctx.globalAlpha = 0.96 * revealT;
             ctx.fillStyle = '#fef3c7';
             ctx.font = `bold ${8 * bodyScale}px Cinzel`;
             ctx.textAlign = 'center';
@@ -647,17 +653,17 @@ export const render_system = {
                 }
                 if (smallIcon) {
                     const iconSize = 9.8 * bodyScale;
-                    ctx.globalAlpha = 0.96;
+                    ctx.globalAlpha = 0.96 * revealT;
                     ctx.drawImage(smallIcon, x - iconSize / 2, magazine.y - iconSize / 2, iconSize, iconSize);
                 } else {
                     ctx.fillStyle = color;
-                    ctx.globalAlpha = 0.92;
+                    ctx.globalAlpha = 0.92 * revealT;
                     ctx.beginPath();
                     ctx.arc(x, magazine.y, 4.2 * bodyScale, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 ctx.shadowBlur = 0;
-                ctx.globalAlpha = 1;
+                ctx.globalAlpha = revealT;
                 ctx.font = `bold ${5.3 * bodyScale}px Cinzel`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -677,18 +683,35 @@ export const render_system = {
             const params = visual.params || Projectile.calculateVisualParams(recipe, false);
             const deformation = visual.deformation || { x: 1, y: 1 };
             const rotation = Number.isFinite(visual.previewRotation) ? visual.previewRotation : -Math.PI / 2;
-            const projectileRadius = Math.max(7, Math.min(12 * bodyScale, params.radius * 0.82 * (1 + chargeProgress * 0.16)));
+            let projectileRadius = Math.max(7, Math.min(12 * bodyScale, params.radius * 0.82 * (1 + chargeProgress * 0.16)));
+
+            // [reload-load-in] 装填阶段：弹药从弹仓方向带轻微过冲地“弹入”弹膛并放大成形，
+            // 而不是发射后瞬间满尺寸出现。
+            let loadRiseY = 0;
+            if (visual.isReloading) {
+                const t = reloadProgress;
+                // easeOutBack：带一点回弹过冲，强化“咔哒装填到位”的手感
+                const c1 = 1.70158;
+                const c3 = c1 + 1;
+                const back = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+                projectileRadius *= Math.max(0.05, back);
+                // 前 80% 内从下方（弹仓）升入弹膛
+                loadRiseY = (1 - Math.min(1, t / 0.8)) * 18 * bodyScale;
+            }
+
+            ctx.save();
+            ctx.globalAlpha *= revealT;
             Projectile.drawVisuals(
                 ctx,
                 chamberX,
-                chamberY,
+                chamberY + loadRiseY,
                 projectileRadius,
                 recipe,
                 rotation,
                 params.intensity,
                 deformation
             );
-
+            ctx.restore();
         };
 
         drawLoadedProjectile();
