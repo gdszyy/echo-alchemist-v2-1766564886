@@ -1960,12 +1960,20 @@ class DeathExplosion {
      * @param {number} y
      * @param {'normal'|'elite'|'boss'} tier - 敌人等级
      */
-    constructor(x, y, tier = 'normal') {
+    constructor(x, y, tier = 'normal', variant = 'default') {
         this.x = x;
         this.y = y;
         this.tier = tier;
+        this.variant = variant;
         this.life = 1.0;
         this.timer = 0;
+
+        // [剧毒火焰死亡] 毒焰溶解专属死亡：绿色毒气云 + 上升毒焰舌 + 酸液气泡 + 飞溅毒滴
+        if (variant === 'venom') {
+            this._initVenom(tier);
+            this._pixi = null;
+            return;
+        }
 
         if (tier === 'boss') {
             // Boss：先膨胀挥扎，再猛烈内爆塑陷
@@ -2057,7 +2065,81 @@ class DeathExplosion {
         this._pixi = null; // [PixiJS 迁移]
     }
 
+    // [剧毒火焰死亡] 初始化毒焰溶解死亡的几何参数（按敌人等级缩放）
+    _initVenom(tier) {
+        const scale = tier === 'boss' ? 1.8 : (tier === 'elite' ? 1.3 : 1.0);
+        this.scale = scale;
+        this.decay = tier === 'boss' ? 0.013 : (tier === 'elite' ? 0.019 : 0.025);
+        // 毒气云：先膨胀后消散
+        this.gasRadius = 5 * scale;
+        this.gasMaxRadius = 30 + (tier === 'boss' ? 42 : (tier === 'elite' ? 18 : 0));
+        // 腐蚀核：溶解收缩的躯体残影
+        this.coreRadius = 15 * scale;
+        // 上升的毒焰舌
+        const flameCount = tier === 'boss' ? 9 : (tier === 'elite' ? 6 : 4);
+        this.flames = Array.from({ length: flameCount }, () => ({
+            ox: (Math.random() - 0.5) * 22 * scale,
+            phase: Math.random() * Math.PI * 2,
+            sway: (3 + Math.random() * 4) * scale,
+            height: (16 + Math.random() * 20) * scale,
+            width: (4 + Math.random() * 4) * scale,
+            speed: 0.7 + Math.random() * 0.6,
+            rise: 0,
+            life: 0.85 + Math.random() * 0.15,
+            bright: Math.random() < 0.4,
+        }));
+        // 酸液气泡：向外漂移后破裂
+        const bubbleCount = tier === 'boss' ? 16 : (tier === 'elite' ? 10 : 6);
+        this.bubbles = Array.from({ length: bubbleCount }, () => ({
+            angle: Math.random() * Math.PI * 2,
+            dist: (4 + Math.random() * 10) * scale,
+            speed: 0.3 + Math.random() * 0.7,
+            size: (1.6 + Math.random() * 2.6) * scale,
+            wobble: Math.random() * Math.PI * 2,
+            popAt: 0.25 + Math.random() * 0.45, // life 低于此阈值时破裂消失
+        }));
+        // 飞溅毒液滴：抛物线四散
+        const dropCount = tier === 'boss' ? 14 : (tier === 'elite' ? 9 : 5);
+        this.droplets = Array.from({ length: dropCount }, () => {
+            const a = Math.random() * Math.PI * 2;
+            const sp = (1.2 + Math.random() * 2.6) * (0.7 + scale * 0.3);
+            return {
+                x: 0, y: 0,
+                vx: Math.cos(a) * sp,
+                vy: Math.sin(a) * sp - 1.4,
+                size: (1.5 + Math.random() * 2.4) * scale,
+                gravity: 0.10 + Math.random() * 0.07,
+                bright: Math.random() < 0.5,
+                alpha: 0.7 + Math.random() * 0.3,
+            };
+        });
+    }
+
+    // [剧毒火焰死亡] 推进毒焰溶解死亡动画
+    _updateVenom(timeScale) {
+        this.timer += timeScale;
+        this.life -= this.decay * timeScale;
+        if (this.gasRadius < this.gasMaxRadius) {
+            this.gasRadius += (this.gasMaxRadius / 14) * timeScale;
+        }
+        this.coreRadius = Math.max(0, this.coreRadius - 0.45 * timeScale);
+        for (const f of this.flames) {
+            f.rise += f.speed * timeScale;
+            f.phase += 0.22 * timeScale;
+        }
+        for (const b of this.bubbles) {
+            b.dist += b.speed * timeScale;
+            b.wobble += 0.3 * timeScale;
+        }
+        for (const d of this.droplets) {
+            d.x += d.vx * timeScale;
+            d.y += d.vy * timeScale;
+            d.vy += d.gravity * timeScale;
+        }
+    }
+
     update(timeScale) {
+        if (this.variant === 'venom') { this._updateVenom(timeScale); return; }
         this.timer += timeScale;
         this.life -= this.decay * timeScale;
 
@@ -2116,6 +2198,7 @@ class DeathExplosion {
             if (!this._pixi) this._pixi = deathExplosion_pixiCreate(this);
             if (this._pixi) { deathExplosion_pixiSync(this, this._pixi); return; }
         }
+        if (this.variant === 'venom') { this._drawVenom(ctx); return; }
         ctx.save();
         const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
         const isLow = quality === 'low';
@@ -2291,6 +2374,100 @@ class DeathExplosion {
             ctx.fillStyle = s.color;
             ctx.beginPath();
             ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    // [剧毒火焰死亡] Canvas 绘制毒焰溶解死亡
+    _drawVenom(ctx) {
+        const life = Math.max(0, this.life);
+        const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const isLow = quality === 'low';
+        ctx.save();
+
+        // ---- 1. 毒气云：径向绿黄渐变（加亮混合）----
+        if (this.gasRadius > 0) {
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = life * 0.5;
+            const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.gasRadius);
+            grad.addColorStop(0, 'rgba(190,242,100,0.9)');
+            grad.addColorStop(0.45, 'rgba(132,204,22,0.5)');
+            grad.addColorStop(1, 'rgba(101,163,13,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.gasRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // ---- 2. 腐蚀核：暗绿溶解残影（正常混合，先于焰舌画）----
+        if (this.coreRadius > 0) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = life * 0.7;
+            const cGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.coreRadius);
+            cGrad.addColorStop(0, 'rgba(54,83,20,0.9)');
+            cGrad.addColorStop(0.7, 'rgba(63,98,18,0.5)');
+            cGrad.addColorStop(1, 'rgba(63,98,18,0)');
+            ctx.fillStyle = cGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.coreRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // ---- 3. 上升的毒焰舌 ----
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        for (const f of this.flames) {
+            const fa = life * f.life;
+            if (fa <= 0.02) continue;
+            const baseX = this.x + f.ox + Math.sin(f.phase) * f.sway * 0.4;
+            const baseY = this.y - f.rise;
+            const tipX = baseX + Math.sin(f.phase * 1.6) * f.sway;
+            const tipY = baseY - f.height;
+            const midX = (baseX + tipX) / 2 + Math.sin(f.phase * 1.2) * f.sway * 0.5;
+            const midY = (baseY + tipY) / 2;
+            ctx.globalAlpha = fa * 0.85;
+            const fGrad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
+            fGrad.addColorStop(0, f.bright ? 'rgba(217,249,157,0.9)' : 'rgba(132,204,22,0.85)');
+            fGrad.addColorStop(0.5, 'rgba(101,163,13,0.6)');
+            fGrad.addColorStop(1, 'rgba(101,163,13,0)');
+            ctx.strokeStyle = fGrad;
+            ctx.lineWidth = f.width;
+            if (!isLow) { ctx.shadowColor = '#84cc16'; ctx.shadowBlur = _sb(6); }
+            ctx.beginPath();
+            ctx.moveTo(baseX, baseY);
+            ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // ---- 4. 酸液气泡（漂移 + 破裂）----
+        for (const b of this.bubbles) {
+            if (this.life < b.popAt) continue; // 破裂后不再绘制
+            const bx = this.x + Math.cos(b.angle) * b.dist + Math.sin(b.wobble) * 2;
+            const by = this.y + Math.sin(b.angle) * b.dist - b.dist * 0.15;
+            ctx.globalAlpha = life * 0.55;
+            ctx.fillStyle = 'rgba(190,242,100,0.6)';
+            ctx.beginPath();
+            ctx.arc(bx, by, b.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = life * 0.85;
+            ctx.strokeStyle = 'rgba(217,249,157,0.8)';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(bx, by, b.size, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // ---- 5. 飞溅毒液滴 ----
+        for (const d of this.droplets) {
+            ctx.globalAlpha = life * d.alpha;
+            ctx.fillStyle = d.bright ? '#bef264' : '#84cc16';
+            ctx.beginPath();
+            ctx.arc(this.x + d.x, this.y + d.y, d.size, 0, Math.PI * 2);
             ctx.fill();
         }
 

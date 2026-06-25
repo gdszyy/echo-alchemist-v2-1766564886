@@ -503,6 +503,9 @@ export function deathExplosion_pixiSync(de, pixi) {
     gfx.clear();
     if (de.life <= 0) return;
 
+    // [剧毒火焰死亡] 毒焰溶解专属渲染
+    if (de.variant === 'venom') { deathExplosion_pixiSyncVenom(de, gfx); return; }
+
     const t = Math.min(1, de.timer / (1 / de.decay));
 
     // 1. Boss 膨胀阶段
@@ -594,6 +597,74 @@ export function deathExplosion_pixiSync(de, pixi) {
         const sAlpha = s.alpha * distRatio * Math.max(0, de.life);
         gfx.beginFill(pixiCssColor(s.color), Math.max(0, sAlpha));
         gfx.drawCircle(sx, sy, s.size);
+        gfx.endFill();
+    }
+}
+
+// [剧毒火焰死亡] PixiJS 渲染毒焰溶解死亡（gfx 为 ADD 混合）
+function deathExplosion_pixiSyncVenom(de, gfx) {
+    const life = Math.max(0, de.life);
+
+    // 1. 毒气云（多层叠加近似径向渐变）
+    if (de.gasRadius > 0) {
+        gfx.beginFill(0x84CC16, life * 0.16);
+        gfx.drawCircle(de.x, de.y, de.gasRadius);
+        gfx.endFill();
+        gfx.beginFill(0xBEF264, life * 0.18);
+        gfx.drawCircle(de.x, de.y, de.gasRadius * 0.6);
+        gfx.endFill();
+        gfx.beginFill(0xD9F99D, life * 0.22);
+        gfx.drawCircle(de.x, de.y, de.gasRadius * 0.3);
+        gfx.endFill();
+    }
+
+    // 2. 腐蚀核（柔和暗绿）
+    if (de.coreRadius > 0) {
+        gfx.beginFill(0x365314, life * 0.3);
+        gfx.drawCircle(de.x, de.y, de.coreRadius);
+        gfx.endFill();
+        gfx.beginFill(0x3F6212, life * 0.25);
+        gfx.drawCircle(de.x, de.y, de.coreRadius * 0.55);
+        gfx.endFill();
+    }
+
+    // 3. 上升的毒焰舌（二次贝塞尔曲线 + 外辉光）
+    for (const f of de.flames) {
+        const fa = life * f.life;
+        if (fa <= 0.03) continue;
+        const baseX = de.x + f.ox + Math.sin(f.phase) * f.sway * 0.4;
+        const baseY = de.y - f.rise;
+        const tipX = baseX + Math.sin(f.phase * 1.6) * f.sway;
+        const tipY = baseY - f.height;
+        const midX = (baseX + tipX) / 2 + Math.sin(f.phase * 1.2) * f.sway * 0.5;
+        const midY = (baseY + tipY) / 2;
+        const col = f.bright ? 0xD9F99D : 0x84CC16;
+        gfx.lineStyle(f.width * 2.2, 0x84CC16, fa * 0.3);
+        gfx.moveTo(baseX, baseY);
+        gfx.quadraticCurveTo(midX, midY, tipX, tipY);
+        gfx.lineStyle(f.width, col, fa * 0.85);
+        gfx.moveTo(baseX, baseY);
+        gfx.quadraticCurveTo(midX, midY, tipX, tipY);
+    }
+    gfx.lineStyle(0);
+
+    // 4. 酸液气泡
+    for (const b of de.bubbles) {
+        if (de.life < b.popAt) continue;
+        const bx = de.x + Math.cos(b.angle) * b.dist + Math.sin(b.wobble) * 2;
+        const by = de.y + Math.sin(b.angle) * b.dist - b.dist * 0.15;
+        gfx.beginFill(0xBEF264, life * 0.5);
+        gfx.drawCircle(bx, by, b.size);
+        gfx.endFill();
+        gfx.lineStyle(0.8, 0xD9F99D, life * 0.8);
+        gfx.drawCircle(bx, by, b.size);
+        gfx.lineStyle(0);
+    }
+
+    // 5. 飞溅毒液滴
+    for (const d of de.droplets) {
+        gfx.beginFill(d.bright ? 0xBEF264 : 0x84CC16, life * d.alpha);
+        gfx.drawCircle(de.x + d.x, de.y + d.y, d.size);
         gfx.endFill();
     }
 }

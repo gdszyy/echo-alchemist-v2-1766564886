@@ -861,6 +861,36 @@ class SoundManager {
                 noise.stop(now + 0.25);
                 break;
             }
+            // @section:effect_venom_death - venom_death：剧毒火焰溶解死亡，低频咕噜下滑 + 高通腐蚀噪声嘶嘶
+            case 'venom_death': {
+                // 低频咕噜（溶解感）：三角波下滑
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.35);
+                gain.gain.setValueAtTime(0.07, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+                osc.connect(gain);
+                gain.connect(this.sfxGain);
+                osc.start(now);
+                osc.stop(now + 0.4);
+                // 腐蚀嘶嘶声（高通白噪声）
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const nFilter = this.ctx.createBiquadFilter();
+                nFilter.type = 'highpass';
+                nFilter.frequency.setValueAtTime(1400, now);
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.06, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                noise.connect(nFilter);
+                nFilter.connect(noiseGain);
+                noiseGain.connect(this.sfxGain);
+                noise.start(now);
+                noise.stop(now + 0.32);
+                break;
+            }
             default:
                 this.playTone(400, 'sine', 0.08, 0.1);
         }
