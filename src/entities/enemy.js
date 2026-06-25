@@ -1007,18 +1007,21 @@ class Enemy {
             
             // 1.  燃烧前的黑烟 -> 改为 Mist (模拟热浪/蒸汽)
             // 概率随温度升高
-            if (Math.random() < (0.02 + (this.temp / 400)) * timeScale) {
+            // [可视性] 黑烟会用 source-over 真实遮挡美术素材与身后的敌人，
+            //          因此降低生成频率、降低不透明度、加快消散，避免画面被糊住。
+            if (Math.random() < (0.01 + (this.temp / 900)) * timeScale) {
                 const spawnX = this.pos.x + (Math.random() - 0.5) * this.width * 0.8;
                 const spawnY = this.pos.y - this.height * 0.4;
 
-                // 颜色：使用纯黑色，带一点透明度
+                // 颜色：使用纯黑色，带一点透明度（更淡）
                 // 必须包含 '0,0,0' 以便让 Particle.draw 识别并关闭混合模式
-                const smokeColor = `rgba(0, 0, 0, ${0.2 + Math.random() * 0.15})`;
+                const smokeColor = `rgba(0, 0, 0, ${0.1 + Math.random() * 0.07})`;
 
                 const heatSmoke = new Particle(spawnX, spawnY, smokeColor, 'mist');
                 heatSmoke.vel.y = -0.8 - Math.random() * 0.8; // 上升速度稍快
                 heatSmoke.vel.x = (Math.random() - 0.5) * 0.5; // 稍微左右飘
-                heatSmoke.size = this.width * 0.22; // 减小烟雾团尺寸
+                heatSmoke.size = this.width * 0.18; // 减小烟雾团尺寸（更小，减少遮挡）
+                heatSmoke.decay = 0.045 + Math.random() * 0.02; // 更快消散（原 mist ≈0.02）
                 // [限制] 热浪烟雾也受风属性压制
                 game.spawn_pushParticleWithLimit(heatSmoke);
             }
