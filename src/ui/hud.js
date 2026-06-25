@@ -379,7 +379,8 @@ export const hud_system = {
                     'resonance': { name: '🔂 共鸣', color: CONFIG.ui.damageStats.resonance },
                     'venom': { name: '☠️ 剧毒', color: CONFIG.ui.damageStats.venom },
                     'overcharge': { name: '⚡ 超载', color: CONFIG.ui.damageStats.overcharge },
-                    'echo': { name: '🔊 回响', color: CONFIG.ui.damageStats.echo }
+                    'echo': { name: '🔊 回响', color: CONFIG.ui.damageStats.echo },
+                    'skill': { name: '✨ 技能', color: CONFIG.ui.damageStats.skill }
                 };
                 
                 const conf = typeConfig[dtype] || { name: dtype, color: CONFIG.ui.damageStats.default };

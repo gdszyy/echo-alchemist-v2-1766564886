@@ -13,7 +13,7 @@
  * @module ui/shop
  */
 
-import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS } from '../config.js';
+import { META_SHOP_CONFIG, CONFIG, RELIC_DB, BOARD_STRUCTURE_RELICS, SKILL_DB } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
 import { showToast } from '../entities.js';
 import { eventBus } from '../event_bus.js';
@@ -395,9 +395,15 @@ export const shop_system = {
         if (window.showToast) showToast(`獲得遺物: ${relic.name}`);
         
         // 处理遗物效果
-        if (relic.effect === 'pink_peg_up') {
+        if (relic.effect === 'unlock_skill') {
+            // [技能来源扩展] 解锁主动技能的遗物：实际解锁由 combat_recomputeActiveSkills()
+            // 读取 ownedRelics 完成（本函数末尾统一调用）。
+            const sk = (SKILL_DB || []).find(s => s.id === relic.skillId);
+            if (window.showToast && sk) showToast(`解锁技能: ${sk.name}`);
+        }
+        else if (relic.effect === 'pink_peg_up') {
             this.pinkPegCount = (this.pinkPegCount || 0) + 3;
-        } 
+        }
         else if (relic.effect === 'combat_wall') {
             this.hasCombatWall = true;
         } else if (relic.effect === 'permanent_size_up') {
@@ -608,6 +614,11 @@ export const shop_system = {
             if (window.showToast) showToast(`混沌契约已签订！子弹伤害 ×2，但研磨阶段被禁用。`);
         }
         // ============================================================================
+
+        // [技能来源扩展] 拾取任意遗物后重算技能并集（unlock_skill 遗物据此解锁对应主动技能）
+        if (typeof this.combat_recomputeActiveSkills === 'function') {
+            this.combat_recomputeActiveSkills();
+        }
 
         if (!options.skipClose) this.ui_closeRelicSelection();
     },

@@ -594,49 +594,22 @@ export const rune_launcher_system = {
             }
         }
 
-        // 9. [技能系统迭代] 根据激活的符文词条派生已解锁技能列表
-        //    SKILL_DB 中每个技能的 unlockRuneword 字段指向一个 RUNEWORD_DB 的 id
-        //    当该词条被激活时，对应技能自动解锁
-        const prevSkillCount = this.activeSkills ? this.activeSkills.length : 0;
-        const activatedRunewordIds = new Set(activatedRunewords.map(rw => rw.id));
-        const newActiveSkills = SKILL_DB.filter(sk => sk.unlockRuneword && activatedRunewordIds.has(sk.unlockRuneword));
-        this.activeSkills = newActiveSkills;
+        // 9. [技能来源扩展] 将当前激活的词条 id 写入实例，并交由统一的
+        //    combat_recomputeActiveSkills() 计算「基础/词条/遗物/商店」四类技能并集。
+        //    （槽位增删与技能栏/SP 面板的显隐刷新都在该方法内统一处理。）
+        const prevSkillIds = new Set((this.activeSkills || []).map(s => s.id));
+        this._activeRunewordIds = new Set(activatedRunewords.map(rw => rw.id));
+        if (typeof this.combat_recomputeActiveSkills === 'function') {
+            this.combat_recomputeActiveSkills();
+        } else {
+            // 兜底：旧逻辑（仅词条来源）
+            this.activeSkills = SKILL_DB.filter(sk => sk.unlockRuneword && this._activeRunewordIds.has(sk.unlockRuneword));
+        }
 
-        // 如果技能列表发生变化，同步更新技能杠和 SP 面板显隐
-        if (newActiveSkills.length !== prevSkillCount) {
-            // 如果有新解锁的技能，确保 skill_point 槽在下一回合中生成
-            if (newActiveSkills.length > 0 && !this.unlockedSlots.includes('skill_point')) {
-                this.unlockedSlots.push('skill_point');
-                // 增加槽位数量以容纳技能点槽
-                if (this.slotCount < this.unlockedSlots.length) {
-                    this.slotCount = this.unlockedSlots.length;
-                }
-                showToast('✨ 符文解锁技能！下一回合将出现技能点槽');
-            } else if (newActiveSkills.length === 0 && this.unlockedSlots.includes('skill_point')) {
-                this.unlockedSlots = this.unlockedSlots.filter(t => t !== 'skill_point');
-                this.slotCount = Math.max(1, this.unlockedSlots.length);
-            }
-            // 同步更新技能杠显示
-            if (this.ui) {
-                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-            }
-            // [fix] 精确更新技能杠和 SP 面板的显隐，避免调用 ui_updateUI() 导致
-            // 所有 .ui-overlay 被全局隐藏，从而意外关闭符文发射器面板。
-            const hasSkills = this.activeSkills && this.activeSkills.length > 0;
-            const skillBar = document.getElementById('skill-bar');
-            if (skillBar) {
-                skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
-            }
-            const spPanel = document.getElementById('sp-panel');
-            if (spPanel) {
-                if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkills) {
-                    spPanel.style.opacity = '1';
-                    spPanel.style.pointerEvents = 'auto';
-                } else {
-                    spPanel.style.opacity = '0';
-                    spPanel.style.pointerEvents = 'none';
-                }
-            }
+        // 词条新解锁技能时给出提示（避免局开始的基础技能也弹提示）
+        const newlyUnlocked = (this.activeSkills || []).filter(s => s.unlockRuneword && !prevSkillIds.has(s.id));
+        if (newlyUnlocked.length > 0) {
+            showToast(`✨ 符文解锁技能：${newlyUnlocked.map(s => s.name).join('、')}`);
         }
     },
 

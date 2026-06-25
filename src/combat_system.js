@@ -328,6 +328,327 @@ export const combat_system = {
                 showToast('無彈藥可強化');
             }
         }
+
+        // ==================== [技能来源扩展] 新增技能（基础/词条/遗物/商店）统一分发 ====================
+        else if (typeof this.combat_activateSkillExtended === 'function') {
+            this.combat_activateSkillExtended(skill, p, method);
+        }
+    },
+
+    /**
+     * combat_recomputeActiveSkills - 统一重算「当前局内已解锁技能列表」
+     *
+     * [技能来源扩展] activeSkills 现在是四类来源的并集：
+     *   1. 基础技能 (source:'base')              —— 每局常驻，保证 SP 永远有去处
+     *   2. 词条解锁 (unlockRuneword 命中激活词条)  —— 由 ui_updateRuneGrid 写入 this._activeRunewordIds
+     *   3. 遗物解锁 (unlockRelic 命中 ownedRelics)
+     *   4. 商店购买 (技能 id 命中 purchasedSkillIds)
+     *
+     * 任何来源发生变化（放置符文 / 拾取遗物 / 商店购买 / 局开始）都应调用本方法。
+     * 同时负责维护 skill_point 槽的增删与技能栏 / SP 面板的显隐刷新。
+     *
+     * @returns {boolean} activeSkills 是否发生了变化
+     */
+    combat_recomputeActiveSkills() {
+        const rwIds = this._activeRunewordIds instanceof Set ? this._activeRunewordIds : new Set();
+        const owned = Array.isArray(this.ownedRelics) ? this.ownedRelics : [];
+        const purchased = Array.isArray(this.purchasedSkillIds) ? this.purchasedSkillIds : [];
+
+        const result = [];
+        for (const sk of SKILL_DB) {
+            if (!sk || !sk.id) continue;
+            let unlocked = false;
+            if (sk.source === 'base') unlocked = true;
+            else if (sk.unlockRuneword && rwIds.has(sk.unlockRuneword)) unlocked = true;
+            else if (sk.unlockRelic && owned.includes(sk.unlockRelic)) unlocked = true;
+            // 商店购买可解锁任意被标记为 shop 的技能（也允许作为兜底解锁路径）
+            if (!unlocked && purchased.includes(sk.id)) unlocked = true;
+            if (unlocked) result.push(sk);
+        }
+
+        // [技能来源扩展] 显示优先级：战斗技能栏受锁定的 2×2（4 格）布局限制，
+        // 让玩家「主动投入」获得的技能（商店/遗物/词条）优先占据有限的可见槽，
+        // 常驻的基础技能作为兜底排在最后（数量超 4 时才会被挤出可见区）。
+        const sourceRank = { shop: 0, relic: 1, runeword: 2, base: 3 };
+        result.sort((a, b) => (sourceRank[a.source] ?? 2) - (sourceRank[b.source] ?? 2));
+
+        const prev = Array.isArray(this.activeSkills) ? this.activeSkills : [];
+        const changed = prev.length !== result.length || result.some((s, i) => (prev[i] && prev[i].id) !== s.id);
+        this.activeSkills = result;
+
+        // —— 维护 skill_point 槽：仅当有任意已解锁技能时才保留 ——
+        if (!Array.isArray(this.unlockedSlots)) this.unlockedSlots = [];
+        const hasSkills = result.length > 0;
+        if (hasSkills && !this.unlockedSlots.includes('skill_point')) {
+            this.unlockedSlots.push('skill_point');
+            if ((this.slotCount || 0) < this.unlockedSlots.length) {
+                this.slotCount = this.unlockedSlots.length;
+            }
+        } else if (!hasSkills && this.unlockedSlots.includes('skill_point')) {
+            this.unlockedSlots = this.unlockedSlots.filter(t => t !== 'skill_point');
+            this.slotCount = Math.max(1, this.unlockedSlots.length);
+        }
+
+        // —— 刷新技能栏 / SP 面板（DOM 与 UI 在不可用时安全跳过）——
+        if (this.ui && typeof this.ui.updateSkillBar === 'function') {
+            this.ui.updateSkillBar(this.skillPoints || 0, this.activeSkills);
+        }
+        if (typeof document !== 'undefined') {
+            const skillBar = document.getElementById('skill-bar');
+            if (skillBar) {
+                skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
+            }
+            const spPanel = document.getElementById('sp-panel');
+            if (spPanel) {
+                if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkills) {
+                    spPanel.style.opacity = '1';
+                    spPanel.style.pointerEvents = 'auto';
+                } else {
+                    spPanel.style.opacity = '0';
+                    spPanel.style.pointerEvents = 'none';
+                }
+            }
+        }
+
+        return changed;
+    },
+
+    /**
+     * combat_activateSkillExtended - 新增技能的效果分发器
+     *
+     * [技能来源扩展] 与既有 combat_activateSkill 的 if/else 链分离，集中实现新技能，
+     * 避免单个方法过长。调用前 combat_activateSkill 已扣除 SP 并播放通用反馈。
+     * 若技能因「无弹药 / 无敌人」无法生效，本方法负责返还 SP。
+     *
+     * @param {object} skill - SKILL_DB 条目
+     * @param {object} p     - skill.params 快捷引用
+     * @param {string} method - skill.methodId
+     */
+    combat_activateSkillExtended(skill, p, method) {
+        const refund = (msg) => {
+            this.skillPoints += skill.cost;
+            this.ui.updateSkillPoints(this.skillPoints);
+            this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+            if (msg) showToast(msg);
+        };
+        const activeEnemies = () => this.enemies.filter(e => e.active);
+        const dealTo = (e, dmg, color) => {
+            const r = e.takeDamage(dmg);
+            const hp = r.hpDamage ?? r.actualDamage ?? 0;
+            this.combat_recordDamage(hp, 'skill', 'main', this._currentDamageShotId);
+            if (hp > 0) this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${Math.ceil(hp)}`, color || '#fff');
+            if (r.killed) this.spawn_addScore(e.maxHp, e);
+            return r;
+        };
+
+        // ---------- 基础技能 ----------
+        if (method === 'skill_arcane_missiles') {
+            const targets = activeEnemies().sort((a, b) => b.pos.y - a.pos.y).slice(0, p.targetCount);
+            if (targets.length === 0) { refund('沒有敵人可攻擊'); return; }
+            const dmg = this.round * p.roundMult;
+            targets.forEach((e, i) => {
+                const startX = e.pos.x + (Math.random() - 0.5) * 40;
+                this.spawn_createParticle(startX, Math.max(20, e.pos.y - 60), p.particleColor, 'spark');
+                dealTo(e, dmg, p.particleColor);
+            });
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, '奧術飛彈!', p.particleColor);
+            try { audio.playPowerup(2); } catch (e2) {}
+        }
+
+        else if (method === 'skill_kinetic_charge') {
+            if (this.ammoQueue.length === 0) { refund('無彈藥可強化'); return; }
+            const a = this.ammoQueue[0];
+            a.damage = (a.damage || 0) + p.flatDamage;
+            a.bounce = (a.bounce || 0) + p.bounceBonus;
+            a.multicast = (a.multicast || 0) + p.multicastBonus;
+            this.spawn_createSkillIgnition(this.width / 2, this.height - 80, p.particleColor);
+            this.ui_updateAmmoUI();
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, p.floatText, p.particleColor);
+            try { audio.playPowerup(3); } catch (e2) {}
+        }
+
+        // ---------- 词条解锁技能 ----------
+        else if (method === 'skill_frost_nova_burst') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
+            this.ui_triggerScreenShake(140);
+            const dmg = this.round * p.roundMult;
+            list.forEach(e => {
+                e.applyTemp(-p.tempDown);
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'mist');
+                dealTo(e, dmg, p.particleColor);
+            });
+            this.spawn_createShockwave(this.width / 2, this.height / 2, p.particleColor);
+            try { audio.playEffect('cryo'); } catch (e2) {}
+        }
+
+        else if (method === 'skill_irradiate_field') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
+            const dmg = this.round * p.roundMult;
+            list.forEach(e => {
+                e._frostPrisonAmp = Math.max(e._frostPrisonAmp || 0, p.damageAmpBonus);
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
+                this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '☢️辐照', p.particleColor);
+                dealTo(e, dmg, p.particleColor);
+            });
+            try { audio.playPowerup(3); } catch (e2) {}
+        }
+
+        else if (method === 'skill_flame_sword_dance') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            const swordDmg = Math.round(this.round * p.roundMult);
+            for (let i = 0; i < p.swordCount; i++) {
+                const target = list[Math.floor(Math.random() * list.length)];
+                const spawnX = target.pos.x + (Math.random() - 0.5) * 60;
+                const spawnY = Math.max(30, target.pos.y - 80);
+                const swordConfig = { damage: swordDmg, pyro: 2, cryo: 0, lightning: 0, overcharge: 0, wind: 0, multicast: 0, type: 'flying_sword' };
+                const lvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
+                this.combat_flyingSword_addSon(spawnX, spawnY, null, lvl, swordConfig, i * 5);
+                this.combat_flyingSword_assignTarget(target);
+                target.applyTemp(p.tempUp);
+            }
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, '炎光劍舞!', p.particleColor);
+            try { audio.playEffect('split'); } catch (e2) {}
+        }
+
+        else if (method === 'skill_static_field') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 200 });
+            this.ui_triggerScreenShake(120);
+            list.forEach(e => {
+                e.applyTemp(p.shockStacks);
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
+            });
+            // 从血量最高的敌人引发一次闪电链
+            const source = list.slice().sort((a, b) => b.displayHp - a.displayHp)[0];
+            if (source) {
+                const dmg = p.chainDmgBase + this.round;
+                if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
+                    this.lightningBolts.push(new LightningBolt(source.pos.x, 0, source.pos.x, source.pos.y));
+                }
+                this.combat_lightning_triggerChain(source, dmg, [source], p.chainLevel);
+            }
+            try { audio.playLightning(); } catch (e2) {}
+        }
+
+        else if (method === 'skill_precision_volley') {
+            if (this.ammoQueue.length === 0) { refund('無彈藥可強化'); return; }
+            const a = this.ammoQueue[0];
+            a.damage = (a.damage || 0) + p.flatDamage;
+            a._critChance = Math.max(a._critChance || 0, p.critChance);
+            a._critDamage = Math.max(a._critDamage || 0, p.critDamage);
+            this.spawn_createSkillIgnition(this.width / 2, this.height - 80, p.particleColor);
+            this.ui_updateAmmoUI();
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, p.floatText, p.particleColor);
+            try { audio.playPowerup(4); } catch (e2) {}
+        }
+
+        // ---------- 遗物解锁技能 ----------
+        else if (method === 'skill_gravity_well') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            const pushDistance = this.enemyHeight * p.pushRows;
+            const dmg = this.round * p.roundMult;
+            list.forEach(e => {
+                e.dropTargetY = Math.max(80, e.dropTargetY - pushDistance);
+                e.pos.y = e.dropTargetY;
+                this.spawn_createParticle(e.pos.x, e.pos.y + e.height / 2, p.particleColor, 'mist');
+                dealTo(e, dmg, p.particleColor);
+            });
+            this.spawn_createShockwave(this.width / 2, this.height / 2, p.shockwaveColor);
+            this.ui_triggerScreenShake(180);
+            try { audio.playEffect('split'); } catch (e2) {}
+        }
+
+        else if (method === 'skill_chrono_freeze') {
+            const list = activeEnemies();
+            const freezeFrames = Math.round(p.freezeDuration * 60);
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 300 });
+            this.ui_triggerScreenShake(150);
+            list.forEach(e => {
+                e.temp = -100;
+                e.frozenTurns = Math.max(e.frozenTurns || 0, freezeFrames);
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'mist');
+                this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '⏳冻结!', p.particleColor);
+            });
+            // 返还 SP（受上限约束）
+            const maxSP = CONFIG.gameplay.maxSkillPoints || 0;
+            this.skillPoints = Math.min(maxSP, (this.skillPoints || 0) + (p.spRefund || 0));
+            this.ui.updateSkillPoints(this.skillPoints);
+            this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
+            try { audio.playEffect('cryo'); } catch (e2) {}
+        }
+
+        else if (method === 'skill_phoenix_blessing') {
+            const list = activeEnemies();
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
+            this.playerShield = (this.playerShield || 0) + p.shieldGain;
+            const dmg = this.round * p.roundMult;
+            list.forEach(e => {
+                e.applyTemp(15);
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
+                dealTo(e, dmg, p.particleColor);
+            });
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, `🔥 屏障 +${p.shieldGain}`, p.particleColor);
+            if (typeof this.ui_updateShieldUI === 'function') this.ui_updateShieldUI();
+            try { audio.playPowerup(4); } catch (e2) {}
+        }
+
+        // ---------- 局内商店购买技能 ----------
+        else if (method === 'skill_meteor_strike') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 300 });
+            this.ui_triggerScreenShake(220);
+            const dmg = this.round * p.roundMult;
+            const overTemp = Math.round(100 * (p.tempUp / 100) + p.tempUp);
+            list.forEach(e => {
+                if (e.temp < overTemp) e.temp = Math.min(e.temp + p.tempUp, overTemp);
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
+                dealTo(e, dmg, p.particleColor);
+            });
+            this.spawn_createShockwave(this.width / 2, this.height / 2, p.particleColor);
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, '隕石轟擊!', p.particleColor);
+            try { audio.playEffect('explosion'); } catch (e2) {}
+        }
+
+        else if (method === 'skill_prism_overload') {
+            if (this.ammoQueue.length === 0) { refund('無彈藥可強化'); return; }
+            const a = this.ammoQueue[0];
+            a.pyro = (a.pyro || 0) + p.elemStacks;
+            a.cryo = (a.cryo || 0) + p.elemStacks;
+            a.lightning = (a.lightning || 0) + p.elemStacks;
+            a.explosive = true;
+            a._forceFusion = true;
+            a.multicast = (a.multicast || 0) + p.multicastBonus;
+            this.spawn_createSkillIgnition(this.width / 2, this.height - 80, p.explosionColor);
+            this.ui_updateAmmoUI();
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, p.floatText, p.explosionColor);
+            try { audio.playPowerup(5); } catch (e2) {}
+        }
+
+        else if (method === 'skill_fortune_strike') {
+            const list = activeEnemies();
+            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            const dmg = this.round * p.roundMult;
+            let kills = 0;
+            list.forEach(e => {
+                this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
+                const r = dealTo(e, dmg, p.particleColor);
+                if (r.killed) kills++;
+            });
+            if (kills > 0) {
+                const gain = kills * p.fragmentsPerKill;
+                this.runFragments = (this.runFragments || 0) + gain;
+                this.spawn_createFloatingText(this.width / 2, this.height / 2, `💰 +${gain}`, p.particleColor);
+            }
+            try { audio.playEffect('collect'); } catch (e2) {}
+        }
     },
 
 /**

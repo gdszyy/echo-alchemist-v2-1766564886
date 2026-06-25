@@ -11,11 +11,11 @@
 |---|---|---|---|---|
 | `runeword_meltdown` | 熔毁 | `rune_pyro_1` × 2 + `rune_pyro_2` | 火焰燃烧伤害与过热爆炸最终伤害提升 | 熔毁新星 |
 | `runeword_absolute_zero` | 绝对零度 | `rune_cryo_1` × 2 + `rune_cryo_2` | 冰冻状态下每次物理伤害令该敌人本回合受到的所有伤害加深 | 冰牢封印 |
-| `runeword_frost_nova` | 冰霜新星 | `rune_cryo_1` × 1 + `rune_bounce_1` × 1 + `rune_cryo_2` × 1 | 弹珠每弹跳数次释放冰霜新星，造成冰属性伤害并降温 | — |
+| `runeword_frost_nova` | 冰霜新星 | `rune_cryo_1` × 1 + `rune_bounce_1` × 1 + `rune_cryo_2` × 1 | 弹珠每弹跳数次释放冰霜新星，造成冰属性伤害并降温 | 冰霜新星 |
 | `runeword_thunderstorm` | 雷暴之语 | `rune_lightning_1` × 2 + `rune_lightning_2` | 闪电链的伤害衰减系数提升 | 雷神降临 |
 | `runeword_thunder_scatter` | 雷霆散射 | `rune_lightning_1` × 1 + `rune_scatter_1` × 1 + `rune_lightning_2` × 1 | 每次成功触发闪电链时，有概率额外释放一条同属性闪电链 | — |
 | `runeword_kinetic_surge` | 动能激增 | `rune_bounce_1` × 2 + `rune_bounce_2` | 本次发射的弹珠，后续每次弹射伤害固定增加 | 动能爆发 |
-| `runeword_irradiation` | 照射 | `rune_laser_1` × 2 + `rune_laser_2` | 激光变为持续照射，累积照射同一敌人伤害加深 | — |
+| `runeword_irradiation` | 照射 | `rune_laser_1` × 2 + `rune_laser_2` | 激光变为持续照射，累积照射同一敌人伤害加深 | 辐照领域 |
 
 ### 1.2 复合机制词条（6 个）
 
@@ -52,6 +52,26 @@
 | `runeword_mass_collapse` | 质量坍缩 | `rune_bounce_1` × 2 + `rune_pyro_1` × 1 | 强制获得爆炸属性（范围减半）；只清空所有散射层数（连射保留），每清空 1 层散射爆炸范围 +10% |
 | `runeword_kinetic_decay` | 动能衰变 | `rune_bounce_1` × 2 + `rune_pierce_1` × 1 | 子弹初始获得 25% 伤害加成；每次命中后加成乘以 (1 - 7%) 衰减（最低衰减至 0%） |
 | `runeword_echo_shot` | 回响射击 | `rune_scatter_1` × 2 + `rune_bounce_1` × 1 | 子弹首次击中敌人时，有 25% 概率按原角度额外发射一颗单发子弹 |
+
+## 1.6 技能系统总览（技能来源扩展）
+
+> **数据来源**：`src/config.js` → `SKILL_DB`（共 19 个技能）。
+> **核心入口**：`combat_recomputeActiveSkills()`（`src/combat_system.js`）—— 统一把四类来源
+> 求并集写入 `this.activeSkills`，并维护 `skill_point` 槽与技能栏/SP 面板显隐。
+> 任意来源变化（放符文 / 拾遗物 / 商店买 / 局开始）都应调用它。
+
+技能效果分发：原 6 个走 `combat_activateSkill` 的 if/else 链；新增 13 个集中在
+`combat_activateSkillExtended(skill, p, method)`（同文件），由前者末尾兜底调用。
+
+| 来源 (`source`) | 解锁条件 | 数量 | 技能 |
+|---|---|---|---|
+| `base` | 每局常驻（保证 SP 永远有去处） | 2 | 奥术飞弹、蓄能填装 |
+| `runeword` | 对应 `unlockRuneword` 词条激活 | 11 | 冰牢封印/雷神降临/动能爆发/熔毁新星/剑刃雨/棱光炮（原）+ 冰霜新星/辐照领域/炎光剑舞/静电力场/精准齐射（新） |
+| `relic` | 拥有 `unlockRelic` 遗物（`effect:'unlock_skill'`） | 3 | 引力坍缩(`relic_gravity_core`)、时滞冻结(`relic_chrono_shard`)、不死鸟祝福(`relic_phoenix_feather`) |
+| `shop` | 局内商店购买（写入 `purchasedSkillIds`，`shopPrice` 定价） | 3 | 陨石轰击、棱镜超载、财富打击 |
+
+状态字段：`activeSkills`（运行时并集，不持久化）、`purchasedSkillIds`（持久化于局存档）、
+`_activeRunewordIds`（由 `ui_updateRuneGrid` 写入的当前激活词条集合）。
 
 ## 2. 词条 effectId 与实现位置速查
 

@@ -5507,6 +5507,7 @@ function createCombatContext(mainGame, canvas) {
         activeRunewordStats: {},
         skillPoints: 0,
         activeSkills: [],
+        purchasedSkillIds: [],
         skillChargeActualValue: 0,
         skillChargeTempValue: 0,
         skillChargeLevel: 0,

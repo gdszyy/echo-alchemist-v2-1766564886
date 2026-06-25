@@ -215,8 +215,10 @@ class Game {
         this.hasCombatWall = false; 
         this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽（技能点槽由符文词条解锁后动态加入）
         this.slotCount = 1; // 初始1个槽位
-        this.activeSkills = []; // 当前局内已解锁的技能列表（由符文词条激活驱动）
-        this.pegs = []; 
+        this.activeSkills = []; // 当前局内已解锁的技能列表（基础/词条/遗物/商店四类来源的并集）
+        this.purchasedSkillIds = []; // [技能来源扩展] 局内商店购买解锁的技能 id 列表
+        this._activeRunewordIds = new Set(); // [技能来源扩展] 当前激活词条 id 集合（由 ui_updateRuneGrid 写入）
+        this.pegs = [];
         this.enemies = []; 
         this.specialSlots = []; 
         this.dropBalls = []; 

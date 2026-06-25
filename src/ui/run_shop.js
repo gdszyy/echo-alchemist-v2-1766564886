@@ -17,7 +17,7 @@
  *   - 局结束时未消费的 runFragments 按比例转换为 saveData.runeFragments
  */
 
-import { CONFIG } from '../config.js';
+import { CONFIG, SKILL_DB } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
 import { MODULE_DEFS, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
 
@@ -127,6 +127,22 @@ function generateInventory(game, count) {
     if (items.length < count) {
         const forceShowcase = modulePool.some(d => Array.isArray(d.tags) && d.tags.includes(MODULE_SHOWCASE_TAG));
         addModuleItem(forceShowcase && Math.random() < MODULE_SHOWCASE_PRIORITY);
+    }
+
+    // 1.5 [技能来源扩展] 主动技能商品：出售 source:'shop' 的技能，每局每个技能仅售一次。
+    const purchasedSkillSet = new Set(game.purchasedSkillIds || []);
+    const skillPool = (SKILL_DB || []).filter(s => s && s.source === 'shop' && !purchasedSkillSet.has(s.id));
+    const skillItem = takeRandom(skillPool);
+    if (skillItem && items.length < count) {
+        items.push({
+            kind: 'skill_unlock',
+            skillId: skillItem.id,
+            name: skillItem.name,
+            icon: skillItem.icon,
+            desc: `${skillItem.desc}（释放需消耗 ${skillItem.cost} SP）`,
+            price: skillItem.shopPrice || 80,
+            rarity: 'epic',
+        });
     }
 
     // 2. 结构扩展：槽位扩张 / 特殊槽解锁 / 特殊槽数量，三者最多出现一个。
@@ -426,6 +442,12 @@ export const run_shop = {
             if (!Array.isArray(this.runeInventory)) this.runeInventory = [];
             this.runeInventory.push({ id: it.runeId, level: 1 });
             if (window.showToast) window.showToast(`获得符文: ${it.name}`);
+        } else if (it.kind === 'skill_unlock') {
+            // [技能来源扩展] 购买主动技能：写入 purchasedSkillIds 并重算技能并集
+            if (!Array.isArray(this.purchasedSkillIds)) this.purchasedSkillIds = [];
+            if (!this.purchasedSkillIds.includes(it.skillId)) this.purchasedSkillIds.push(it.skillId);
+            if (typeof this.combat_recomputeActiveSkills === 'function') this.combat_recomputeActiveSkills();
+            if (window.showToast) window.showToast(`习得技能: ${it.name}`);
         } else if (it.kind === 'marble_pack') {
             this.runFragments -= it.price;
             inventory.splice(idx, 1);

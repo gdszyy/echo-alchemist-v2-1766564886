@@ -498,6 +498,8 @@ export const game_system = {
         this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽
         this.slotCount = 1; // 初始1个槽位
         this.activeSkills = []; // 重置已解锁技能列表
+        this.purchasedSkillIds = []; // [技能来源扩展] 重置商店购买的技能
+        this._activeRunewordIds = new Set(); // [技能来源扩展] 重置激活词条集合
         this.marbleSizeBonus = 0;
 
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
@@ -2936,6 +2938,7 @@ export const game_system = {
                 hasCombatWall: this.hasCombatWall || false,
                 unlockedSlots: (this.unlockedSlots || []).slice(),
                 slotCount: this.slotCount || 1,
+                purchasedSkillIds: (this.purchasedSkillIds || []).slice(), // [技能来源扩展] 持久化商店购买的技能
                 marbleSizeBonus: this.marbleSizeBonus || 0,
                 flatDamageBonus: this.flatDamageBonus || 0,
                 playerShield: this.playerShield || 0,
@@ -3083,6 +3086,7 @@ export const game_system = {
             this.hasCombatWall = state.hasCombatWall || false;
             this.unlockedSlots = (state.unlockedSlots || ['multicast']).slice();
             this.slotCount = state.slotCount || 1;
+            this.purchasedSkillIds = (state.purchasedSkillIds || []).slice(); // [技能来源扩展] 恢复商店购买的技能
             this.marbleSizeBonus = state.marbleSizeBonus || 0;
             this.flatDamageBonus = state.flatDamageBonus || 0;
             this.playerShield = state.playerShield || 0;
