@@ -1663,8 +1663,8 @@ phase_gathering_getRandomPegType() {
             if (e._frostPrisonAmp) e._frostPrisonAmp = 0; // 冰牢封印伤害加成每回合清除
         });
         
-        // [技能充能系统] 初始化充能状态
-        this.combat_skillCharge_init();
+        // [技能充能系统] 初始化充能状态：持久条跨回合累积保留，临时条每回合刷新清零
+        this.combat_skillCharge_init(true);
         
         if (this.ui) {
             this.ui.updateSkillPoints(this.skillPoints);

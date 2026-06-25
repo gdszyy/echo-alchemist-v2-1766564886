@@ -1199,13 +1199,17 @@ export const hud_system = {
 
         // @section:hud_rune_charge_listeners - 技能充能初始化/升级/进度更新事件监听器
         // ── 技能充能 UI 初始化 ──────────────────────────────────────────
-        eventBus.on(EVENT_TYPES.UI_SKILL_CHARGE_INIT, () => {
+        eventBus.on(EVENT_TYPES.UI_SKILL_CHARGE_INIT, ({ actualValue = 0, tempValue = 0, totalValue } = {}) => {
+            // 持久条跨回合保留：回合开始时按当前持久条数值渲染，而非强制清零。
+            const actual = Math.max(0, Math.min(1, actualValue));
+            const total = Math.max(0, Math.min(1, totalValue ?? (actual + tempValue)));
+            const temporary = Math.max(0, Math.min(1 - actual, total - actual));
             const meter = document.getElementById('combat-rune-charge-ui');
             if (meter) {
                 meter.classList.remove('skill-charge-bursting');
-                meter.style.setProperty('--skill-charge-actual', '0%');
-                meter.style.setProperty('--skill-charge-temp', '0%');
-                meter.style.setProperty('--skill-charge-total', '0%');
+                meter.style.setProperty('--skill-charge-actual', `${actual * 100}%`);
+                meter.style.setProperty('--skill-charge-temp', `${temporary * 100}%`);
+                meter.style.setProperty('--skill-charge-total', `${total * 100}%`);
             }
             const slot = document.getElementById('combat-rune-single-slot');
             if (slot) {
@@ -1221,13 +1225,13 @@ export const hud_system = {
             }
             const fill = document.getElementById('combat-charge-bar-fill');
             if (fill) {
-                fill.style.width = '0%';
                 fill.classList.remove('charge-burst');
+                fill.style.width = `${total * 100}%`;
             }
             const tempFill = document.getElementById('combat-charge-bar-temp-fill');
             if (tempFill) {
-                tempFill.style.left = '0%';
-                tempFill.style.width = '0%';
+                tempFill.style.left = `${actual * 100}%`;
+                tempFill.style.width = `${temporary * 100}%`;
             }
         });
 
