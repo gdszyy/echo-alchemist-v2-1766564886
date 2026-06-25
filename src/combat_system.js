@@ -4171,10 +4171,17 @@ export const combat_system = {
      * @param {Enemy} enemy - 死亡的敌人实例
      * @param {string} shotId - 弹丸射击 ID
      */
-    _triggerDeathFX(enemy, shotId) {
+    _triggerDeathFX(enemy, shotId, options = {}) {
         const x = enemy.pos.x;
         const y = enemy.pos.y;
         const tier = enemy.type; // 'normal' | 'elite' | 'boss'
+
+        // [剧毒火焰死亡] 毒素 DoT 击杀走专属死亡特效（绿色毒焰溶解），区别于普通/精英/Boss 死亡
+        if (options && options.cause === 'venom') {
+            this._triggerVenomDeathFX(enemy, x, y, tier);
+            return;
+        }
+
         const isFrozen = enemy.temp <= -80;  // 冰冻状态门槛
         const isBurning = enemy.temp >= 100; // 燃烧状态门槛
 
@@ -4323,6 +4330,62 @@ export const combat_system = {
                     p.size = 5 + Math.random() * 4;
                 }
             }
+        }
+    },
+
+    // ============================================================
+    // [剧毒火焰死亡] 毒素 DoT 击杀专属死亡特效
+    // 主题：绿色毒焰溶解 —— 毒气云膨胀 + 上升毒焰舌 + 酸液气泡 + 飞溅毒滴，
+    // 区别于冰冻碎裂 / 燃烧爆炸 / 分级内爆。按敌人等级缩放强度。
+    // ============================================================
+    _triggerVenomDeathFX(enemy, x, y, tier) {
+        if (!this.deathExplosions) this.deathExplosions = [];
+        const _deBudget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        // Boss 死亡稀有且重要，不受上限约束；精英/普通受 deathExplosionLimit 约束
+        if (tier === 'boss' || this.deathExplosions.length < _deBudget.deathExplosionLimit) {
+            this.deathExplosions.push(new DeathExplosion(x, y, tier, 'venom'));
+        }
+
+        // 毒雾扩散粒子（向上漂浮的腐蚀烟雾）
+        const mistCount = tier === 'boss' ? 14 : (tier === 'elite' ? 9 : 5);
+        for (let i = 0; i < mistCount; i++) {
+            const p = this.spawn_createParticle(
+                x + (Math.random() - 0.5) * 18,
+                y + (Math.random() - 0.5) * 14,
+                i % 2 ? 'rgba(132,204,22,0.5)' : 'rgba(101,163,13,0.45)',
+                'mist'
+            );
+            if (p) {
+                p.vel = new Vec2((Math.random() - 0.5) * 0.6, -0.3 - Math.random() * 0.5);
+                p.size = 6 + Math.random() * 6;
+            }
+        }
+
+        // 飞溅毒液粒子（四散的酸液滴）
+        const splashCount = tier === 'boss' ? 12 : (tier === 'elite' ? 7 : 4);
+        for (let i = 0; i < splashCount; i++) {
+            const p = this.spawn_createParticle(x, y, i % 2 ? '#84cc16' : '#bef264', 'venom');
+            if (p) {
+                const a = Math.random() * Math.PI * 2;
+                const sp = 1.2 + Math.random() * 2.4;
+                p.vel = new Vec2(Math.cos(a) * sp, Math.sin(a) * sp - 1);
+            }
+        }
+
+        // 腐蚀冲击波
+        if (typeof this.spawn_createShockwave === 'function') {
+            this.spawn_createShockwave(x, y, '#84cc16');
+        }
+
+        // 击杀震动（毒焰溶解较柔，震幅低于爆炸）
+        if (typeof this.triggerScreenShake === 'function') {
+            this.triggerScreenShake(tier === 'boss' ? 10 : (tier === 'elite' ? 5 : 2.5));
+        }
+
+        // 音效 + 浮动文字
+        if (audio && typeof audio.playEffect === 'function') audio.playEffect('venom_death');
+        if (typeof this.spawn_createFloatingText === 'function') {
+            this.spawn_createFloatingText(x, y - 26, '☠️ 溶解!', '#84cc16');
         }
     },
 };

@@ -1866,9 +1866,17 @@ phase_gathering_getRandomPegType() {
                     // bypassShield=true 让毒素 DoT 不受护盾减伤
                     const r = e.takeDamage(dmg, null, true);
                     if (r && this.combat_recordDamage) this.combat_recordDamage(r.actualDamage, 'pyro', 'main');
-                    if (this.spawn_createFloatingText) this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `☠️${dmg}`, '#84cc16');
-                    if (this.spawn_createParticle) {
-                        for (let i = 0; i < 3; i++) this.spawn_createParticle(e.pos.x, e.pos.y, '#84cc16', 'mist');
+                    if (r && r.killed) {
+                        // [剧毒火焰死亡] 毒素 DoT 击杀：触发专属毒焰溶解死亡特效
+                        // （此前 DoT 击杀不经过击中-死亡路径，故无任何死亡表现）
+                        if (typeof this._triggerDeathFX === 'function') {
+                            this._triggerDeathFX(e, null, { cause: 'venom' });
+                        }
+                    } else {
+                        if (this.spawn_createFloatingText) this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `☠️${dmg}`, '#84cc16');
+                        if (this.spawn_createParticle) {
+                            for (let i = 0; i < 3; i++) this.spawn_createParticle(e.pos.x, e.pos.y, '#84cc16', 'mist');
+                        }
                     }
                 }
             }
