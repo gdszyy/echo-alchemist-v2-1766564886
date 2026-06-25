@@ -525,6 +525,10 @@ export const game_system = {
         this.runeLootItems = [];
         this.skillPoints = 0;
         this.ui.updateSkillPoints(this.skillPoints);
+        // [技能充能系统] 持久条跨回合累积，但整局开始时清零
+        this.skillChargeActualValue = 0;
+        this.skillChargeTempValue = 0;
+        this.skillChargeLevel = 0;
 
         // 重置 UI
         document.getElementById('combat-message').innerHTML = '';

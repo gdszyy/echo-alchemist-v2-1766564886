@@ -3858,10 +3858,16 @@ export const combat_system = {
 
     /**
      * @method combat_skillCharge_init
-     * @description 初始化技能充能状态（战斗阶段开始时调用）
+     * @description 初始化技能充能状态。
+     *   - 持久条（actualValue）跨回合累积：每回合开始时保留，仅整局重置时清零。
+     *   - 临时条（tempValue）每回合刷新：回合开始恒为 0，回合内衰减。
+     * @param {boolean} preservePersistent - 为 true 时保留持久条（每回合战斗开始用），
+     *   为 false 时清零所有充能（整局重置 / 进入试炼场用）。
      */
-    combat_skillCharge_init() {
-        this.skillChargeActualValue = 0;
+    combat_skillCharge_init(preservePersistent = false) {
+        this.skillChargeActualValue = preservePersistent
+            ? Math.max(0, Math.min(1, this.skillChargeActualValue || 0))
+            : 0;
         this.skillChargeTempValue = 0;
         this.skillChargeLevel = 0;
         this.runeChargeCurrentRune = null;
@@ -3872,13 +3878,17 @@ export const combat_system = {
 
     /**
      * @method combat_skillCharge_initUI
-     * @description 初始化技能充能 UI（实际条 + 临时条）
+     * @description 初始化技能充能 UI（实际条 + 临时条）。
+     *   发送当前持久条数值，使跨回合保留的持久条在回合开始时即可见。
      */
     combat_skillCharge_initUI() {
+        const actualValue = Math.max(0, Math.min(1, this.skillChargeActualValue || 0));
+        const tempValue = Math.max(0, Math.min(1 - actualValue, this.skillChargeTempValue || 0));
+        const totalValue = Math.max(0, Math.min(1, actualValue + tempValue));
         eventBus.emit(EVENT_TYPES.UI_SKILL_CHARGE_INIT, {
-            actualValue: 0,
-            tempValue: 0,
-            totalValue: 0
+            actualValue,
+            tempValue,
+            totalValue
         });
     },
 
@@ -4013,8 +4023,8 @@ export const combat_system = {
         this.runeChargeCurrentLevel = 1;
     },
 
-    combat_runeCharge_init() {
-        this.combat_skillCharge_init();
+    combat_runeCharge_init(preservePersistent = false) {
+        this.combat_skillCharge_init(preservePersistent);
     },
 
     combat_runeCharge_initUI() {

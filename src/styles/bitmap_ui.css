@@ -1243,14 +1243,22 @@
     z-index: 1;
 }
 
+/* 临时条：不透明琥珀色 + 斜向危险条纹 + 左侧亮缝，与持久条（平滑流光青绿）形成明确视觉区分。
+   注意：不再使用 mix-blend-mode: screen / 半透明渐变——否则会与下层青绿持久条混色，看起来几乎一致。 */
 #combat-rune-charge-ui.skill-charge-meter-v2 #combat-charge-bar-temp-fill {
     background:
         url('../../assets/ui/sprites/skill_charge_temp_fill.png') left center / 192px 12px repeat-x,
-        linear-gradient(90deg, rgba(251, 191, 36, 0.10), rgba(249, 115, 22, 0.28)) !important;
+        repeating-linear-gradient(-45deg,
+            rgba(255, 247, 224, 0.42) 0, rgba(255, 247, 224, 0.42) 2px,
+            rgba(255, 255, 255, 0) 2px, rgba(255, 255, 255, 0) 6px),
+        linear-gradient(90deg, #fbbf24, #f97316) !important;
     border-radius: 0 999px 999px 0 !important;
-    box-shadow: inset 0 0 5px rgba(254, 243, 199, 0.35), 0 0 7px rgba(251, 191, 36, 0.24) !important;
+    border-left: 1.5px solid rgba(255, 248, 225, 0.95) !important;
+    box-shadow:
+        -2px 0 7px rgba(251, 191, 36, 0.55),
+        inset 0 0 5px rgba(254, 243, 199, 0.4),
+        0 0 8px rgba(249, 115, 22, 0.4) !important;
     animation: skillChargeTempFlicker 0.74s ease-in-out infinite alternate;
-    mix-blend-mode: screen;
     z-index: 2;
     pointer-events: none;
 }
@@ -1288,8 +1296,8 @@
 }
 
 @keyframes skillChargeTempFlicker {
-    from { filter: brightness(0.92) saturate(0.96); opacity: 0.72; }
-    to { filter: brightness(1.24) saturate(1.2); opacity: 0.94; }
+    from { filter: brightness(0.96) saturate(1); opacity: 0.86; }
+    to { filter: brightness(1.26) saturate(1.25); opacity: 1; }
 }
 
 @keyframes skillChargeBurstSprite {
