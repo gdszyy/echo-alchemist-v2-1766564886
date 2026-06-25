@@ -3438,3 +3438,132 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
         width: 57% !important;
     }
 }
+
+/* ==================== [技能装配系统] 技能编辑器 ==================== */
+.skill-editor-open-btn {
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #e2e8f0;
+    background: linear-gradient(145deg, rgba(99, 102, 241, 0.35), rgba(15, 23, 42, 0.95));
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.skill-editor-open-btn:hover {
+    border-color: #a5b4fc;
+    box-shadow: 0 0 10px rgba(165, 180, 252, 0.4);
+}
+
+.skill-editor-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(2, 6, 23, 0.78);
+    backdrop-filter: blur(2px);
+}
+.skill-editor-overlay.is-open { display: flex; }
+
+.skill-editor-modal {
+    width: min(560px, 96vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(160deg, rgba(30, 41, 59, 0.98), rgba(2, 6, 23, 0.98));
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    border-radius: 14px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+.skill-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+.skill-editor-titles { display: flex; align-items: baseline; gap: 10px; }
+.skill-editor-title { margin: 0; font-size: 17px; font-weight: 700; color: #f1f5f9; }
+.skill-editor-count { font-size: 12px; color: #94a3b8; }
+.skill-editor-close-btn {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    color: #cbd5e1;
+    font-size: 14px;
+    cursor: pointer;
+}
+.skill-editor-close-btn:hover { border-color: #f87171; color: #fecaca; }
+.skill-editor-hint {
+    margin: 10px 16px 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #fde68a;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 8px;
+}
+.skill-editor-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px 16px;
+    overflow-y: auto;
+}
+.skill-editor-empty { padding: 28px 8px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+.skill-editor-card {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(100, 116, 139, 0.4);
+    border-left: 4px solid var(--skill-color, #64748b);
+    cursor: pointer;
+    color: #e2e8f0;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.skill-editor-card:hover { background: rgba(30, 41, 59, 0.9); transform: translateX(2px); }
+.skill-editor-card.is-equipped {
+    border-color: var(--skill-color, #64748b);
+    box-shadow: inset 0 0 0 1px var(--skill-color, #64748b), 0 0 10px rgba(165, 180, 252, 0.18);
+    background: rgba(30, 41, 59, 0.95);
+}
+.skill-editor-card.is-locked { opacity: 0.55; }
+.skill-editor-card-icon { font-size: 26px; line-height: 1; align-self: center; min-width: 30px; text-align: center; }
+.skill-editor-card-main { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; }
+.skill-editor-card-title { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.skill-editor-card-title b { color: #f8fafc; }
+.skill-editor-card-cost {
+    font-size: 11px; color: #cbd5e1;
+    padding: 1px 6px; border-radius: 6px;
+    background: rgba(99, 102, 241, 0.25);
+}
+.skill-editor-card-desc { font-size: 12px; color: #94a3b8; line-height: 1.4; }
+.skill-editor-card-meta { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 6px; min-width: 56px; }
+.skill-editor-card-source { font-size: 10px; color: #64748b; }
+.skill-editor-card-toggle {
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 999px;
+    color: #cbd5e1;
+    background: rgba(51, 65, 85, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    white-space: nowrap;
+}
+.skill-editor-card.is-equipped .skill-editor-card-toggle {
+    color: #064e3b; background: #6ee7b7; border-color: #34d399;
+}

@@ -497,7 +497,12 @@ export const game_system = {
         this.hasCombatWall = false;
         this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽
         this.slotCount = 1; // 初始1个槽位
-        this.activeSkills = []; // 重置已解锁技能列表
+        this.activeSkills = []; // 重置装备到技能栏的技能
+        this.unlockedSkills = []; // [技能装配] 重置技能池
+        this.equippedSkillIds = []; // [技能装配] 重置装备列表
+        this._seenSkillIds = new Set(); // [技能装配] 重置池快照
+        this.purchasedSkillIds = []; // [技能来源扩展] 重置商店购买的技能
+        this._activeRunewordIds = new Set(); // [技能来源扩展] 重置激活词条集合
         this.marbleSizeBonus = 0;
 
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
@@ -2940,6 +2945,10 @@ export const game_system = {
                 hasCombatWall: this.hasCombatWall || false,
                 unlockedSlots: (this.unlockedSlots || []).slice(),
                 slotCount: this.slotCount || 1,
+                purchasedSkillIds: (this.purchasedSkillIds || []).slice(), // [技能来源扩展] 持久化商店购买的技能
+                equippedSkillIds: (this.equippedSkillIds || []).slice(), // [技能装配] 持久化装备的技能
+                seenSkillIds: Array.from(this._seenSkillIds || []), // [技能装配] 持久化池快照，避免读档误判新解锁
+                activeRunewordIds: Array.from(this._activeRunewordIds || []), // [技能装配] 持久化激活词条，保证读档后技能池正确
                 marbleSizeBonus: this.marbleSizeBonus || 0,
                 flatDamageBonus: this.flatDamageBonus || 0,
                 playerShield: this.playerShield || 0,
@@ -3087,6 +3096,14 @@ export const game_system = {
             this.hasCombatWall = state.hasCombatWall || false;
             this.unlockedSlots = (state.unlockedSlots || ['multicast']).slice();
             this.slotCount = state.slotCount || 1;
+            this.purchasedSkillIds = (state.purchasedSkillIds || []).slice(); // [技能来源扩展] 恢复商店购买的技能
+            this.equippedSkillIds = (state.equippedSkillIds || []).slice(); // [技能装配] 恢复装备的技能
+            this._seenSkillIds = new Set(state.seenSkillIds || []); // [技能装配] 恢复池快照
+            this._activeRunewordIds = new Set(state.activeRunewordIds || []); // [技能装配] 恢复激活词条，保证首次重算技能池正确
+            // [技能装配] 读档后重算技能池/装配（不弹编辑器），保持 activeSkills 与 UI 一致
+            if (typeof this.combat_recomputeActiveSkills === 'function') {
+                this.combat_recomputeActiveSkills({ allowEditorPopup: false });
+            }
             this.marbleSizeBonus = state.marbleSizeBonus || 0;
             this.flatDamageBonus = state.flatDamageBonus || 0;
             this.playerShield = state.playerShield || 0;

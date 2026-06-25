@@ -287,6 +287,7 @@ const CONFIG = {
             venom: '#4ade80',
             overcharge: '#f59e0b',
             echo: '#60a5fa',
+            skill: '#c4b5fd',
             default: '#cbd5e1'
         },
         attributeDisplay: {
@@ -1003,6 +1004,7 @@ const CONFIG = {
         eliteFragmentDropChance: 0.80,
         bossFragmentDrop: 8,            // Boss 击杀必掉
         maxSkillPoints: 3,  // 技能点上限
+        maxEquippedSkills: 4,  // [技能装配] 战斗技能栏可同时装备的技能上限（受 2×2 布局约束）
         skillChargeHitGain: 0.03,       // 命中获得的技能充能
         skillChargeKillGain: 0.10,      // 击杀获得的技能充能
         skillChargeRetainRatio: 0.35,   // 充能衰减后保留到实际条的比例
@@ -1758,6 +1760,46 @@ const RELIC_DB = [
         recommendTip: '遗物三选一不合心意时多看一轮，适合寻找关键构筑件。'
     },
 
+    // ==================== [技能来源扩展] 解锁主动技能的遗物 ====================
+    // effect: 'unlock_skill' + skillId 指向 SKILL_DB 中 source:'relic' 的技能。
+    // 拾取后由 combat_recomputeActiveSkills() 读取 ownedRelics 并解锁对应技能。
+    {
+        id: 'relic_gravity_core',
+        name: '引力核心',
+        icon: '🕳️',
+        desc: '解锁主动技能【引力坍缩】：消耗 SP 将所有敌人拉离防线并造成伤害。',
+        rarity: 'epic',
+        effect: 'unlock_skill',
+        skillId: 'skill_gravity_well',
+        maxStacks: 1,
+        tags: ['主动技能', '控场'],
+        recommendTip: '获得一个可用 SP 释放的范围控场技能，缓解贴线压力。'
+    },
+    {
+        id: 'relic_chrono_shard',
+        name: '時滯結晶',
+        icon: '⏳',
+        desc: '解锁主动技能【时滞冻结】：消耗 SP 冻结全场并返还 1 点 SP。',
+        rarity: 'legendary',
+        effect: 'unlock_skill',
+        skillId: 'skill_chrono_freeze',
+        maxStacks: 1,
+        tags: ['主动技能', '控场'],
+        recommendTip: '高价值控场技能，冻结全场且几乎零净消耗。'
+    },
+    {
+        id: 'relic_phoenix_feather',
+        name: '不死鳥之羽',
+        icon: '🔥',
+        desc: '解锁主动技能【不死鸟祝福】：消耗 SP 获得防线屏障并灼烧全场。',
+        rarity: 'epic',
+        effect: 'unlock_skill',
+        skillId: 'skill_phoenix_blessing',
+        maxStacks: 1,
+        tags: ['主动技能', '防线'],
+        recommendTip: '兼顾防守与清场的主动技能，适合稳住防线。'
+    },
+
     // 走私者系列：立即给予符文（按稀有度分为4个版本）
     {
         id: 'smuggler_pouch_common',
@@ -1999,6 +2041,7 @@ const SKILL_DB = [
     {
         id: 'skill_frost_prison',
         methodId: 'skill_frost_prison',
+        source: 'runeword',
         unlockRuneword: 'runeword_absolute_zero', // 解锁词条：绝对零度
         name: '冰牢封印',
         icon: '🧊',
@@ -2015,6 +2058,7 @@ const SKILL_DB = [
     {
         id: 'skill_thunder_call',
         methodId: 'skill_thunder_call',
+        source: 'runeword',
         unlockRuneword: 'runeword_thunderstorm', // 解锁词条：雷暴之语
         name: '雷神降臨',
         icon: '🌩️',
@@ -2032,6 +2076,7 @@ const SKILL_DB = [
     {
         id: 'skill_kinetic_burst',
         methodId: 'skill_kinetic_burst',
+        source: 'runeword',
         unlockRuneword: 'runeword_kinetic_surge', // 解锁词条：动能激增
         name: '動能爆發',
         icon: '🔄',
@@ -2048,6 +2093,7 @@ const SKILL_DB = [
     {
         id: 'skill_meltdown_nova',
         methodId: 'skill_meltdown_nova',
+        source: 'runeword',
         unlockRuneword: 'runeword_meltdown', // 解锁词条：熔毁
         name: '熔毀新星',
         icon: '🌋',
@@ -2063,6 +2109,7 @@ const SKILL_DB = [
     {
         id: 'skill_blade_rain',
         methodId: 'skill_blade_rain',
+        source: 'runeword',
         unlockRuneword: 'runeword_blade_storm', // 解锁词条：剑刃风暴
         name: '劍刃雨',
         icon: '⚔️',
@@ -2078,6 +2125,7 @@ const SKILL_DB = [
     {
         id: 'skill_prismatic_shot',
         methodId: 'skill_prismatic_shot',
+        source: 'runeword',
         unlockRuneword: 'runeword_elemental_fusion', // 解锁词条：元素聚变
         name: '棱光炮',
         icon: '🌈',
@@ -2091,6 +2139,235 @@ const SKILL_DB = [
             forceFusion: true,
             floatText: 'PRISMATIC!',
             explosionColor: '#f0abfc'
+        }
+    },
+
+    // ==================== [技能来源扩展] 基础技能（无需解锁，每局常驻可用） ====================
+    // 设计目的：保证任何构筑下 SP 都有去处，根治「有技能点但无技能可放」的问题。
+    {
+        id: 'skill_arcane_missiles',
+        methodId: 'skill_arcane_missiles',
+        source: 'base',
+        name: '奧術飛彈',
+        icon: '✨',
+        cost: 1,
+        color: '#c4b5fd',
+        desc: '向最靠近防线的 3 个敌人各发射一枚奥术飞弹，每枚造成 回合数 × 3 伤害。',
+        params: {
+            targetCount: 3,
+            roundMult: 3,
+            particleColor: '#c4b5fd'
+        }
+    },
+    {
+        id: 'skill_kinetic_charge',
+        methodId: 'skill_kinetic_charge',
+        source: 'base',
+        name: '蓄能填裝',
+        icon: '🔋',
+        cost: 1,
+        color: '#fcd34d',
+        desc: '下一发弹珠基础伤害 +8、弹跳上限 +3、连射 +1。',
+        params: {
+            flatDamage: 8,
+            bounceBonus: 3,
+            multicastBonus: 1,
+            floatText: 'CHARGED!',
+            particleColor: '#fcd34d'
+        }
+    },
+
+    // ==================== [技能来源扩展] 词条解锁技能（覆盖更多词条） ====================
+    {
+        id: 'skill_frost_nova_burst',
+        methodId: 'skill_frost_nova_burst',
+        source: 'runeword',
+        unlockRuneword: 'runeword_frost_nova', // 解锁词条：冰霜新星
+        name: '冰霜新星',
+        icon: '❄️',
+        cost: 2,
+        color: '#7dd3fc',
+        desc: '向全场释放冰霜新星，对所有敌人造成 回合数 × 3 冰属性伤害并大幅降温。',
+        params: {
+            roundMult: 3,
+            tempDown: 60,
+            particleColor: '#7dd3fc',
+            flashColor: 'rgba(125, 211, 252, 0.15)'
+        }
+    },
+    {
+        id: 'skill_irradiate_field',
+        methodId: 'skill_irradiate_field',
+        source: 'runeword',
+        unlockRuneword: 'runeword_irradiation', // 解锁词条：照射
+        name: '輻照領域',
+        icon: '☢️',
+        cost: 2,
+        color: '#a3e635',
+        desc: '展开辐照力场，对所有敌人造成 回合数 × 2 伤害，并使其本回合受到的伤害提升 25%。',
+        params: {
+            roundMult: 2,
+            damageAmpBonus: 0.25,
+            particleColor: '#a3e635',
+            flashColor: 'rgba(163, 230, 53, 0.15)'
+        }
+    },
+    {
+        id: 'skill_flame_sword_dance',
+        methodId: 'skill_flame_sword_dance',
+        source: 'runeword',
+        unlockRuneword: 'runeword_flame_sword', // 解锁词条：炎光剑影
+        name: '炎光劍舞',
+        icon: '🗡️',
+        cost: 2,
+        color: '#fb7185',
+        desc: '召唤 4 道炎光飞剑斩击随机敌人，每道造成 回合数 × 4 火属性伤害并升温。',
+        params: {
+            swordCount: 4,
+            roundMult: 4,
+            tempUp: 25,
+            particleColor: '#fb7185'
+        }
+    },
+    {
+        id: 'skill_static_field',
+        methodId: 'skill_static_field',
+        source: 'runeword',
+        unlockRuneword: 'runeword_lightning_shield', // 解锁词条：雷电护盾
+        name: '靜電力場',
+        icon: '⚡',
+        cost: 2,
+        color: '#38bdf8',
+        desc: '对所有敌人施加感电，并从血量最高的敌人引发一次 12 级闪电链。',
+        params: {
+            shockStacks: 4,
+            chainDmgBase: 6,
+            chainLevel: 12,
+            particleColor: '#38bdf8',
+            flashColor: 'rgba(56, 189, 248, 0.15)'
+        }
+    },
+    {
+        id: 'skill_precision_volley',
+        methodId: 'skill_precision_volley',
+        source: 'runeword',
+        unlockRuneword: 'runeword_focused_fire', // 解锁词条：专注射击
+        name: '精準齊射',
+        icon: '🎯',
+        cost: 2,
+        color: '#f87171',
+        desc: '下一发弹珠必定暴击（造成 200% 伤害），并附加 +6 基础伤害。',
+        params: {
+            flatDamage: 6,
+            critChance: 1,
+            critDamage: 2,
+            floatText: 'PRECISION!',
+            particleColor: '#f87171'
+        }
+    },
+
+    // ==================== [技能来源扩展] 遗物解锁技能（配套 RELIC_DB 中 effect:'unlock_skill'） ====================
+    {
+        id: 'skill_gravity_well',
+        methodId: 'skill_gravity_well',
+        source: 'relic',
+        unlockRelic: 'relic_gravity_core', // 解锁遗物：引力核心
+        name: '引力坍縮',
+        icon: '🕳️',
+        cost: 2,
+        color: '#818cf8',
+        desc: '将所有敌人向上拉离防线 2 行，并造成 回合数 × 3 伤害。',
+        params: {
+            pushRows: 2,
+            roundMult: 3,
+            shockwaveColor: '#818cf8',
+            particleColor: '#818cf8'
+        }
+    },
+    {
+        id: 'skill_chrono_freeze',
+        methodId: 'skill_chrono_freeze',
+        source: 'relic',
+        unlockRelic: 'relic_chrono_shard', // 解锁遗物：时滞结晶
+        name: '時滯凍結',
+        icon: '⏳',
+        cost: 3,
+        color: '#5eead4',
+        desc: '冻结所有敌人 4 秒，并立即返还 1 点 SP。',
+        params: {
+            freezeDuration: 4,
+            spRefund: 1,
+            particleColor: '#5eead4',
+            flashColor: 'rgba(94, 234, 212, 0.15)'
+        }
+    },
+    {
+        id: 'skill_phoenix_blessing',
+        methodId: 'skill_phoenix_blessing',
+        source: 'relic',
+        unlockRelic: 'relic_phoenix_feather', // 解锁遗物：不死鸟之羽
+        name: '不死鳥祝福',
+        icon: '🔥',
+        cost: 2,
+        color: '#fdba74',
+        desc: '获得 3 层防线屏障，并对所有敌人造成 回合数 × 2 火属性伤害。',
+        params: {
+            shieldGain: 3,
+            roundMult: 2,
+            particleColor: '#fdba74',
+            flashColor: 'rgba(253, 186, 116, 0.15)'
+        }
+    },
+
+    // ==================== [技能来源扩展] 局内商店购买技能（source:'shop' + shopPrice） ====================
+    {
+        id: 'skill_meteor_strike',
+        methodId: 'skill_meteor_strike',
+        source: 'shop',
+        shopPrice: 90,
+        name: '隕石轟擊',
+        icon: '☄️',
+        cost: 3,
+        color: '#f97316',
+        desc: '天降陨石轰击全场，对所有敌人造成 回合数 × 6 伤害并施加过热。',
+        params: {
+            roundMult: 6,
+            tempUp: 40,
+            particleColor: '#f97316',
+            flashColor: 'rgba(249, 115, 22, 0.2)'
+        }
+    },
+    {
+        id: 'skill_prism_overload',
+        methodId: 'skill_prism_overload',
+        source: 'shop',
+        shopPrice: 80,
+        name: '稜鏡超載',
+        icon: '🌟',
+        cost: 2,
+        color: '#e879f9',
+        desc: '下一发弹珠附加火/冰/雷各 3 层、强制爆破，且连射 +1。',
+        params: {
+            elemStacks: 3,
+            multicastBonus: 1,
+            floatText: 'OVERLOAD!',
+            explosionColor: '#e879f9'
+        }
+    },
+    {
+        id: 'skill_fortune_strike',
+        methodId: 'skill_fortune_strike',
+        source: 'shop',
+        shopPrice: 70,
+        name: '財富打擊',
+        icon: '💰',
+        cost: 2,
+        color: '#fde047',
+        desc: '对所有敌人造成 回合数 × 3 伤害；每击杀一个敌人额外获得 6 局内碎片。',
+        params: {
+            roundMult: 3,
+            fragmentsPerKill: 6,
+            particleColor: '#fde047'
         }
     }
 ];

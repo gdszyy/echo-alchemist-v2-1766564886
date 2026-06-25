@@ -18,7 +18,7 @@ import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY, ELEMENT_RESONANCE_D
 import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement } from '../rune_system.js';
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
-import { SKILL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生
+import { SKILL_DB, CONFIG } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生 + 技能装配上限
 import { getRuneIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A6] 位图符文图标
 
 /**
@@ -594,49 +594,22 @@ export const rune_launcher_system = {
             }
         }
 
-        // 9. [技能系统迭代] 根据激活的符文词条派生已解锁技能列表
-        //    SKILL_DB 中每个技能的 unlockRuneword 字段指向一个 RUNEWORD_DB 的 id
-        //    当该词条被激活时，对应技能自动解锁
-        const prevSkillCount = this.activeSkills ? this.activeSkills.length : 0;
-        const activatedRunewordIds = new Set(activatedRunewords.map(rw => rw.id));
-        const newActiveSkills = SKILL_DB.filter(sk => sk.unlockRuneword && activatedRunewordIds.has(sk.unlockRuneword));
-        this.activeSkills = newActiveSkills;
+        // 9. [技能来源扩展] 将当前激活的词条 id 写入实例，并交由统一的
+        //    combat_recomputeActiveSkills() 计算「基础/词条/遗物/商店」四类技能并集。
+        //    （槽位增删与技能栏/SP 面板的显隐刷新都在该方法内统一处理。）
+        const prevPoolIds = new Set((this.unlockedSkills || []).map(s => s.id));
+        this._activeRunewordIds = new Set(activatedRunewords.map(rw => rw.id));
+        if (typeof this.combat_recomputeActiveSkills === 'function') {
+            this.combat_recomputeActiveSkills();
+        } else {
+            // 兜底：旧逻辑（仅词条来源）
+            this.activeSkills = SKILL_DB.filter(sk => sk.unlockRuneword && this._activeRunewordIds.has(sk.unlockRuneword));
+        }
 
-        // 如果技能列表发生变化，同步更新技能杠和 SP 面板显隐
-        if (newActiveSkills.length !== prevSkillCount) {
-            // 如果有新解锁的技能，确保 skill_point 槽在下一回合中生成
-            if (newActiveSkills.length > 0 && !this.unlockedSlots.includes('skill_point')) {
-                this.unlockedSlots.push('skill_point');
-                // 增加槽位数量以容纳技能点槽
-                if (this.slotCount < this.unlockedSlots.length) {
-                    this.slotCount = this.unlockedSlots.length;
-                }
-                showToast('✨ 符文解锁技能！下一回合将出现技能点槽');
-            } else if (newActiveSkills.length === 0 && this.unlockedSlots.includes('skill_point')) {
-                this.unlockedSlots = this.unlockedSlots.filter(t => t !== 'skill_point');
-                this.slotCount = Math.max(1, this.unlockedSlots.length);
-            }
-            // 同步更新技能杠显示
-            if (this.ui) {
-                this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-            }
-            // [fix] 精确更新技能杠和 SP 面板的显隐，避免调用 ui_updateUI() 导致
-            // 所有 .ui-overlay 被全局隐藏，从而意外关闭符文发射器面板。
-            const hasSkills = this.activeSkills && this.activeSkills.length > 0;
-            const skillBar = document.getElementById('skill-bar');
-            if (skillBar) {
-                skillBar.style.display = (this.phase === 'combat' && hasSkills) ? 'flex' : 'none';
-            }
-            const spPanel = document.getElementById('sp-panel');
-            if (spPanel) {
-                if ((this.phase === 'gathering' || this.phase === 'combat') && hasSkills) {
-                    spPanel.style.opacity = '1';
-                    spPanel.style.pointerEvents = 'auto';
-                } else {
-                    spPanel.style.opacity = '0';
-                    spPanel.style.pointerEvents = 'none';
-                }
-            }
+        // 词条新解锁技能时给出提示（基于技能池增量，避免局开始的基础技能也弹提示）
+        const newlyUnlocked = (this.unlockedSkills || []).filter(s => s.unlockRuneword && !prevPoolIds.has(s.id));
+        if (newlyUnlocked.length > 0) {
+            showToast(`✨ 符文解锁技能：${newlyUnlocked.map(s => s.name).join('、')}`);
         }
     },
 
@@ -2060,6 +2033,128 @@ export const rune_launcher_system = {
 
 //         // showStep(0);
     // },
+
+    // ==================== [技能装配系统] 技能编辑器（loadout） ====================
+    /**
+     * ui_openSkillEditor - 打开技能装配编辑器
+     * @param {object} [opts]
+     * @param {boolean} [opts.forced] 是否为「装备已满又解锁新技能」触发的强制弹出
+     */
+    ui_openSkillEditor(opts = {}) {
+        if (typeof document === 'undefined') return;
+        const overlay = document.getElementById('skill-editor-overlay');
+        if (!overlay) return;
+        this._skillEditorForced = !!opts.forced;
+        overlay.classList.add('is-open');
+        overlay.style.display = 'flex';
+        // 绑定一次性按钮事件
+        if (overlay.dataset.bound !== 'true') {
+            overlay.dataset.bound = 'true';
+            const closeBtn = document.getElementById('skill-editor-close-btn');
+            if (closeBtn) closeBtn.addEventListener('click', () => this.ui_closeSkillEditor());
+            // 点击遮罩空白处关闭
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) this.ui_closeSkillEditor();
+            });
+        }
+        this.ui_renderSkillEditor();
+    },
+
+    ui_closeSkillEditor() {
+        if (typeof document === 'undefined') return;
+        const overlay = document.getElementById('skill-editor-overlay');
+        if (!overlay) return;
+        overlay.classList.remove('is-open');
+        overlay.style.display = 'none';
+        this._skillEditorForced = false;
+    },
+
+    /**
+     * ui_toggleEquipSkill - 装备 / 卸下一个技能（受 maxEquippedSkills 上限约束）
+     */
+    ui_toggleEquipSkill(skillId) {
+        const pool = Array.isArray(this.unlockedSkills) ? this.unlockedSkills : [];
+        if (!pool.some(s => s.id === skillId)) return; // 不在池中，忽略
+        if (!Array.isArray(this.equippedSkillIds)) this.equippedSkillIds = [];
+        const cap = (CONFIG.gameplay && CONFIG.gameplay.maxEquippedSkills) || 4;
+        const idx = this.equippedSkillIds.indexOf(skillId);
+        if (idx >= 0) {
+            // 卸下（仍保留在池中，可重装）
+            this.equippedSkillIds.splice(idx, 1);
+        } else {
+            if (this.equippedSkillIds.length >= cap) {
+                showToast(`最多装备 ${cap} 个技能，请先卸下一个`);
+                return;
+            }
+            this.equippedSkillIds.push(skillId);
+        }
+        // 重算 activeSkills 与技能栏（不触发再次弹窗）
+        if (typeof this.combat_recomputeActiveSkills === 'function') {
+            this.combat_recomputeActiveSkills({ allowEditorPopup: false });
+        }
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        this.ui_renderSkillEditor();
+    },
+
+    /**
+     * ui_renderSkillEditor - 渲染技能编辑器内容（池中全部技能 + 装备状态）
+     */
+    ui_renderSkillEditor() {
+        if (typeof document === 'undefined') return;
+        const body = document.getElementById('skill-editor-body');
+        if (!body) return;
+        const pool = Array.isArray(this.unlockedSkills) ? this.unlockedSkills : [];
+        const equipped = new Set(this.equippedSkillIds || []);
+        const cap = (CONFIG.gameplay && CONFIG.gameplay.maxEquippedSkills) || 4;
+
+        // 头部计数与强制提示
+        const countEl = document.getElementById('skill-editor-count');
+        if (countEl) countEl.textContent = `已装备 ${equipped.size}/${cap}`;
+        const hintEl = document.getElementById('skill-editor-hint');
+        if (hintEl) {
+            if (this._skillEditorForced) {
+                hintEl.textContent = '技能已超过上限：请卸下不需要的技能，为新技能腾出装备位。';
+                hintEl.style.display = 'block';
+            } else {
+                hintEl.style.display = 'none';
+            }
+        }
+
+        const SOURCE_LABEL = { base: '基础', runeword: '词条', relic: '遗物', shop: '商店' };
+
+        body.innerHTML = '';
+        if (pool.length === 0) {
+            body.innerHTML = '<div class="skill-editor-empty">尚未解锁任何技能。激活符文词条、拾取遗物或在局内商店购买即可获得技能。</div>';
+            return;
+        }
+        pool.forEach(sk => {
+            const isEquipped = equipped.has(sk.id);
+            const atCap = equipped.size >= cap;
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'skill-editor-card' + (isEquipped ? ' is-equipped' : '');
+            // 未装备且已满 → 视觉置灰但仍可点（点了会提示先卸下）
+            if (!isEquipped && atCap) card.classList.add('is-locked');
+            card.style.setProperty('--skill-color', sk.color || '#94a3b8');
+            const cost = Math.max(0, Number(sk.cost) || 0);
+            card.innerHTML = `
+                <span class="skill-editor-card-icon">${sk.icon || '✦'}</span>
+                <span class="skill-editor-card-main">
+                    <span class="skill-editor-card-title">
+                        <b>${sk.name}</b>
+                        <span class="skill-editor-card-cost">${cost} SP</span>
+                    </span>
+                    <span class="skill-editor-card-desc">${sk.desc || ''}</span>
+                </span>
+                <span class="skill-editor-card-meta">
+                    <span class="skill-editor-card-source">${SOURCE_LABEL[sk.source] || '技能'}</span>
+                    <span class="skill-editor-card-toggle">${isEquipped ? '✓ 已装备' : '＋ 装备'}</span>
+                </span>
+            `;
+            card.addEventListener('click', () => this.ui_toggleEquipSkill(sk.id));
+            body.appendChild(card);
+        });
+    },
 
 
 };

@@ -4864,6 +4864,7 @@
                 <div id="combat-status-note" class="combat-status-note">等待战斗开始</div>
             </div>
             <div id="sp-panel" class="flex flex-wrap gap-2 pointer-events-none transition-opacity duration-300"></div>
+            <button id="skill-editor-open-btn" type="button" class="skill-editor-open-btn pointer-events-auto" style="display:none;">✎ 技能</button>
         </div>
 
         <!-- 中间：战斗阶段保持空场，技能充能已下沉到底部技能舱 -->
@@ -5355,6 +5356,21 @@
 
 
 
+    </div>
+
+    <!-- [技能装配系统] 技能编辑器 overlay -->
+    <div id="skill-editor-overlay" class="skill-editor-overlay" style="display:none;">
+        <div class="skill-editor-modal">
+            <div class="skill-editor-header">
+                <div class="skill-editor-titles">
+                    <h3 class="skill-editor-title">技能装配</h3>
+                    <span id="skill-editor-count" class="skill-editor-count">已装备 0/4</span>
+                </div>
+                <button id="skill-editor-close-btn" type="button" class="skill-editor-close-btn" aria-label="关闭">✕</button>
+            </div>
+            <div id="skill-editor-hint" class="skill-editor-hint" style="display:none;"></div>
+            <div id="skill-editor-body" class="skill-editor-body"></div>
+        </div>
     </div>
 
     <!-- Phase: Truth Book (Encyclopedia) -->
