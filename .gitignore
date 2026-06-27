@@ -5,6 +5,10 @@ tmp/
 Audio_sample/
 assets/audio-local/
 codex-*.log
+tmp*_preview_server*.log
 _verif.mjs
 scripts/__pycache__/
 *.pyc
+docs/architecture/music_processing/_mine/
+docs/archive/**/*.png
+docs/archive/**/*.json
