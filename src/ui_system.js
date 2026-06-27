@@ -2439,9 +2439,14 @@ export const ui_system = {
         const html = Object.entries(counts).map(([id, count]) => {
             const def = RELIC_DB.find(r => r.id === id) || { name: id, icon: '❓', desc: '' };
             const stack = count > 1 ? ` <span style="color:#fbbf24;font-weight:bold;">×${count}</span>` : '';
+            const relicBitmapSrc = getRelicIconSrc(id);
+            const iconFallback = def.icon || '🔮';
+            const iconHtml = relicBitmapSrc
+                ? `<img src="${relicBitmapSrc}" alt="" style="width:32px;height:32px;object-fit:contain;display:block;" loading="lazy" onerror="this.style.display='none';this.insertAdjacentText('afterend','${iconFallback}');">`
+                : iconFallback;
             return `
                 <div style="display:flex;align-items:flex-start;gap:8px;padding:8px;margin-bottom:6px;background:rgba(30,41,59,0.6);border:1px solid rgba(100,116,139,0.3);border-radius:8px;">
-                    <span style="font-size:20px;line-height:1;">${def.icon || '🔮'}</span>
+                    <span class="pause-relic-icon" style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;font-size:20px;line-height:1;flex-shrink:0;">${iconHtml}</span>
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:12px;font-weight:bold;color:#e2e8f0;">${def.name}${stack}</div>
                         <div style="font-size:10px;color:#94a3b8;margin-top:2px;line-height:1.4;">${def.desc || ''}</div>

@@ -1,8 +1,28 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年6月24日 | **状态：⏳ P0 交互优化大盘已整理 · PixiJS 渲染管线迁移规划中 · 阶段状态残留 / 大型基底生成节奏为下一优先级 · 位图化视觉重构规划中**
+**最后更新：** 2026年6月27日 | **状态：⏳ P0 交互优化大盘已整理 · 药剂炼成机制文档整理与规划已启动 · PixiJS 渲染管线迁移规划中 · 位图化视觉资产缺口索引已建立**
 
 > 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
+
+---
+
+## 2026-06-27 药剂炼成机制整理入口
+
+当前药剂机制的权威规则、工程现状、差距和分期计划已集中到以下文档：
+
+- [`docs/rune_potion_spell_contract.md`](docs/rune_potion_spell_contract.md)：机制权威口径，定义“符文组合 = 法术内容，法阵 = 形态 + 嵌套合约”。
+- [`docs/potion_alchemy_development_plan.md`](docs/potion_alchemy_development_plan.md)：当前代码现状、差距、P0-P5 路线图、文件影响范围与验收闸门。
+- [`docs/spell_vfx_design.md`](docs/spell_vfx_design.md)：法阵形态 VFX 规格与 `combat_playSpellFormVFX()` 表现层要求。
+
+近期 Codex 执行批次：
+
+| 批次 | 任务 | 状态 |
+| :--- | :--- | :--- |
+| C1 | 中断与覆盖边界：关闭炼金台、切 Tab、进入战斗、刷新恢复时，已投入符文不返还且草稿状态可解释 | 待实施 |
+| C2 | 法阵选择 MVP：用按钮/分段控件选择 `bottle`、`orb`、`beam`、`meteor`、`tower`，不先做手绘识别 | 待实施 |
+| C3 | 法阵合法性表：扩展 `_potionAlchemyDraft` 记录 `formId`、`nestingMode`、`slotType`，并校验 `spellType x formId` | 待实施 |
+| C4 | `spellContent` 解析：从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容 | 待实施 |
+| C5 | `spellTree` 存档：将 `preparedPotionSpell` 从静态 `potionId` 兼容字段升级为可持久化树结构 | 待实施 |
 
 ---
 
@@ -81,6 +101,19 @@
 
 > 将现有纯矢量/CSS 绘制的 UI 与敌人，逐步替换为自动生成的位图（9-Slice 切图 + Sprite Sheet），在不破坏现有动态特效逻辑的前提下大幅提升视觉表现力。
 > 完整设计规格见 [`design_spec_bitmap.md`](./design_spec_bitmap.md)。
+> 具体生成规范见 [`docs/art_asset_generation_guidelines.md`](docs/art_asset_generation_guidelines.md)，用于约束场景、效果、材质、透明管线、Prompt 模板与验收标准。
+> 当前资产缺口、覆盖状态与生成排期见 [`docs/asset_gap_index.md`](docs/asset_gap_index.md)。该索引是后续生成 UI、ICON、Toast、遗物图标与敌人重绘 pass 的执行入口。
+
+### Phase 5 当前资产生成优先级（2026-06-25）
+
+| 优先级 | 内容 | 当前状态 | 下一步 |
+| :--- | :--- | :--- | :--- |
+| P0 | 遗物图标缺口 | `RELIC_DB` 44 个中 14 个仍走 emoji fallback；本轮已生成 6 个 P0 遗物图标；符文/弹药/属性图标已覆盖 | 继续分批生成 `assets/icons/relic/<id>.png` 并写入 `RELIC_ICON_MAP` |
+| P0 | 暂停菜单与首页首屏 | `#phase-pause` 完全缺位图；首页缺标题徽章与开始按钮底板 | 生成 `pause_menu_bg.png`、`pause_menu_btn_9s.png`、`title_badge.png`、`start_btn_metal.png` |
+| P0 | 设置弹窗收口 | 面板与 toggle 已有，滑条与关闭按钮缺 Sprite | 生成 `slider_track.png`、`slider_thumb.png`、`modal_close_btn.png` |
+| P1 | 回合 Toast 状态化二批 | Pass 1 已有标题牌、威胁槽与 Boss 小像；状态横幅与高危边框仍缺 | 按 `round_start_boss_toast_asset_contract.md` 生成 `round_toast_*`、danger plate、danger frame |
+| P1 | Meta / Shop / Gathering 中频页面 | 背景与卡片部分覆盖，分类/货币/价格/钉盘外框缺 | 补 Tab、SP 货币、价格标签、钉盘外框 |
+| P2 | 图鉴 / 结算 / 数据页 / Runeword | 低频页面仍有 CSS fallback | 生成真理之书侧标、统计卡片、数据徽章、Runeword 图标 |
 
 ### Phase 5.0：核心页面体验重设与流程优化 🧭 新增记录
 
