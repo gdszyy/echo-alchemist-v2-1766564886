@@ -788,16 +788,12 @@ export const game_phase = {
             }
         }
 
-        // [技能来源扩展] 进入钉盘前先重算技能并集（基础技能保证 activeSkills 非空、skill_point 槽常驻）
+        // [技能来源扩展] 进入钉盘前先重算技能并集；SP 由技能充能条发放，不再生成 skill_point 槽
         if (typeof this.combat_recomputeActiveSkills === 'function') {
             this.combat_recomputeActiveSkills({ allowEditorPopup: false });
         }
         // [unlock_slot 遗物 + slot_count_up] 在模块外额外创建特殊槽
-        let effectiveSlots = [...(this.unlockedSlots || [])];
-        // [技能装配] skill_point 槽取决于「技能池」是否非空（而非当前装备数），玩家卸光技能仍保留 SP 来源
-        if (!this.unlockedSkills || this.unlockedSkills.length === 0) {
-            effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
-        }
+        let effectiveSlots = [...(this.unlockedSlots || [])].filter(t => t !== 'skill_point');
         const effectiveSlotCount = Math.min(this.slotCount || 0, effectiveSlots.length > 0 ? this.slotCount : 0);
         if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
             const validIdx = this.pegs.map((p, i) => i).filter(i => this.pegs[i].type !== 'pink');
@@ -1336,16 +1332,13 @@ export const game_phase = {
             }
         }
 
-        // [技能来源扩展] 进入钉盘前先重算技能并集（基础技能保证 activeSkills 非空、skill_point 槽常驻）
+        // [技能来源扩展] 进入钉盘前先重算技能并集；SP 由技能充能条发放，不再生成 skill_point 槽
         if (typeof this.combat_recomputeActiveSkills === 'function') {
             this.combat_recomputeActiveSkills({ allowEditorPopup: false });
         }
-        // [技能系统迭代] 动态过滤 skill_point 槽：只要技能池非空就生成技能点槽（与装备数无关）
-        let effectiveSlots = [...this.unlockedSlots];
-        if (!this.unlockedSkills || this.unlockedSkills.length === 0) {
-            effectiveSlots = effectiveSlots.filter(t => t !== 'skill_point');
-        }
-        const effectiveSlotCount = Math.min(this.slotCount, effectiveSlots.length > 0 ? this.slotCount : 0);
+        // [技能充能迭代] skill_point 槽已退役；旧存档或旧逻辑带入时在入口过滤
+        let effectiveSlots = [...(this.unlockedSlots || [])].filter(t => t !== 'skill_point');
+        const effectiveSlotCount = Math.min(this.slotCount || 0, effectiveSlots.length > 0 ? (this.slotCount || 0) : 0);
         if (CONFIG.debug) console.log(`[DEBUG] Starting special slot creation: effectiveSlots=${JSON.stringify(effectiveSlots)}, slotCount=${effectiveSlotCount}`);
         if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
             const slotTypes = effectiveSlots;
@@ -1826,6 +1819,29 @@ phase_gathering_getRandomPegType() {
         } 
     },
 
+    phase_calcVenomEffectiveStacks(rawStacks) {
+        const stacks = Math.max(0, Math.floor(rawStacks || 0));
+        const venomCfg = (CONFIG.mechanics && CONFIG.mechanics.venom) || {};
+        const linearStacks = Math.max(0, Math.floor(venomCfg.linearStacks ?? 30));
+        const overflowSqrtScale = Math.max(0, venomCfg.overflowSqrtScale ?? 6);
+        if (stacks <= linearStacks) return stacks;
+        return linearStacks + Math.sqrt(stacks - linearStacks) * overflowSqrtScale;
+    },
+
+    phase_playThawFeedback(enemy) {
+        if (!enemy || !enemy.pos) return;
+        // @perf-impact: 解冻反馈 - 复用 skill ignition 既有粒子/冲击波预算，仅在扫描波触发解冻瞬间执行。
+        if (typeof this.spawn_createSkillIgnition === 'function') {
+            this.spawn_createSkillIgnition(enemy.pos.x, enemy.pos.y, '#67e8f9', { skillType: 'thaw' });
+        }
+        if (typeof this.spawn_createFloatingText === 'function') {
+            this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 42, '解冻', '#67e8f9', 12);
+        }
+        if (audio && typeof audio.playEffect === 'function') {
+            audio.playEffect('shatter');
+        }
+    },
+
 //  处理单个敌人的回合逻辑 (当波扫到它时调用)
     /**
      * @param {any} e - TODO: Describe this parameter.
@@ -1834,10 +1850,21 @@ phase_gathering_getRandomPegType() {
         if (!e.active || e.hasActedThisTurn) return;
 
         e.hasActedThisTurn = true;
+        const wasFrozenAtTurnStart = e._wasFrozenLastTurn === true || e.isFrozenCurrentTurn === true;
+        const isFrozenAtTurnStart = e.temp <= -80;
+        const thawedAtTurnStart = wasFrozenAtTurnStart && !isFrozenAtTurnStart;
+        if (thawedAtTurnStart) {
+            e._wasFrozenLastTurn = false;
+            e.isFrozenCurrentTurn = false;
+            if (typeof this.phase_playThawFeedback === 'function') {
+                this.phase_playThawFeedback(e);
+            }
+        }
 
         // --- [新属性] 毒素 DoT 结算 ---
-        // 公式：dmg = venomStacks × dotPerStack × dotMultiplier(共鸣)
-        // 冻结（temp <= -80）时跳过本回合，但层数保留；解冻当回合一次性结算（按当前层数 ×1）。
+        // 公式：dmg = effectiveVenomStacks × dotPerStack × dotMultiplier(共鸣)
+        // effectiveVenomStacks 前段线性，超出后按 sqrt 溢出段递减，保留高层数收益但避免线性爆炸。
+        // 冻结（temp <= -80）时跳过本回合，但层数保留；解冻当回合额外结算 1 次，并享受冰冻伤害加深。
         // 过热（temp >= 100）时每回合结算 2 次。
         // ignoreShield=true 共鸣下：对 shield 敌人 DoT 双倍（毒素本身 bypass 护盾减伤）。
         if ((e.venomStacks || 0) > 0) {
@@ -1849,24 +1876,26 @@ phase_gathering_getRandomPegType() {
             const ignoreShield = venomResParams ? (venomResParams.ignoreShield || false) : false;
 
             const isFrozen = (e.temp <= -80);
-            // 解冻当回合一次性结算：上回合冻结但本回合未冻 -> _venomFrozenAccum
-            // 这里以 e._wasFrozenLastTurn 简易检测：若本帧冻结，标记 true，次回合解除时一次性结算。
+            // 解冻当回合在扫描波触发点结算：thawedAtTurnStart 与解冻动画共用同一状态边沿。
             if (isFrozen) {
                 // 冻结当回合不发作，仅标记
                 e._wasFrozenLastTurn = true;
             } else {
                 let ticks = 1;
                 if (e.temp >= 100) ticks = 2;
-                let oneShotMult = 1;
-                if (e._wasFrozenLastTurn) {
-                    // 解冻当回合一次性结算（按当前 stacks ×1）
-                    oneShotMult = 1; // 维持公式一致：×当前 stacks 一次
-                    e._wasFrozenLastTurn = false;
+                const venomStacks = Math.max(0, e.venomStacks || 0);
+                const effectiveStacks = typeof this.phase_calcVenomEffectiveStacks === 'function'
+                    ? this.phase_calcVenomEffectiveStacks(venomStacks)
+                    : venomStacks;
+                const baseTickDmg = effectiveStacks * dotPerStack * dotMultiplier;
+                let dotDmg = baseTickDmg * ticks;
+                if (thawedAtTurnStart) {
+                    const cryoRes = this.activeElementResonances && this.activeElementResonances['cryo'];
+                    const cryoResParams = cryoRes ? cryoRes.params : null;
+                    const frozenDamageAmp = cryoResParams ? (cryoResParams.frozenPhysDmgBonus || 0) : 0;
+                    const thawExtraTickMultiplier = venomCfg.thawExtraTickMultiplier ?? 1.0;
+                    dotDmg += baseTickDmg * thawExtraTickMultiplier * (1 + frozenDamageAmp);
                 }
-                // 三角阈值：每累计 1, 2, 3, 4… 层才 +1 点伤害
-                // stacks=1→1dmg, stacks=3→2dmg, stacks=6→3dmg, stacks=10→4dmg ...
-                const venomTier = Math.floor((-1 + Math.sqrt(1 + 8 * e.venomStacks)) / 2);
-                let dotDmg = (venomTier * dotPerStack * dotMultiplier) * ticks * oneShotMult;
                 // 对 shield 敌人 DoT 双倍（共鸣 Tier3）
                 if (ignoreShield && e.affixes && e.affixes.includes('shield')) {
                     dotDmg *= 2;
@@ -1875,7 +1904,8 @@ phase_gathering_getRandomPegType() {
                     const dmg = Math.max(1, Math.ceil(dotDmg));
                     // bypassShield=true 让毒素 DoT 不受护盾减伤
                     const r = e.takeDamage(dmg, null, true);
-                    if (r && this.combat_recordDamage) this.combat_recordDamage(r.actualDamage, 'pyro', 'main');
+                    const venomHpDamage = r ? (r.hpDamage ?? r.actualDamage ?? 0) : 0;
+                    if (venomHpDamage > 0 && this.combat_recordDamage) this.combat_recordDamage(venomHpDamage, 'venom', 'main');
                     if (r && r.killed) {
                         // [剧毒火焰死亡] 毒素 DoT 击杀：触发专属毒焰溶解死亡特效
                         // （此前 DoT 击杀不经过击中-死亡路径，故无任何死亡表现）
@@ -1883,7 +1913,10 @@ phase_gathering_getRandomPegType() {
                             this._triggerDeathFX(e, null, { cause: 'venom' });
                         }
                     } else {
-                        if (this.spawn_createFloatingText) this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, `☠️${dmg}`, '#84cc16');
+                        if (this.spawn_createFloatingText) {
+                            const venomLabel = thawedAtTurnStart ? `解冻☠️${dmg}` : `☠️${dmg}`;
+                            this.spawn_createFloatingText(e.pos.x, e.pos.y - 30, venomLabel, '#84cc16');
+                        }
                         if (this.spawn_createParticle) {
                             for (let i = 0; i < 3; i++) this.spawn_createParticle(e.pos.x, e.pos.y, '#84cc16', 'mist');
                         }
@@ -2200,8 +2233,6 @@ phase_gathering_getRandomPegType() {
             if (e.type === 'boss' && e.bossType && typeof e._moveCooldown !== 'undefined') {
                 if ((e._bossVulnerabilityExposedTurns || 0) > 0) {
                     e._willMoveThisTurn = false;
-                } else if (e.berserked) {
-                    e._willMoveThisTurn = true;
                 } else {
                     e._willMoveThisTurn = (e._moveCooldown === 0);
                 }

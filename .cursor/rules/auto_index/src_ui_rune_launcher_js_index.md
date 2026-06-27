@@ -1,6 +1,6 @@
 # src\ui\rune_launcher.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 2068 | 函数数: 29 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 2628 | 函数数: 52 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -28,6 +28,25 @@
 | ui_doRuneReforge | method | `ui_doRuneReforge()` |  |
 | _ui_playMergeShardFlyEffect | method | `_ui_playMergeShardFlyEffect(startX, startY, amount)` |  |
 | _ui_showRuneActionResult | method | `_ui_showRuneActionResult(message, type)` |  |
+| _ui_isPotionAlchemyUnlocked | method | `_ui_isPotionAlchemyUnlocked()` |  |
+| _ui_getPotionRuneEntry | method | `_ui_getPotionRuneEntry(idx)` |  |
+| _ui_getSelectedPotionRunes | method | `_ui_getSelectedPotionRunes()` |  |
+| _ui_estimatePotionRuneValue | method | `_ui_estimatePotionRuneValue(runeInfo)` |  |
+| _ui_resolvePotionRecipe | method | `_ui_resolvePotionRecipe(selectedRunes)` |  |
+| _ui_getPotionAlchemyDraft | method | `_ui_getPotionAlchemyDraft()` |  |
+| _ui_resetPotionAlchemyDraft | method | `_ui_resetPotionAlchemyDraft()` |  |
+| _ui_getPotionDraftRunes | method | `_ui_getPotionDraftRunes()` |  |
+| _ui_renderPotionDraftRunes | method | `_ui_renderPotionDraftRunes()` |  |
+| _ui_calcPotionDraftRefund | method | `_ui_calcPotionDraftRefund(runes, result = null)` |  |
+| _ui_consumePotionRune | method | `_ui_consumePotionRune(idx)` |  |
+| ui_updatePotionAlchemyPanel | method | `ui_updatePotionAlchemyPanel()` |  |
+| _ui_renderPotionCurrent | method | `_ui_renderPotionCurrent()` |  |
+| _ui_renderAlchemyNotes | method | `_ui_renderAlchemyNotes()` |  |
+| _ui_renderPotionAlchemyInventory | method | `_ui_renderPotionAlchemyInventory()` |  |
+| _ui_updatePotionAlchemyPreview | method | `_ui_updatePotionAlchemyPreview()` |  |
+| ui_clearPotionSelection | method | `ui_clearPotionSelection()` |  |
+| ui_confirmPotionAlchemy | method | `ui_confirmPotionAlchemy()` |  |
+| _ui_showPotionActionResult | method | `_ui_showPotionActionResult(message, type)` |  |
 | ui_switchRuneTab | method | `ui_switchRuneTab(tab)` |  |
 | ui_showRunewordDetail | method | `ui_showRunewordDetail(runewordId, level = 1)` |  |
 | ui_renderRuneCodex | method | `ui_renderRuneCodex()` |  |
@@ -38,6 +57,10 @@
 | _ui_showRunewordBubble | method | `_ui_showRunewordBubble(formableRunewords)` |  |
 | _ui_hideRunewordBubble | method | `_ui_hideRunewordBubble()` |  |
 | ui_autoArrangeRunes | method | `ui_autoArrangeRunes()` |  |
+| ui_openSkillEditor | method | `ui_openSkillEditor(opts = {})` |  |
+| ui_closeSkillEditor | method | `ui_closeSkillEditor()` |  |
+| ui_toggleEquipSkill | method | `ui_toggleEquipSkill(skillId)` |  |
+| ui_renderSkillEditor | method | `ui_renderSkillEditor()` |  |
 
 ## 其他 @section 标记
 

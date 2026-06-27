@@ -78,6 +78,102 @@ function _buildAttributeChip(entry, className = '') {
     return chip;
 }
 
+function _buildCombatAttributePlaceholder(slotIndex) {
+    const chip = _buildAttributeChip({
+        key: 'empty',
+        value: 0,
+        name: `属性槽 ${slotIndex + 1}`,
+        color: '#64748b',
+    }, 'combat-ammo-attribute-chip is-empty');
+    chip.title = `属性槽 ${slotIndex + 1}`;
+    return chip;
+}
+
+function _buildCombatAttributeMoreSlot(hiddenEntries) {
+    const chip = _buildAttributeChip({
+        key: 'empty',
+        value: 0,
+        name: '更多属性',
+        color: hiddenEntries[0] ? hiddenEntries[0].color : '#cbd5e1',
+    }, 'combat-ammo-attribute-chip is-more');
+    const valueEl = chip.querySelector('.attribute-chip-value');
+    if (valueEl) valueEl.textContent = `+${hiddenEntries.length}`;
+    chip.title = hiddenEntries.map(entry => `${entry.name} ${entry.value}`).join(' · ');
+    return chip;
+}
+
+function _buildCombatAttributeSlots(profile, maxSlots = 4) {
+    const entries = Array.isArray(profile && profile.entries) ? profile.entries : [];
+    const damageDisplay = CONFIG.ui.attributeDisplay.damage || {};
+    const sourceEntries = entries.length > 0 ? entries : [{
+        key: 'damage',
+        value: Math.max(0, Math.floor(Number(profile && profile.damage) || 0)),
+        name: damageDisplay.name || '基础伤害',
+        icon: damageDisplay.icon || '',
+        color: damageDisplay.color || '#a855f7',
+    }];
+    const hiddenEntries = sourceEntries.length > maxSlots ? sourceEntries.slice(maxSlots - 1) : [];
+    const visibleEntries = hiddenEntries.length > 0 ? sourceEntries.slice(0, maxSlots - 1) : sourceEntries.slice(0, maxSlots);
+    const slots = visibleEntries.map(entry => _buildAttributeChip(entry, 'combat-ammo-attribute-chip'));
+    if (hiddenEntries.length > 0) {
+        slots.push(_buildCombatAttributeMoreSlot(hiddenEntries));
+    }
+    while (slots.length < maxSlots) {
+        slots.push(_buildCombatAttributePlaceholder(slots.length));
+    }
+    return slots;
+}
+
+function _buildCombatQueueAttributeIcon(entry, className = '') {
+    const key = _safeAttributeKey(entry && entry.key);
+    const value = Math.max(0, Math.floor(Number(entry && entry.value) || 0));
+    const icon = document.createElement('span');
+    icon.className = `combat-ammo-queue-attr-icon attr-icon-${key}${className ? ` ${className}` : ''}`;
+    icon.dataset.attribute = key;
+    icon.style.setProperty('--chip-color', (entry && entry.color) || '#cbd5e1');
+    icon.style.setProperty('--attribute-icon-image', _attributeIconAssetUrl(key));
+    icon.title = `${(entry && entry.name) || key} ${value}`;
+
+    const count = document.createElement('span');
+    count.className = 'combat-ammo-queue-attr-value';
+    count.textContent = value > 0 ? String(value) : '';
+
+    icon.appendChild(count);
+    return icon;
+}
+
+function _buildCombatQueueAttributeMoreIcon(hiddenEntries) {
+    const icon = _buildCombatQueueAttributeIcon({
+        key: 'empty',
+        value: 0,
+        name: 'More',
+        color: hiddenEntries[0] ? hiddenEntries[0].color : '#cbd5e1',
+    }, 'is-more');
+    const count = icon.querySelector('.combat-ammo-queue-attr-value');
+    if (count) count.textContent = `+${hiddenEntries.length}`;
+    icon.title = hiddenEntries.map(entry => `${entry.name} ${entry.value}`).join(' / ');
+    return icon;
+}
+
+function _buildCombatQueueAttributeIcons(profile, maxIcons = 4) {
+    const entries = Array.isArray(profile && profile.entries) ? profile.entries : [];
+    const damageDisplay = CONFIG.ui.attributeDisplay.damage || {};
+    const sourceEntries = entries.length > 0 ? entries : [{
+        key: 'damage',
+        value: Math.max(0, Math.floor(Number(profile && profile.damage) || 0)),
+        name: damageDisplay.name || 'Damage',
+        icon: damageDisplay.icon || '',
+        color: damageDisplay.color || '#a855f7',
+    }];
+    const hiddenEntries = sourceEntries.length > maxIcons ? sourceEntries.slice(maxIcons - 1) : [];
+    const visibleEntries = hiddenEntries.length > 0 ? sourceEntries.slice(0, maxIcons - 1) : sourceEntries.slice(0, maxIcons);
+    const icons = visibleEntries.map(entry => _buildCombatQueueAttributeIcon(entry));
+    if (hiddenEntries.length > 0) {
+        icons.push(_buildCombatQueueAttributeMoreIcon(hiddenEntries));
+    }
+    return icons;
+}
+
 function _playRuneAcquireReveal(runeDef, runeLevel, delay = 0) {
     if (typeof document === 'undefined' || !runeDef) return;
     setTimeout(() => {
@@ -525,9 +621,10 @@ export const hud_system = {
                 combatHud.innerHTML = '';
                 
                 const recipes = this.ammoQueue || [];
-                const upcomingRecipes = recipes.slice(1, 6);
+                const upcomingRecipes = recipes.slice(1, 3);
                 combatHud.classList.add('combat-ammo-console');
                 combatHud.classList.toggle('is-empty', upcomingRecipes.length === 0);
+                combatHud.classList.toggle('has-two-upcoming', upcomingRecipes.length > 1);
                 combatHud.dataset.queueCount = String(upcomingRecipes.length);
 
                 if (upcomingRecipes.length === 0) {
@@ -542,6 +639,7 @@ export const hud_system = {
 
                     const nextSlot = document.createElement('div');
                     nextSlot.className = 'combat-ammo-next-slot';
+                    nextSlot.dataset.ammoIndex = 'next-1';
                     nextSlot.style.setProperty('--ammo-accent', nextProfile.primary.color);
                     if (nextIconSrc) nextSlot.style.setProperty('--ammo-icon', `url("${nextIconSrc}")`);
                     nextSlot.title = nextProfile.summary;
@@ -568,32 +666,21 @@ export const hud_system = {
 
                     const attributeRow = document.createElement('div');
                     attributeRow.className = 'combat-ammo-attribute-row';
-                    const entries = nextProfile.entries.slice(0, 4);
-                    if (entries.length === 0) {
-                        attributeRow.appendChild(_buildAttributeChip({
-                            key: 'damage',
-                            value: nextProfile.damage,
-                            name: '基础伤害',
-                            icon: CONFIG.ui.attributeDisplay.damage.icon,
-                            color: CONFIG.ui.attributeDisplay.damage.color,
-                        }, 'combat-ammo-attribute-chip'));
-                    } else {
-                        entries.forEach(entry => {
-                            attributeRow.appendChild(_buildAttributeChip(entry, 'combat-ammo-attribute-chip'));
-                        });
-                    }
+                    _buildCombatAttributeSlots(nextProfile, 4).forEach(slot => {
+                        attributeRow.appendChild(slot);
+                    });
 
                     combatHud.append(nextSlot, attributeRow);
 
                     const queueStrip = document.createElement('div');
                     queueStrip.className = 'combat-ammo-queue-strip';
                     queueStrip.classList.toggle('is-empty', upcomingRecipes.length <= 1);
-                    upcomingRecipes.slice(1, 5).forEach((recipe, idx) => {
+                    upcomingRecipes.slice(1, 2).forEach((recipe, idx) => {
                         const profile = getAmmoReadabilityProfile(recipe);
                         const iconSrc = getAmmoIconSrc(recipe);
                         const chip = document.createElement('div');
                         chip.className = 'combat-ammo-queue-chip';
-                        chip.dataset.queueIndex = String(idx + 3);
+                        chip.dataset.queueIndex = String(idx + 2);
                         chip.style.setProperty('--ammo-accent', profile.primary.color);
                         if (iconSrc) chip.style.setProperty('--ammo-icon', `url("${iconSrc}")`);
                         chip.title = profile.summary;
@@ -606,19 +693,9 @@ export const hud_system = {
 
                         const chipAttrs = document.createElement('span');
                         chipAttrs.className = 'combat-ammo-queue-attrs';
-                        const queueEntries = profile.entries.slice(0, 2);
-                        if (queueEntries.length === 0) {
-                            const dot = document.createElement('i');
-                            dot.style.setProperty('--dot-color', profile.primary.color);
-                            chipAttrs.appendChild(dot);
-                        } else {
-                            queueEntries.forEach(entry => {
-                                const dot = document.createElement('i');
-                                dot.style.setProperty('--dot-color', entry.color);
-                                dot.title = `${entry.name} ${entry.value}`;
-                                chipAttrs.appendChild(dot);
-                            });
-                        }
+                        _buildCombatQueueAttributeIcons(profile, 4).forEach(attrIcon => {
+                            chipAttrs.appendChild(attrIcon);
+                        });
 
                         chip.append(chipIcon, chipDamage, chipAttrs);
                         queueStrip.appendChild(chip);
@@ -629,7 +706,7 @@ export const hud_system = {
                         emptyQueue.textContent = 'QUEUE EMPTY';
                         queueStrip.appendChild(emptyQueue);
                     }
-                    const hiddenCount = Math.max(0, recipes.length - 6);
+                    const hiddenCount = Math.max(0, recipes.length - 3);
                     if (hiddenCount > 0) {
                         const more = document.createElement('div');
                         more.className = 'combat-ammo-queue-more';
@@ -922,6 +999,38 @@ export const hud_system = {
 
 
 /**
+     * @method ui_getCanvasPointForElement
+     * @description 将 DOM 元素中心点从视口坐标转换到当前游戏 canvas 坐标。
+     * @param {HTMLElement} el - 目标 DOM 元素。
+     * @param {object} options - anchorX / anchorY 控制取点，clamp 控制是否夹到画布内。
+     */
+    ui_getCanvasPointForElement(el, options = {}) {
+        if (!el || typeof el.getBoundingClientRect !== 'function') return null;
+        const canvasEl = this.canvas || document.getElementById('gameCanvas');
+        const canvasRect = canvasEl && typeof canvasEl.getBoundingClientRect === 'function'
+            ? canvasEl.getBoundingClientRect()
+            : null;
+        if (!canvasRect || !canvasRect.width || !canvasRect.height) return null;
+
+        const rect = el.getBoundingClientRect();
+        if (!rect || (rect.width === 0 && rect.height === 0)) return null;
+
+        const anchorX = Number.isFinite(options.anchorX) ? options.anchorX : 0.5;
+        const anchorY = Number.isFinite(options.anchorY) ? options.anchorY : 0.5;
+        const scaleX = (this.width || canvasRect.width) / canvasRect.width;
+        const scaleY = (this.height || canvasRect.height) / canvasRect.height;
+        let x = (rect.left + rect.width * anchorX - canvasRect.left) * scaleX;
+        let y = (rect.top + rect.height * anchorY - canvasRect.top) * scaleY;
+
+        if (options.clamp !== false) {
+            x = Math.max(0, Math.min(this.width || canvasRect.width, x));
+            y = Math.max(0, Math.min(this.height || canvasRect.height, y));
+        }
+        return { x, y, el, rect };
+    },
+
+
+/**
      */
     ui_updateUICache() {
         const gaugeEl = document.getElementById('hero-gauge-container');
@@ -930,13 +1039,16 @@ export const hud_system = {
             const targetEl = panelStack && !panelStack.classList.contains('hidden') && panelStack.children.length > 0
                 ? panelStack
                 : gaugeEl;
-            const rect = targetEl.getBoundingClientRect();
+            const targetPoint = this.ui_getCanvasPointForElement
+                ? this.ui_getCanvasPointForElement(targetEl)
+                : null;
             // 缓存中心坐标
             this.uiCache = {
-                x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2,
+                x: targetPoint ? targetPoint.x : this.width / 2,
+                y: targetPoint ? targetPoint.y : this.height - 100,
                 // 缓存 DOM 引用，避免重复查询
                 el: targetEl,
+                targetEl,
                 pulseLayer: document.getElementById('gauge-pulse-layer'),
                 gaugeShell: document.getElementById('gauge-shell')
             };

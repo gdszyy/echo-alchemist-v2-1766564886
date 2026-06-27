@@ -1,9 +1,9 @@
 # src\effects\particles.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 3840 | 函数数: 99 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 5197 | 函数数: 135 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -20,24 +20,35 @@
 | constructor | method | `constructor(x, y, angle, length, color)` |  |
 | update | method | `update()` |  |
 | draw | method | `draw(ctx)` |  |
-| constructor | method | `constructor(x, y, angle, length = 92, color = '#fca5a5', quality = 'high')` |  |
+| constructor | method | `constructor(x, y, angle, length = 92, color = '#fca5a5', quality = 'high', options = {})` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, bottomY)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| constructor | method | `constructor(x, y, color)` |  |
+| constructor | method | `constructor(x, y, color, options = {})` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
+| _drawImpact | method | `_drawImpact(ctx, isLow, radius, t)` |  |
+| _drawAssimilation | method | `_drawAssimilation(ctx, isLow, radius, t)` |  |
+| constructor | method | `constructor(x, y, color, options = {})` |  |
+| constructor | method | `constructor(x, y, color, options = {})` |  |
 | constructor | method | `constructor(x, y, mode = 'prelude', quality = 'high')` |  |
 | update | method | `update(timeScale)` |  |
+| draw | method | `draw(ctx)` |  |
+| constructor | method | `constructor(x, y, chainIndex = 0, quality = 'high')` |  |
+| update | method | `update(timeScale)` |  |
+| phases | method | `phases()` |  |
+| handAngle | method | `handAngle(ph)` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(segments, width, color, isContinuous = false)` |  |
 | startFadeOut | method | `startFadeOut()` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| constructor | method | `constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null)` |  |
+| constructor | method | `constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null, options = {})` |  |
 | update | method | `update(timeScale)` |  |
+| accelerateExit | method | `accelerateExit()` |  |
+| getRenderScale | method | `getRenderScale()` |  |
 | draw | method | `draw(ctx)` |  |
 | constructor | method | `constructor(x, y, targetX, targetY, color, initialVel, onArrive, options = {})` |  |
 | update | method | `update(timeScale)` |  |
@@ -55,8 +66,8 @@
 | draw | method | `draw(ctx)` |  |
 | _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
 | destroy | method | `destroy()` |  |
-| constructor | method | `constructor(enemy, duration = 2500)` |  |
-| refresh | method | `refresh(duration = 2500)` |  |
+| constructor | method | `constructor(enemy, duration = 600)` |  |
+| refresh | method | `refresh(duration = 600)` |  |
 | update | method | `update(pos, timeScale)` |  |
 | _spawnArc | method | `_spawnArc()` |  |
 | draw | method | `draw(ctx)` |  |
@@ -77,12 +88,16 @@
 | constructor | method | `constructor(x, y)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
-| constructor | method | `constructor(x, y, tier = 'normal')` |  |
+| constructor | method | `constructor(x, y, tier = 'normal', variant = 'default')` |  |
+| _initVenom | method | `_initVenom(tier)` |  |
+| _updateVenom | method | `_updateVenom(timeScale)` |  |
 | update | method | `update(timeScale)` |  |
-| draw | method | `draw(ctx)` |  |
+| draw | method | `draw(ctx)` | ⚠️ 巨型函数，见 @section 导航 |
+| _drawVenom | method | `_drawVenom(ctx)` |  |
 | constructor | method | `constructor(x, y, range = 120)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
+| _traceBloomPetal | method | `_traceBloomPetal(ctx, angle, petal, bloom, alpha, isLow, tintOverride = null)` |  |
 | constructor | method | `constructor(x, y, radius)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
@@ -110,8 +125,33 @@
 | _setupType | method | `_setupType(pmul)` |  |
 | update | method | `update(timeScale)` |  |
 | draw | method | `draw(ctx)` |  |
+| constructor | method | `constructor(enemy)` |  |
+| addArc | method | `addArc(hitX, hitY, dirAngle, tier3 = false)` |  |
+| update | method | `update(pos, timeScale)` |  |
+| _arcAnim | method | `_arcAnim(arc)` |  |
+| draw | method | `draw(ctx)` |  |
+| _arcGeom | method | `_arcGeom(arc, phase = 0, scale = 1)` |  |
+| _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
+| destroy | method | `destroy()` |  |
+| constructor | method | `constructor(enemy)` |  |
+| addBurst | method | `addBurst(hitX, hitY, resonance = false)` |  |
+| update | method | `update(pos, timeScale)` |  |
+| draw | method | `draw(ctx)` |  |
+| _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
+| _starAt | method | `_starAt(ctx, cx, cy, r, alpha)` |  |
+| destroy | method | `destroy()` |  |
+| constructor | method | `constructor(enemy)` |  |
+| addRipple | method | `addRipple(hitX, hitY, tier3 = false)` |  |
+| update | method | `update(pos, timeScale)` |  |
+| draw | method | `draw(ctx)` |  |
+| _drawCanvas2D | method | `_drawCanvas2D(ctx)` |  |
+| destroy | method | `destroy()` |  |
 
 ## 巨型函数内部节点 (@section 标记)
+
+### draw
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### draw
 

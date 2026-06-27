@@ -139,8 +139,8 @@ class Projectile {
         }
         if (this.config.pierce > 0) {
             this.rotation = Math.atan2(this.vel.y, this.vel.x);
-        } else if (this.config.scatter > 0) {
-            this.rotation += 0.3 * timeScale; 
+        } else if (this.config.scatter > 0 || this.config.isScatterChild) {
+            this.rotation += (this.isCopy ? 0.08 : 0.11) * timeScale;
         } else {
             this.rotation += 0.1 * timeScale;
         }
@@ -876,17 +876,40 @@ class Projectile {
             const dy = en.pos.y - this.pos.y;
             if (dx * dx + dy * dy <= radius * radius) {
                 const r = en.takeDamage(dmg);
+                const hpDamage = r.hpDamage ?? r.actualDamage ?? 0;
                 if (typeof game.combat_recordDamage === 'function') {
                     game.combat_recordDamage(r.actualDamage, 'pyro', 'main', this.shotId);
+                }
+                if (hpDamage > 0 && typeof game.spawn_createExplosionHitGust === 'function') {
+                    game.spawn_createExplosionHitGust(en, this.pos.x, this.pos.y, {
+                        color: '#ef4444',
+                        emberColor: '#fb7185',
+                        intensity: Math.min(1.6, 0.9 + radius / 160),
+                    });
                 }
                 if (r.killed && typeof game.spawn_addScore === 'function') game.spawn_addScore(en.maxHp);
             }
         });
-        if (typeof game.spawn_createShockwave === 'function') {
-            game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
-        }
-        if (typeof game.spawn_createImpactBlast === 'function') {
-            game.spawn_createImpactBlast(this.pos.x, this.pos.y, '#fbbf24', {isOvercharge: true});
+        const impactDirection = this.vel && Number.isFinite(this.vel.x) && Number.isFinite(this.vel.y)
+            ? { x: this.vel.x, y: this.vel.y }
+            : null;
+        if (typeof game.spawn_createProjectileExplosion === 'function') {
+            game.spawn_createProjectileExplosion(this.pos.x, this.pos.y, {
+                waveColor: '#ef4444',
+                particleColor: '#fbbf24',
+                particleMode: 'spark',
+            }, {
+                radius,
+                impactDirection,
+                isOvercharge: true,
+            });
+        } else {
+            if (typeof game.spawn_createShockwave === 'function') {
+                game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
+            }
+            if (typeof game.spawn_createImpactBlast === 'function') {
+                game.spawn_createImpactBlast(this.pos.x, this.pos.y, '#fbbf24', { isOvercharge: true });
+            }
         }
         if (typeof game.spawn_createFloatingText === 'function') {
             game.spawn_createFloatingText(this.pos.x, this.pos.y - 24, `💥${dmg}`, '#fbbf24');
@@ -1205,6 +1228,8 @@ class Projectile {
 
     // [Trail V2] 解析拖尾颜色（与 Canvas 2D 路径一致的属性→颜色映射）
     _resolveTrailColor(cfg) {
+        // [Phase 2.11] 回响幽灵弹蓝色残影：优先于继承的元素色，使其与原始弹体明显区分
+        if (cfg._isEchoChild) return '#60a5fa';
         if (cfg.isLaser) return '#7dd3fc';
         if (cfg.type === 'flying_sword') return '#0ea5e9';
         if (cfg.type === 'rainbow') return '#e9d5ff';
@@ -1213,12 +1238,12 @@ class Projectile {
         if ((cfg.cryo || 0) > 0) return '#22d3ee';
         if ((cfg.lightning || 0) > 0) return '#c084fc';
         if ((cfg.wind || 0) > 0) return '#34d399';
-        if ((cfg.pierce || 0) > 0) return '#fca5a5';
+        if ((cfg.scatter || 0) > 0 || cfg.isScatterChild) return '#facc15';
         if ((cfg.bounce || 0) > 0) return '#86efac';
-        if ((cfg.scatter || 0) > 0) return '#facc15';
+        if ((cfg.pierce || 0) > 0) return '#fca5a5';
         if ((cfg.venom || 0) > 0) return '#84cc16';
         if ((cfg.overcharge || 0) > 0) return '#f59e0b';
-        if ((cfg.echo || 0) > 0) return '#c084fc';
+        if ((cfg.echo || 0) > 0) return '#60a5fa';
         return '#94a3b8';
     }
 
@@ -1302,7 +1327,7 @@ class Projectile {
         if ((config.wind || 0) > 0) colors.push('#34d399');
         if ((config.pierce || 0) > 0) colors.push('#fb7185');
         if ((config.bounce || 0) > 0) colors.push('#22c55e');
-        if ((config.scatter || 0) > 0) colors.push('#facc15');
+        if ((config.scatter || 0) > 0 || config.isScatterChild) colors.push('#facc15');
         if ((config.venom || 0) > 0) colors.push('#84cc16');
         if ((config.overcharge || 0) > 0) colors.push('#f59e0b');
         if ((config.echo || 0) > 0) colors.push('#c084fc');
@@ -1333,15 +1358,15 @@ class Projectile {
         } else if ((config.wind || 0) > 0 || (config.venom || 0) > 0) {
             shell = '#172a24';
             edge = 'rgba(52, 211, 153, 0.74)';
+        } else if ((config.scatter || 0) > 0 || config.isScatterChild || (config.overcharge || 0) > 0) {
+            shell = '#302614';
+            edge = 'rgba(250, 204, 21, 0.72)';
         } else if ((config.pierce || 0) > 0) {
             shell = '#2f2326';
             edge = 'rgba(251, 113, 133, 0.72)';
         } else if ((config.bounce || 0) > 0) {
             shell = '#1d2b22';
             edge = 'rgba(74, 222, 128, 0.68)';
-        } else if ((config.scatter || 0) > 0 || (config.overcharge || 0) > 0) {
-            shell = '#302614';
-            edge = 'rgba(250, 204, 21, 0.72)';
         } else if (mainColor && mainColor !== 'rainbow') {
             core = mainColor;
         }
@@ -1366,10 +1391,15 @@ class Projectile {
             ctx.lineTo(-radius * 0.3, 0);
             ctx.lineTo(-radius * 0.8, -radius * 0.7);
         } else if (shapeType === 'star') {
-            for (let i = 0; i < 4; i++) {
-                ctx.rotate(Math.PI / 2);
-                ctx.lineTo(radius, 0);
-                ctx.lineTo(radius * 0.4, radius * 0.4);
+            const outerR = radius * 1.08;
+            const innerR = radius * 0.48;
+            for (let i = 0; i < 8; i++) {
+                const a = -Math.PI / 2 + i * Math.PI / 4;
+                const r = i % 2 === 0 ? outerR : innerR;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
             }
         } else if (shapeType === 'crystal') {
             ctx.moveTo(0, -radius * 1.3);
@@ -1418,6 +1448,12 @@ class Projectile {
         ctx.beginPath();
         if (shapeType === 'arrow') {
             ctx.ellipse(-radius * 0.08, 0, radius * 0.46, radius * 0.32, 0, 0, Math.PI * 2);
+        } else if (shapeType === 'star') {
+            ctx.moveTo(0, -radius * 0.50);
+            ctx.lineTo(radius * 0.42, 0);
+            ctx.lineTo(0, radius * 0.50);
+            ctx.lineTo(-radius * 0.42, 0);
+            ctx.closePath();
         } else if (shapeType === 'crystal') {
             ctx.moveTo(0, -radius * 0.62);
             ctx.lineTo(radius * 0.38, 0);
@@ -1433,7 +1469,13 @@ class Projectile {
         ctx.shadowBlur = isLowQuality ? 0 : _sb(isHighQuality ? 6 : 3);
         ctx.fillStyle = material.core;
         ctx.beginPath();
-        if (shapeType === 'crystal') {
+        if (shapeType === 'star') {
+            ctx.moveTo(0, -radius * 0.26);
+            ctx.lineTo(radius * 0.22, 0);
+            ctx.lineTo(0, radius * 0.26);
+            ctx.lineTo(-radius * 0.22, 0);
+            ctx.closePath();
+        } else if (shapeType === 'crystal') {
             ctx.moveTo(0, -radius * 0.34);
             ctx.lineTo(radius * 0.22, 0);
             ctx.lineTo(0, radius * 0.34);
@@ -1450,6 +1492,34 @@ class Projectile {
             ctx.beginPath();
             ctx.arc(-radius * 0.10, -radius * 0.12, Math.max(1, radius * 0.07), 0, Math.PI * 2);
             ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    static drawScatterSplitterDetails(ctx, radius, material, isLowQuality, isHighQuality) {
+        // @perf-impact: scatter projectile splitter glyph - flat strokes only; no gradients, particles, or extra budgets.
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = isLowQuality ? 0.34 : 0.48;
+        ctx.strokeStyle = material.edge;
+        ctx.lineWidth = Math.max(0.7, radius * 0.075);
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+            const a = -Math.PI / 2 + i * Math.PI / 2;
+            ctx.moveTo(Math.cos(a) * radius * 0.44, Math.sin(a) * radius * 0.44);
+            ctx.lineTo(Math.cos(a) * radius * 0.86, Math.sin(a) * radius * 0.86);
+        }
+        ctx.stroke();
+        if (isHighQuality) {
+            ctx.globalAlpha = 0.40;
+            ctx.fillStyle = material.core;
+            for (let i = 0; i < 4; i++) {
+                const a = Math.PI / 4 + i * Math.PI / 2;
+                ctx.beginPath();
+                ctx.arc(Math.cos(a) * radius * 0.55, Math.sin(a) * radius * 0.55, Math.max(0.7, radius * 0.055), 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
         ctx.restore();
     }
@@ -1538,7 +1608,7 @@ class Projectile {
         // 1. 确定形状
         let shapeType = 'circle';
         if (config.pierce > 0) shapeType = 'arrow';
-        if (config.scatter > 0) shapeType = 'star';
+        if (config.scatter > 0 || config.isScatterChild) shapeType = 'star';
         if (config.isLaser) shapeType = 'orb';
         if (config.isMatryoshka) shapeType = 'matryoshka';
         if (config.wind) shapeType = 'crystal'; // 风属性使用菱形
@@ -1560,6 +1630,7 @@ class Projectile {
         if (config.venom > 0) { mainColors.push('#ecfccb'); glowColors.push('#84cc16'); }
         if (config.overcharge > 0) { mainColors.push('#fef3c7'); glowColors.push('#f59e0b'); }
         if (config.echo > 0) { mainColors.push('#f3e8ff'); glowColors.push('#c084fc'); }
+        if (config.scatter > 0 || config.isScatterChild) { mainColors.push('#fef3c7'); glowColors.push('#eab308'); }
         if (config.pierce > 0 && mainColors.length === 0) { mainColors.push('#fee2e2'); glowColors.push('#ef4444'); }
         if (mainColors.length === 0) {
             if (config.bounce > 0) { mainColors.push('#dcfce7'); glowColors.push('#22c55e'); }
@@ -1674,6 +1745,9 @@ class Projectile {
         }
         ctx.restore();
         Projectile.drawAlchemicalDetails(ctx, shapeType, radius, material, isLowQuality, isHighQuality);
+        if (shapeType === 'star') {
+            Projectile.drawScatterSplitterDetails(ctx, radius, material, isLowQuality, isHighQuality);
+        }
         // @perf-impact: Pure pyro bullet molten core - small flat fills and gated glow only; no particles or gradient rebuild.
         if (config.pyro > 0 && !config.explosive) {
             const time = Date.now() / 180;

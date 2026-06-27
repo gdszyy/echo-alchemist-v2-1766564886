@@ -258,7 +258,9 @@ const RUNE_DB = [
  * 每个词条对象包含：
  *   id: 唯一字符串标识符
  *   name: 词条名称（中文）
- *   pattern: 符文 id 数组（2~4个符文，在网格同一路径中凑齐即可，不限顺序）
+ *   pattern: 符文 id 数组；3 符文词条默认按“外环试剂 + 中心核心 + 外环试剂”解析
+ *            pattern[1] 必须位于 3x3 中心，pattern[0]/pattern[2] 位于同一穿心轴线两端
+ *   spellFormula: 可选法阵公式覆写；shape: 'loose_line' 可回退旧版同一路径无序匹配
  *   effect_desc: 效果描述字符串
  *   stats: 属性加成对象（键与现有弹药属性对应）
  */

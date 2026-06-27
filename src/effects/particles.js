@@ -44,6 +44,9 @@ import {
     electrocuteEffect_pixiCreate, electrocuteEffect_pixiSync, electrocuteEffect_pixiDestroy,
     venomEffect_pixiCreate, venomEffect_pixiSync, venomEffect_pixiDestroy,
     windMarkEffect_pixiCreate, windMarkEffect_pixiSync, windMarkEffect_pixiDestroy,
+    bounceArcEffect_pixiCreate, bounceArcEffect_pixiSync, bounceArcEffect_pixiDestroy,
+    scatterBurstEffect_pixiCreate, scatterBurstEffect_pixiSync, scatterBurstEffect_pixiDestroy,
+    echoRippleEffect_pixiCreate, echoRippleEffect_pixiSync, echoRippleEffect_pixiDestroy,
     affixSkillVFX_pixiCreate, affixSkillVFX_pixiSync, affixSkillVFX_pixiDestroy,
 } from '../render/pixi_effect_adapter.js';
 
@@ -398,27 +401,38 @@ class SlashEffect {
 
 // @perf-impact: 穿透命中切割特效 - 复用全局 maxParticles 入口，low 档关闭 shadowBlur 与高亮叠加。
 class PierceCutEffect {
-    constructor(x, y, angle, length = 92, color = '#fca5a5', quality = 'high') {
+    constructor(x, y, angle, length = 92, color = '#fca5a5', quality = 'high', options = {}) {
+        const optionBag = typeof options === 'number' ? { intensity: options } : (options || {});
+        const rawIntensity = typeof optionBag.intensity === 'number' ? optionBag.intensity : 0.65;
         this.x = x;
         this.y = y;
         this.angle = angle || 0;
         this.length = length;
         this.color = color || '#fca5a5';
         this.quality = quality || 'high';
+        this.intensity = Math.max(0.25, Math.min(1, rawIntensity));
+        this.actualDamage = Math.max(0, optionBag.actualDamage || 0);
         this.life = 1.0;
         this.age = 0;
-        this.duration = this.quality === 'low' ? 14 : 18;
+        this.duration = this.quality === 'low'
+            ? 10 + Math.round(this.intensity * 3)
+            : (this.quality === 'medium' ? 12 + Math.round(this.intensity * 3) : 13 + Math.round(this.intensity * 4));
         this.active = true;
-        this.cutWidth = 4 + Math.random() * 1.5;
+        this.cutWidth = (2.0 + Math.random() * 0.8) * (0.70 + this.intensity * 0.45);
         this.edgeSeed = Math.random() * Math.PI * 2;
-        const chipCount = this.quality === 'low' ? 3 : (this.quality === 'medium' ? 5 : 7);
+        this.openScale = (this.quality === 'low' ? 2.4 : 3.4) + this.intensity * 2.7;
+        this.glowAlpha = this.quality === 'low' ? 0 : 0.035 + this.intensity * 0.07;
+        this.lipAlpha = 0.18 + this.intensity * 0.18;
+        this.coreAlpha = 0.40 + this.intensity * 0.28;
+        const chipBase = this.quality === 'low' ? 0 : (this.quality === 'medium' ? 2 : 4);
+        const chipCount = Math.max(0, Math.round(chipBase * (0.35 + this.intensity * 0.5)));
         this.chips = Array.from({ length: chipCount }, (_, i) => ({
             side: i % 2 === 0 ? 1 : -1,
             along: (Math.random() - 0.5) * this.length * 0.74,
-            lift: 3 + Math.random() * 8,
-            speed: 1.4 + Math.random() * 2.2,
-            size: 2 + Math.random() * 2.5,
-            alpha: 0.5 + Math.random() * 0.35,
+            lift: 2 + Math.random() * 5,
+            speed: 0.8 + Math.random() * 1.3,
+            size: 1.1 + Math.random() * 1.6,
+            alpha: 0.22 + Math.random() * 0.24,
         }));
         this._pixi = null; // [PixiJS 迁移]
     }
@@ -442,13 +456,13 @@ class PierceCutEffect {
         }
         const t = Math.min(1, this.age / this.duration);
         const isLow = this.quality === 'low';
-        const open = Math.sin(t * Math.PI) * (isLow ? 4 : 8);
+        const open = Math.sin(t * Math.PI) * this.openScale;
         const halfL = this.length / 2;
 
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
-        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+        ctx.globalCompositeOperation = (isLow || this.intensity < 0.58) ? 'source-over' : 'lighter';
         ctx.lineCap = 'round';
 
         // 锥形切口：沿轴填充柳叶/纺锤形（两端尖、中段宽），呈现锐利刀痕而非均匀光带。
@@ -480,25 +494,25 @@ class PierceCutEffect {
         if (!isLow) {
             // 1. 外层热辉光（柔和锥形）
             ctx.shadowColor = this.color;
-            ctx.shadowBlur = _sb(12);
-            fillSpindle(cw * 1.25, this.color, this.life * 0.16, 0.5, 0);
+            ctx.shadowBlur = _sb(4 + this.intensity * 5);
+            fillSpindle(cw * 1.18, this.color, this.life * this.glowAlpha, 0.5, 0);
             ctx.shadowBlur = 0;
         }
         // 2. 上下两唇：沿轴张开，营造「被劈开」的张口
-        fillSpindle(cw * 0.5, this.color, this.life * 0.5, 0.7, -open * 0.5);
-        fillSpindle(cw * 0.5, this.color, this.life * 0.5, 0.7, open * 0.5);
+        fillSpindle(cw * 0.46, this.color, this.life * this.lipAlpha, 0.7, -open * 0.5);
+        fillSpindle(cw * 0.46, this.color, this.life * this.lipAlpha, 0.7, open * 0.5);
         // 3. 核心白热切口：极细、两端尖锐
-        fillSpindle(Math.max(0.6, cw * 0.3 * (0.55 + 0.45 * this.life)), '#ffffff', slitAlpha, 1.0, 0);
+        fillSpindle(Math.max(0.45, cw * 0.22 * (0.55 + 0.45 * this.life)), '#ffffff', slitAlpha * this.coreAlpha, 1.0, 0);
 
-        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
-        const tickCount = isLow ? 2 : 4;
+        ctx.globalCompositeOperation = (isLow || this.intensity < 0.58) ? 'source-over' : 'lighter';
+        const tickCount = isLow ? 0 : Math.max(1, Math.round(1 + this.intensity * (this.quality === 'high' ? 2 : 1)));
         for (let i = 0; i < tickCount; i++) {
             const k = (i + 1) / (tickCount + 1);
             const x = -halfL + this.length * k;
             const wobble = Math.sin(this.edgeSeed + i * 1.7) * 4;
-            ctx.globalAlpha = this.life * (0.32 + i * 0.08);
+            ctx.globalAlpha = this.life * this.intensity * (0.12 + i * 0.04);
             ctx.strokeStyle = i % 2 ? '#ffffff' : this.color;
-            ctx.lineWidth = isLow ? 1 : 1.4;
+            ctx.lineWidth = 0.8 + this.intensity * 0.35;
             ctx.beginPath();
             ctx.moveTo(x - 5, -open - wobble * 0.25);
             ctx.lineTo(x + 6, open + wobble * 0.25);
@@ -506,7 +520,7 @@ class PierceCutEffect {
         }
 
         for (const chip of this.chips) {
-            const chipAlpha = chip.alpha * this.life;
+            const chipAlpha = chip.alpha * this.life * (0.50 + this.intensity * 0.35);
             ctx.globalAlpha = chipAlpha;
             ctx.fillStyle = this.color;
             const cx = chip.along;
@@ -591,35 +605,73 @@ class CollectionBeam {
         ctx.restore();
     }
 }
-// @perf-impact: 通用范围冲击波 - 仍由 shockwaveLimit 控制，low 档关闭径向填充和阴影。
+// @perf-impact: 上下文化范围波 - 仍由 shockwaveLimit 控制，low 档关闭径向填充/阴影并减少辐射线。
 class Shockwave {
-    constructor(x, y, color) {
+    constructor(x, y, color, options = {}) {
+        const optionBag = options || {};
         this.x = x;
         this.y = y;
         this.radius = 1;
         this.alpha = 1.0;
         this.color = color || '#ffffff';
-        this.maxRadius = 120;
+        this.kind = optionBag.kind || 'generic';
+        this.intensity = Math.max(0.35, Math.min(1.8, optionBag.intensity || 1));
+        this.maxRadius = optionBag.maxRadius || (this.kind === 'impact' ? 92 : (this.kind === 'assimilation' ? 58 : 120));
+        this.damageRadius = Number.isFinite(optionBag.damageRadius) ? Math.max(0, optionBag.damageRadius) : this.maxRadius;
+        this.coverageRing = !!optionBag.coverageRing && this.kind === 'impact';
+        this.growthSpeed = optionBag.growthSpeed || (this.kind === 'impact' ? 7.4 : (this.kind === 'assimilation' ? 3.1 : 4));
+        this.fadeSpeed = optionBag.fadeSpeed || (this.kind === 'impact' ? 0.068 : (this.kind === 'assimilation' ? 0.045 : 0.04));
+        this.directionAngle = Number.isFinite(optionBag.directionAngle)
+            ? optionBag.directionAngle
+            : (optionBag.direction && Number.isFinite(optionBag.direction.x) && Number.isFinite(optionBag.direction.y)
+                ? Math.atan2(optionBag.direction.y, optionBag.direction.x)
+                : null);
         this.seed = Math.random() * Math.PI * 2;
-        this.arcJitter = Array.from({ length: 7 }, (_, i) => ({
-            start: this.seed + i * (Math.PI * 2 / 7) + (Math.random() - 0.5) * 0.25,
+        const arcCount = this.kind === 'impact' ? 5 : (this.kind === 'assimilation' ? 6 : 7);
+        const spokeCount = this.kind === 'assimilation' ? 6 : 8;
+        this.arcJitter = Array.from({ length: arcCount }, (_, i) => ({
+            start: this.seed + i * (Math.PI * 2 / arcCount) + (Math.random() - 0.5) * 0.25,
             span: 0.42 + Math.random() * 0.34,
             weight: 0.6 + Math.random() * 0.7,
         }));
-        this.spokes = Array.from({ length: 8 }, (_, i) => ({
-            angle: this.seed + i * (Math.PI * 2 / 8) + (Math.random() - 0.5) * 0.28,
+        this.spokes = Array.from({ length: spokeCount }, (_, i) => ({
+            angle: this.seed + i * (Math.PI * 2 / spokeCount) + (Math.random() - 0.5) * 0.28,
             reach: 0.58 + Math.random() * 0.38,
             width: 1 + Math.random() * 1.5,
         }));
+        const impactShardCount = this.coverageRing ? 12 : 9;
+        this.impactShards = this.kind === 'impact'
+            ? Array.from({ length: impactShardCount }, (_, i) => ({
+                angle: this.coverageRing
+                    ? this.seed + i * Math.PI * 2 / impactShardCount + (Math.random() - 0.5) * 0.36
+                    : (this.directionAngle ?? this.seed) + (i - 4) * 0.19 + (Math.random() - 0.5) * 0.22,
+                reach: this.coverageRing ? 0.48 + Math.random() * 0.44 : 0.42 + Math.random() * 0.38,
+                startReach: this.coverageRing ? 0.06 + Math.random() * 0.1 : 0,
+                delay: this.coverageRing ? Math.random() * 0.14 : 0,
+                spin: (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * 1.1),
+                size: 2.2 + Math.random() * 3.4,
+                alpha: 0.45 + Math.random() * 0.35,
+            }))
+            : [];
+        this.glyphs = this.kind === 'assimilation'
+            ? Array.from({ length: 6 }, (_, i) => ({
+                angle: this.seed + i * Math.PI * 2 / 6,
+                offset: 0.75 + Math.random() * 0.25,
+                size: 2 + Math.random() * 2.5,
+                spin: (Math.random() < 0.5 ? -1 : 1) * (0.015 + Math.random() * 0.02),
+            }))
+            : [];
+        this.glyphRotation = 0;
         this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
         const scale = Number.isFinite(timeScale) ? Math.max(0, timeScale) : 1;
         if (this.radius < this.maxRadius) {
-            this.radius = Math.min(this.maxRadius, Math.max(0.1, this.radius + 4 * scale));
+            this.radius = Math.min(this.maxRadius, Math.max(0.1, this.radius + this.growthSpeed * scale));
         }
-        this.alpha = Math.max(0, this.alpha - 0.04 * scale);
+        this.alpha = Math.max(0, this.alpha - this.fadeSpeed * scale);
+        if (this.kind === 'assimilation') this.glyphRotation += 0.085 * scale;
     }
 
     draw(ctx) {
@@ -634,6 +686,15 @@ class Shockwave {
         const radius = Number.isFinite(this.radius) ? Math.max(0.1, this.radius) : 0.1;
         const t = Math.min(1, radius / this.maxRadius);
         const band = 10 + 14 * (1 - t);
+
+        if (this.kind === 'impact') {
+            this._drawImpact(ctx, isLow, radius, t);
+            return;
+        }
+        if (this.kind === 'assimilation') {
+            this._drawAssimilation(ctx, isLow, radius, t);
+            return;
+        }
 
         ctx.save();
         ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
@@ -707,6 +768,251 @@ class Shockwave {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
+    }
+
+    _drawImpact(ctx, isLow, radius, t) {
+        const dir = this.directionAngle ?? this.seed;
+        const back = dir + Math.PI;
+        const spread = isLow ? 0.9 : 1.15;
+        const damageRadius = Number.isFinite(this.damageRadius) ? this.damageRadius : this.maxRadius;
+        const targetSplashRadius = this.coverageRing && damageRadius > 0 ? damageRadius : radius;
+        const coverageProgress = this.coverageRing ? (1 - Math.pow(1 - Math.min(1, t), 3)) : t;
+        const splashRadius = this.coverageRing ? Math.max(2, targetSplashRadius * coverageProgress) : radius;
+        const coverageAlpha = this.coverageRing ? this.alpha * (isLow ? 0.38 : 0.72) * (1 - t * 0.42) : 0;
+        ctx.save();
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+        ctx.lineCap = 'round';
+
+        // @perf-impact: Explosion animated coverage splash - stays inside one shockwave object; low quality skips radial fill/glow and uses fewer full-circle spokes.
+        if (this.coverageRing && damageRadius > 0) {
+            if (!isLow) {
+                ctx.globalAlpha = coverageAlpha * 0.24;
+                const pressure = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, splashRadius
+                );
+                pressure.addColorStop(0, withAlpha('#ffffff', 0.22 * this.alpha * (1 - t * 0.45)));
+                pressure.addColorStop(0.42, withAlpha(this.color, 0.20 * this.alpha));
+                pressure.addColorStop(0.84, withAlpha(this.color, 0.08 * this.alpha));
+                pressure.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = pressure;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, splashRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = coverageAlpha;
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = isLow ? 0 : _sb((9 - t * 3.5) * this.intensity);
+            ctx.strokeStyle = withAlpha(this.color, isLow ? 0.55 : 0.9);
+            ctx.lineWidth = isLow ? 1.3 : Math.max(1.4, 3 - t * 1.15);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, splashRadius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.globalAlpha = coverageAlpha * (isLow ? 0.38 : 0.58);
+            ctx.shadowBlur = isLow ? 0 : _sb(3 * this.intensity);
+            ctx.strokeStyle = withAlpha('#ffffff', isLow ? 0.36 : 0.62);
+            ctx.lineWidth = isLow ? 0.8 : 1.2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, Math.max(1, splashRadius * 0.985), 0, Math.PI * 2);
+            ctx.stroke();
+
+            const ringCount = isLow ? 1 : 2;
+            for (let k = 0; k < ringCount; k++) {
+                const rr = Math.max(4, splashRadius * (0.38 + k * 0.24 + t * 0.18));
+                ctx.globalAlpha = coverageAlpha * (k === 0 ? 0.9 : 0.62);
+                ctx.shadowBlur = isLow ? 0 : _sb((4.5 - k) * this.intensity);
+                ctx.strokeStyle = k === 0 ? withAlpha('#ffffff', isLow ? 0.42 : 0.68) : withAlpha(this.color, isLow ? 0.5 : 0.78);
+                ctx.lineWidth = isLow ? 1.2 : (2.4 - k * 0.5);
+                for (const arc of this.arcJitter) {
+                    const start = arc.start + k * 0.18;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, rr, start, start + arc.span * 1.45);
+                    ctx.stroke();
+                }
+            }
+
+            const spokeCount = isLow ? Math.min(5, this.spokes.length) : this.spokes.length;
+            for (let i = 0; i < spokeCount; i++) {
+                const spoke = this.spokes[i];
+                const inner = splashRadius * (0.12 + t * 0.08);
+                const outer = splashRadius * Math.min(0.96, spoke.reach + 0.08);
+                const fade = coverageAlpha * (isLow ? 0.48 : 0.62) * (1 - t * 0.24);
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = isLow ? 1 : Math.max(1.1, spoke.width * 0.85);
+                if (isLow) {
+                    ctx.strokeStyle = withAlpha(this.color, fade);
+                } else {
+                    const grad = ctx.createLinearGradient(
+                        this.x + Math.cos(spoke.angle) * inner,
+                        this.y + Math.sin(spoke.angle) * inner,
+                        this.x + Math.cos(spoke.angle) * outer,
+                        this.y + Math.sin(spoke.angle) * outer
+                    );
+                    grad.addColorStop(0, withAlpha(this.color, 0));
+                    grad.addColorStop(0.55, withAlpha(this.color, fade));
+                    grad.addColorStop(1, withAlpha('#ffffff', 0));
+                    ctx.strokeStyle = grad;
+                }
+                ctx.beginPath();
+                ctx.moveTo(
+                    this.x + Math.cos(spoke.angle) * inner,
+                    this.y + Math.sin(spoke.angle) * inner
+                );
+                ctx.lineTo(
+                    this.x + Math.cos(spoke.angle) * outer,
+                    this.y + Math.sin(spoke.angle) * outer
+                );
+                ctx.stroke();
+            }
+        }
+
+        const coneAlpha = this.alpha * (this.coverageRing ? (isLow ? 0.16 : 0.28) : (isLow ? 0.38 : 0.62));
+        const coneWidth = (isLow ? 1.7 : 3.0) * this.intensity * (1 - t * 0.28);
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = isLow ? 0 : _sb(10 * this.intensity);
+        for (let i = -2; i <= 2; i++) {
+            const a = dir + i * spread / 4;
+            const inner = radius * 0.18;
+            const outer = radius * (0.72 + Math.abs(i) * 0.05);
+            ctx.globalAlpha = coneAlpha * (1 - Math.abs(i) * 0.14);
+            ctx.strokeStyle = i === 0 ? '#ffffff' : this.color;
+            ctx.lineWidth = coneWidth * (i === 0 ? 0.7 : 1);
+            ctx.beginPath();
+            ctx.moveTo(this.x + Math.cos(a) * inner, this.y + Math.sin(a) * inner);
+            ctx.lineTo(this.x + Math.cos(a) * outer, this.y + Math.sin(a) * outer);
+            ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = this.alpha * (this.coverageRing ? (isLow ? 0.2 : 0.34) : (isLow ? 0.48 : 0.72));
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = isLow ? 2 : 3.2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius, dir - spread * 0.62, dir + spread * 0.62);
+        ctx.stroke();
+
+        ctx.globalAlpha = this.alpha * (this.coverageRing ? 0.18 : 0.32);
+        ctx.strokeStyle = withAlpha('#ffffff', isLow ? 0.45 : 0.75);
+        ctx.lineWidth = isLow ? 1 : 1.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius * 0.62, back - spread * 0.35, back + spread * 0.35);
+        ctx.stroke();
+
+        if (!isLow) {
+            for (const shard of this.impactShards) {
+                const rawTravel = this.coverageRing
+                    ? Math.max(0, Math.min(1, (t - (shard.delay || 0)) / Math.max(0.2, 1 - (shard.delay || 0))))
+                    : 1;
+                if (this.coverageRing && rawTravel <= 0) continue;
+                const travel = 1 - Math.pow(1 - rawTravel, 3);
+                const startReach = this.coverageRing ? (shard.startReach || 0.08) : 0;
+                const dist = (this.coverageRing ? targetSplashRadius : radius) * (startReach + (shard.reach - startReach) * travel);
+                const sx = this.x + Math.cos(shard.angle) * dist;
+                const sy = this.y + Math.sin(shard.angle) * dist;
+                const shardAlpha = this.alpha * shard.alpha * (this.coverageRing ? Math.min(1, rawTravel * 3) : 1);
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(shard.angle + (shard.spin || 0) * travel);
+                ctx.globalAlpha = shardAlpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(shard.size, 0);
+                ctx.lineTo(-shard.size * 0.6, -shard.size * 0.42);
+                ctx.lineTo(-shard.size * 0.25, shard.size * 0.58);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    _drawAssimilation(ctx, isLow, radius, t) {
+        const pull = 1 - t;
+        ctx.save();
+        ctx.globalCompositeOperation = isLow ? 'source-over' : 'lighter';
+        ctx.lineCap = 'round';
+
+        if (!isLow) {
+            ctx.globalAlpha = this.alpha * 0.22;
+            const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, radius * 1.25);
+            glow.addColorStop(0, withAlpha('#ffffff', 0.28 * this.alpha));
+            glow.addColorStop(0.48, withAlpha(this.color, 0.22 * this.alpha));
+            glow.addColorStop(1, withAlpha(this.color, 0));
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, radius * 1.25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const ringCount = isLow ? 1 : 2;
+        for (let k = 0; k < ringCount; k++) {
+            const rr = Math.max(2, radius * (0.78 + k * 0.22));
+            ctx.globalAlpha = this.alpha * (k === 0 ? 0.82 : 0.45);
+            ctx.strokeStyle = k === 0 ? this.color : '#ffffff';
+            ctx.lineWidth = isLow ? 1.2 : (2.2 - k * 0.6);
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = isLow ? 0 : _sb(5);
+            for (let i = 0; i < 6; i++) {
+                const a = this.seed + this.glyphRotation + i * Math.PI * 2 / 6;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, rr, a + 0.08, a + 0.36);
+                ctx.stroke();
+            }
+        }
+
+        ctx.shadowBlur = 0;
+        for (const glyph of this.glyphs) {
+            glyph.angle += glyph.spin;
+            const a = glyph.angle + this.glyphRotation;
+            const rr = radius * glyph.offset;
+            const gx = this.x + Math.cos(a) * rr;
+            const gy = this.y + Math.sin(a) * rr;
+            ctx.globalAlpha = this.alpha * (isLow ? 0.46 : 0.76);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = isLow ? 1 : 1.4;
+            ctx.beginPath();
+            ctx.moveTo(gx, gy);
+            ctx.lineTo(
+                gx - Math.cos(a) * glyph.size * (1.8 + pull),
+                gy - Math.sin(a) * glyph.size * (1.8 + pull)
+            );
+            ctx.stroke();
+        }
+
+        const spokeCount = isLow ? 3 : 6;
+        for (let i = 0; i < spokeCount; i++) {
+            const a = this.seed - this.glyphRotation * 0.7 + i * Math.PI * 2 / spokeCount;
+            const outer = radius * (0.86 + 0.1 * Math.sin(this.seed + i));
+            const inner = radius * (0.24 + pull * 0.22);
+            ctx.globalAlpha = this.alpha * (isLow ? 0.36 : 0.5);
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = isLow ? 1 : 1.6;
+            ctx.beginPath();
+            ctx.moveTo(this.x + Math.cos(a) * outer, this.y + Math.sin(a) * outer);
+            ctx.lineTo(this.x + Math.cos(a) * inner, this.y + Math.sin(a) * inner);
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+}
+
+class ImpactBlastWave extends Shockwave {
+    constructor(x, y, color, options = {}) {
+        super(x, y, color, { ...options, kind: 'impact' });
+    }
+}
+
+class AssimilationPulseWave extends Shockwave {
+    constructor(x, y, color, options = {}) {
+        super(x, y, color, { ...options, kind: 'assimilation' });
     }
 }
 
@@ -1099,8 +1405,9 @@ class FloatingText {
      * @param {string} [color='#fbbf24'] - 颜色 (默认为金色)
      * @param {number} [fontSize=16] - 字号
      * @param {HTMLImageElement|null} [iconImg=null] - 可选图标图片（渲染在文字左侧）
+     * @param {object} [options] - 渲染与生命周期选项
      */
-    constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null) { 
+    constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null, options = {}) {
         this.pos = new Vec2(x, y); 
         this.vel = new Vec2(0, -1); // 向上飄
         this.life = 1.0; 
@@ -1108,12 +1415,37 @@ class FloatingText {
         this.color = color;
         this.fontSize = fontSize;
         this.iconImg = iconImg;
+        this.isDamageNumber = !!options.isDamageNumber;
+        this._floatingDamageOwner = options.floatingDamageOwner || null;
+        this._quickExit = false;
+        this._quickExitProgress = 0;
         this._pixi = null; // [PixiJS 迁移]
     }
 
     update(timeScale) {
-        this.pos = this.pos.add(this.vel.mult(timeScale)); 
-        this.life -= 0.02 * timeScale; 
+        const ts = Number.isFinite(timeScale) ? Math.max(0, timeScale) : 1;
+        this.pos = this.pos.add(this.vel.mult(ts));
+        if (this._quickExit) {
+            this._quickExitProgress += 0.18 * ts;
+            this.life -= 0.07 * ts;
+        } else {
+            this.life -= 0.02 * ts;
+        }
+    }
+
+    accelerateExit() {
+        if (this.life <= 0 || this._quickExit) return;
+        this._quickExit = true;
+        this._quickExitProgress = 0;
+        this.life = Math.min(this.life, 0.42);
+        this.vel = new Vec2(0, -2.2);
+    }
+
+    getRenderScale() {
+        if (!this.isDamageNumber) return 1;
+        if (this._quickExit) return Math.max(0.12, 1 - this._quickExitProgress);
+        const fadeIn = Math.min(1, Math.max(0, (1 - this.life) * 6));
+        return 0.92 + fadeIn * 0.08;
     }
 
     draw(ctx) {
@@ -1124,8 +1456,8 @@ class FloatingText {
             if (this._pixi) { floatingText_pixiSync(this, this._pixi); return; }
         }
         ctx.save();
-        ctx.globalAlpha = Math.max(0, this.life); 
-        ctx.font = `bold ${this.fontSize}px sans-serif`; 
+        ctx.globalAlpha = Math.max(0, this.life) * (this.isDamageNumber ? 0.92 : 1);
+        ctx.font = `${this.isDamageNumber ? '700' : 'bold'} ${this.fontSize}px ${this.isDamageNumber ? 'Cinzel, serif' : 'sans-serif'}`;
         ctx.textAlign = 'center';
 
         let textOffsetX = 0;
@@ -1145,15 +1477,18 @@ class FloatingText {
         }
         
         const drawX = this.pos.x + textOffsetX;
+        const renderScale = this.getRenderScale();
+        ctx.translate(drawX, this.pos.y);
+        ctx.scale(renderScale, renderScale);
 
         // 繪製描邊讓文字更清楚
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.lineWidth = Math.max(3, this.fontSize / 5);
-        ctx.strokeText(this.text, drawX, this.pos.y);
+        ctx.strokeStyle = this.isDamageNumber ? 'rgba(8, 12, 18, 0.72)' : 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = this.isDamageNumber ? Math.max(2, this.fontSize / 6) : Math.max(3, this.fontSize / 5);
+        ctx.strokeText(this.text, 0, 0);
         
         // 繪製填充
         ctx.fillStyle = this.color; 
-        ctx.fillText(this.text, drawX, this.pos.y); 
+        ctx.fillText(this.text, 0, 0);
         ctx.restore();
     }
 }
@@ -1649,7 +1984,7 @@ class BurnEffect {
 /**
  * ElectrocuteEffect - 敌人被闪电命中后的持续电弧视觉特效
  *
- * 附着在 lightning 命中的敌人身上，持续 2-3 秒（每次命中刷新计时器）。
+ * 附着在 lightning 命中的敌人身上，持续 0.6 秒（每次命中刷新计时器）。
  * 3-5 条随机锯齿电弧在敌人表面闪烁，每 100-200ms 重新随机路径。
  *
  * @perf-impact: 持续电弧特效 - 每敌人 1 Graphics（电弧路径重绘频率 5-10Hz）
@@ -1657,9 +1992,9 @@ class BurnEffect {
 class ElectrocuteEffect {
     /**
      * @param {object} enemy - 敌人实例引用
-     * @param {number} [duration=2500] - 持续时间（毫秒）
+     * @param {number} [duration=600] - 持续时间（毫秒）
      */
-    constructor(enemy, duration = 2500) {
+    constructor(enemy, duration = 600) {
         this.enemy = enemy;
         this.x = enemy.pos.x;
         this.y = enemy.pos.y;
@@ -1683,7 +2018,7 @@ class ElectrocuteEffect {
     }
 
     /** 刷新持续时间（每次 lightning 命中调用） */
-    refresh(duration = 2500) {
+    refresh(duration = 600) {
         this.timer = Math.max(this.timer, duration);
         this.maxTimer = Math.max(this.maxTimer, duration);
     }
@@ -2118,7 +2453,7 @@ class IceWave {
  * DeathExplosion - 敌人死亡时的分级「消散」特效
  *
  * 设计理念：不是向外爆炸，而是按敌人层级拆解材质
- *   - 普通：小圆圈内缩消失 + 灰色烟尘向内漂散
+ *   - 普通：裂纹崩开 + 石片错位 + 少量灰蓝棱片散落
  *   - 精英：紫晶裂隙切开 + 碎片分离 + 暗芯熄灭
  *   - Boss：先膨胀挥扎，再猛烈内爆塑陷 + 黑洞涡旋 + 缓慢消散
  *
@@ -2210,28 +2545,39 @@ class DeathExplosion {
             }));
             this.souls = [];
         } else {
-            // 普通：小圆圈内缩消失 + 灰烟尘
+            // @perf-impact: 普通死亡碎裂反馈 - 复用 DeathExplosion 数量预算，只绘制少量线段/三角碎片，不新增渐变环。
+            // 普通：裂纹崩开 + 石片错位，不再绘制圆形光圈。
             this.decay = 0.04;
-            this.collapseRings = [
-                { r: 28, color: '#94a3b8', lw: 2, alpha: 0.7 },
-            ];
+            this.collapseRings = [];
             this.collapseSpeed = 3.5;
             this.collapseStarted = true;
             this.expanding = false;
             this.expandR = 0;
-            this.voidLife = 0.5;
+            this.voidLife = 0;
             this.voidRadius = 0;
-            this.voidMaxRadius = 8;
+            this.voidMaxRadius = 0;
             this.voidDecay = 0.06;
-            this.voidEnabled = true;
-            this.souls = Array.from({ length: 5 }, () => ({
-                angle: Math.random() * Math.PI * 2,
-                dist: 18 + Math.random() * 10,
-                speed: 1.2 + Math.random() * 0.8,
-                size: 0.8 + Math.random() * 1,
-                alpha: 0.4 + Math.random() * 0.3,
-                color: '#94a3b8',
+            this.voidEnabled = false;
+            this.normalSplitAngle = Math.random() * Math.PI * 2;
+            this.normalCracks = Array.from({ length: 4 }, (_, i) => ({
+                angle: this.normalSplitAngle + (i - 1.5) * 0.34 + (Math.random() - 0.5) * 0.24,
+                offset: (i - 1.5) * 3.5 + (Math.random() - 0.5) * 3,
+                length: 12 + Math.random() * 14,
+                alpha: 0.42 + Math.random() * 0.28,
             }));
+            this.normalShards = Array.from({ length: 8 }, () => ({
+                along: (Math.random() - 0.5) * 26,
+                side: Math.random() < 0.5 ? -1 : 1,
+                dist: 2 + Math.random() * 5,
+                speed: 0.55 + Math.random() * 1.35,
+                drift: (Math.random() - 0.5) * 0.65,
+                size: 2 + Math.random() * 2.5,
+                spin: (Math.random() - 0.5) * 0.18,
+                spinAngle: Math.random() * Math.PI * 2,
+                alpha: 0.48 + Math.random() * 0.32,
+                color: Math.random() < 0.55 ? '#94a3b8' : '#cbd5e1',
+            }));
+            this.souls = [];
         }
         this._pixi = null; // [PixiJS 迁移]
     }
@@ -2342,6 +2688,14 @@ class DeathExplosion {
         if (this.tier === 'elite') {
             for (const shard of this.eliteShards) {
                 shard.dist += shard.speed * timeScale;
+                shard.spinAngle += shard.spin * timeScale;
+            }
+        }
+
+        if (this.tier === 'normal') {
+            for (const shard of this.normalShards || []) {
+                shard.dist += shard.speed * timeScale;
+                shard.along += shard.drift * timeScale;
                 shard.spinAngle += shard.spin * timeScale;
             }
         }
@@ -2487,6 +2841,78 @@ class DeathExplosion {
             ctx.closePath();
             ctx.fill();
 
+            ctx.restore();
+        }
+
+        // ---- 1c. 普通死亡：裂纹崩开 + 棱片错位，不绘制圆形冲击波 ----
+        if (this.tier === 'normal') {
+            const splitAngle = this.normalSplitAngle || 0;
+            const open = Math.min(1, t * 1.35);
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(splitAngle);
+            ctx.globalCompositeOperation = 'source-over';
+
+            ctx.globalAlpha = this.life * 0.5;
+            ctx.fillStyle = 'rgba(30, 41, 59, 0.72)';
+            ctx.beginPath();
+            ctx.moveTo(-14 - open * 3, -6);
+            ctx.lineTo(-2 - open * 5, -10);
+            ctx.lineTo(-5 - open * 4, 8);
+            ctx.lineTo(-16 - open * 2, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(2 + open * 5, -9);
+            ctx.lineTo(15 + open * 3, -5);
+            ctx.lineTo(13 + open * 2, 7);
+            ctx.lineTo(4 + open * 4, 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.lineCap = 'round';
+            for (const crack of this.normalCracks || []) {
+                const localT = Math.min(1, t * 1.5);
+                const half = crack.length * (0.3 + localT * 0.7) / 2;
+                ctx.save();
+                ctx.rotate(crack.angle - splitAngle);
+                ctx.translate(0, crack.offset);
+                ctx.globalAlpha = crack.alpha * this.life;
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = isLow ? 1.1 : 1.6;
+                ctx.beginPath();
+                ctx.moveTo(-half, 0);
+                ctx.lineTo(-half * 0.25, -2.2 * crack.alpha);
+                ctx.lineTo(half * 0.25, 1.8 * crack.alpha);
+                ctx.lineTo(half, 0);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            for (const shard of this.normalShards || []) {
+                const sx = shard.along;
+                const sy = shard.side * (shard.dist + open * 6);
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(shard.spinAngle);
+                ctx.globalAlpha = shard.alpha * this.life;
+                ctx.fillStyle = shard.color;
+                ctx.beginPath();
+                ctx.moveTo(-shard.size, -shard.size * 0.25);
+                ctx.lineTo(shard.size * 0.9, -shard.size * 0.55);
+                ctx.lineTo(shard.size * 0.25, shard.size);
+                ctx.closePath();
+                ctx.fill();
+                if (!isLow) {
+                    ctx.globalAlpha = shard.alpha * this.life * 0.35;
+                    ctx.strokeStyle = '#f8fafc';
+                    ctx.lineWidth = 0.6;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            ctx.globalCompositeOperation = 'source-over';
             ctx.restore();
         }
 
@@ -2652,14 +3078,17 @@ class DeathExplosion {
 /**
  * HealWave - 范围治疗技能触发时的扩散治疗波特效
  *
- * 设计理念：柔和的粉绿色治疗能量从施法者中心向外扩散，
- * 包含多圈同心扩散环 + 中心光晕 + 十字脉冲光线，
+ * 设计理念：柔和的粉绿色治疗能量从施法者中心开花式绽放，
+ * 包含中心光晕、治疗范围环与封闭贝塞尔花瓣，
  * 视觉上比普通冲击波更「治愈」，扩散更慢、持续更久。
  *
  * 参数：
  *   x, y   - 施法者中心坐标
  *   range  - 治疗范围（像素），决定最大扩散半径
  */
+// @perf-impact: HealWave layered bloom adds soft petal/mote drawing; gated by waveLimit and quality reductions.
+const HEAL_LOW_PETAL_TINTS = ['#f9a8d4', '#86efac', '#fbcfe8', '#86efac', '#f9a8d4'];
+
 class HealWave {
     constructor(x, y, range = 120) {
         this.x = x;
@@ -2676,10 +3105,31 @@ class HealWave {
         this.glowRadius = 0;
         this.glowMaxRadius = range * 0.35;
         this.glowLife = 1.0;
-        // 十字脉冲光线（4 条，向外延伸）
+        // 开花式治疗瓣：区别于爆炸/冲击波的放射线，使用封闭花瓣轮廓表现生命能量舒展。
         this.crossLife = 1.0;
         this.crossLen = 0;
         this.crossMaxLen = range * 0.5;
+        this.petalSpin = Math.random() * Math.PI * 2;
+        this.bloom = 0;
+        this.petalFade = 1;
+        const petalPalette = ['#f9a8d4', '#86efac', '#fbcfe8', '#86efac'];
+        this.petals = Array.from({ length: 10 }, (_, i) => ({
+            angle: this.petalSpin + i * Math.PI * 2 / 10,
+            delay: (i % 2) * 0.10 + Math.random() * 0.06,
+            fold: (i % 2 === 0 ? -1 : 1) * (0.62 + Math.random() * 0.28),
+            reach: 0.74 + Math.random() * 0.22,
+            width: 0.92 + Math.random() * 0.34,
+            curl: (Math.random() - 0.5) * 0.18,
+            alpha: 0.42 + Math.random() * 0.18,
+            tint: petalPalette[i % petalPalette.length],
+        }));
+        this.motes = Array.from({ length: 12 }, (_, i) => ({
+            angle: this.petalSpin + i * Math.PI * 2 / 12 + Math.random() * 0.24,
+            orbit: 0.35 + Math.random() * 0.5,
+            size: 1.4 + Math.random() * 2.2,
+            delay: Math.random() * 0.38,
+            tint: i % 3 === 0 ? '#f9a8d4' : '#bbf7d0',
+        }));
         this._pixi = null; // [PixiJS 迁移]
     }
 
@@ -2697,6 +3147,10 @@ class HealWave {
         // 十字光线：随主环同步延伸
         this.crossLen = this.radius * 0.55;
         this.crossLife = this.life * 1.1;
+        this.petalSpin += 0.006 * timeScale;
+        const bloomT = Math.max(0, Math.min(1, (this.radius - this.maxRadius * 0.08) / Math.max(1, this.maxRadius * 0.72)));
+        this.bloom = bloomT * bloomT * (3 - 2 * bloomT);
+        this.petalFade = Math.max(0, Math.min(1, this.life * 2.35));
     }
 
     draw(ctx) {
@@ -2706,6 +3160,8 @@ class HealWave {
             if (!this._pixi) this._pixi = healWave_pixiCreate(this);
             if (this._pixi) { healWave_pixiSync(this, this._pixi); return; }
         }
+        const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const isLow = quality === 'low';
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
@@ -2766,32 +3222,140 @@ class HealWave {
             ctx.shadowBlur = 0;
         }
 
-        // ---- 4. 十字脉冲光线（4 方向，随主环延伸） ----
+        // ---- 4. 开花式治疗瓣（封闭花瓣轮廓，随治疗波绽放） ----
         if (this.crossLife > 0 && this.crossLen > 0) {
-            const cAlpha = Math.max(0, this.crossLife * 0.6);
-            ctx.globalAlpha = cAlpha;
-            const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-            for (const [dx, dy] of dirs) {
-                const startR = this.radius * 0.3;
-                const endR = this.radius * 0.3 + this.crossLen;
-                const grad = ctx.createLinearGradient(
-                    this.x + dx * startR, this.y + dy * startR,
-                    this.x + dx * endR,   this.y + dy * endR
+            const cAlpha = Math.max(0, this.crossLife);
+            const petals = this.petals || [];
+            const petalCount = isLow ? Math.min(5, petals.length) : petals.length;
+            for (let i = 0; i < petalCount; i++) {
+                const petalIndex = isLow ? Math.floor(i * petals.length / petalCount) : i;
+                const petal = petals[petalIndex];
+                if (!petal) continue;
+                const a = petal.angle + this.petalSpin * 0.12;
+                this._traceBloomPetal(
+                    ctx,
+                    a,
+                    petal,
+                    this.bloom,
+                    cAlpha,
+                    isLow,
+                    isLow ? HEAL_LOW_PETAL_TINTS[i % HEAL_LOW_PETAL_TINTS.length] : null
                 );
-                grad.addColorStop(0, `rgba(134, 239, 172, ${cAlpha})`);
-                grad.addColorStop(1, 'rgba(244, 114, 182, 0)');
-                ctx.strokeStyle = grad;
-                ctx.lineWidth = 2.5;
-                ctx.beginPath();
-                ctx.moveTo(this.x + dx * startR, this.y + dy * startR);
-                ctx.lineTo(this.x + dx * endR,   this.y + dy * endR);
-                ctx.stroke();
             }
+            ctx.shadowBlur = 0;
+        }
+
+        // ---- 5. 花心：小型绿白芯，帮助花形闭合 ----
+        if (!isLow && this.motes && this.motes.length > 0) {
+            const moteFade = Math.max(0, Math.min(1, this.life * 2.0));
+            for (const mote of this.motes) {
+                const moteBloom = Math.max(0, Math.min(1, (this.bloom - mote.delay) / Math.max(0.01, 1 - mote.delay)));
+                if (moteBloom <= 0.01) continue;
+                const drift = (1 - Math.pow(1 - moteBloom, 2)) * this.radius * 0.16;
+                const a = mote.angle + this.petalSpin * 0.25;
+                const r = this.radius * mote.orbit + drift;
+                ctx.globalAlpha = moteFade * (1 - moteBloom * 0.45) * 0.38;
+                ctx.fillStyle = mote.tint;
+                ctx.beginPath();
+                ctx.arc(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r, mote.size * (0.7 + moteBloom * 0.6), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const coreAlpha = Math.max(0, Math.min(1, this.glowLife * 0.58));
+        if (coreAlpha > 0) {
+            ctx.globalAlpha = coreAlpha;
+            ctx.shadowColor = '#86efac';
+            ctx.shadowBlur = isLow ? 0 : _sb(7);
+            ctx.fillStyle = '#f7fee7';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, Math.max(3, this.glowRadius * 0.10), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
         }
 
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
+    }
+
+    _traceBloomPetal(ctx, angle, petal, bloom, alpha, isLow, tintOverride = null) {
+        if (bloom <= 0.01 || alpha <= 0.01) return;
+        const localBloom = Math.max(0, Math.min(1, (bloom - (petal.delay || 0)) / Math.max(0.01, 1 - (petal.delay || 0))));
+        if (localBloom <= 0.01) return;
+        const open = localBloom * localBloom * (3 - 2 * localBloom);
+        const widthT = Math.max(0, Math.min(1, (localBloom - 0.16) / 0.84));
+        const widthOpen = widthT * widthT * (3 - 2 * widthT);
+        const petalFade = this.petalFade ?? 1;
+        const bodyAlpha = alpha * petal.alpha * petalFade * (isLow ? 0.36 : 0.54) * (0.35 + open * 0.65);
+        if (bodyAlpha <= 0.01) return;
+
+        const hingeAngle = angle + (petal.fold || 0) * (1 - open);
+        const rootX = Math.cos(angle);
+        const rootY = Math.sin(angle);
+        const uX = Math.cos(hingeAngle);
+        const uY = Math.sin(hingeAngle);
+        const nX = -uY;
+        const nY = uX;
+        const flowerR = this.maxRadius * (0.30 + petal.reach * 0.24);
+        const baseR = this.maxRadius * (0.045 + 0.018 * open);
+        const petalLen = flowerR * (0.28 + open * 0.72);
+        const shoulderLen = petalLen * (0.42 + open * 0.08);
+        const crownLen = petalLen * (0.74 + open * 0.10);
+        const petalW = this.maxRadius * (0.010 + (0.047 + 0.020 * petal.width) * widthOpen);
+        const curl = petal.curl * this.maxRadius * (0.15 + open * 0.85);
+
+        const baseX = this.x + rootX * baseR;
+        const baseY = this.y + rootY * baseR;
+        const crownCurl = curl * 0.48;
+        const crownX = baseX + uX * petalLen + nX * curl * 0.24;
+        const crownY = baseY + uY * petalLen + nY * curl * 0.24;
+        const leftBaseX = baseX + nX * petalW * (0.10 + open * 0.10);
+        const leftBaseY = baseY + nY * petalW * (0.10 + open * 0.10);
+        const rightBaseX = baseX - nX * petalW * (0.10 + open * 0.10);
+        const rightBaseY = baseY - nY * petalW * (0.10 + open * 0.10);
+        const leftShoulderX = baseX + uX * shoulderLen + nX * petalW + nX * curl;
+        const leftShoulderY = baseY + uY * shoulderLen + nY * petalW + nY * curl;
+        const rightShoulderX = baseX + uX * shoulderLen - nX * petalW + nX * curl * 0.25;
+        const rightShoulderY = baseY + uY * shoulderLen - nY * petalW + nY * curl * 0.25;
+        const leftCrownX = baseX + uX * crownLen + nX * petalW * 0.76 + nX * crownCurl;
+        const leftCrownY = baseY + uY * crownLen + nY * petalW * 0.76 + nY * crownCurl;
+        const rightCrownX = baseX + uX * crownLen - nX * petalW * 0.76 + nX * crownCurl * 0.35;
+        const rightCrownY = baseY + uY * crownLen - nY * petalW * 0.76 + nY * crownCurl * 0.35;
+
+        const tracePath = () => {
+            ctx.beginPath();
+            ctx.moveTo(leftBaseX, leftBaseY);
+            ctx.bezierCurveTo(leftShoulderX, leftShoulderY, leftShoulderX, leftShoulderY, leftCrownX, leftCrownY);
+            ctx.bezierCurveTo(crownX + nX * petalW * 0.20, crownY + nY * petalW * 0.20, crownX - nX * petalW * 0.20, crownY - nY * petalW * 0.20, rightCrownX, rightCrownY);
+            ctx.bezierCurveTo(rightShoulderX, rightShoulderY, rightShoulderX, rightShoulderY, rightBaseX, rightBaseY);
+            ctx.quadraticCurveTo(baseX, baseY, leftBaseX, leftBaseY);
+            ctx.closePath();
+        };
+
+        ctx.globalAlpha = bodyAlpha * (isLow ? 0.75 : 0.55);
+        const petalTint = tintOverride || petal.tint || '#f9a8d4';
+
+        ctx.fillStyle = petalTint;
+        ctx.shadowColor = petalTint;
+        ctx.shadowBlur = isLow ? 0 : _sb(12 * open);
+        tracePath();
+        ctx.fill();
+
+        ctx.globalAlpha = bodyAlpha;
+        if (!isLow) {
+            const grad = ctx.createLinearGradient(baseX, baseY, crownX, crownY);
+            grad.addColorStop(0, withAlpha(petalTint, 0));
+            grad.addColorStop(0.30, withAlpha('#ffffff', 0.16));
+            grad.addColorStop(0.58, withAlpha(petalTint, 0.92));
+            grad.addColorStop(1, withAlpha(petalTint, 0.08));
+            ctx.fillStyle = grad;
+        } else {
+            ctx.fillStyle = withAlpha(petalTint, 0.72);
+        }
+        ctx.shadowBlur = 0;
+        tracePath();
+        ctx.fill();
     }
 }
 
@@ -4190,6 +4754,413 @@ class AffixSkillVFX {
     get dead() { return this.life <= 0; }
 }
 
+// ==================== 弹跳动能弧线特效（Phase 2.7）====================
+/**
+ * BounceArcEffect - 弹跳命中后在敌人表面产生的短促弹性冲击标记
+ *
+ * 附着在 bounce 命中的敌人身上（enemy._bounceArcEffect）。每次弹跳命中追加 1 组短弧
+ * （最多 3 组叠加），短弧由命中方向驱动并贴近命中点，0.28 秒内弹出后快速缩小淡出。
+ * 三阶共鸣：短弧变为双层回弹弧 + 命中点小型绿色扩散环。
+ *
+ * @perf-impact: 弹跳冲击短弧 - 每敌人最多 3 组短弧（三阶 ×2）；瞬态 0.28s 自动消散。
+ *               PixiJS 优先单 Graphics 批绘 / Canvas 2D 回退（共用 _arcGeom 几何）。
+ */
+class BounceArcEffect {
+    /** @param {object} enemy - 敌人实例引用 */
+    constructor(enemy) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this._pixi = null;
+        this.arcs = []; // { ox, oy, dir, life, maxLife, helix, ring, side }
+    }
+
+    /**
+     * 追加一条弹跳弧线
+     * @param {number} hitX 命中点世界 X
+     * @param {number} hitY 命中点世界 Y
+     * @param {number} dirAngle 反弹方向（弧度）
+     * @param {boolean} [tier3=false] 三阶共鸣（双螺旋 + 扩散环）
+     */
+    addArc(hitX, hitY, dirAngle, tier3 = false) {
+        // 命中点相对敌人中心的偏移，随敌人移动保持贴合表面
+        const ox = hitX - this.enemy.pos.x;
+        const oy = hitY - this.enemy.pos.y;
+        const fallbackDir = (Math.abs(ox) + Math.abs(oy) > 0.001)
+            ? Math.atan2(oy, ox)
+            : -Math.PI / 2;
+        const safeDir = (typeof dirAngle === 'number' && Number.isFinite(dirAngle))
+            ? dirAngle
+            : fallbackDir;
+        this.arcs.push({
+            ox, oy,
+            dir: safeDir,
+            life: 280,
+            maxLife: 280,
+            helix: !!tier3,
+            ring: tier3 ? 0 : -1, // >=0 表示三阶扩散环当前半径（像素）
+            side: (this.arcs.length % 2 === 0) ? 1 : -1,
+        });
+        while (this.arcs.length > 3) this.arcs.shift();
+    }
+
+    update(pos, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+        const dtMs = timeScale * 16.67;
+        for (let i = this.arcs.length - 1; i >= 0; i--) {
+            const arc = this.arcs[i];
+            arc.life -= dtMs;
+            if (arc.ring >= 0) arc.ring += timeScale * 0.92; // 扩散环增长（0.28s ≈ 15px）
+            if (arc.life <= 0) this.arcs.splice(i, 1);
+        }
+    }
+
+    _arcAnim(arc) {
+        const t = Math.max(0, Math.min(1, arc.life / arc.maxLife));
+        const progress = 1 - t;
+        const popT = Math.min(1, progress / 0.16);
+        const shrinkT = Math.max(0, (progress - 0.16) / 0.84);
+        const shrinkEase = 1 - Math.pow(1 - shrinkT, 2);
+        return {
+            fade: Math.pow(t, 2.2),
+            scale: (0.76 + 0.36 * popT) - 0.52 * shrinkEase,
+        };
+    }
+
+    draw(ctx) {
+        if (this.arcs.length === 0) return;
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = bounceArcEffect_pixiCreate(this);
+            if (this._pixi) { bounceArcEffect_pixiSync(this, this._pixi); return; }
+        }
+        this._drawCanvas2D(ctx);
+    }
+
+    /**
+     * 计算一条回弹短弧的二次贝塞尔几何（相对敌人中心坐标）
+     * @param {object} arc 弧线数据
+     * @param {number} [phase=0] 双层错相（0/1 决定内外层偏移）
+     * @param {number} [scale=1] 弹出/回缩缩放
+     * @returns {{sx,sy,cx,cy,ex,ey,span}}
+     */
+    _arcGeom(arc, phase = 0, scale = 1) {
+        const enemySize = Math.max(this.width || 0, this.height || 0);
+        const span = Math.min(38, Math.max(18, enemySize * 0.34 + 8)) * Math.max(0.4, scale);
+        const dirX = Math.cos(arc.dir);
+        const dirY = Math.sin(arc.dir);
+        const normX = -dirY;
+        const normY = dirX;
+        const layerOffset = (phase === 0 ? 0 : -0.16) * span * (arc.side || 1);
+        const halfSpan = span * (phase === 0 ? 0.46 : 0.34);
+        const backOffset = span * 0.10;
+        const bow = span * (phase === 0 ? 0.48 : 0.34);
+        const sx = arc.ox - normX * halfSpan - dirX * backOffset + normX * layerOffset;
+        const sy = arc.oy - normY * halfSpan - dirY * backOffset + normY * layerOffset;
+        const ex = arc.ox + normX * halfSpan - dirX * backOffset + normX * layerOffset;
+        const ey = arc.oy + normY * halfSpan - dirY * backOffset + normY * layerOffset;
+        const cx = arc.ox + dirX * bow + normX * layerOffset;
+        const cy = arc.oy + dirY * bow + normY * layerOffset;
+        return { sx, sy, cx, cy, ex, ey, span };
+    }
+
+    _drawCanvas2D(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        for (const arc of this.arcs) {
+            const anim = this._arcAnim(arc);
+            if (anim.fade <= 0) continue;
+            const phases = arc.helix ? [0, 1] : [0];
+            for (const ph of phases) {
+                const g = this._arcGeom(arc, ph, anim.scale);
+                // 外层弹性绿辉：降低亮度，短促弹出后迅速回收
+                ctx.strokeStyle = `rgba(34, 197, 94, ${0.20 * anim.fade})`;
+                ctx.lineWidth = Math.max(4, g.span * 0.18);
+                ctx.shadowColor = '#22c55e';
+                ctx.shadowBlur = _sb(4 * anim.fade);
+                ctx.beginPath();
+                ctx.moveTo(g.sx, g.sy);
+                ctx.quadraticCurveTo(g.cx, g.cy, g.ex, g.ey);
+                ctx.stroke();
+                // 内层薄荷芯
+                ctx.strokeStyle = `rgba(220, 252, 231, ${0.46 * anim.fade})`;
+                ctx.lineWidth = Math.max(1.6, g.span * 0.075);
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.moveTo(g.sx, g.sy);
+                ctx.quadraticCurveTo(g.cx, g.cy, g.ex, g.ey);
+                ctx.stroke();
+            }
+            const pulseR = Math.max(4, Math.min(15, 11 * anim.scale));
+            ctx.strokeStyle = `rgba(187, 247, 208, ${0.16 * anim.fade})`;
+            ctx.lineWidth = 1.4;
+            ctx.shadowColor = '#22c55e';
+            ctx.shadowBlur = _sb(2.5 * anim.fade);
+            ctx.beginPath();
+            ctx.arc(arc.ox, arc.oy, pulseR, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            // 三阶共鸣：命中点小型绿色扩散环
+            if (arc.ring >= 0) {
+                ctx.strokeStyle = `rgba(34, 197, 94, ${0.22 * anim.fade})`;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#22c55e';
+                ctx.shadowBlur = _sb(3 * anim.fade);
+                ctx.beginPath();
+                ctx.arc(arc.ox, arc.oy, arc.ring, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    destroy() {
+        if (this._pixi) { bounceArcEffect_pixiDestroy(this._pixi); this._pixi = null; }
+        this.arcs.length = 0;
+    }
+
+    get active() { return this.arcs.length > 0; }
+}
+
+// ==================== 散射星爆特效（Phase 2.9）====================
+/**
+ * ScatterBurstEffect - 散射命中后的金色星爆标记
+ *
+ * 附着在 scatter 命中的敌人身上（enemy._scatterBurstEffect）。每次散射命中追加一个星爆
+ * （4-6 条金色辐射线，0.6 秒消散）；共鸣激活时辐射线增至 8-12 条并在末端闪烁四角星。
+ *
+ * @perf-impact: 散射星爆 - 每敌人最多 4 个并发星爆，每个 4-12 条短线；瞬态 0.6s。
+ *               PixiJS 优先单 Graphics 批绘 / Canvas 2D 回退。
+ */
+class ScatterBurstEffect {
+    /** @param {object} enemy - 敌人实例引用 */
+    constructor(enemy) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this._pixi = null;
+        this.bursts = []; // { ox, oy, rays:[angle...], life, maxLife, resonance }
+    }
+
+    /**
+     * 追加一个散射星爆
+     * @param {number} hitX 命中点世界 X
+     * @param {number} hitY 命中点世界 Y
+     * @param {boolean} [resonance=false] 共鸣激活（更多辐射线 + 末端四角星）
+     */
+    addBurst(hitX, hitY, resonance = false) {
+        const ox = hitX - this.enemy.pos.x;
+        const oy = hitY - this.enemy.pos.y;
+        const rayCount = resonance ? (6 + Math.floor(Math.random() * 3)) : (3 + Math.floor(Math.random() * 2));
+        const base = Math.random() * Math.PI * 2;
+        const rays = [];
+        for (let i = 0; i < rayCount; i++) {
+            rays.push(base + (Math.PI * 2 * i) / rayCount + (Math.random() - 0.5) * 0.16);
+        }
+        const maxLife = resonance ? 520 : 460;
+        this.bursts.push({ ox, oy, rays, life: maxLife, maxLife, resonance: !!resonance });
+        while (this.bursts.length > 4) this.bursts.shift();
+    }
+
+    update(pos, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+        const dtMs = timeScale * 16.67;
+        for (let i = this.bursts.length - 1; i >= 0; i--) {
+            this.bursts[i].life -= dtMs;
+            if (this.bursts[i].life <= 0) this.bursts.splice(i, 1);
+        }
+    }
+
+    draw(ctx) {
+        if (this.bursts.length === 0) return;
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = scatterBurstEffect_pixiCreate(this);
+            if (this._pixi) { scatterBurstEffect_pixiSync(this, this._pixi); return; }
+        }
+        this._drawCanvas2D(ctx);
+    }
+
+    _drawCanvas2D(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        for (const b of this.bursts) {
+            const t = b.life / b.maxLife;     // 1 → 0
+            const grow = 1 - t;                // 0 → 1
+            const reach = (b.resonance ? 20 : 14) * (0.4 + grow * 0.82);
+            ctx.shadowColor = '#facc15';
+            ctx.shadowBlur = _sb((b.resonance ? 4 : 2.5) * t);
+            for (const a of b.rays) {
+                const ex = b.ox + Math.cos(a) * reach;
+                const ey = b.oy + Math.sin(a) * reach;
+                ctx.strokeStyle = `rgba(250, 204, 21, ${(b.resonance ? 0.62 : 0.48) * t})`;
+                ctx.lineWidth = b.resonance ? 1.5 : 1.2;
+                ctx.beginPath();
+                ctx.moveTo(b.ox + Math.cos(a) * 3, b.oy + Math.sin(a) * 3);
+                ctx.lineTo(ex, ey);
+                ctx.stroke();
+                // 共鸣：辐射线末端四角星闪烁
+                if (b.resonance) {
+                    const flick = 0.5 + 0.5 * Math.sin(b.life * 0.05);
+                    this._starAt(ctx, ex, ey, 2.4, 0.55 * t * flick);
+                }
+            }
+            ctx.shadowBlur = 0;
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    // 在 (cx,cy) 画一个小四角星（复用 scatter 弹体形状）
+    _starAt(ctx, cx, cy, r, alpha) {
+        if (alpha <= 0) return;
+        ctx.fillStyle = `rgba(255, 240, 160, ${Math.max(0, Math.min(1, alpha))})`;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const ang = (Math.PI / 4) * i;
+            const rad = (i % 2 === 0) ? r : r * 0.4;
+            const px = cx + Math.cos(ang) * rad;
+            const py = cy + Math.sin(ang) * rad;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    destroy() {
+        if (this._pixi) { scatterBurstEffect_pixiDestroy(this._pixi); this._pixi = null; }
+        this.bursts.length = 0;
+    }
+
+    get active() { return this.bursts.length > 0; }
+}
+
+// ==================== 回响波纹特效（Phase 2.11）====================
+/**
+ * EchoRippleEffect - 回响触发时的扩散声波波纹
+ *
+ * 附着在 echo 命中的敌人身上（enemy._echoRippleEffect）。每次回响追加一组 3 圈同心圆
+ * （间隔 80ms 依次扩散，颜色 #60a5fa，alpha 递减 0.5/0.3/0.15，线宽递减），0.6 秒消散。
+ * 与 Shockwave 单圈、lightning 紫色系区分。
+ * 三阶共鸣：额外 4 条等距弧线从敌人身体向外扩散（#93c5fd，模拟回声定位）。
+ *
+ * @perf-impact: 回响波纹 - 每敌人最多 3 组波纹，每组 3 圈 arc + 三阶 4 弧；瞬态 0.6s。
+ *               PixiJS 优先单 Graphics 批绘 / Canvas 2D 回退。
+ */
+class EchoRippleEffect {
+    /** @param {object} enemy - 敌人实例引用 */
+    constructor(enemy) {
+        this.enemy = enemy;
+        this.x = enemy.pos.x;
+        this.y = enemy.pos.y;
+        this.width = enemy.width;
+        this.height = enemy.height;
+        this._pixi = null;
+        this.ripples = []; // { ox, oy, age, life, maxLife, echoLoc }
+    }
+
+    /**
+     * 追加一组回响波纹
+     * @param {number} hitX 命中点世界 X
+     * @param {number} hitY 命中点世界 Y
+     * @param {boolean} [tier3=false] 三阶共鸣（回声定位 4 弧）
+     */
+    addRipple(hitX, hitY, tier3 = false) {
+        const ox = hitX - this.enemy.pos.x;
+        const oy = hitY - this.enemy.pos.y;
+        this.ripples.push({ ox, oy, age: 0, life: 600, maxLife: 600, echoLoc: !!tier3 });
+        while (this.ripples.length > 3) this.ripples.shift();
+    }
+
+    update(pos, timeScale) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.width = this.enemy.width;
+        this.height = this.enemy.height;
+        const dtMs = timeScale * 16.67;
+        for (let i = this.ripples.length - 1; i >= 0; i--) {
+            const r = this.ripples[i];
+            r.age += dtMs;
+            r.life -= dtMs;
+            if (r.life <= 0) this.ripples.splice(i, 1);
+        }
+    }
+
+    draw(ctx) {
+        if (this.ripples.length === 0) return;
+        if (pixiIsActive()) {
+            if (!this._pixi) this._pixi = echoRippleEffect_pixiCreate(this);
+            if (this._pixi) { echoRippleEffect_pixiSync(this, this._pixi); return; }
+        }
+        this._drawCanvas2D(ctx);
+    }
+
+    _drawCanvas2D(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.globalCompositeOperation = 'lighter';
+        const ringAlphas = [0.5, 0.3, 0.15];
+        const ringWidths = [2.6, 1.8, 1.0];
+        const maxR = 46;
+        for (const rp of this.ripples) {
+            ctx.shadowColor = '#60a5fa';
+            for (let k = 0; k < 3; k++) {
+                // 80ms 错相：第 k 圈延迟 k*80ms 开始扩散
+                const localAge = rp.age - k * 80;
+                if (localAge <= 0) continue;
+                const prog = Math.min(1, localAge / (rp.maxLife * 0.7));
+                const radius = 6 + prog * maxR;
+                const fade = 1 - prog;
+                ctx.strokeStyle = `rgba(96, 165, 250, ${ringAlphas[k] * fade})`;
+                ctx.lineWidth = ringWidths[k];
+                ctx.shadowBlur = _sb(5 * fade);
+                ctx.beginPath();
+                ctx.arc(rp.ox, rp.oy, radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            // 三阶共鸣：回声定位 4 条等距弧（以敌人身体为中心）
+            if (rp.echoLoc) {
+                const prog = Math.min(1, rp.age / (rp.maxLife * 0.8));
+                const fade = 1 - prog;
+                const rad = 10 + prog * 54;
+                ctx.strokeStyle = `rgba(147, 197, 253, ${0.6 * fade})`;
+                ctx.lineWidth = 2.4;
+                ctx.shadowBlur = _sb(6 * fade);
+                for (let a = 0; a < 4; a++) {
+                    const start = (Math.PI / 2) * a + Math.PI / 4;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, rad, start - 0.4, start + 0.4);
+                    ctx.stroke();
+                }
+            }
+            ctx.shadowBlur = 0;
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+    }
+
+    destroy() {
+        if (this._pixi) { echoRippleEffect_pixiDestroy(this._pixi); this._pixi = null; }
+        this.ripples.length = 0;
+    }
+
+    get active() { return this.ripples.length > 0; }
+}
+
 // ==================== 导出 ====================
 export {
     Particle,
@@ -4197,6 +5168,8 @@ export {
     PierceCutEffect,
     CollectionBeam,
     Shockwave,
+    ImpactBlastWave,
+    AssimilationPulseWave,
     LaserBeam,
     FloatingText,
     EnergyOrb,
@@ -4206,6 +5179,9 @@ export {
     ElectrocuteEffect,
     VenomEffect,
     WindMarkEffect,
+    BounceArcEffect,
+    ScatterBurstEffect,
+    EchoRippleEffect,
     IceWave,
     DeathExplosion,
     HealWave,

@@ -62,7 +62,7 @@
 | ID | 名称 | 稀有度 | 类型 | 关键钩子位置 |
 |---|---|---|---|---|
 | `hunter_instinct` | 猎人本能 | rare | 战斗被动 | `combat_system.js` `combat_damageEnemy`：在 `enemy.takeDamage` 之前对场上 hp 最低敌人 ×1.25 |
-| `rune_resonance_core` | 符文共鸣核 | rare | 击杀奖励 | `combat_system.js` `combat_skillCharge_onHit`：击杀 +0.08 技能充能 |
+| `rune_resonance_core` | 技能共鸣核 | rare | 击杀奖励 | `combat_system.js` `combat_skillCharge_onHit`：击杀 +0.08 技能充能 |
 | `mirror_magazine` | 镜像弹夹 | rare | 一次性 | `ui/shop.js` `ui_selectRelic`：复制 `ammoQueue` 中评分最高的子弹至队尾 |
 | `doomsday_timer` | 末日计时器 | rare | 回合开始 | `game_phase.js` `phase_finalizeRound`（round++ 之后）→ `combat_system.js` `relic_runRoundStartHooks`；若末日击杀成功，则短延迟后补触发；主触发每累计 5 次，补触发上限 +1 |
 | `echo_reverberation` | 余韵回响 | rare | 钉板编译 | `calc_utils.js` `calc_compileCollectionToRecipe`：单属性 ≥10 层时 +1 |
@@ -72,6 +72,7 @@
 | `mortal_burst` | 殒命爆裂 | rare | 击杀联动 | `combat_system.js` killed 块：max(2, maxHp×10%) AOE 真实伤害 |
 | `corridor_arc` | 回廊电弧 | epic | 墙撞 + 回合开始 | `entities/projectile.js` `_applyMove`（左右墙壁 +1 闪电层）+ `relic_runRoundStartHooks`（紧贴墙壁 50% 触发电弧） |
 | `chaos_pact` | 混沌契约 | cursed | 永久 + 流程 | `ui/shop.js`（拾取时给 3 稀有符文 + 设置 `chaosPactDamageMult=2`）+ `game_phase.js` `phase_startGatheringPhase`（直接跳过研磨）+ `combat_fireNextShot`（伤害倍率应用） |
+| `relic_sage_apothecary` | 贤者药匣 | legendary | 特殊解锁 | `ui/shop.js` 拾取 `unlock_potion_alchemy` 后开启炼金台药剂 Tab；`ui/rune_launcher.js` 消耗符文炼成 `preparedPotionSpell`；`systems.js` 渲染药剂槽；`combat_system.js` `combat_activatePotionSpell()` 释放药剂 |
 | `greedy_wheel` | 贪婪轮盘 | cursed | 发射时 | `combat_system.js` `combat_fireNextShot`：multicast 折算为 +damage×0.5/层；`game_phase.js` `burstQueue` 在每次贪婪发射后按 75% 概率继续排入下一次续转 |
 | `energy_shield`（修改） | 力場護盾 | cursed | 墙壁联动 | `entities/projectile.js` `_applyMove`：每次墙体接触最多消耗 1 层反弹或穿透；同帧角落碰撞也只扣 1 层；无耐久时继续正常墙体反弹 |
 
@@ -82,6 +83,10 @@
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `chaosPactDamageMult` | `1` | 混沌契约的永久伤害倍率，发射时应用到 `finalRecipe.damage` |
+| `potionAlchemyUnlocked` | `false` | 贤者药匣是否已解锁本局药剂炼成 |
+| `preparedPotionSpell` | `null` | 当前预调制药剂，包含 `potionId`、`charges`、`maxCharges`、`quality` 与来源符文 |
+| `knownPotionSpellIds` | `[]` | 本局已炼成/释放过的药剂 ID，供图鉴或后续提示扩展 |
+| `potionRecipeHistory` | `[]` | 最近药剂炼成结果，保留成功/失败与返还信息，存档时截断为 10 条 |
 | 子弹 recipe `_greedyWheelEnabled` / `_greedyWheelChance` | `false` / `0.75` | 贪婪轮盘发射链标记；续转子弹也会按同一概率继续触发，直到失败或达到防御性最大链长 |
 | 子弹 recipe `_attributeProtocolBonus` | `undefined` | 调试用，记录属性协议本次发射叠加的伤害值 |
 | 敌人 `_mortalBurstTriggered` | `false` | 殒命爆裂连锁防递归 |

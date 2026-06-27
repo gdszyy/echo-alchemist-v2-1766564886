@@ -12,14 +12,14 @@
  * - eventBus, EVENT_TYPES（来自 event_bus.js）
  */
 
-import { CONFIG, SKILL_DB, RELIC_DB } from './config.js';
+import { CONFIG, SKILL_DB, RELIC_DB, POTION_SPELL_DB } from './config.js';
 import { Enemy, Projectile, Particle, FloatingText, CloneSpore } from './entities.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { Vec2, adjustColorBrightness } from './utils/math_utils.js';
 import { RUNEWORD_DB, ELEMENT_RESONANCE_DB } from './rune_config.js';
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ID } from './data/enemy_v2_metadata.js';
-import { getEnemyV2IconSrc } from './bitmap_icons.js';
-import { resolveEnemyVisualAsset, describeAssetHitStatus, buildEnemyAssetKey } from './data/enemy_visual_assets.js';
+import { getEnemyAffixIconSrc, getEnemyV2IconSrc } from './bitmap_icons.js';
+import { resolveEnemyVisualAsset, describeAssetHitStatus } from './data/enemy_visual_assets.js';
 import {
     pixiCleanupAllEffects,
     floatingText_pixiDestroy, shockwave_pixiDestroy, lightningBolt_pixiDestroy,
@@ -687,10 +687,10 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         icon: '◇',
         tags: ['R47', '热核吞噬', '冷热抵消', '破绽: venom/laser'],
         trainingScenarioId: 'boss_chimera',
-        content: 'Chimera 现在是随机热核吞噬。每回合随机吞噬 1 个非 Boss 敌人，然后召唤一个 +100°C 或 -100°C 的热核养料。被吞目标温度达到阈值时，会按 100°C 为单位转成热层或寒层；冷热层互相抵消，并转化为流彩护盾。狂暴时本次吸收层数翻倍。试炼场入口：boss_chimera。',
+        content: 'Chimera 现在是左右热核吞噬。每个奇美拉回合会先吞噬两个目标，左侧倾向低温、右侧倾向高温；吞噬结算后再在左侧生成低温养料、右侧生成高温养料，共 2-3 个且不带狂暴词条。被吞目标温度达到阈值时，按温度绝对值一比一转成热核或冰核；冷热核心互相抵消，并按抵消层数 100% 转化为流彩护盾，狂暴阶段最终护盾量翻倍。试炼场入口：boss_chimera。',
         setup: (game) => setupTruthBookBossDemo(game, 'chimera', true),
         loop: [
-            { type: 'log', text: '随机吞噬热核养料' },
+            { type: 'log', text: '先吞噬后召唤养料' },
             { type: 'wait', frames: 80 },
             { type: 'log', text: '冷热抵消转流彩护盾' },
             { type: 'enemy_turn' },
@@ -722,10 +722,10 @@ const TRUTH_BOOK_CORE_ENTRIES = [
     {
         id: 'truth_core_skill_charge',
         categoryId: 'core',
-        title: '技能/符文充能',
+        title: '技能充能',
         icon: '🔋',
         tags: ['命中 3%', '击杀 10%', '实际条/临时条'],
-        content: '旧“符文充能”已兼容为技能充能。战斗命中提供基础 3% 充能，击杀提供 10%；每次命中可能触发 2x/4x/8x 倍率。获得的充能按保留比例拆成实际条与临时条：实际条稳定保留，临时条会在战斗中衰减。总量达到 100% 时尝试发放 1 点 SP；若 SP 已满，满条会保留到玩家消耗 SP 后再转换。',
+        content: '技能充能是战斗阶段的 SP 来源。战斗命中提供基础 3% 充能，击杀提供 10%；每次命中可能触发 2x/4x/8x 倍率。获得的充能按保留比例拆成实际条与临时条：实际条稳定保留，临时条会在战斗中衰减。总量达到 100% 时尝试发放 1 点 SP；若 SP 已满，满条会保留到玩家消耗 SP 后再转换。',
         loop: [
             { type: 'log', text: '命中：实际条 + 临时条' },
             { type: 'wait', frames: 90 },
@@ -784,9 +784,12 @@ const TRUTH_BOOK_CORE_ENTRIES = [
 function normalizeTruthBookEntry(entry, categoryId) {
     const title = entry.title || entry.name || entry.id;
     const content = entry.content || entry.desc || '';
+    const resolvedCategoryId = entry.categoryId || categoryId;
+    const iconSrc = entry.iconSrc || (resolvedCategoryId === 'enemy_affix' ? getEnemyAffixIconSrc(entry.id) : null);
     return {
         ...entry,
-        categoryId: entry.categoryId || categoryId,
+        categoryId: resolvedCategoryId,
+        iconSrc,
         title,
         content,
         name: entry.name || title,
@@ -1010,16 +1013,18 @@ class UIManager {
         container.innerHTML = '';
         // 仅渲染已解锁的技能，而非遍历全部 SKILL_DB
         const skillsToRender = activeSkills || [];
-        const directSkillLimit = 4;
+        const potionUnlocked = !!(game && (game.potionAlchemyUnlocked || (game.ownedRelics || []).includes('relic_sage_apothecary')));
+        const preparedPotion = potionUnlocked && game ? game.preparedPotionSpell : null;
+        const directSkillLimit = potionUnlocked ? 3 : 4;
         const visibleSkills = skillsToRender.slice(0, directSkillLimit);
         const overflowCount = Math.max(0, skillsToRender.length - directSkillLimit);
-        container.dataset.visibleSkillCount = String(visibleSkills.length);
+        container.dataset.visibleSkillCount = String(visibleSkills.length + (potionUnlocked ? 1 : 0));
         if (overflowCount > 0) {
             container.dataset.overflowSkillCount = String(overflowCount);
         } else {
             delete container.dataset.overflowSkillCount;
         }
-        if (skillsToRender.length === 0) return;
+        if (skillsToRender.length === 0 && !potionUnlocked) return;
 
         const maxVisibleSP = 5;
         const maxSP = Math.min(maxVisibleSP, Math.max(CONFIG.gameplay.maxSkillPoints || 0, currentSP));
@@ -1030,7 +1035,7 @@ class UIManager {
         const head = document.createElement('div');
         head.className = 'skill-bar-head';
         head.innerHTML = `
-            <span class="skill-bar-title">技能</span>
+            <span class="skill-bar-title">${potionUnlocked ? '技能 / 药剂' : '技能'}</span>
             <span class="skill-sp-readout" aria-label="SP ${currentSP}">${spGems}</span>
         `;
         container.appendChild(head);
@@ -1076,6 +1081,49 @@ class UIManager {
             }
             grid.appendChild(btn);
         });
+        if (potionUnlocked) {
+            const potionDef = preparedPotion
+                ? (POTION_SPELL_DB || []).find(p => p.id === preparedPotion.potionId)
+                : null;
+            const charges = Math.max(0, Number(preparedPotion?.charges) || 0);
+            const maxCharges = Math.max(charges, Number(preparedPotion?.maxCharges) || 0);
+            const isDisabled = !potionDef || charges <= 0 || !game || game.phase !== 'combat' || game.isEnemyTurn;
+            const color = potionDef?.color || '#94a3b8';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'skill-button potion-skill-button';
+            btn.disabled = isDisabled;
+            btn.title = potionDef ? `${potionDef.name} · ${potionDef.desc || ''}` : '空药剂槽';
+            btn.setAttribute(
+                'aria-label',
+                potionDef
+                    ? `${potionDef.name}，剩余 ${charges}/${maxCharges || charges} 装药`
+                    : '空药剂槽'
+            );
+            if (!isDisabled && potionDef) {
+                btn.style.borderColor = color;
+                btn.style.background = `linear-gradient(145deg, ${adjustColorBrightness(color, 0.35)} 0%, rgba(15, 23, 42, 0.96) 78%)`;
+                btn.style.boxShadow = `0 0 12px ${color}66`;
+            }
+            btn.innerHTML = `
+                <span class="skill-ready-mark" aria-hidden="true"></span>
+                <span class="skill-button-icon" aria-hidden="true">${potionDef?.icon || '🧪'}</span>
+                <span class="skill-cost-badge" aria-hidden="true">${maxCharges ? `${charges}/${maxCharges}` : '0'}</span>
+                <span class="skill-disabled-reason" aria-hidden="true">${potionDef ? (charges <= 0 ? '空瓶' : '') : '空瓶'}</span>
+            `;
+            if (!isDisabled && potionDef) {
+                const stopProp = (e) => { e.stopPropagation(); };
+                btn.addEventListener('mousedown', stopProp);
+                btn.addEventListener('touchstart', stopProp, { passive: false });
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (game && typeof game.combat_activatePotionSpell === 'function') {
+                        game.combat_activatePotionSpell();
+                    }
+                };
+            }
+            grid.appendChild(btn);
+        }
         container.appendChild(grid);
     }
 
@@ -1171,7 +1219,24 @@ class UIManager {
                 if (info) {
                     const div = document.createElement('div');
                     div.className = 'bg-slate-800 p-2 rounded border border-slate-700';
-                    div.innerHTML = `<div class="font-bold text-amber-100 mb-1">${info.name}</div><div class="text-xs text-slate-400">${info.desc}</div>`;
+                    const title = document.createElement('div');
+                    title.className = 'font-bold text-amber-100 mb-1 flex items-center gap-2';
+                    const iconSrc = getEnemyAffixIconSrc(affix);
+                    if (iconSrc) {
+                        const img = document.createElement('img');
+                        img.src = iconSrc;
+                        img.alt = '';
+                        img.className = 'w-5 h-5 object-contain shrink-0';
+                        title.appendChild(img);
+                    }
+                    const name = document.createElement('span');
+                    name.textContent = info.name;
+                    title.appendChild(name);
+                    const desc = document.createElement('div');
+                    desc.className = 'text-xs text-slate-400';
+                    desc.textContent = info.desc;
+                    div.appendChild(title);
+                    div.appendChild(desc);
                     affixContainer.appendChild(div);
                 }
             });
@@ -1307,11 +1372,33 @@ function advanceOuroborosAttachmentSlotAcceptance(game) {
     return result;
 }
 
+function setupSkillTrainingTargets(game) {
+    if (!game) return;
+    const w = game.enemyWidth || 60;
+    const h = game.enemyHeight || 60;
+    const top = game.combatGridTopY || 80;
+    const makeEnemy = (col, row, hp, type = 'normal', affixes = []) => {
+        const x = col * w + w / 2;
+        const y = top + row * h + h / 2;
+        return new Enemy(x, y, w, h, hp, hp, type, affixes);
+    };
+
+    game.round = Math.max(12, Number(game.round) || 1);
+    game.enemies.push(
+        makeEnemy(1, 0, 420),
+        makeEnemy(3, 0, 420),
+        makeEnemy(2, 1, 760, 'elite', ['shield']),
+        makeEnemy(0, 2, 360),
+        makeEnemy(4, 2, 360)
+    );
+}
+
 const TRAINING_SCENARIOS = {
     categories: [
         { id: 'enemy', name: '敵人詞條' },
         { id: 'attribute', name: '屬性效果' },
         { id: 'boss', name: 'Boss 機制' },
+        { id: 'skill', name: '主动技能' },
         { id: 'runeword', name: '符文詞條' },
         { id: 'resonance', name: '屬性共鳴' },
         { id: 'relic', name: '遺物/精華' },
@@ -1320,6 +1407,22 @@ const TRAINING_SCENARIOS = {
     ],
     scenarios: [
         // ── 敵人詞條 ──────────────────────────────────────────────────
+        {
+            id: 'active_skill_sandbox',
+            categoryId: 'skill',
+            name: '主动技能沙盒',
+            icon: '✨',
+            desc: '[主动技能] 预置一组前排/后排/护盾敌人，并临时补满 SP。底部“技能测试”面板可选择任意 SKILL_DB 技能释放；强化类技能会作用于当前子弹配方。',
+            keepSidebarOpenOnDemo: true,
+            setup: (game) => {
+                setupSkillTrainingTargets(game);
+            },
+            bulletConfig: { damage: 35, bounce: 2, pierce: 1, scatter: 0, multicast: 1, pyro: 1, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                tg.refillSkillPoints();
+                tg.activateSkillForTest(tg.selectedSkillId || 'skill_arcane_missiles');
+            }
+        },
         {
             id: 'enemy_shield',
             categoryId: 'enemy',
@@ -1772,7 +1875,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'boss',
             name: '缝合奇美拉·喀迈拉',
             icon: '◇',
-            desc: '热核吞噬+流彩护盾。每回合随机吞噬 1 名敌人并召唤 +100°C 或 -100°C 热核养料；吞噬温度会转为热/寒层，冷热抵消时生成流彩护盾，狂暴时层数翻倍。破绽谱：毒素/激光。',
+            desc: '热核吞噬+流彩转盾。每回合左侧生成低温养料、右侧生成高温养料，共 2-3 名且无狂暴词条；吞噬时吃两个目标，左侧倾向低温、右侧倾向高温。吞噬温度会一比一转为热核/冰核，冷热抵消时 100% 生成流彩护盾，狂暴阶段护盾量翻倍。破绽谱：毒素/激光。',
             setup: (game) => { game.spawn_spawnBoss('chimera', true); },
             bulletConfig: { damage: 46, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, venom: 6, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -3155,8 +3258,9 @@ function buildEnemyV2Scenarios() {
     // @section:enemy_v2_asset_status - 资源命中状态文本
     // [资源命中状态] 直接从 enemy_sprite_manifest.json 解析，避免重复硬编码命名。
     // 同时保留 ENEMY_V2_BY_ID.placeholder 作为占位资源标记。
-    const resourceStatusFor = ({ archetype, cols, rows, affixes, archetypeIdForPlaceholder }) => {
+    const resourceStatusFor = ({ type, archetype, cols, rows, affixes, archetypeIdForPlaceholder }) => {
         const probe = {
+            type: type || undefined,
             baseArchetype: archetype || null,
             gridCols: cols || 1,
             gridRows: rows || 1,
@@ -3409,8 +3513,71 @@ function buildEnemyV2Scenarios() {
         }
     };
 
+    const setupEliteGolemAffixComboPreview = (game) => {
+        const tg = game.trainingGround;
+        if (tg && typeof tg._clearV2MatrixOverlay === 'function') tg._clearV2MatrixOverlay();
+
+        const combos = [
+            { col: 0, row: 0, affixes: ['armorSpore'] },
+            { col: 1, row: 0, affixes: ['jump'] },
+            { col: 2, row: 0, affixes: ['haste'] },
+            { col: 3, row: 0, affixes: ['berserk'] },
+            { col: 0, row: 1, affixes: ['armorSpore', 'jump'] },
+            { col: 1, row: 1, affixes: ['armorSpore', 'haste'] },
+            { col: 2, row: 1, affixes: ['armorSpore', 'berserk'] },
+            { col: 3, row: 1, affixes: ['jump', 'haste'] },
+            { col: 4, row: 1, affixes: ['jump', 'berserk'] },
+            { col: 5, row: 1, affixes: ['haste', 'berserk'] },
+            { col: 0, row: 2, affixes: ['armorSpore', 'jump', 'haste'] },
+            { col: 1, row: 2, affixes: ['armorSpore', 'jump', 'berserk'] },
+            { col: 2, row: 2, affixes: ['armorSpore', 'haste', 'berserk'] },
+            { col: 3, row: 2, affixes: ['jump', 'haste', 'berserk'] },
+            { col: 2, row: 3, affixes: ['armorSpore', 'jump', 'haste', 'berserk'] },
+            { col: 4, row: 0, affixes: ['armorSpore', 'shield'] },
+            { col: 5, row: 0, affixes: ['jump', 'haste', 'shield'] },
+            { col: 4, row: 2, affixes: ['armorSpore', 'jump', 'haste', 'berserk', 'shield'] },
+        ];
+
+        const w = game.enemyWidth;
+        const h = game.enemyHeight;
+        const top = game.combatGridTopY;
+
+        combos.forEach(({ col, row, affixes }) => {
+            const e = new Enemy(col * w + w / 2, top + row * h + h / 2, w, h, 360, 360, 'elite', affixes.slice());
+            e.baseArchetype = null;
+            e.gridCols = 1;
+            e.gridRows = 1;
+            e._moveInterval = 9999;
+            e._moveCooldown = 9999;
+            e.hasActedThisTurn = true;
+            e.dropTargetY = e.pos.y;
+            if (affixes.includes('shield')) e.shieldCharges = 3;
+            if (typeof e.initSprite === 'function') e.initSprite();
+            game.enemies.push(e);
+        });
+    };
+
     // @section:enemy_v2_scene_list - 验收场景列表
     return [
+        {
+            id: 'ev2_elite_golem_affix_combos_pass12',
+            categoryId: 'enemy_v2',
+            name: 'P12 精英魔像交叉素材',
+            icon: 'P12',
+            assetHitTag: 'Pass12 素材',
+            keepSidebarOpenOnDemo: true,
+            desc: [
+                'Pass12 elite golem affix combo preview.',
+                'Layout: single-affix row uses pass10/pass11 bases; pair row, triple row, and four-affix combo use pass12 regenerated cross-affix body art; right-side shield samples verify extra affixes do not drop the body art back to the old elite golem.',
+                'Expected: pass12 front-facing elite golem sprites carry the core affix colors in the body art; no old affix sigils, bitmap overlays, target fallback marks, or status tag badges should appear over them.'
+            ].join('\n'),
+            setup: (game) => setupEliteGolemAffixComboPreview(game),
+            bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
+            demoAction: (game, tg) => {
+                if (tg && tg.addLog) tg.addLog('Pass12 elite golem combo sprites are rendered through Enemy.initSprite().');
+            }
+        },
+
         // ── 场景 1：普通 1×1 对照 ─────────────────────────────────────
         {
             id: 'ev2_ref_1x1',
@@ -3780,6 +3947,9 @@ class TrainingGround {
         };
         // 自定义敌人配置
         this.enemyConfig = { base: 'normal', hp: 1000, affixes: [] };
+        const defaultSkill = (SKILL_DB || []).find(sk => sk.source === 'base') || (SKILL_DB || [])[0];
+        this.selectedSkillId = defaultSkill ? defaultSkill.id : null;
+        this._savedSkillSandboxState = null;
         this.stats = {
             totalDamage: 0,
             lastTotal: 0,
@@ -3865,11 +4035,12 @@ class TrainingGround {
             }
             .train-sidebar-tabs {
                 display: flex;
+                flex-wrap: wrap;
                 border-bottom: 1px solid #1e293b;
                 flex-shrink: 0;
             }
             .train-scat-btn {
-                flex: 1;
+                flex: 1 0 33.333%;
                 padding: 5px 2px;
                 font-size: 10px;
                 font-weight: bold;
@@ -4106,14 +4277,39 @@ class TrainingGround {
             .train-enemy-num { width:84px; font-family:monospace; color:#fca5a5; text-align:right; -moz-appearance:textfield; }
             .train-enemy-num::-webkit-outer-spin-button, .train-enemy-num::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
             .train-enemy-range { flex:1; min-width:120px; height:4px; accent-color:#ef4444; cursor:pointer; }
-            .train-affix-chip { padding:3px 9px; border-radius:999px; border:1px solid #475569; background:rgba(30,41,59,0.6); color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s; user-select:none; }
+            .train-affix-chip { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-height:22px; padding:3px 9px; border-radius:999px; border:1px solid #475569; background:rgba(30,41,59,0.6); color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s; user-select:none; }
+            .train-affix-chip-icon { width:14px; height:14px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 0 4px rgba(103,232,249,0.22)); }
             .train-affix-chip:hover { border-color:#64748b; color:#e2e8f0; }
             .train-affix-chip.on { background:rgba(6,182,212,0.18); border-color:#06b6d4; color:#cffafe; }
             .train-affix-group-label { width:100%; font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin:6px 0 2px; }
+            /* 技能测试面板 */
+            .train-skill-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+            .train-skill-sp { display:flex; align-items:center; gap:6px; color:#c4b5fd; font-size:12px; font-weight:bold; }
+            .train-skill-sp-pill { display:inline-flex; min-width:32px; justify-content:center; padding:2px 8px; border-radius:999px; background:rgba(124,58,237,0.22); border:1px solid rgba(167,139,250,0.35); color:#ddd6fe; font-family:monospace; }
+            .train-skill-actions { display:flex; flex-wrap:wrap; gap:6px; }
+            .train-skill-action { padding:6px 10px; border-radius:7px; font-size:11px; font-weight:bold; cursor:pointer; transition:background .15s, transform .15s; }
+            .train-skill-action:active { transform:scale(0.97); }
+            .train-skill-action.primary { background:#7c3aed; color:#f5f3ff; }
+            .train-skill-action.primary:hover { background:#8b5cf6; }
+            .train-skill-action.secondary { background:#1e293b; color:#cbd5e1; border:1px solid #334155; }
+            .train-skill-action.secondary:hover { background:#334155; }
+            .train-skill-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:8px; max-height:28vh; overflow-y:auto; padding-right:2px; }
+            .train-skill-card { display:grid; grid-template-columns:30px minmax(0,1fr); gap:8px; padding:9px; border-radius:8px; border:1px solid rgba(71,85,105,0.8); background:rgba(15,23,42,0.72); color:#cbd5e1; text-align:left; cursor:pointer; transition:border-color .15s, background .15s, transform .15s; }
+            .train-skill-card:hover { border-color:rgba(167,139,250,0.65); background:rgba(30,41,59,0.86); transform:translateY(-1px); }
+            .train-skill-card.active { border-color:var(--skill-color, #a78bfa); box-shadow:0 0 0 1px color-mix(in srgb, var(--skill-color, #a78bfa) 40%, transparent); background:rgba(49,46,129,0.42); }
+            .train-skill-icon { width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:7px; background:rgba(15,23,42,0.9); font-size:18px; }
+            .train-skill-main { min-width:0; display:flex; flex-direction:column; gap:3px; }
+            .train-skill-head { display:flex; align-items:center; justify-content:space-between; gap:6px; min-width:0; }
+            .train-skill-name { color:#f8fafc; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .train-skill-cost { flex:0 0 auto; color:#fef3c7; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.25); border-radius:5px; padding:1px 5px; font-size:10px; font-family:monospace; }
+            .train-skill-desc { color:#94a3b8; font-size:10px; line-height:1.45; }
+            .train-skill-source { color:#64748b; font-size:10px; }
+            .train-skill-current { margin-top:8px; padding:7px 9px; border-radius:8px; background:rgba(30,41,59,0.55); border:1px solid #334155; color:#a5b4fc; font-size:11px; line-height:1.5; }
             @media (max-width: 767px) {
                 .train-panel-content { max-height: 50vh; }
                 #train-attr-grid { grid-template-columns: repeat(2, 1fr) !important; }
                 #train-sidebar { width: 160px; min-width: 160px; }
+                .train-skill-grid { grid-template-columns:1fr; max-height:34vh; }
             }
         `;
         document.head.appendChild(style);
@@ -4148,6 +4344,9 @@ class TrainingGround {
                     <button onclick="game.trainingGround.spawnCustomEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">👾</span>
                     </button>
+                    <button onclick="game.trainingGround.activateSkillForTest()" class="w-12 h-12 rounded-full bg-violet-600/80 backdrop-blur-md border border-violet-300/50 text-white shadow-lg shadow-violet-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                        <span class="text-xl">✨</span>
+                    </button>
                 </div>
                 <!-- 底部控制面板 -->
                 <div id="train-control-panel" class="collapsed">
@@ -4155,6 +4354,7 @@ class TrainingGround {
                     <div class="flex border-b border-slate-700 bg-slate-900/50">
                         <button onclick="game.trainingGround.switchTab('bullet')" id="tab-btn-bullet" class="train-tab-btn active">子弹编辑</button>
                         <button onclick="game.trainingGround.switchTab('enemy')" id="tab-btn-enemy" class="train-tab-btn">敌人配置</button>
+                        <button onclick="game.trainingGround.switchTab('skill')" id="tab-btn-skill" class="train-tab-btn">技能测试</button>
                     </div>
                     <!-- 子弹编辑面板 -->
                     <div id="panel-bullet" class="train-panel-content active">
@@ -4181,6 +4381,10 @@ class TrainingGround {
                             <button onclick="game.phase_enemy_startLogic()" class="py-2 px-4 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold transition-colors text-sm">触发敌人行动</button>
                         </div>
                     </div>
+                    <!-- 技能测试面板 -->
+                    <div id="panel-skill" class="train-panel-content">
+                        <div id="train-skill-controls"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -4189,6 +4393,7 @@ class TrainingGround {
         this.renderAttributeControls();
         this.updateBulletPreview();
         this.renderEnemyControls();
+        this.renderSkillControls();
     }
 
     clearEnemies() {
@@ -4373,7 +4578,9 @@ class TrainingGround {
         const groups = TrainingGround.ENEMY_AFFIX_OPTIONS.map(g => {
             const chips = g.items.map(it => {
                 const on = cfg.affixes.includes(it.id);
-                return `<button class="train-affix-chip ${on ? 'on' : ''}" onclick="game.trainingGround.toggleEnemyAffix('${it.id}')">${it.name}</button>`;
+                const iconSrc = getEnemyAffixIconSrc(it.id);
+                const iconHtml = iconSrc ? `<img class="train-affix-chip-icon" src="${iconSrc}" alt="">` : '';
+                return `<button class="train-affix-chip ${on ? 'on' : ''}" onclick="game.trainingGround.toggleEnemyAffix('${it.id}')">${iconHtml}<span>${it.name}</span></button>`;
             }).join('');
             return `<div class="train-affix-group-label">${g.label}</div><div class="flex flex-wrap gap-1 mb-1">${chips}</div>`;
         }).join('');
@@ -4406,6 +4613,211 @@ class TrainingGround {
                 ${groups}
             </div>
         `;
+    }
+
+    getSkillTestMaxSP() {
+        const configured = Number(CONFIG.gameplay?.maxSkillPoints ?? 3);
+        return Math.max(0, Number.isFinite(configured) ? configured : 3);
+    }
+
+    getSelectedSkill() {
+        const skills = SKILL_DB || [];
+        return skills.find(sk => sk.id === this.selectedSkillId) || skills.find(sk => sk.source === 'base') || skills[0] || null;
+    }
+
+    _getSkillSourceLabel(source) {
+        return {
+            base: '基础',
+            runeword: '词条',
+            relic: '遗物',
+            shop: '商店'
+        }[source] || '技能';
+    }
+
+    renderSkillControls() {
+        const container = document.getElementById('train-skill-controls');
+        if (!container) return;
+        const skills = SKILL_DB || [];
+        const selected = this.getSelectedSkill();
+        if (selected && selected.id !== this.selectedSkillId) this.selectedSkillId = selected.id;
+        const maxSP = this.getSkillTestMaxSP();
+        const currentSP = Math.max(0, Math.min(maxSP, Number(this.game.skillPoints) || 0));
+        const esc = (value) => String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+
+        const cards = skills.map(sk => {
+            const active = selected && sk.id === selected.id;
+            const color = sk.color || '#a78bfa';
+            return `
+                <button class="train-skill-card ${active ? 'active' : ''}" style="--skill-color:${esc(color)}" onclick="game.trainingGround.selectSkill('${esc(sk.id)}')">
+                    <span class="train-skill-icon" style="color:${esc(color)}">${esc(sk.icon || '✦')}</span>
+                    <span class="train-skill-main">
+                        <span class="train-skill-head">
+                            <span class="train-skill-name">${esc(sk.name)}</span>
+                            <span class="train-skill-cost">${Number(sk.cost) || 0} SP</span>
+                        </span>
+                        <span class="train-skill-desc">${esc(sk.desc || '')}</span>
+                        <span class="train-skill-source">${this._getSkillSourceLabel(sk.source)}</span>
+                    </span>
+                </button>
+            `;
+        }).join('');
+        const currentSkillLine = selected
+            ? `${esc(selected.icon || '✦')} ${esc(selected.name)} · ${Number(selected.cost) || 0} SP · ${esc(this._getSkillSourceLabel(selected.source))}`
+            : '无可用技能';
+        const currentSkillDesc = selected ? `<br>${esc(selected.desc || '')}` : '';
+
+        container.innerHTML = `
+            <div class="train-skill-toolbar">
+                <div class="train-skill-sp">
+                    <span>SP</span>
+                    <span class="train-skill-sp-pill">${currentSP}/${maxSP}</span>
+                </div>
+                <div class="train-skill-actions">
+                    <button class="train-skill-action secondary" onclick="game.trainingGround.adjustSkillPoints(-1)">-1 SP</button>
+                    <button class="train-skill-action secondary" onclick="game.trainingGround.adjustSkillPoints(1)">+1 SP</button>
+                    <button class="train-skill-action secondary" onclick="game.trainingGround.refillSkillPoints()">补满 SP</button>
+                    <button class="train-skill-action primary" onclick="game.trainingGround.activateSkillForTest()">释放当前</button>
+                </div>
+            </div>
+            <div class="train-skill-grid">${cards}</div>
+            <div class="train-skill-current">
+                当前：${currentSkillLine}
+                ${currentSkillDesc}
+            </div>
+        `;
+    }
+
+    selectSkill(skillId) {
+        const skill = (SKILL_DB || []).find(sk => sk.id === skillId);
+        if (!skill) return;
+        this.selectedSkillId = skill.id;
+        this._syncSkillTestLoadout(skill.id);
+        this.renderSkillControls();
+    }
+
+    setSkillPoints(rawVal) {
+        const maxSP = this.getSkillTestMaxSP();
+        let value = Math.round(Number(rawVal));
+        if (!Number.isFinite(value)) value = 0;
+        this.game.skillPoints = Math.max(0, Math.min(maxSP, value));
+        this.game.ui?.updateSkillPoints?.(this.game.skillPoints);
+        this.game.ui?.updateSkillBar?.(this.game.skillPoints, this.game.activeSkills || []);
+        this.renderSkillControls();
+    }
+
+    adjustSkillPoints(delta) {
+        this.setSkillPoints((this.game.skillPoints || 0) + delta);
+    }
+
+    refillSkillPoints() {
+        this.setSkillPoints(this.getSkillTestMaxSP());
+    }
+
+    _syncSkillTestLoadout(skillId = this.selectedSkillId, opts = {}) {
+        const skill = (SKILL_DB || []).find(sk => sk.id === skillId) || this.getSelectedSkill();
+        if (!skill) return null;
+        const maxSP = this.getSkillTestMaxSP();
+        this.selectedSkillId = skill.id;
+        this.game.unlockedSkills = (SKILL_DB || []).slice();
+        this.game.equippedSkillIds = [skill.id];
+        this.game.activeSkills = [skill];
+        if (opts.ensureSp && (this.game.skillPoints || 0) < skill.cost) {
+            this.game.skillPoints = Math.min(maxSP, Math.max(0, Number(skill.cost) || 0));
+        }
+        this.game.ui?.updateSkillPoints?.(this.game.skillPoints || 0);
+        this.game.ui?.updateSkillBar?.(this.game.skillPoints || 0, this.game.activeSkills);
+        return skill;
+    }
+
+    _prepareSkillTestAmmo() {
+        if (!Array.isArray(this.game.ammoQueue) || this.game.ammoQueue.length === 0) {
+            this.game.ammoQueue = [{ ...this.bulletConfig }];
+        }
+        if (typeof this.game.ui_updateAmmoUI === 'function') this.game.ui_updateAmmoUI();
+    }
+
+    activateSkillForTest(skillId = this.selectedSkillId) {
+        const skill = this._syncSkillTestLoadout(skillId, { ensureSp: true });
+        if (!skill || typeof this.game.combat_activateSkill !== 'function') return false;
+        if (!Array.isArray(this.game.enemies) || this.game.enemies.filter(e => e.active).length === 0) {
+            setupSkillTrainingTargets(this.game);
+        }
+        this._prepareSkillTestAmmo();
+
+        const prevPhase = this.game.phase;
+        const prevCurrentPhase = this.game.currentPhase;
+        const prevEnemyTurn = this.game.isEnemyTurn;
+        this.game.phase = 'combat';
+        this.game.currentPhase = 'combat';
+        this.game.isEnemyTurn = false;
+        if (this.stats.startTime === 0) this.stats.startTime = Date.now();
+
+        try {
+            this.game.combat_activateSkill(skill);
+        } catch (e) {
+            console.warn('[TrainingGround] activateSkillForTest error:', e);
+            return false;
+        } finally {
+            this.game.phase = prevPhase;
+            this.game.currentPhase = prevCurrentPhase;
+            this.game.isEnemyTurn = prevEnemyTurn;
+            this.game.ui?.updateSkillBar?.(this.game.skillPoints || 0, this.game.activeSkills || []);
+            const sharedSkillBar = document.getElementById('skill-bar');
+            if (sharedSkillBar && this.active) sharedSkillBar.style.display = 'none';
+            this.renderSkillControls();
+        }
+        return true;
+    }
+
+    _captureSkillSandboxState() {
+        if (this._savedSkillSandboxState) return;
+        const game = this.game;
+        this._savedSkillSandboxState = {
+            skillPoints: game.skillPoints || 0,
+            activeSkills: Array.isArray(game.activeSkills) ? game.activeSkills.slice() : [],
+            unlockedSkills: Array.isArray(game.unlockedSkills) ? game.unlockedSkills.slice() : [],
+            equippedSkillIds: Array.isArray(game.equippedSkillIds) ? game.equippedSkillIds.slice() : [],
+            seenSkillIds: game._seenSkillIds instanceof Set ? new Set(game._seenSkillIds) : null,
+            ammoQueue: Array.isArray(game.ammoQueue) ? game.ammoQueue.map(item => ({ ...item })) : [],
+            activeRunewordEffects: { ...(game.activeRunewordEffects || {}) },
+            activeRunewordStats: { ...(game.activeRunewordStats || {}) },
+            activeElementResonances: { ...(game.activeElementResonances || {}) },
+            skillChargeActualValue: game.skillChargeActualValue || 0,
+            skillChargeTempValue: game.skillChargeTempValue || 0,
+            skillChargeLevel: game.skillChargeLevel || 0,
+            round: game.round,
+            playerShield: game.playerShield,
+            runFragments: game.runFragments
+        };
+    }
+
+    _restoreSkillSandboxState() {
+        const saved = this._savedSkillSandboxState;
+        if (!saved) return;
+        const game = this.game;
+        game.skillPoints = saved.skillPoints;
+        game.activeSkills = saved.activeSkills;
+        game.unlockedSkills = saved.unlockedSkills;
+        game.equippedSkillIds = saved.equippedSkillIds;
+        game._seenSkillIds = saved.seenSkillIds;
+        game.ammoQueue = saved.ammoQueue;
+        game.activeRunewordEffects = saved.activeRunewordEffects;
+        game.activeRunewordStats = saved.activeRunewordStats;
+        game.activeElementResonances = saved.activeElementResonances;
+        game.skillChargeActualValue = saved.skillChargeActualValue;
+        game.skillChargeTempValue = saved.skillChargeTempValue;
+        game.skillChargeLevel = saved.skillChargeLevel;
+        game.round = saved.round;
+        game.playerShield = saved.playerShield;
+        game.runFragments = saved.runFragments;
+        game.ui?.updateSkillPoints?.(game.skillPoints || 0);
+        game.ui?.updateSkillBar?.(game.skillPoints || 0, game.activeSkills || []);
+        this._savedSkillSandboxState = null;
     }
 
     // 切换基座：自动套用该基座的推荐血量与专属词条（仍可手动微调）
@@ -4564,8 +4976,10 @@ class TrainingGround {
                 <button onclick="game.trainingGround.switchCategory('enemy')" id="scat-btn-enemy" class="train-scat-btn active">敵人</button>
                 <button onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
                 <button onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
+                <button onclick="game.trainingGround.switchCategory('skill')" id="scat-btn-skill" class="train-scat-btn">技能</button>
                 <button onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
                 <button onclick="game.trainingGround.switchCategory('resonance')" id="scat-btn-resonance" class="train-scat-btn" title="屬性共鳴 1/2/3 階驗證">共鳴</button>
+                <button onclick="game.trainingGround.switchCategory('relic')" id="scat-btn-relic" class="train-scat-btn">遺物</button>
                 <button onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
                 <button onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敵人 V2 美術驗收場景">驗收</button>
             </div>
@@ -4696,6 +5110,12 @@ class TrainingGround {
             this.updateBulletPreview();
         }
 
+        if (scenario.categoryId === 'skill') {
+            if (scenario.skillId) this.selectedSkillId = scenario.skillId;
+            this._syncSkillTestLoadout(this.selectedSkillId, { ensureSp: true });
+            this.setSkillPoints(this.getSkillTestMaxSP());
+        }
+
         // 2. 执行初始敌人布置
         if (scenario.setup) {
             try {
@@ -4816,6 +5236,7 @@ class TrainingGround {
         this.stats.totalDamage = 0;
         this.stats.startTime = 0;
         this.stats.dps = 0;
+        this.renderSkillControls();
     }
 
     /**
@@ -5031,6 +5452,7 @@ class TrainingGround {
 
     enter() {
         this.active = true;
+        this._captureSkillSandboxState();
         this.game.hasCombatWall = true; 
         this.game.phase_switchPhase('training');
         // 试炼场顶部栏高度为 40px（h-10），重新计算 combatGridTopY
@@ -5075,6 +5497,9 @@ class TrainingGround {
         }
         // [修复] 进入试炼场时，同步初始连射倍率（默认为 1）
         eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total: 1 + (this.bulletConfig.multicast || 0), bonusAmount: 0 });
+        this.renderSkillControls();
+        const sharedSkillBar = document.getElementById('skill-bar');
+        if (sharedSkillBar) sharedSkillBar.style.display = 'none';
     }
 
     exit() {
@@ -5085,6 +5510,7 @@ class TrainingGround {
         document.getElementById('phase-training').style.display = 'none';
         document.getElementById('phase-training').classList.remove('active-phase');
         document.getElementById('phase-training').classList.add('hidden-phase');
+        this._restoreSkillSandboxState();
         this.game.phase_switchPhase('meta');
     }
 

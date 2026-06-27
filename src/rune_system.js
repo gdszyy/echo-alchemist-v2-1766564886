@@ -18,9 +18,34 @@
  * - 新增 rune_merge(runeObjects, runeInventory)：三同ID同等级符文合成为高一等级符文
  * - 新增 rune_reforge(runeObjects, runeInventory, game)：任意三符文重铸为新符文
  * - 新增 _removeRuneFromInventory 辅助函数
+ *
+ * 变更记录 (Spell Form V1: 符文组合法术化)：
+ * - 3 符文词条默认按“核心轴线法阵”解析：pattern[1] 必须嵌套在 3x3 中心，
+ *   pattern[0]/pattern[2] 作为外环试剂放在同一条穿心轴线两端（端点可反向）。
+ * - 个别特殊词条可设置 spellFormula.shape = 'loose_line' 回退旧版同一路径无序匹配。
  */
 
 import { loot_calcRuneDrop } from './loot_system.js';
+
+const CENTER_CELL_INDEX = 4;
+
+const LEGACY_LINE_PATHS = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6],
+];
+
+const CORE_AXIS_PATHS = [
+    [3, 4, 5],
+    [1, 4, 7],
+    [0, 4, 8],
+    [2, 4, 6],
+];
 
 /**
  * getRuneId - 从网格条目中提取符文 ID（向后兼容辅助函数）
@@ -49,7 +74,7 @@ function getRuneId(entry) {
  *     0 | 1 | 2
  *     3 | 4 | 5
  *     6 | 7 | 8
- * @param {Array<Object>} runewordDb - 词条数据库，每个词条含 id, name, pattern[], stats{}
+ * @param {Array<Object>} runewordDb - 词条数据库，每个词条含 id, name, pattern[], stats{}, spellFormula{}
  * @returns {{ activeStats: Object, activatedRunewords: Array<Object>, activatedCells: Set<number> }}
  *   - activeStats: 所有激活词条的 stats 合并对象，如 { pyro: 3, bounce: 1 }
  *   - activatedRunewords: 激活的词条对象数组
@@ -58,28 +83,6 @@ function getRuneId(entry) {
 function parseRuneGrid(grid, runewordDb) {
     // 将网格条目统一转换为符文 ID 数组（兼容新旧格式）
     const idGrid = grid.map(entry => getRuneId(entry));
-
-    // 定义 3x3 网格的所有路径（行、列、对角线）
-    // 每条路径是格子索引的数组
-    const PATHS = [
-        // 3 行
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
-        // 3 列
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
-        // 2 条对角线
-        [0, 4, 8], // 主对角线（左上到右下）
-        [2, 4, 6], // 副对角线（右上到左下）
-    ];
-
-    // 提取每条路径上的符文 id 序列（过滤 null）
-    const pathSequences = PATHS.map(path => ({
-        indices: path,
-        runes: path.map(i => idGrid[i]).filter(r => r !== null && r !== undefined),
-    }));
 
     const activatedRunewords = [];
     const activatedCells = new Set();
@@ -90,19 +93,12 @@ function parseRuneGrid(grid, runewordDb) {
         const pattern = runeword.pattern;
         if (!pattern || pattern.length === 0) continue;
 
-        let matchCount = 0;
         let localMatchedCells = new Set();
+        const matches = findRunewordSpellMatches(runeword, idGrid);
+        const matchCount = matches.length;
 
-        // 检查每条路径
-        for (const { indices, runes } of pathSequences) {
-            if (runes.length < pattern.length) continue;
-
-            // 在路径的符文序列中查找正向或反向匹配
-            const matched = findPatternInSequence(runes, pattern, indices, idGrid);
-            if (matched) {
-                matchCount++;
-                matched.forEach(idx => localMatchedCells.add(idx));
-            }
+        for (const matched of matches) {
+            matched.forEach(idx => localMatchedCells.add(idx));
         }
 
         if (matchCount > 0) {
@@ -190,15 +186,92 @@ function calcRuneBaseStats(runeGrid, runeDb) {
 }
 
 /**
- * findPatternInSequence - 在路径的符文序列中查找 pattern（正向或反向）
+ * findRunewordSpellMatches - 按词条法阵公式查找所有匹配轴线
  *
- * @param {string[]} runes - 路径上过滤后的符文 id 数组
+ * 默认法阵为“核心轴线法阵”：pattern[1] 是核心符文，必须落在 3x3 中央；
+ * pattern[0] / pattern[2] 是外环试剂，必须放在任意穿过中央的轴线两端。
+ * 这让符文组合从“凑材料”更接近“试剂 + 核心 + 试剂”的施法合成。
+ *
+ * 特殊词条可通过 spellFormula.shape = 'loose_line' 使用旧版全路径无序匹配。
+ *
+ * @param {Object} runeword - RUNEWORD_DB 中的词条定义
+ * @param {Array<string|null>} idGrid - 完整 9 格符文 ID 网格
+ * @returns {number[][]} 匹配到的格子索引数组列表
+ */
+function findRunewordSpellMatches(runeword, idGrid) {
+    const pattern = runeword.pattern || [];
+    const formula = runeword.spellFormula || {};
+    if (formula.shape === 'loose_line' || pattern.length !== 3) {
+        return findLooseLineMatches(pattern, idGrid);
+    }
+    return findCoreAxisMatches(pattern, idGrid, formula);
+}
+
+/**
+ * findCoreAxisMatches - 查找核心嵌套在中央的三符文轴线法阵
+ *
+ * @param {string[]} pattern - 词条 pattern 数组
+ * @param {Array<string|null>} idGrid - 完整 9 格符文 ID 网格
+ * @param {Object} formula - 可选法阵公式配置
+ * @returns {number[][]}
+ */
+function findCoreAxisMatches(pattern, idGrid, formula = {}) {
+    const centerSlot = Number.isInteger(formula.centerSlot) ? formula.centerSlot : 1;
+    const centerRune = pattern[centerSlot];
+    const outerPattern = pattern.filter((_, idx) => idx !== centerSlot);
+    const endpointOrder = formula.endpointOrder || 'flex';
+    const matches = [];
+
+    if (!centerRune || idGrid[CENTER_CELL_INDEX] !== centerRune) {
+        return matches;
+    }
+
+    for (const indices of CORE_AXIS_PATHS) {
+        const centerIndexInPath = indices.indexOf(CENTER_CELL_INDEX);
+        if (centerIndexInPath === -1) continue;
+        if (idGrid[indices[centerIndexInPath]] !== centerRune) continue;
+
+        const endpointIndices = indices.filter(idx => idx !== CENTER_CELL_INDEX);
+        const endpointRunes = endpointIndices.map(idx => idGrid[idx]);
+        if (endpointRunes.some(r => r === null || r === undefined)) continue;
+
+        const endpointsMatch = endpointOrder === 'fixed'
+            ? endpointRunes.every((rune, idx) => rune === outerPattern[idx])
+            : sequenceMatchesPatternUnordered(endpointRunes, outerPattern);
+
+        if (endpointsMatch) {
+            matches.push(indices);
+        }
+    }
+
+    return matches;
+}
+
+/**
+ * findLooseLineMatches - 旧版同一路径无序匹配回退
+ *
+ * @param {string[]} pattern - 词条 pattern 数组
+ * @param {Array<string|null>} idGrid - 完整 9 格符文 ID 网格
+ * @returns {number[][]}
+ */
+function findLooseLineMatches(pattern, idGrid) {
+    const matches = [];
+    for (const indices of LEGACY_LINE_PATHS) {
+        const matched = findPatternInSequence(pattern, indices, idGrid);
+        if (matched) matches.push(matched);
+    }
+    return matches;
+}
+
+/**
+ * findPatternInSequence - 在路径的符文序列中查找 pattern（旧版无序）
+ *
  * @param {string[]} pattern - 词条 pattern 数组
  * @param {number[]} indices - 路径的格子索引数组（与 grid 对应）
  * @param {Array<string|null>} idGrid - 完整的 9 格符文 ID 网格（已统一为字符串格式）
  * @returns {number[]|null} 若匹配成功，返回参与匹配的格子索引数组；否则返回 null
  */
-function findPatternInSequence(runes, pattern, indices, idGrid) {
+function findPatternInSequence(pattern, indices, idGrid) {
     const patternLen = pattern.length;
 
     // 策略：在 indices 数组中，找到一个子序列（连续索引），

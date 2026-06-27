@@ -1,6 +1,6 @@
 # src\systems.js 函数索引
 
-> 自动生成于 2026-06-24 | 总行数: 5282 | 函数数: 72 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 6209 | 函数数: 87 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -12,6 +12,7 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | buildV2BestiaryEntries | function | `buildV2BestiaryEntries()` |  |
+| buildSkillCodexEntries | function | `buildSkillCodexEntries()` |  |
 | setupTruthBookBossDemo | function | `setupTruthBookBossDemo(game, bossId, isBigBoss = false)` |  |
 | normalizeTruthBookEntry | function | `normalizeTruthBookEntry(entry, categoryId)` |  |
 | buildTruthBookEntries | function | `buildTruthBookEntries()` |  |
@@ -30,6 +31,7 @@
 | clearOuroborosOrbitEchoes | function | `clearOuroborosOrbitEchoes(game)` |  |
 | setupOuroborosAttachmentSlotAcceptance | function | `setupOuroborosAttachmentSlotAcceptance(game, slotIndex = 0)` |  |
 | advanceOuroborosAttachmentSlotAcceptance | function | `advanceOuroborosAttachmentSlotAcceptance(game)` |  |
+| setupSkillTrainingTargets | function | `setupSkillTrainingTargets(game)` |  |
 | buildV2MatrixScenarios | function | `buildV2MatrixScenarios()` |  |
 | buildEnemyV2Scenarios | function | `buildEnemyV2Scenarios()` | ⚠️ 巨型函数，见 @section 导航 |
 | constructor | method | `constructor(game)` |  |
@@ -39,6 +41,19 @@
 | adjustBullet | method | `adjustBullet(key, delta)` |  |
 | renderAttributeControls | method | `renderAttributeControls()` |  |
 | renderEnemyControls | method | `renderEnemyControls()` |  |
+| getSkillTestMaxSP | method | `getSkillTestMaxSP()` |  |
+| getSelectedSkill | method | `getSelectedSkill()` |  |
+| _getSkillSourceLabel | method | `_getSkillSourceLabel(source)` |  |
+| renderSkillControls | method | `renderSkillControls()` |  |
+| selectSkill | method | `selectSkill(skillId)` |  |
+| setSkillPoints | method | `setSkillPoints(rawVal)` |  |
+| adjustSkillPoints | method | `adjustSkillPoints(delta)` |  |
+| refillSkillPoints | method | `refillSkillPoints()` |  |
+| _syncSkillTestLoadout | method | `_syncSkillTestLoadout(skillId = this.selectedSkillId, opts = {})` |  |
+| _prepareSkillTestAmmo | method | `_prepareSkillTestAmmo()` |  |
+| activateSkillForTest | method | `activateSkillForTest(skillId = this.selectedSkillId)` |  |
+| _captureSkillSandboxState | method | `_captureSkillSandboxState()` |  |
+| _restoreSkillSandboxState | method | `_restoreSkillSandboxState()` |  |
 | setEnemyBase | method | `setEnemyBase(id)` |  |
 | setEnemyHp | method | `setEnemyHp(rawVal)` |  |
 | adjustEnemyHp | method | `adjustEnemyHp(delta)` |  |

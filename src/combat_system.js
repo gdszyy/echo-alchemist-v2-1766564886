@@ -1,5 +1,5 @@
 import { 
-    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB 
+    META_SHOP_CONFIG, ATTRIBUTES_FOR_SHOP, setDeepValue, CONFIG, RELIC_DB, SKILL_DB, POTION_SPELL_DB
 } from './config.js';
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
@@ -7,6 +7,7 @@ import {
     Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, showToast, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
     ElectrocuteEffect, VenomEffect, WindMarkEffect,
+    BounceArcEffect, ScatterBurstEffect, EchoRippleEffect,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba, RuneLoot
 } from './entities.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -35,6 +36,936 @@ export const combat_system = {
         this.spawn_createFloatingText(x, y, text, color);
     },
 
+    combat_spreadVenomStacks(sourceEnemy, targets, totalStacks) {
+        const stacksToSpread = Math.max(0, Math.floor(totalStacks || 0));
+        const validTargets = (targets || []).filter(target =>
+            target &&
+            target !== sourceEnemy &&
+            target.active &&
+            typeof target.applyVenom === 'function'
+        );
+        if (stacksToSpread <= 0 || validTargets.length <= 0) return 0;
+
+        const baseStacks = Math.floor(stacksToSpread / validTargets.length);
+        let remainder = stacksToSpread % validTargets.length;
+        let applied = 0;
+
+        validTargets.forEach(target => {
+            const stacks = baseStacks + (remainder > 0 ? 1 : 0);
+            if (remainder > 0) remainder -= 1;
+            if (stacks <= 0) return;
+
+            target.applyVenom(stacks);
+            applied += stacks;
+            if (typeof this.spawn_createFloatingText === 'function') {
+                this.spawn_createFloatingText(target.pos.x, target.pos.y - 32, `☠️+${stacks}`, '#86efac', 11);
+            }
+        });
+
+        return applied;
+    },
+
+    // @perf-impact: 药剂法术释放反馈 - 复用既有粒子、飞剑、闪电与冲击波入口，受 CONFIG.performance 现有预算限制。
+    combat_activatePotionSpell() {
+        if (this.phase !== 'combat' || this.isEnemyTurn) return;
+        const unlocked = !!(this.potionAlchemyUnlocked || (this.ownedRelics || []).includes('relic_sage_apothecary'));
+        if (!unlocked) return;
+
+        const prepared = this.preparedPotionSpell;
+        if (!prepared || (prepared.charges || 0) <= 0) {
+            showToast('药剂槽为空。');
+            return;
+        }
+
+        const potionDef = (POTION_SPELL_DB || []).find(p => p.id === prepared.potionId);
+        if (!potionDef) {
+            showToast('未知药剂，无法释放。');
+            return;
+        }
+
+        const applied = this.combat_applyPotionSpell(potionDef, prepared);
+        if (!applied) return;
+
+        prepared.charges = Math.max(0, (Number(prepared.charges) || 0) - 1);
+        if (!Array.isArray(this.knownPotionSpellIds)) this.knownPotionSpellIds = [];
+        if (!this.knownPotionSpellIds.includes(potionDef.id)) this.knownPotionSpellIds.push(potionDef.id);
+
+        this.ui?.updateSkillBar?.(this.skillPoints || 0, this.activeSkills || []);
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+    },
+
+    combat_getPotionVfxProfile(potionDef) {
+        const raw = potionDef?.vfxProfile || {};
+        return {
+            spellType: potionDef?.spellType || 'burst',
+            formId: potionDef?.formId || 'bottle',
+            nestingMode: potionDef?.nestingMode || 'shatter',
+            slotType: potionDef?.slotType || raw.slotType || null,
+            targetMode: raw.targetMode || 'cluster_center',
+            shatterStyle: raw.shatterStyle || 'blast',
+            trailMode: raw.trailMode || raw.burstMode || 'spark',
+            burstMode: raw.burstMode || raw.trailMode || 'spark',
+            label: raw.label || potionDef?.name || '药剂碎裂',
+            radius: Number.isFinite(raw.radius) ? raw.radius : 92,
+        };
+    },
+
+    combat_resolvePotionVfxPoint(targets = [], opts = {}) {
+        if (opts.point && Number.isFinite(opts.point.x) && Number.isFinite(opts.point.y)) {
+            return { x: opts.point.x, y: opts.point.y };
+        }
+
+        const targetMode = opts.targetMode || 'cluster_center';
+        if (targetMode === 'ammo_socket') {
+            return { x: this.width / 2, y: Math.max(80, this.height - 82) };
+        }
+
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(e => e && e.pos);
+        if (list.length <= 0) {
+            return { x: this.width / 2, y: Math.max(90, this.height * 0.32) };
+        }
+
+        if (targetMode === 'primary_enemy' || targetMode === 'selected_targets') {
+            return { x: list[0].pos.x, y: list[0].pos.y };
+        }
+
+        const sum = list.reduce((acc, e) => {
+            acc.x += e.pos.x;
+            acc.y += e.pos.y;
+            return acc;
+        }, { x: 0, y: 0 });
+        return { x: sum.x / list.length, y: sum.y / list.length };
+    },
+
+    combat_getPotionVfxBudget(targetMode = 'cluster_center') {
+        const quality = this.perfQualityLevel || 'high';
+        const isLow = quality === 'low';
+        const isMid = quality === 'medium';
+        const isAmmo = targetMode === 'ammo_socket';
+        return {
+            quality,
+            isLow,
+            isMid,
+            trailCount: isAmmo ? (isLow ? 2 : (isMid ? 3 : 4)) : (isLow ? 3 : (isMid ? 5 : 7)),
+            radialCount: isLow ? 5 : (isMid ? 8 : 12),
+            accentCount: isLow ? 2 : (isMid ? 4 : 6),
+            targetLimit: isLow ? 3 : (isMid ? 5 : 8),
+            boltCount: isLow ? 0 : (isMid ? 1 : 2),
+        };
+    },
+
+    combat_spawnPotionVfxParticle(x, y, color, mode = 'spark', opts = {}) {
+        const p = this.spawn_createParticle?.(x, y, color, mode);
+        if (!p) return null;
+
+        if (p.vel) {
+            if (Number.isFinite(opts.vx) || Number.isFinite(opts.vy)) {
+                p.vel.x = Number.isFinite(opts.vx) ? opts.vx : 0;
+                p.vel.y = Number.isFinite(opts.vy) ? opts.vy : 0;
+            } else if (Number.isFinite(opts.angle) || Number.isFinite(opts.speed)) {
+                const angle = Number.isFinite(opts.angle) ? opts.angle : Math.random() * Math.PI * 2;
+                const speed = Number.isFinite(opts.speed) ? opts.speed : 1;
+                p.vel.x = Math.cos(angle) * speed;
+                p.vel.y = Math.sin(angle) * speed;
+            }
+        }
+
+        if (Number.isFinite(opts.sizeMult)) p.size *= opts.sizeMult;
+        if (Number.isFinite(opts.life)) p.life = opts.life;
+        if (Number.isFinite(opts.decay)) p.decay = opts.decay;
+        if (Number.isFinite(opts.gravity)) p.gravity = opts.gravity;
+        if (Number.isFinite(opts.drag)) p.drag = opts.drag;
+        if (opts.scale) p.scale = opts.scale;
+        return p;
+    },
+
+    combat_emitPotionRadialParticles(point, color, mode, count, opts = {}) {
+        const total = Math.max(0, Math.floor(count || 0));
+        if (total <= 0) return;
+
+        const spawnRadius = Math.max(0, Number(opts.spawnRadius) || 0);
+        const speed = Math.max(0, Number(opts.speed) || 1.5);
+        const jitter = Number.isFinite(opts.jitter) ? opts.jitter : 0.28;
+        const startAngle = Number.isFinite(opts.startAngle) ? opts.startAngle : Math.random() * Math.PI * 2;
+
+        for (let i = 0; i < total; i++) {
+            const angle = startAngle + (i / total) * Math.PI * 2 + (Math.random() - 0.5) * jitter;
+            const x = point.x + Math.cos(angle) * spawnRadius;
+            const y = point.y + Math.sin(angle) * spawnRadius;
+            const dir = opts.inward ? angle + Math.PI : angle;
+            this.combat_spawnPotionVfxParticle(x, y, color, mode, {
+                angle: dir,
+                speed: speed * (0.75 + Math.random() * 0.5),
+                sizeMult: opts.sizeMult ?? (0.8 + Math.random() * 0.45),
+                life: opts.life,
+                decay: opts.decay,
+                gravity: opts.gravity,
+                drag: opts.drag,
+                scale: opts.scale,
+            });
+        }
+    },
+
+    combat_emitPotionArcingTrail(profile, origin, point, color, targetMode) {
+        const budget = this.combat_getPotionVfxBudget(targetMode);
+        const styleLift = profile.spellType === 'construct' ? 0.24 : (profile.spellType === 'status' ? 0.42 : 0.34);
+        const arcLift = Math.min(140, Math.max(34, Math.abs(origin.y - point.y) * styleLift));
+        const sideDrift = profile.shatterStyle === 'collapse_ring' ? -18 : (profile.shatterStyle === 'mark' ? 12 : 0);
+
+        for (let i = 0; i < budget.trailCount; i++) {
+            const t = (i + 1) / (budget.trailCount + 1);
+            const cx = (origin.x + point.x) / 2 + sideDrift * Math.sin(t * Math.PI);
+            const cy = Math.min(origin.y, point.y) - arcLift;
+            const x = (1 - t) * (1 - t) * origin.x + 2 * (1 - t) * t * cx + t * t * point.x;
+            const y = (1 - t) * (1 - t) * origin.y + 2 * (1 - t) * t * cy + t * t * point.y;
+            const dx = point.x - origin.x;
+            const dy = point.y - origin.y;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            this.combat_spawnPotionVfxParticle(x, y, color, profile.trailMode, {
+                vx: (dx / len) * (0.55 + t * 0.65) + (Math.random() - 0.5) * 0.35,
+                vy: (dy / len) * (0.55 + t * 0.65) - 0.45 + (Math.random() - 0.5) * 0.25,
+                sizeMult: 0.7 + t * 0.55,
+                drag: profile.spellType === 'status' ? 0.94 : undefined,
+            });
+        }
+    },
+
+    combat_emitPotionTargetAccents(profile, targets, color, targetMode) {
+        if (targetMode === 'ammo_socket') return;
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(e => e && e.active && e.pos);
+        if (list.length <= 0) return;
+
+        const budget = this.combat_getPotionVfxBudget(targetMode);
+        const seen = new Set();
+        const limited = [];
+        for (const target of list) {
+            if (seen.has(target)) continue;
+            seen.add(target);
+            limited.push(target);
+            if (limited.length >= budget.targetLimit) break;
+        }
+
+        const mode = profile.shatterStyle === 'mist_bloom' ? profile.burstMode : profile.trailMode;
+        const perTarget = profile.spellType === 'status' && !budget.isLow ? 2 : 1;
+        limited.forEach((target, index) => {
+            for (let i = 0; i < perTarget; i++) {
+                const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.8 + index * 0.08;
+                this.combat_spawnPotionVfxParticle(
+                    target.pos.x + (Math.random() - 0.5) * Math.max(10, target.width || 24) * 0.45,
+                    target.pos.y + (Math.random() - 0.5) * Math.max(10, target.height || 24) * 0.38,
+                    color,
+                    mode,
+                    {
+                        angle,
+                        speed: profile.spellType === 'status' ? 1.0 : 2.2,
+                        sizeMult: profile.spellType === 'construct' ? 0.85 : 1.05,
+                        gravity: profile.spellType === 'status' ? -0.02 : undefined,
+                    }
+                );
+            }
+        });
+    },
+
+    combat_emitPotionShortBolts(point, count, radius = 46) {
+        if (!this.lightningBolts) this.lightningBolts = [];
+        const budget = CONFIG.performance[this.perfQualityLevel || 'high'] || CONFIG.performance.high;
+        const total = Math.max(0, Math.floor(count || 0));
+
+        for (let i = 0; i < total; i++) {
+            if (this.lightningBolts.length >= budget.lightningLimit) return;
+            const angle = -Math.PI / 2 + (i - (total - 1) / 2) * 0.72 + (Math.random() - 0.5) * 0.25;
+            const inner = Math.max(14, radius * 0.25);
+            const outer = Math.max(28, radius);
+            this.lightningBolts.push(new LightningBolt(
+                point.x + Math.cos(angle) * inner,
+                point.y + Math.sin(angle) * inner,
+                point.x + Math.cos(angle) * outer,
+                point.y + Math.sin(angle) * outer
+            ));
+        }
+    },
+
+    combat_playPotionShatterVFX(profile, targets, ctx) {
+        const { point, origin, color, radius, intensity, targetMode } = ctx;
+        const budget = this.combat_getPotionVfxBudget(targetMode);
+        const dx = point.x - origin.x;
+        const dy = point.y - origin.y;
+        const len = Math.max(1, Math.hypot(dx, dy));
+        const impactDirection = { x: dx / len, y: dy / len };
+        const explosion = (extra = {}) => {
+            if (typeof this.spawn_createProjectileExplosion !== 'function') return false;
+            this.spawn_createProjectileExplosion(point.x, point.y, {
+                waveColor: color,
+                particleColor: color,
+                particleMode: profile.burstMode,
+            }, {
+                radius,
+                intensity,
+                impactDirection,
+                ...extra,
+            });
+            return true;
+        };
+
+        if (profile.shatterStyle === 'seal') {
+            this.spawn_createAssimilationPulse?.(point.x, point.y, color, {
+                isMutation: true,
+                isMirror: false,
+            });
+            this.combat_emitPotionRadialParticles(point, color, 'spark', budget.radialCount, {
+                spawnRadius: budget.isLow ? 10 : 16,
+                speed: 1.2,
+                sizeMult: 0.72,
+                gravity: -0.04,
+            });
+            if (!budget.isLow) {
+                this.combat_emitPotionRadialParticles(point, color, 'line', budget.isMid ? 3 : 5, {
+                    spawnRadius: 20,
+                    speed: 0.25,
+                    sizeMult: 0.8,
+                    life: 0.42,
+                    scale: { x: budget.isMid ? 16 : 22, y: 0.55 },
+                });
+            }
+            return;
+        }
+
+        if (profile.shatterStyle === 'mist_bloom') {
+            explosion({ intensity: intensity * 0.72 });
+            const mistMode = profile.burstMode === 'venom' ? 'venom' : 'mist';
+            this.combat_emitPotionRadialParticles(point, color, mistMode, budget.radialCount + (budget.isLow ? 0 : 3), {
+                spawnRadius: Math.max(14, radius * 0.18),
+                speed: profile.burstMode === 'venom' ? 0.9 : 1.2,
+                sizeMult: profile.burstMode === 'venom' ? 0.9 : 1.25,
+                gravity: profile.burstMode === 'venom' ? -0.05 : 0.0,
+                drag: 0.96,
+            });
+            return;
+        }
+
+        if (profile.shatterStyle === 'mark') {
+            this.spawn_createAssimilationWave?.(point.x, point.y, color, {
+                maxRadius: Math.max(46, radius * 0.72),
+                intensity: 0.78,
+                growthSpeed: 3.4,
+                fadeSpeed: 0.052,
+            });
+            this.combat_emitPotionRadialParticles(point, color, 'spark', budget.radialCount, {
+                spawnRadius: 8,
+                speed: 2.2,
+                sizeMult: 0.72,
+                gravity: 0.02,
+            });
+            this.combat_emitPotionShortBolts(point, budget.boltCount, radius * 0.72);
+            return;
+        }
+
+        if (profile.shatterStyle === 'shard_sigil') {
+            this.spawn_createAssimilationWave?.(point.x, point.y, color, {
+                maxRadius: Math.max(48, radius),
+                intensity: 0.72,
+                growthSpeed: 3.2,
+                fadeSpeed: 0.05,
+            });
+            this.combat_emitPotionRadialParticles(point, color, 'shard', budget.radialCount, {
+                spawnRadius: Math.max(18, radius * 0.28),
+                speed: 1.8,
+                sizeMult: 0.72,
+                gravity: 0.16,
+                drag: 0.92,
+            });
+            if (!budget.isLow) {
+                this.combat_emitPotionRadialParticles(point, color, 'line', budget.isMid ? 4 : 6, {
+                    spawnRadius: Math.max(24, radius * 0.34),
+                    speed: 0.18,
+                    life: 0.38,
+                    scale: { x: 18, y: 0.5 },
+                });
+            }
+            return;
+        }
+
+        if (profile.shatterStyle === 'collapse_ring') {
+            if (typeof this.spawn_createImpactWave === 'function') {
+                this.spawn_createImpactWave(point.x, point.y, color, {
+                    radius,
+                    maxRadius: Math.max(72, radius),
+                    damageRadius: radius,
+                    coverageRing: true,
+                    intensity: intensity * 0.85,
+                });
+            } else {
+                explosion({ intensity: intensity * 0.82 });
+            }
+            this.spawn_createAssimilationWave?.(point.x, point.y, color, {
+                maxRadius: Math.max(54, radius * 0.72),
+                intensity: 0.88,
+                growthSpeed: 4.2,
+                fadeSpeed: 0.06,
+            });
+            this.combat_emitPotionRadialParticles(point, color, 'mist', budget.radialCount, {
+                spawnRadius: Math.max(28, radius * 0.42),
+                speed: 2.1,
+                inward: true,
+                sizeMult: 1.05,
+                drag: 0.9,
+            });
+            this.combat_emitPotionRadialParticles(point, color, 'spark', Math.ceil(budget.accentCount * 0.8), {
+                spawnRadius: 10,
+                speed: 2.6,
+                gravity: 0.0,
+            });
+            return;
+        }
+
+        if (profile.shatterStyle === 'overload_blast') {
+            explosion({ intensity: intensity * 1.18, isOvercharge: true });
+            this.combat_emitPotionRadialParticles(point, color, 'ember', budget.radialCount, {
+                spawnRadius: 12,
+                speed: 2.4,
+                gravity: -0.08,
+                sizeMult: 1.1,
+            });
+            this.combat_emitPotionShortBolts(point, budget.boltCount + (budget.isLow ? 0 : 1), radius * 0.62);
+            return;
+        }
+
+        if (!explosion()) {
+            this.spawn_createShockwave?.(point.x, point.y, color);
+        }
+        if (!budget.isLow) {
+            this.combat_emitPotionRadialParticles(point, color, profile.burstMode, budget.accentCount, {
+                spawnRadius: 12,
+                speed: 1.8,
+                sizeMult: 0.9,
+            });
+        }
+    },
+
+    // @perf-impact: 药瓶碎裂法术表现 - 单次释放的短生命周期粒子/冲击波，按画质截断残影、命中点法术图案与短电弧数量，并复用 CONFIG.performance 现有预算。
+    combat_playPotionBottleVFX(potionDef, targets = [], opts = {}) {
+        const profile = this.combat_getPotionVfxProfile(potionDef);
+        const color = opts.color || potionDef?.color || '#f8fafc';
+        const targetMode = opts.targetMode || profile.targetMode;
+        const point = this.combat_resolvePotionVfxPoint(targets, { ...opts, targetMode });
+        const origin = opts.origin || { x: this.width / 2, y: Math.max(80, this.height - 82) };
+        const radius = Number.isFinite(opts.radius) ? opts.radius : profile.radius;
+        const intensity = Math.max(0.45, Math.min(1.7, opts.intensity || (profile.spellType === 'burst' ? 1.15 : 0.9)));
+
+        if (typeof this.spawn_createSkillIgnition === 'function') {
+            this.spawn_createSkillIgnition(origin.x, origin.y, color, {
+                skillTier: 'premium',
+                intensity: targetMode === 'ammo_socket' ? 0.62 : 0.72,
+                radius: targetMode === 'ammo_socket' ? 24 : 30,
+                withShockwave: false,
+            });
+        }
+
+        this.combat_emitPotionArcingTrail(profile, origin, point, color, targetMode);
+        this.combat_playPotionShatterVFX(profile, targets, { point, origin, color, radius, intensity, targetMode });
+        this.combat_emitPotionTargetAccents(profile, targets, color, targetMode);
+
+        if (typeof this.spawn_createFloatingText === 'function' && profile.label) {
+            this.spawn_createFloatingText(point.x, point.y - 34, profile.label, color, 12);
+        }
+        if (opts.shakeMs && typeof this.ui_triggerScreenShake === 'function') {
+            this.ui_triggerScreenShake(opts.shakeMs);
+        }
+
+        return point;
+    },
+
+    combat_buildSpellFormVfxContext(profile, spellDef, targets = [], opts = {}) {
+        const color = opts.color || spellDef?.color || '#f8fafc';
+        const targetMode = opts.targetMode || profile.targetMode || 'cluster_center';
+        const point = this.combat_resolvePotionVfxPoint(targets, { ...opts, targetMode });
+        const origin = opts.origin || { x: this.width / 2, y: Math.max(80, this.height - 82) };
+        const radius = Number.isFinite(opts.radius) ? opts.radius : profile.radius;
+        const intensity = Math.max(0.45, Math.min(1.7, opts.intensity || (profile.spellType === 'burst' ? 1.1 : 0.85)));
+        return {
+            point,
+            origin,
+            color,
+            radius,
+            intensity,
+            targetMode,
+            budget: this.combat_getPotionVfxBudget(targetMode),
+        };
+    },
+
+    combat_emitSpellFormCastCue(profile, ctx) {
+        if (typeof this.spawn_createSkillIgnition !== 'function') return;
+        const isBeamLike = profile.formId === 'beam' || profile.formId === 'sweeping_laser';
+        this.spawn_createSkillIgnition(ctx.origin.x, ctx.origin.y, ctx.color, {
+            skillTier: 'premium',
+            intensity: isBeamLike ? 0.54 : 0.64,
+            radius: isBeamLike ? 22 : 28,
+            withShockwave: false,
+        });
+    },
+
+    combat_emitSpellFormLabel(profile, ctx, offset = 32) {
+        if (typeof this.spawn_createFloatingText === 'function' && profile.label) {
+            this.spawn_createFloatingText(ctx.point.x, ctx.point.y - offset, profile.label, ctx.color, 12);
+        }
+    },
+
+    combat_resolveSpellReleaseProfile(profile, preferred = null) {
+        const releaseProfile = { ...profile };
+        if (preferred) releaseProfile.shatterStyle = preferred;
+        if (!releaseProfile.shatterStyle || releaseProfile.shatterStyle === 'seal') {
+            releaseProfile.shatterStyle = releaseProfile.spellType === 'status'
+                ? 'mist_bloom'
+                : (releaseProfile.spellType === 'construct' ? 'shard_sigil' : 'blast');
+        }
+        return releaseProfile;
+    },
+
+    combat_playSpellOrbVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        const targetMode = ctx.targetMode;
+        this.combat_emitPotionArcingTrail(profile, ctx.origin, ctx.point, ctx.color, targetMode);
+
+        const shellCount = ctx.budget.isLow ? 3 : (ctx.budget.isMid ? 5 : 7);
+        this.combat_emitPotionRadialParticles(ctx.point, ctx.color, profile.trailMode, shellCount, {
+            spawnRadius: Math.max(18, ctx.radius * 0.24),
+            speed: 0.55,
+            inward: true,
+            sizeMult: 0.72,
+            drag: 0.94,
+        });
+        if (!ctx.budget.isLow) {
+            this.combat_emitPotionRadialParticles(ctx.point, ctx.color, 'line', ctx.budget.isMid ? 3 : 5, {
+                spawnRadius: Math.max(22, ctx.radius * 0.3),
+                speed: 0.16,
+                life: 0.44,
+                scale: { x: ctx.budget.isMid ? 14 : 20, y: 0.52 },
+            });
+        }
+
+        this.spawn_createAssimilationWave?.(ctx.point.x, ctx.point.y, ctx.color, {
+            maxRadius: Math.max(44, ctx.radius * 0.58),
+            intensity: 0.62,
+            growthSpeed: 2.8,
+            fadeSpeed: 0.056,
+        });
+        const releaseProfile = this.combat_resolveSpellReleaseProfile(profile);
+        this.combat_playPotionShatterVFX(releaseProfile, targets, ctx);
+        this.combat_emitSpellFormLabel(profile, ctx, 34);
+        return ctx.point;
+    },
+
+    combat_playSpellMineVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        this.spawn_createAssimilationWave?.(ctx.point.x, ctx.point.y, ctx.color, {
+            maxRadius: Math.max(42, ctx.radius * 0.48),
+            intensity: 0.5,
+            growthSpeed: 2.1,
+            fadeSpeed: 0.066,
+        });
+
+        const glyphCount = ctx.budget.isLow ? 3 : (ctx.budget.isMid ? 5 : 7);
+        this.combat_emitPotionRadialParticles(ctx.point, ctx.color, 'line', glyphCount, {
+            spawnRadius: Math.max(18, ctx.radius * 0.28),
+            speed: 0.12,
+            life: 0.46,
+            scale: { x: 14, y: 0.5 },
+        });
+        this.combat_emitPotionRadialParticles(ctx.point, ctx.color, profile.burstMode, ctx.budget.accentCount, {
+            spawnRadius: Math.max(10, ctx.radius * 0.18),
+            speed: 1.1,
+            inward: true,
+            sizeMult: 0.78,
+            drag: 0.9,
+        });
+
+        const releaseStyle = profile.spellType === 'status' ? 'mist_bloom' : (profile.spellType === 'construct' ? 'shard_sigil' : 'blast');
+        const releaseProfile = this.combat_resolveSpellReleaseProfile(profile, releaseStyle);
+        this.combat_playPotionShatterVFX(releaseProfile, targets, ctx);
+        this.combat_emitSpellFormLabel(profile, ctx, 30);
+        return ctx.point;
+    },
+
+    combat_playSpellOrbitVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        this.spawn_createAssimilationWave?.(ctx.point.x, ctx.point.y, ctx.color, {
+            maxRadius: Math.max(56, ctx.radius * 0.86),
+            intensity: 0.54,
+            growthSpeed: 2.9,
+            fadeSpeed: 0.054,
+        });
+
+        const slashCount = ctx.budget.isLow ? 1 : (ctx.budget.isMid ? 2 : 3);
+        for (let i = 0; i < slashCount; i++) {
+            const angle = (i / slashCount) * Math.PI * 2 + Math.random() * 0.24;
+            const px = ctx.point.x + Math.cos(angle) * Math.max(18, ctx.radius * 0.34);
+            const py = ctx.point.y + Math.sin(angle) * Math.max(18, ctx.radius * 0.34);
+            this.spawn_pushParticleWithLimit?.(new SlashAnim(px, py, angle + Math.PI / 2, ctx.budget.isLow ? 0.32 : 0.44, ctx.color));
+            this.combat_spawnPotionVfxParticle(px, py, ctx.color, profile.trailMode, {
+                angle: angle + Math.PI / 2,
+                speed: 1.2,
+                sizeMult: 0.7,
+                drag: 0.92,
+            });
+        }
+        this.combat_emitPotionTargetAccents(profile, targets, ctx.color, ctx.targetMode);
+        this.combat_emitSpellFormLabel(profile, ctx, 32);
+        return ctx.point;
+    },
+
+    combat_playSpellSlashVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(e => e && e.active && e.pos);
+        const points = list.length > 0
+            ? list.slice(0, ctx.budget.targetLimit).map(e => ({ x: e.pos.x, y: e.pos.y, width: e.width || 32 }))
+            : [{ x: ctx.point.x, y: ctx.point.y, width: Math.max(32, ctx.radius * 0.4) }];
+        const length = Math.max(44, Math.min(104, ctx.radius * 0.86));
+        const quality = ctx.budget.quality;
+
+        for (const [index, point] of points.entries()) {
+            const baseAngle = Math.atan2(point.y - ctx.origin.y, point.x - ctx.origin.x);
+            const angle = baseAngle + (index % 2 === 0 ? -0.18 : 0.18) + (Math.random() - 0.5) * 0.24;
+            this.spawn_pushParticleWithLimit?.(new SlashEffect(point.x, point.y, angle, length, ctx.color));
+            if (!ctx.budget.isLow) {
+                this.spawn_pushParticleWithLimit?.(new PierceCutEffect(
+                    point.x,
+                    point.y,
+                    angle,
+                    Math.max(38, length * 0.78),
+                    ctx.color,
+                    quality,
+                    { intensity: profile.spellType === 'burst' ? 0.7 : 0.48 }
+                ));
+            }
+            this.combat_emitPotionRadialParticles(point, ctx.color, profile.burstMode, ctx.budget.isLow ? 1 : 2, {
+                spawnRadius: Math.max(6, point.width * 0.18),
+                speed: profile.spellType === 'status' ? 1.0 : 1.8,
+                sizeMult: 0.75,
+            });
+        }
+
+        if (typeof this.spawn_createFloatingText === 'function' && profile.label) {
+            this.spawn_createFloatingText(ctx.point.x, ctx.point.y - 32, profile.label, ctx.color, 12);
+        }
+        return ctx.point;
+    },
+
+    combat_playSpellBeamVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        const width = (ctx.budget.isLow ? 5 : (ctx.budget.isMid ? 7 : 9)) * Math.max(0.75, ctx.intensity);
+        const beam = new LaserBeam([
+            new Vec2(ctx.origin.x, ctx.origin.y),
+            new Vec2(ctx.point.x, ctx.point.y),
+        ], width, ctx.color, false);
+        this.spawn_pushParticleWithLimit?.(beam);
+
+        this.spawn_createAssimilationWave?.(ctx.point.x, ctx.point.y, ctx.color, {
+            maxRadius: Math.max(34, ctx.radius * 0.52),
+            intensity: profile.spellType === 'delay' ? 0.64 : 0.48,
+            growthSpeed: ctx.budget.isLow ? 2.5 : 3.2,
+            fadeSpeed: 0.058,
+        });
+        if (!ctx.budget.isLow) {
+            this.combat_emitPotionTargetAccents(profile, targets, ctx.color, ctx.targetMode);
+        }
+        if (typeof this.spawn_createFloatingText === 'function' && profile.label) {
+            this.spawn_createFloatingText(ctx.point.x, ctx.point.y - 30, profile.label, ctx.color, 12);
+        }
+        return ctx.point;
+    },
+
+    combat_playSpellMeteorVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        const dropHeight = ctx.budget.isLow ? 110 : (ctx.budget.isMid ? 145 : 175);
+        const start = new Vec2(ctx.point.x + (ctx.budget.isLow ? 0 : 18), Math.max(18, ctx.point.y - dropHeight));
+        const width = ctx.budget.isLow ? 5 : (ctx.budget.isMid ? 7 : 10);
+
+        this.spawn_createAssimilationWave?.(ctx.point.x, ctx.point.y, ctx.color, {
+            maxRadius: Math.max(42, ctx.radius * 0.66),
+            intensity: 0.58,
+            growthSpeed: 2.8,
+            fadeSpeed: 0.064,
+        });
+        this.spawn_pushParticleWithLimit?.(new LaserBeam([
+            start,
+            new Vec2(ctx.point.x, ctx.point.y),
+        ], width, ctx.color, false));
+        this.combat_emitPotionRadialParticles(start, ctx.color, profile.trailMode, ctx.budget.isLow ? 2 : 4, {
+            spawnRadius: 8,
+            speed: 1.45,
+            gravity: 0.08,
+            sizeMult: 0.72,
+        });
+
+        const releaseProfile = { ...profile };
+        if (!releaseProfile.shatterStyle || releaseProfile.shatterStyle === 'seal') {
+            releaseProfile.shatterStyle = releaseProfile.spellType === 'status' ? 'mist_bloom' : 'blast';
+        }
+        this.combat_playPotionShatterVFX(releaseProfile, targets, ctx);
+        this.combat_emitPotionTargetAccents(releaseProfile, targets, ctx.color, ctx.targetMode);
+        if (typeof this.spawn_createFloatingText === 'function' && profile.label) {
+            this.spawn_createFloatingText(ctx.point.x, ctx.point.y - 36, profile.label, ctx.color, 12);
+        }
+        return ctx.point;
+    },
+
+    combat_playSpellSweepingLaserVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        const segmentCount = ctx.budget.isLow ? 2 : (ctx.budget.isMid ? 3 : 4);
+        const sweepRadius = Math.max(42, ctx.radius * 0.62);
+        const baseAngle = Math.atan2(ctx.point.y - ctx.origin.y, ctx.point.x - ctx.origin.x);
+        const width = ctx.budget.isLow ? 4 : (ctx.budget.isMid ? 5.5 : 7);
+
+        for (let i = 0; i < segmentCount; i++) {
+            const t = segmentCount <= 1 ? 0.5 : i / (segmentCount - 1);
+            const fan = (t - 0.5) * 0.95;
+            const end = new Vec2(
+                ctx.point.x + Math.cos(baseAngle + fan + Math.PI / 2) * sweepRadius * 0.5,
+                ctx.point.y + Math.sin(baseAngle + fan + Math.PI / 2) * sweepRadius * 0.28
+            );
+            const mid = new Vec2(
+                (ctx.origin.x + end.x) / 2 + Math.cos(baseAngle + fan) * 14,
+                (ctx.origin.y + end.y) / 2 + Math.sin(baseAngle + fan) * 14
+            );
+            this.spawn_pushParticleWithLimit?.(new LaserBeam([
+                new Vec2(ctx.origin.x, ctx.origin.y),
+                mid,
+                end,
+            ], width, ctx.color, false));
+        }
+
+        this.spawn_createAssimilationWave?.(ctx.point.x, ctx.point.y, ctx.color, {
+            maxRadius: Math.max(52, ctx.radius * 0.72),
+            intensity: 0.5,
+            growthSpeed: 3.3,
+            fadeSpeed: 0.062,
+        });
+        this.combat_emitPotionTargetAccents(profile, targets, ctx.color, ctx.targetMode);
+        this.combat_emitSpellFormLabel(profile, ctx, 34);
+        return ctx.point;
+    },
+
+    combat_playSpellTowerVFX(profile, targets = [], ctx) {
+        this.combat_emitSpellFormCastCue(profile, ctx);
+        const height = ctx.budget.isLow ? 58 : (ctx.budget.isMid ? 74 : 92);
+        const baseY = ctx.point.y + 14;
+        const top = new Vec2(ctx.point.x, baseY - height);
+        const base = new Vec2(ctx.point.x, baseY);
+
+        this.spawn_createAssimilationPulse?.(ctx.point.x, baseY, ctx.color, {
+            isMutation: true,
+            isMirror: profile.nestingMode === 'tower_death' || profile.slotType === 'death',
+        });
+        this.spawn_pushParticleWithLimit?.(new LaserBeam([top, base], ctx.budget.isLow ? 5 : 7, ctx.color, false));
+        this.combat_emitPotionRadialParticles({ x: ctx.point.x, y: baseY }, ctx.color, 'shard', ctx.budget.accentCount, {
+            spawnRadius: Math.max(16, ctx.radius * 0.24),
+            speed: 0.95,
+            sizeMult: 0.72,
+            gravity: 0.12,
+            drag: 0.92,
+        });
+        if (!ctx.budget.isLow) {
+            this.combat_emitPotionRadialParticles({ x: ctx.point.x, y: baseY - height * 0.48 }, ctx.color, 'line', 3, {
+                spawnRadius: 12,
+                speed: 0.12,
+                life: 0.44,
+                scale: { x: 18, y: 0.54 },
+            });
+        }
+        this.combat_emitSpellFormLabel(profile, { ...ctx, point: { x: ctx.point.x, y: baseY - height * 0.55 } }, 28);
+        return ctx.point;
+    },
+
+    // @perf-impact: Generic spell-form VFX dispatcher - all form branches create only short-lived particles/effects and reuse existing particle, shockwave, lightning, and CONFIG.performance budgets; unsupported forms fall back to the already budgeted bottle presentation.
+    combat_playSpellFormVFX(spellDef, targets = [], opts = {}) {
+        const profile = this.combat_getPotionVfxProfile(spellDef);
+        if (opts.formId) profile.formId = opts.formId;
+        if (opts.spellType) profile.spellType = opts.spellType;
+        if (opts.nestingMode) profile.nestingMode = opts.nestingMode;
+        if (opts.shatterStyle) profile.shatterStyle = opts.shatterStyle;
+        if (opts.slotType) profile.slotType = opts.slotType;
+
+        if (profile.formId === 'bottle') {
+            return this.combat_playPotionBottleVFX(spellDef, targets, opts);
+        }
+
+        const ctx = this.combat_buildSpellFormVfxContext(profile, spellDef, targets, opts);
+        if (profile.formId === 'orb') return this.combat_playSpellOrbVFX(profile, targets, ctx);
+        if (profile.formId === 'mine') return this.combat_playSpellMineVFX(profile, targets, ctx);
+        if (profile.formId === 'orbit') return this.combat_playSpellOrbitVFX(profile, targets, ctx);
+        if (profile.formId === 'slash') return this.combat_playSpellSlashVFX(profile, targets, ctx);
+        if (profile.formId === 'beam') return this.combat_playSpellBeamVFX(profile, targets, ctx);
+        if (profile.formId === 'meteor') return this.combat_playSpellMeteorVFX(profile, targets, ctx);
+        if (profile.formId === 'sweeping_laser') return this.combat_playSpellSweepingLaserVFX(profile, targets, ctx);
+        if (profile.formId === 'tower') return this.combat_playSpellTowerVFX(profile, targets, ctx);
+
+        return this.combat_playPotionBottleVFX(spellDef, targets, opts);
+    },
+
+    combat_applyPotionSpell(potionDef, prepared) {
+        const p = potionDef.params || {};
+        const quality = Math.max(1, Math.min(3, Number(prepared.quality) || 1));
+        const list = this.enemies.filter(e => e.active);
+        const round = Math.max(1, Number(this.round) || 1);
+        const color = potionDef.color || '#f8fafc';
+        const damage = (mult = 1) => Math.max(1, Math.round(round * mult * quality));
+        const dealTo = (e, dmg, attr = 'skill') => {
+            const result = e.takeDamage(dmg);
+            const hp = result.hpDamage ?? result.actualDamage ?? 0;
+            this.combat_recordDamage(hp, attr, 'main', this._currentDamageShotId);
+            if (hp > 0) this.spawn_createFloatingText(e.pos.x, e.pos.y, `-${Math.ceil(hp)}`, color);
+            if (result.killed) this.spawn_addScore(e.maxHp, e);
+            return result;
+        };
+        const flash = (duration = 180) => {
+            eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: `${color}33`, duration });
+        };
+        const impact = (targets, opts = {}) => {
+            if (typeof this.combat_playSkillImpactVFX === 'function') {
+                this.combat_playSkillImpactVFX(
+                    { ...potionDef, source: 'potion', cost: 0 },
+                    targets,
+                    { color, limit: opts.limit || Math.min(6, targets.length || 1) }
+                );
+            }
+        };
+        const requireEnemies = () => {
+            if (list.length > 0) return true;
+            showToast('没有敌人可作用，药剂未消耗。');
+            return false;
+        };
+        const requireAmmo = () => {
+            if (this.ammoQueue && this.ammoQueue.length > 0) return true;
+            showToast('没有弹药可强化，药剂未消耗。');
+            return false;
+        };
+
+        if (potionDef.id === 'potion_frost_seal') {
+            if (!requireEnemies()) return false;
+            flash(220);
+            this.combat_playPotionBottleVFX(potionDef, list, { radius: 124 + quality * 8, shakeMs: 120 });
+            list.forEach(e => {
+                e.applyTemp(-Math.round((p.tempDown || 40) * quality));
+                e.frozenTurns = Math.max(e.frozenTurns || 0, Math.round((p.freezeFrames || 60) * quality));
+                this.spawn_createParticle(e.pos.x, e.pos.y, color, 'mist');
+                dealTo(e, damage(p.roundMult || 2), 'cryo');
+            });
+            impact(list);
+            try { audio.playEffect('cryo'); } catch (e2) {}
+        } else if (potionDef.id === 'potion_molten_flask') {
+            if (!requireEnemies()) return false;
+            flash(200);
+            this.combat_playPotionBottleVFX(potionDef, list, { radius: 116 + quality * 8, shakeMs: 110 });
+            list.forEach(e => {
+                e.applyTemp(Math.round((p.tempUp || 45) * quality));
+                this.spawn_createParticle(e.pos.x, e.pos.y, color, 'spark');
+                dealTo(e, damage(p.roundMult || 2), 'pyro');
+            });
+            impact(list);
+            try { audio.playEffect('pyro'); } catch (e2) {}
+        } else if (potionDef.id === 'potion_storm_lure') {
+            if (!requireEnemies()) return false;
+            const source = list.slice().sort((a, b) => (b.displayHp || b.hp || 0) - (a.displayHp || a.hp || 0))[0];
+            flash(180);
+            this.combat_playPotionBottleVFX(potionDef, [source], { radius: 82 + quality * 6 });
+            if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
+                this.lightningBolts.push(new LightningBolt(source.pos.x, 0, source.pos.x, source.pos.y));
+            }
+            source.applyTemp(CONFIG.balance.lightningTempIncrease || 3);
+            dealTo(source, damage(p.roundMult || 2), 'lightning');
+            this.combat_lightning_triggerChain(source, damage(p.roundMult || 2), [source], (p.chainLevel || 8) + quality * 2);
+            impact([source]);
+            try { audio.playLightning(); } catch (e2) {}
+        } else if (potionDef.id === 'potion_blade_shadow') {
+            if (!requireEnemies()) return false;
+            const swordCount = Math.max(1, (p.swordCount || 2) + quality - 1);
+            const swordTargets = [];
+            for (let i = 0; i < swordCount; i++) {
+                swordTargets.push(list[Math.floor(Math.random() * list.length)]);
+            }
+            this.combat_playPotionBottleVFX(potionDef, swordTargets, { radius: 74 + quality * 6 });
+            for (let i = 0; i < swordCount; i++) {
+                const target = swordTargets[i];
+                const spawnX = target.pos.x + (Math.random() - 0.5) * 60;
+                const spawnY = Math.max(30, target.pos.y - 80);
+                const swordConfig = { damage: damage(p.roundMult || 3), pyro: 0, cryo: 0, lightning: 0, overcharge: 0, wind: 0, multicast: 0, type: 'flying_sword' };
+                const lvl = this.variantLevels ? (this.variantLevels.flying_sword || 1) : 1;
+                this.combat_flyingSword_addSon(spawnX, spawnY, null, lvl, swordConfig, i * 5);
+                this.combat_flyingSword_assignTarget(target);
+            }
+            impact(list, { limit: swordCount });
+            try { audio.playEffect('split'); } catch (e2) {}
+        } else if (potionDef.id === 'potion_collapse_vial') {
+            if (!requireEnemies()) return false;
+            const center = list.slice().sort((a, b) => b.pos.y - a.pos.y)[0];
+            const radius = (p.radius || 95) + quality * 12;
+            const pushDistance = this.enemyHeight * (p.pushRows || 0.5) * quality;
+            const targets = list.filter(e => Math.hypot(e.pos.x - center.pos.x, e.pos.y - center.pos.y) <= radius);
+            flash(220);
+            this.combat_playPotionBottleVFX(potionDef, targets, { point: center.pos, radius, shakeMs: 170 });
+            targets.forEach(e => {
+                e.dropTargetY = Math.max(80, e.dropTargetY - pushDistance);
+                e.pos.y = e.dropTargetY;
+                this.spawn_createParticle(e.pos.x, e.pos.y + e.height / 2, color, 'mist');
+                dealTo(e, damage(p.roundMult || 3), 'skill');
+            });
+            impact(targets);
+            try { audio.playEffect('split'); } catch (e2) {}
+        } else if (potionDef.id === 'potion_echo_phial') {
+            if (!requireAmmo()) return false;
+            const ammo = this.ammoQueue[0];
+            ammo.multicast = (ammo.multicast || 0) + (p.multicastBonus || 1);
+            ammo._potionEchoCopyChance = Math.max(ammo._potionEchoCopyChance || 0, p.copyChance || 0.45);
+            this.combat_playPotionBottleVFX(potionDef, [], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 56 });
+            this.ui_updateAmmoUI();
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, 'ECHO POTION', color);
+            try { audio.playPowerup(3); } catch (e2) {}
+        } else if (potionDef.id === 'potion_venom_mist') {
+            if (!requireEnemies()) return false;
+            flash(180);
+            this.combat_playPotionBottleVFX(potionDef, list, { radius: 128 + quality * 8 });
+            list.forEach(e => {
+                if (typeof e.applyVenom === 'function') e.applyVenom((p.venomStacks || 3) * quality);
+                this.spawn_createParticle(e.pos.x, e.pos.y, color, 'venom');
+                dealTo(e, damage(p.roundMult || 1), 'venom');
+            });
+            impact(list);
+            try { audio.playEffect('venom'); } catch (e2) {}
+        } else if (potionDef.id === 'potion_prism_focus') {
+            if (!requireAmmo()) return false;
+            const ammo = this.ammoQueue[0];
+            ammo.laser = (ammo.laser || 0) + (p.laserBonus || 2) + quality - 1;
+            ammo.pierce = (ammo.pierce || 0) + (p.pierceBonus || 2) + quality - 1;
+            ammo.damage = (ammo.damage || 0) + (p.damageBonus || 6) * quality;
+            ammo.isLaser = true;
+            ammo._potionPrismFocus = true;
+            this.combat_playPotionBottleVFX(potionDef, [], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 62 });
+            this.ui_updateAmmoUI();
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, 'PRISM POTION', color);
+            try { audio.playPowerup(4); } catch (e2) {}
+        } else if (potionDef.id === 'potion_overload_vial') {
+            if (!requireEnemies()) return false;
+            const center = list.slice().sort((a, b) => (b.displayHp || b.hp || 0) - (a.displayHp || a.hp || 0))[0];
+            const radius = (p.radius || 90) + quality * 10;
+            const targets = list.filter(e => Math.hypot(e.pos.x - center.pos.x, e.pos.y - center.pos.y) <= radius);
+            flash(260);
+            this.combat_playPotionBottleVFX(potionDef, targets, { point: center.pos, radius, shakeMs: 200 });
+            targets.forEach(e => {
+                e.applyTemp((p.tempUp || 25) * quality);
+                this.spawn_createParticle(e.pos.x, e.pos.y, color, 'spark');
+                dealTo(e, damage(p.roundMult || 5), 'overcharge');
+            });
+            impact(targets);
+            try { audio.playEffect('explosion'); } catch (e2) {}
+        } else {
+            showToast('药剂效果尚未接入，药剂未消耗。');
+            return false;
+        }
+
+        showToast(`释放药剂：${potionDef.name}`);
+        return true;
+    },
+
 // --- [新增] 更新連射倍率 UI ---
     /**
      * @param {any} bonusAmount - TODO: Describe this parameter.
@@ -57,6 +988,78 @@ export const combat_system = {
             activeMarbleIndex: this.activeMarbleIndex
         });
     },
+
+    combat_getSkillVisualTier(skill) {
+        if (skill && skill.visualTier) return skill.visualTier;
+        return skill && skill.source === 'base' ? 'default' : 'premium';
+    },
+
+    combat_getSkillVisualColor(skill) {
+        return (skill && (skill.color || skill.params?.particleColor || skill.params?.explosionColor)) || '#c4b5fd';
+    },
+
+    // @perf-impact: 玩家主动技能释放反馈 - 复用 skill ignition 的粒子/冲击波三档预算，不新增常驻对象或 CONFIG.performance 字段
+    combat_playSkillCastVFX(skill, opts = {}) {
+        if (!skill || typeof this.spawn_createSkillIgnition !== 'function') return;
+        const tier = this.combat_getSkillVisualTier(skill);
+        const isPremium = tier === 'premium';
+        const quality = this.perfQualityLevel || 'high';
+        const color = opts.color || this.combat_getSkillVisualColor(skill);
+        const x = Number.isFinite(opts.x) ? opts.x : this.width / 2;
+        const y = Number.isFinite(opts.y) ? opts.y : Math.max(90, this.height - 88);
+
+        this.spawn_createSkillIgnition(x, y, color, {
+            skillTier: tier,
+            intensity: opts.intensity ?? (isPremium ? 1.25 : 0.75),
+            radius: opts.radius ?? (isPremium ? 44 : 28),
+            withShockwave: opts.withShockwave ?? isPremium,
+        });
+
+        if (isPremium && quality !== 'low') {
+            this.spawn_createSkillIgnition(x, Math.max(72, this.height * 0.22), color, {
+                skillTier: tier,
+                intensity: 0.58,
+                radius: 26,
+                withShockwave: false,
+            });
+        }
+    },
+
+    // @perf-impact: 玩家主动技能命中特效 - 目标数按画质截断，粒子/铭刻波由既有预算限流
+    combat_playSkillImpactVFX(skill, targets, opts = {}) {
+        if (!skill || typeof this.spawn_createSkillIgnition !== 'function') return;
+        const list = (Array.isArray(targets) ? targets : [targets]).filter(e => e && e.active && e.pos);
+        if (list.length === 0) return;
+
+        const tier = this.combat_getSkillVisualTier(skill);
+        const isPremium = tier === 'premium';
+        const quality = this.perfQualityLevel || 'high';
+        const defaultLimit = isPremium
+            ? (quality === 'low' ? 3 : (quality === 'medium' ? 6 : 8))
+            : (quality === 'low' ? 1 : 3);
+        const limit = Math.max(0, Math.min(list.length, Number.isFinite(opts.limit) ? opts.limit : defaultLimit));
+        const color = opts.color || this.combat_getSkillVisualColor(skill);
+
+        for (let i = 0; i < limit; i++) {
+            const e = list[i];
+            const x = e.pos.x;
+            const y = e.pos.y + (Number.isFinite(opts.offsetY) ? opts.offsetY : 0);
+            this.spawn_createSkillIgnition(x, y, color, {
+                skillTier: tier,
+                intensity: isPremium ? 0.55 : 0.32,
+                radius: isPremium ? 22 : 16,
+                withShockwave: false,
+            });
+            if (isPremium && quality !== 'low' && i % 2 === 0 && typeof this.spawn_createAssimilationWave === 'function') {
+                this.spawn_createAssimilationWave(x, y, color, {
+                    maxRadius: 34,
+                    intensity: 0.45,
+                    growthSpeed: 2.4,
+                    fadeSpeed: 0.06,
+                });
+            }
+        }
+    },
 // 在 Game 类中
     /**
      * @param {any} skill - TODO: Describe this parameter.
@@ -76,6 +1079,7 @@ export const combat_system = {
         
         audio.playPowerup(5); 
         showToast(`釋放: ${skill.name}!`);
+        this.combat_playSkillCastVFX(skill);
 
         const p = skill.params;
         
@@ -205,6 +1209,7 @@ export const combat_system = {
                 }
             });
             if (frozenCount > 0) {
+                this.combat_playSkillImpactVFX(skill, this.enemies, { color: p.particleColor });
                 try { audio.playEffect('cryo'); } catch(e2) {}
             }
         }
@@ -232,6 +1237,7 @@ export const combat_system = {
                     if (damageResult.killed) this.spawn_addScore(e.maxHp, e);
                 }
             }
+            this.combat_playSkillImpactVFX(skill, this.enemies, { color: p.boltColor || p.particleColor });
             try { audio.playLightning(); } catch(e2) {}
         }
 
@@ -274,6 +1280,7 @@ export const combat_system = {
                 }
             });
             if (heatedCount > 0) {
+                this.combat_playSkillImpactVFX(skill, this.enemies, { color: p.particleColor });
                 try { audio.playEffect('pyro'); } catch(e2) {}
             }
         }
@@ -304,6 +1311,7 @@ export const combat_system = {
                 this.combat_flyingSword_addSon(spawnX, spawnY, null, lvl, swordConfig, i * 5);
                 this.combat_flyingSword_assignTarget(target);
             }
+            this.combat_playSkillImpactVFX(skill, activeEnemies, { color: p.particleColor, limit: p.swordCount });
             this.spawn_createFloatingText(this.width/2, this.height/2, '剑刃雨!', p.particleColor);
             try { audio.playEffect('split'); } catch(e2) {}
         }
@@ -378,6 +1386,7 @@ export const combat_system = {
         pool.sort((a, b) => (sourceRank[a.source] ?? 2) - (sourceRank[b.source] ?? 2));
         this.unlockedSkills = pool;
         const poolIds = new Set(pool.map(s => s.id));
+        const hasPool = pool.length > 0;
 
         // —— 2. 装配维护 ——
         const cap = (CONFIG.gameplay && CONFIG.gameplay.maxEquippedSkills) || 4;
@@ -407,17 +1416,11 @@ export const combat_system = {
         const changed = prev.length !== result.length || result.some((s, i) => (prev[i] && prev[i].id) !== s.id);
         this.activeSkills = result;
 
-        // —— 4. 维护 skill_point 槽：只要技能池非空就保留 ——
+        // —— 4. 迁移旧 skill_point 槽：SP 仅由技能充能条发放 ——
         if (!Array.isArray(this.unlockedSlots)) this.unlockedSlots = [];
-        const hasPool = pool.length > 0;
-        if (hasPool && !this.unlockedSlots.includes('skill_point')) {
-            this.unlockedSlots.push('skill_point');
-            if ((this.slotCount || 0) < this.unlockedSlots.length) {
-                this.slotCount = this.unlockedSlots.length;
-            }
-        } else if (!hasPool && this.unlockedSlots.includes('skill_point')) {
+        if (this.unlockedSlots.includes('skill_point')) {
             this.unlockedSlots = this.unlockedSlots.filter(t => t !== 'skill_point');
-            this.slotCount = Math.max(1, this.unlockedSlots.length);
+            this.slotCount = Math.max(1, Math.min(this.slotCount || 1, this.unlockedSlots.length || 1));
         }
 
         // —— 5. 刷新技能栏 / SP 面板 / 编辑器入口（DOM 不可用时安全跳过） ——
@@ -495,17 +1498,23 @@ export const combat_system = {
             if (r.killed) this.spawn_addScore(e.maxHp, e);
             return r;
         };
+        const playImpact = (targets, options = {}) => {
+            if (typeof this.combat_playSkillImpactVFX === 'function') {
+                this.combat_playSkillImpactVFX(skill, targets, options);
+            }
+        };
 
         // ---------- 基础技能 ----------
         if (method === 'skill_arcane_missiles') {
             const targets = activeEnemies().sort((a, b) => b.pos.y - a.pos.y).slice(0, p.targetCount);
             if (targets.length === 0) { refund('沒有敵人可攻擊'); return; }
-            const dmg = this.round * p.roundMult;
+            const dmg = (p.flatDamage || 0) + this.round * p.roundMult;
             targets.forEach((e, i) => {
                 const startX = e.pos.x + (Math.random() - 0.5) * 40;
                 this.spawn_createParticle(startX, Math.max(20, e.pos.y - 60), p.particleColor, 'spark');
                 dealTo(e, dmg, p.particleColor);
             });
+            playImpact(targets, { color: p.particleColor, limit: p.targetCount });
             this.spawn_createFloatingText(this.width / 2, this.height / 2, '奧術飛彈!', p.particleColor);
             try { audio.playPowerup(2); } catch (e2) {}
         }
@@ -534,6 +1543,7 @@ export const combat_system = {
                 this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'mist');
                 dealTo(e, dmg, p.particleColor);
             });
+            playImpact(list, { color: p.particleColor });
             this.spawn_createShockwave(this.width / 2, this.height / 2, p.particleColor);
             try { audio.playEffect('cryo'); } catch (e2) {}
         }
@@ -549,6 +1559,7 @@ export const combat_system = {
                 this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '☢️辐照', p.particleColor);
                 dealTo(e, dmg, p.particleColor);
             });
+            playImpact(list, { color: p.particleColor });
             try { audio.playPowerup(3); } catch (e2) {}
         }
 
@@ -566,6 +1577,7 @@ export const combat_system = {
                 this.combat_flyingSword_assignTarget(target);
                 target.applyTemp(p.tempUp);
             }
+            playImpact(list, { color: p.particleColor, limit: p.swordCount });
             this.spawn_createFloatingText(this.width / 2, this.height / 2, '炎光劍舞!', p.particleColor);
             try { audio.playEffect('split'); } catch (e2) {}
         }
@@ -579,6 +1591,7 @@ export const combat_system = {
                 e.applyTemp(p.shockStacks);
                 this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
             });
+            playImpact(list, { color: p.particleColor });
             // 从血量最高的敌人引发一次闪电链
             const source = list.slice().sort((a, b) => b.displayHp - a.displayHp)[0];
             if (source) {
@@ -615,6 +1628,7 @@ export const combat_system = {
                 this.spawn_createParticle(e.pos.x, e.pos.y + e.height / 2, p.particleColor, 'mist');
                 dealTo(e, dmg, p.particleColor);
             });
+            playImpact(list, { color: p.particleColor });
             this.spawn_createShockwave(this.width / 2, this.height / 2, p.shockwaveColor);
             this.ui_triggerScreenShake(180);
             try { audio.playEffect('split'); } catch (e2) {}
@@ -631,6 +1645,7 @@ export const combat_system = {
                 this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'mist');
                 this.spawn_createFloatingText(e.pos.x, e.pos.y - 20, '⏳冻结!', p.particleColor);
             });
+            playImpact(list, { color: p.particleColor });
             // 返还 SP（受上限约束）
             const maxSP = CONFIG.gameplay.maxSkillPoints || 0;
             this.skillPoints = Math.min(maxSP, (this.skillPoints || 0) + (p.spRefund || 0));
@@ -649,6 +1664,7 @@ export const combat_system = {
                 this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
                 dealTo(e, dmg, p.particleColor);
             });
+            playImpact(list, { color: p.particleColor });
             this.spawn_createFloatingText(this.width / 2, this.height / 2, `🔥 屏障 +${p.shieldGain}`, p.particleColor);
             if (typeof this.ui_updateShieldUI === 'function') this.ui_updateShieldUI();
             try { audio.playPowerup(4); } catch (e2) {}
@@ -667,6 +1683,7 @@ export const combat_system = {
                 this.spawn_createParticle(e.pos.x, e.pos.y, p.particleColor, 'spark');
                 dealTo(e, dmg, p.particleColor);
             });
+            playImpact(list, { color: p.particleColor });
             this.spawn_createShockwave(this.width / 2, this.height / 2, p.particleColor);
             this.spawn_createFloatingText(this.width / 2, this.height / 2, '隕石轟擊!', p.particleColor);
             try { audio.playEffect('explosion'); } catch (e2) {}
@@ -697,6 +1714,7 @@ export const combat_system = {
                 const r = dealTo(e, dmg, p.particleColor);
                 if (r.killed) kills++;
             });
+            playImpact(list, { color: p.particleColor });
             if (kills > 0) {
                 const gain = kills * p.fragmentsPerKill;
                 this.runFragments = (this.runFragments || 0) + gain;
@@ -2161,28 +3179,35 @@ export const combat_system = {
             const pierceAngle = (Math.abs(pv.x || 0) + Math.abs(pv.y || 0)) > 0.001
                 ? Math.atan2(pv.y || 0, pv.x || 0)
                 : 0;
-            const pierceLength = isPierceHitNow ? 104 : 86;
-            // @perf-impact: 穿透命中切割反馈 - 复用 maxParticles/sparkLimit，移除旧 shockwave 光圈。
+            const pierceDamage = Math.max(0, actualDmg || 0);
+            const basePierceDamage = Math.max(1, Math.abs(config.damage || pierceDamage || 1));
+            const pierceDamageScale = Math.max(0.35, Math.min(1, Math.sqrt(pierceDamage / Math.max(6, basePierceDamage * 1.8))));
+            const pierceLengthBase = isPierceHitNow ? 82 : 66;
+            const pierceLength = Math.round(pierceLengthBase * (0.78 + pierceDamageScale * 0.28));
+            const pierceQuality = this.perfQualityLevel || 'high';
+            // @perf-impact: 穿透命中切割反馈 - 复用 maxParticles/sparkLimit，并按 actualDmg 压缩长度、亮度与碎屑。
             this.spawn_pushParticleWithLimit(new PierceCutEffect(
                 hitX,
                 hitY,
                 pierceAngle,
                 pierceLength,
-                isPierceHitNow ? '#fecaca' : '#fca5a5',
-                this.perfQualityLevel || 'high'
+                (isPierceHitNow && pierceDamageScale > 0.72) ? '#fecaca' : '#fca5a5',
+                pierceQuality,
+                { intensity: pierceDamageScale, actualDamage: pierceDamage }
             ));
-            const chipCount = this.perfQualityLevel === 'low' ? 1 : (isPierceHitNow ? 3 : 2);
+            const chipBase = pierceQuality === 'low' ? 0 : (pierceQuality === 'medium' ? 1 : (isPierceHitNow ? 2 : 1));
+            const chipCount = Math.min(chipBase, Math.round(chipBase * (0.35 + pierceDamageScale * 0.65)));
             const normalX = -Math.sin(pierceAngle);
             const normalY = Math.cos(pierceAngle);
             for (let i = 0; i < chipCount; i++) {
                 const p = this.spawn_createParticle(hitX, hitY, i % 2 ? '#fecaca' : '#fca5a5', 'spark');
                 if (p && p.vel) {
                     const side = i % 2 === 0 ? 1 : -1;
-                    const forward = 1.2 + Math.random() * 1.6;
-                    const lift = (2.2 + Math.random() * 1.4) * side;
+                    const forward = (0.7 + Math.random() * 1.0) * (0.75 + pierceDamageScale * 0.4);
+                    const lift = (1.3 + Math.random() * 1.1) * side * (0.8 + pierceDamageScale * 0.35);
                     p.vel.x = Math.cos(pierceAngle) * forward + normalX * lift;
                     p.vel.y = Math.sin(pierceAngle) * forward + normalY * lift;
-                    p.size *= 0.85;
+                    p.size *= 0.45 + pierceDamageScale * 0.25;
                 }
             }
         } else if (config.wind > 0) {
@@ -2447,11 +3472,15 @@ export const combat_system = {
         if (typeof this.combat_runeword_elementalFusion_check === 'function') {
             this.combat_runeword_elementalFusion_check(enemy, dmg, shotId);
         }
-        const killed = damageResult.killed;
+        let killed = damageResult.killed;
         const actualDmg = damageResult.hpDamage ?? damageResult.actualDamage ?? 0; // --- [新增] 确定基础伤害类型 (用于统计图表行) ---
         const blockedByDefense = !!(damageResult.defenseBlocked || (damageResult.blockedDamage || 0) > 0 || damageResult.blockedBy);
         if (actualDmg > 0 && !blockedByDefense) {
             spawnPrimaryHitImpact();
+        }
+        if (!killed && actualDmg > 0 && (config.lightning || 0) > 0 && typeof this.combat_lightningVenom_trigger === 'function') {
+            const venomProc = this.combat_lightningVenom_trigger(enemy, shotId, 0);
+            if (venomProc && venomProc.killed) killed = true;
         }
         if (!killed) {
             this.combat_updateBossVulnerabilityProgress(enemy, bossVulnerability, actualDmg);
@@ -2504,6 +3533,39 @@ export const combat_system = {
             damageType,
             bossVulnerability
         });
+
+        // [元素视觉重做 · Phase 2.7/2.9/2.11] 弹跳 / 散射 / 回响 命中视觉反馈
+        // 三者均为敌附瞬态特效（enemy._bounceArcEffect / _scatterBurstEffect / _echoRippleEffect），
+        // 沿用 Phase 1 ElectrocuteEffect 模式：命中追加，update/draw/清理由 enemy.js 生命周期统一管理。
+        // @perf-impact: PixiJS 优先单 Graphics 批绘 / Canvas 2D 回退；各自上限 3-4 并发实例、0.6-0.8s 自动消散；
+        //               三阶增强（双螺旋/星闪/回声定位）经共鸣参数门控，未达三阶不触发额外绘制。
+        if (enemy && enemy.active && !enemy.dead) {
+            // — 弹跳动能弧线（Phase 2.7）：弹射命中追加绿色弧线 + 绿色 +1 计数 —
+            if (isBounceHit) {
+                const _bRes = this.activeElementResonances && this.activeElementResonances['bounce'];
+                const _bTier3 = !!(_bRes && _bRes.params && _bRes.params.noBounceDecay);
+                const _bDir = (projectile && projectile.vel && typeof projectile.vel.x === 'number')
+                    ? Math.atan2(projectile.vel.y, projectile.vel.x)
+                    : Math.atan2(hitY - enemy.pos.y, hitX - enemy.pos.x);
+                if (!enemy._bounceArcEffect) enemy._bounceArcEffect = new BounceArcEffect(enemy);
+                enemy._bounceArcEffect.addArc(hitX, hitY, _bDir, _bTier3);
+                if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 18, '+1', '#22c55e', 11);
+            }
+            // — 散射星爆（Phase 2.9）：散射子弹（含子母散射）命中追加金色星爆，共鸣增强 —
+            if ((config.scatter || 0) > 0 || config.isScatterChild) {
+                const _sRes = this.activeElementResonances && this.activeElementResonances['scatter'];
+                const _sReson = !!(_sRes && _sRes.params);
+                if (!enemy._scatterBurstEffect) enemy._scatterBurstEffect = new ScatterBurstEffect(enemy);
+                enemy._scatterBurstEffect.addBurst(hitX, hitY, _sReson);
+            }
+            // — 回响波纹（Phase 2.11）：echo 属性命中追加蓝色同心波纹，三阶回声定位 —
+            if ((config.echo || 0) > 0) {
+                const _eRes = this.activeElementResonances && this.activeElementResonances['echo'];
+                const _eTier3 = !!(_eRes && _eRes.params && (_eRes.params.triggerChanceBonus || 0) >= 0.99);
+                if (!enemy._echoRippleEffect) enemy._echoRippleEffect = new EchoRippleEffect(enemy);
+                enemy._echoRippleEffect.addRipple(hitX, hitY, _eTier3);
+            }
+        }
 
         // [词条 Hook] 炎光剑影：子母飞剑或普通子弹穿透命中时，命中点生成剑光 AOE 伤害（非爆炸）
         // [穿甲流星联动] 当穿甲流星激活时，散射子弹（isScatterChild=true）继承了穿透层数，
@@ -2777,21 +3839,43 @@ export const combat_system = {
                     const expResult = enemy.takeDamage(explodeDmg);
                     const expHpDamage = expResult.hpDamage ?? expResult.actualDamage ?? 0;
                     this.combat_recordDamage(expHpDamage, 'pyro', sourceType, shotId);
+                    if (expHpDamage > 0 && typeof this.spawn_createExplosionHitGust === 'function') {
+                        this.spawn_createExplosionHitGust(enemy, enemy.pos.x, enemy.pos.y, {
+                            color: '#dc2626',
+                            emberColor: '#fb923c',
+                            intensity: 1.15,
+                        });
+                    }
                     if (expHpDamage > 0) this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expHpDamage)}`, '#dc2626');
                     
                     // --- 3. 范围伤害 (AOE) ---
                     const EXPLODE_RADIUS = pyroCfg.radius; // 爆炸半径
+                    const explodeTargets = [];
                     this.enemies.forEach(other => {
                         if (other !== enemy && other.active && enemy.pos.dist(other.pos) < EXPLODE_RADIUS) {
                             const aoeDmg = explodeDmg * pyroCfg.aoeDamageMult; // 范围伤害
                             const aoeResult = other.takeDamage(aoeDmg);
                             const aoeHpDamage = aoeResult.hpDamage ?? aoeResult.actualDamage ?? 0;
                             this.combat_recordDamage(aoeHpDamage, 'pyro', sourceType, shotId);
-                            
+                            if (aoeHpDamage > 0 && typeof this.spawn_createExplosionHitGust === 'function') {
+                                this.spawn_createExplosionHitGust(other, enemy.pos.x, enemy.pos.y, {
+                                    color: '#dc2626',
+                                    emberColor: '#fb923c',
+                                    intensity: 1,
+                                });
+                            }
+
                             // 范围内的敌人也受到热量波及 (增加少量温度)
                             other.applyTemp(consumedHeat*0.25);
+                            if (other.active) explodeTargets.push(other);
                         }
                     });
+                    if ((enemy.venomStacks || 0) > 0 && explodeTargets.length > 0 && typeof this.combat_spreadVenomStacks === 'function') {
+                        const venomCfg = (CONFIG.mechanics && CONFIG.mechanics.venom) || {};
+                        const spreadRatio = venomCfg.pyroExplosionSpreadRatio ?? pyroCfg.heatConsumptionRate ?? 0;
+                        const spreadStacks = Math.floor((enemy.venomStacks || 0) * spreadRatio);
+                        this.combat_spreadVenomStacks(enemy, explodeTargets, spreadStacks);
+                    }
                 }
             }    // D. 移除热量回填机制 (根据需求取消回填)
         } else if (config.pyro > 0 && isIgnisFurnaceTarget && enemy.temp >= burnTempThreshold) {
@@ -2822,14 +3906,13 @@ export const combat_system = {
         // this._currentDamageShotId = shotId; // 移除：不再需要全局缓存 shotId
         
         // [新增] 统一显示伤害数字 (使用实际造成的伤害)
+        const damageTextOpts = { kind: 'damage', owner: enemy };
         if (this.showDamageNumbers) {
             if (actualDmg > 0) {
-                if (isCrit) {
-                    // [修复] 暴击时：显示更大的红色暴击伤害数字（24px），不再显示 CRIT! 前缀文字
-                    this.spawn_createFloatingText(hitX, hitY - 10, `-${Math.ceil(actualDmg)}`, '#FF3333', 24);
-                } else {
-                    this.spawn_createFloatingText(hitX, hitY, `-${Math.ceil(actualDmg)}`, damageColor);
-                }
+                const damageY = isCrit ? hitY - 10 : hitY;
+                const damageSize = isCrit ? 18 : 13;
+                const textColor = isCrit ? '#FF3333' : damageColor;
+                this.spawn_createFloatingText(hitX, damageY, `-${Math.ceil(actualDmg)}`, textColor, damageSize, null, damageTextOpts);
             }
             if (hitFeedback) {
                 const labelY = hitY - (actualDmg > 0 ? (isCrit ? 36 : 24) : 10);
@@ -3015,6 +4098,14 @@ export const combat_system = {
                     const dy = (other.pos.y - cy);
                     if (dx * dx + dy * dy <= burstRadius * burstRadius) {
                         const aoeResult = other.takeDamage(burstDmg);
+                        const aoeHpDamage = aoeResult.hpDamage ?? aoeResult.actualDamage ?? 0;
+                        if (aoeHpDamage > 0 && typeof this.spawn_createExplosionHitGust === 'function') {
+                            this.spawn_createExplosionHitGust(other, cx, cy, {
+                                color: '#dc2626',
+                                emberColor: '#fb923c',
+                                intensity: 1.15,
+                            });
+                        }
                         if (aoeResult && aoeResult.killed) this.spawn_addScore(other.maxHp, other);
                     }
                 }
@@ -3158,16 +4249,17 @@ export const combat_system = {
                 theme.particleMode = 'normal';
             }
 
+            const explosionRadius = 100 * (config._explosionRadiusMult || 1.0);
             // --- 2. 播放视觉特效 ---
-            // 生成带有属性颜色的 Shockwave
-            this.spawn_createShockwave(projectile.pos.x, projectile.pos.y, theme.waveColor);
+            // 子弹爆炸使用专用前向冲击/弹片表现，不再复用通用 Shockwave 扩散圈。
+            this.spawn_createProjectileExplosion(projectile.pos.x, projectile.pos.y, theme, {
+                impactDirection: projectile.vel,
+                radius: explosionRadius,
+                isOvercharge: config.pyro > 0 || config.explosive > 1,
+            });
 
-            // 生成冲击爆破粒子（含碎片和烟雾）
-            this.spawn_createImpactBlast(projectile.pos.x, projectile.pos.y, theme.particleColor);
-            
             // 播放音效
             audio.playExplosion();
-            const explosionRadius = 100 * (config._explosionRadiusMult || 1.0);
             this.combat_applyExplosionKnockback(projectile.pos.x, projectile.pos.y, explosionRadius, 12);
 
             // --- 3. 造成范围伤害与效果 ---
@@ -3180,6 +4272,13 @@ export const combat_system = {
                     const aoeResult = other.takeDamage(aoeDmg);
                     const aoeHpDamage = aoeResult.hpDamage ?? aoeResult.actualDamage ?? 0;
                     this.combat_recordDamage(aoeHpDamage, 'explosive', 'main', shotId);
+                    if (aoeHpDamage > 0 && typeof this.spawn_createExplosionHitGust === 'function') {
+                        this.spawn_createExplosionHitGust(other, projectile.pos.x, projectile.pos.y, {
+                            color: '#ef4444',
+                            emberColor: '#fb7185',
+                            intensity: Math.min(1.5, 0.85 + explosionRadius / 180),
+                        });
+                    }
                     if (aoeResult.killed) this.spawn_addScore(other.maxHp, other);
                     
                     // --- 4. 关键：AOE 也要施加元素效果 ---
@@ -3627,11 +4726,17 @@ export const combat_system = {
 
         // --- 1. 参数计算 ---
         this.isVisualEffectActive = true;
+        const toFiniteNumber = (value, fallback = 0) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? numeric : fallback;
+        };
+        const laserLevel = Math.max(0, toFiniteNumber(recipe.laser, recipe.isLaser ? 1 : 0));
+        const pierceLevel = Math.max(0, toFiniteNumber(recipe.pierce, 0));
         // [射程] 基础 500 * 1.35 + 每层穿透 250 (决定光线能跑多远)
-        const maxLen = (500 * 1.35) + (recipe.pierce * 250) + (CONFIG.gameplay.laserLengthBonus || 0);
+        const maxLen = (500 * 1.35) + (pierceLevel * 250) + (CONFIG.gameplay.laserLengthBonus || 0);
 
         // [粗细] 基础 3px + 每层激光 4px + 爆破加成 (决定光线视觉宽度)
-        const mainWidth = 3 + (recipe.laser * 4) + (recipe.explosive ? 10 : 0);
+        const mainWidth = 3 + (laserLevel * 4) + (recipe.explosive ? 10 : 0);
 
         // [颜色] 优先级：爆破 > 元素 > 默认蓝
         let color = '#0ea5e9';
@@ -4285,7 +5390,7 @@ export const combat_system = {
 
         let chargeAmount = baseCharge * multiplier;
 
-        // 旧符文充能相关遗物转为技能充能加成，避免遗物效果空转。
+        // 技能充能遗物加成：保留旧 ID 以兼容存档，实际推进技能充能条。
         if (isKill && this.ownedRelics && this.ownedRelics.includes('rune_resonance_core')) {
             chargeAmount += 0.08;
         }
@@ -4521,10 +5626,8 @@ export const combat_system = {
                 break;
 
             case 'chimera':
-                // 狂暴后温度直接达到阈值
-                boss.temp = bossCfg.berserkedTempThreshold || 100;
-                // 记录受击触发全场爆炸概率
-                boss._berserkedBlastOnHitChance = bossCfg.berserkedBlastOnHitChance || 0.25;
+                // 奇美拉不再注入 berserk 词条式升温/受击爆炸。
+                // 热核/冰核按目标温度一比一累计；冷热抵消转流彩护盾，狂暴只翻倍护盾量。
                 break;
 
             case 'ouroboros':
@@ -4595,8 +5698,23 @@ export const combat_system = {
                     'rgba(186,230,253,0.6)', 'mist'
                 );
             }
-            // 冰冻冲击波
-            this.spawn_createShockwave(x, y, '#7dd3fc');
+            // @perf-impact: 冰冻死亡碎裂反馈 - 不再叠加通用 Shockwave，复用 shardLimit 表现冰裂残片。
+            const crackShardCount = tier === 'boss' ? 6 : (tier === 'elite' ? 4 : 3);
+            for (let i = 0; i < crackShardCount; i++) {
+                const p = this.spawn_createParticle(
+                    x + (Math.random() - 0.5) * 14,
+                    y + (Math.random() - 0.5) * 12,
+                    i % 2 ? '#e0f2fe' : '#7dd3fc',
+                    'shard'
+                );
+                if (p) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 1.4 + Math.random() * 2.2;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed - 0.3);
+                    p.size = 2.5 + Math.random() * 2;
+                    p.decay = 0.022 + Math.random() * 0.01;
+                }
+            }
             // 冰冻音效
             audio.playEffect('shatter');
             this.spawn_createFloatingText(x, y - 24, '❄️SHATTER!', '#7dd3fc');
@@ -4630,6 +5748,7 @@ export const combat_system = {
             // 燃烧扩散伤害
             audio.playExplosion();
             this.spawn_createFloatingText(x, y - 24, '🔥SPREAD!', '#f97316');
+            const fireSpreadTargets = [];
             this.enemies.forEach(other => {
                 if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {
                     other.applyTemp(CONFIG.gameplay.fireSpreadTempIncrease);
@@ -4637,8 +5756,12 @@ export const combat_system = {
                     const spreadResult = other.takeDamage(spreadDmg);
                     const spreadHpDamage = spreadResult.hpDamage ?? spreadResult.actualDamage ?? 0;
                     this.combat_recordDamage(spreadHpDamage, 'pyro', 'main', shotId);
+                    if (other.active) fireSpreadTargets.push(other);
                 }
             });
+            if ((enemy.venomStacks || 0) > 0 && fireSpreadTargets.length > 0 && typeof this.combat_spreadVenomStacks === 'function') {
+                this.combat_spreadVenomStacks(enemy, fireSpreadTargets, enemy.venomStacks || 0);
+            }
         }
 
         // --- 3. 分级死亡爆炸特效（在冰冻/燃烧特效之外叠加）---
@@ -4692,20 +5815,27 @@ export const combat_system = {
             this.triggerScreenShake(5);
 
         } else {
-            // 普通敌人：内缩消散，极少的烟尘
+            // @perf-impact: 普通死亡碎片反馈 - 复用 spawn_createParticle 的 shardLimit/maxParticles 预算，低档减少碎片数。
+            // 普通敌人：短促碎裂，避免死亡反馈读成圆形扩散冲击波。
             if (_deUnderLimit) this.deathExplosions.push(new DeathExplosion(x, y, 'normal'));
-            // 1~2 缕烟尘（不向外爆，而是小幅漂移）
-            const dustCount = 1 + Math.floor(Math.random() * 2);
-            for (let i = 0; i < dustCount; i++) {
+            const splitAngle = Math.random() * Math.PI * 2;
+            const shardCount = this.perfQualityLevel === 'low' ? 2 : 4;
+            for (let i = 0; i < shardCount; i++) {
+                const side = i % 2 === 0 ? -1 : 1;
+                const angle = splitAngle + side * (Math.PI * 0.45 + Math.random() * 0.35);
                 const p = this.spawn_createParticle(
                     x + (Math.random() - 0.5) * 10,
                     y + (Math.random() - 0.5) * 10,
-                    'rgba(148,163,184,0.4)', 'mist'
+                    i % 2 ? '#cbd5e1' : '#94a3b8',
+                    'shard'
                 );
                 if (p) {
-                    p.vel = new Vec2((Math.random() - 0.5) * 0.3, -0.2 - Math.random() * 0.3);
-                    p.decay = 0.025;
-                    p.size = 5 + Math.random() * 4;
+                    const speed = 0.9 + Math.random() * 1.5;
+                    p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed - 0.35);
+                    p.decay = 0.028 + Math.random() * 0.012;
+                    p.size = 2 + Math.random() * 2.5;
+                    p.scaleX = 0.5 + Math.random() * 0.45;
+                    p.scaleY = 1.0 + Math.random() * 0.65;
                 }
             }
         }
@@ -4750,9 +5880,20 @@ export const combat_system = {
             }
         }
 
-        // 腐蚀冲击波
-        if (typeof this.spawn_createShockwave === 'function') {
-            this.spawn_createShockwave(x, y, '#84cc16');
+        // @perf-impact: 毒焰死亡溶解反馈 - 不再叠加通用 Shockwave，复用 venom 粒子预算表现酸液崩裂。
+        const meltDropCount = tier === 'boss' ? 6 : (tier === 'elite' ? 4 : 2);
+        for (let i = 0; i < meltDropCount; i++) {
+            const p = this.spawn_createParticle(
+                x + (Math.random() - 0.5) * 12,
+                y + (Math.random() - 0.5) * 10,
+                i % 2 ? '#bef264' : '#65a30d',
+                'venom'
+            );
+            if (p) {
+                const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+                const speed = 0.9 + Math.random() * 1.5;
+                p.vel = new Vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+            }
         }
 
         // 击杀震动（毒焰溶解较柔，震幅低于爆炸）

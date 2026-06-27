@@ -1,5 +1,55 @@
 # 战斗系统规范 (Combat System Architecture)
 
+## 0.5 Laser Recipe Normalization (2026-06-25)
+
+Laser firing must accept either numeric `recipe.laser > 0` or the derived flag `recipe.isLaser === true`. Inside `combat_laser_fire()`, normalize numeric combat parameters before using them in beam width, range, or audio calculations:
+
+- Missing/non-finite `recipe.laser` falls back to `1` when `recipe.isLaser` is true, otherwise `0`.
+- Missing/non-finite `recipe.pierce` falls back to `0`.
+- Derived values such as `mainWidth`, laser tone frequency, and tone duration must remain finite even for TrainingGround/debug recipes that only set `isLaser`.
+
+## 0.6 Venom Thermal Coupling (2026-06-26)
+
+`combat_spreadVenomStacks(sourceEnemy, targets, totalStacks)` is the shared helper for fire-driven venom spread. It distributes a fixed total stack count across currently active targets, preserving the total instead of copying the full stack count to every target.
+
+- Burning death explosions use the existing `CONFIG.gameplay.fireSpreadRadius` target set and distribute the dead enemy's full `venomStacks` across surviving nearby enemies.
+- `ember_fuse` overheat explosions use `CONFIG.mechanics.venom.pyroExplosionSpreadRatio` to take a percentage of the source enemy's current `venomStacks`, then distribute that fixed amount across surviving explosion targets.
+- These fire synergies must not create additional persistent particles. The spread currently applies status stacks and a compact floating label only.
+
+## 0.6.1 Lightning Venom Proc (2026-06-26)
+
+Lightning damage now agitates existing venom stacks without consuming them. `combat_lightningVenom_trigger(enemy, shotId, chainDepth, procKey)` calculates one partial venom tick from the current effective venom stacks and records it as `venom` damage.
+
+- Tuning lives under `CONFIG.mechanics.venom`: `lightningProcRatio=0.35`, `lightningProcChainFalloff=0.85`, and `lightningProcMinRatio=0.20`.
+- Direct lightning projectile hits use `chainDepth=0`; lightning-chain hits use depth `1+` so deeper chains decay toward the minimum ratio.
+- The proc bypasses shields like normal venom DoT, does not consume `venomStacks`, and does not spread venom or start another lightning chain.
+- A per-shot `procKey` prevents the same target from receiving multiple lightning-venom procs from recursive, double, or extra chain branches.
+
+## 0.7 Active Skill Balance And VFX (2026-06-26)
+
+Active skill visuals use two runtime tiers derived by `combat_getSkillVisualTier()`:
+
+- `source:'base'` → `default`: light launcher ignition plus capped target sparks. These are fallback skills and should feel clear but restrained.
+- `runeword` / `relic` / `shop` → `premium`: stronger two-stage cast ignition plus capped target inscription pulses. These represent unlocked or purchased skills and should read as higher-value actions.
+
+`combat_playSkillCastVFX()` runs after a successful SP gate and before method dispatch. `combat_playSkillImpactVFX()` is called by target-based skill branches and truncates affected targets by performance tier. Both helpers reuse `spawn_createSkillIgnition()` and `spawn_createAssimilationWave()`, so they stay under existing particle and `shockwaveLimit` budgets and must not introduce direct DOM work.
+
+Balance note: default `skill_arcane_missiles` now includes a small flat damage floor, default `skill_kinetic_charge` is a modest 1 SP ammo setup, and high-value `skill_kinetic_burst` costs 2 SP so its +15 bounce package does not obsolete the default buff.
+
+## 0.8 Potion Alchemy Combat Slot (2026-06-26)
+
+`relic_sage_apothecary` unlocks a dedicated potion slot rendered by `UIManager.updateSkillBar()`. Potions are not `SKILL_DB` entries and must not consume SP or enter the normal skill cost/cooldown path.
+
+- Release entry: `combat_activatePotionSpell()`.
+- Effect dispatcher: `combat_applyPotionSpell(potionDef, prepared)`.
+- Runtime state: `preparedPotionSpell = { potionId, charges, maxCharges, quality, sourceRunes, createdRound }`.
+- A potion charge is consumed only after the effect applies successfully. No-target and no-ammo cases must return without decrementing `charges`.
+- Presentation dispatcher: `combat_playSpellFormVFX(spellDef, targets, opts)` is the generic spell-form entry. It keeps `bottle` routed through `combat_playPotionBottleVFX()` and provides visual branches for `orb`, `mine`, `beam`, `orbit`, `slash`, `meteor`, `sweeping_laser`, and `tower`. It must remain visual-only: no damage, status, DOM, save, or charge changes.
+- Bottle presentation: `combat_playPotionBottleVFX(potionDef, targets, opts)` reads `POTION_SPELL_DB[*].vfxProfile` and plays the shared bottle sequence: launcher ignition, short arcing trail, bottle shatter/seal pulse, and a semantic floating label. Enemy-target potions resolve their shatter point from the affected target set; ammo-enchant potions use the launcher/ammo socket point.
+- Potion shatter implementation is split by `vfxProfile.shatterStyle` in `combat_playPotionShatterVFX()`: `mist_bloom` emits lingering mist/venom blooms, `blast` uses projectile explosion, `mark` emits a seal plus short LightningBolt arcs, `shard_sigil` emits a shard sigil for construct summons, `collapse_ring` emits an inward pull ring, `seal` uses an ammo-socket assimilation pulse, and `overload_blast` adds overcharge sparks/bolts.
+- VFX must reuse existing combat helpers (`spawn_createParticle`, `spawn_createShockwave`, `combat_flyingSword_addSon`, `combat_lightning_triggerChain`, `spawn_createSkillIgnition`) and stay under the current `CONFIG.performance` budgets. New potion branches that add additional persistent visual objects must add their own `// @perf-impact` note and update `.cursor/rules/performance.md`.
+- Potion bottle VFX is a short-lived presentation layer only. It must not apply damage, status, DOM updates, or charge consumption; those stay in `combat_applyPotionSpell()`.
+
 ## 0.3 Combat Arena Bounds (2026-06-21)
 
 Projectile and laser wall logic must use `game.sys_getCombatBounds()` for the left and right walls. The canvas may include decorative side bands that are outside the playable combat arena. Enemy movement, projectile bounce, laser reflection, and aim-guide prediction should all treat `combatGridLeftX` and `combatGridRightX` as the side walls, not `0` and `game.width`.
@@ -7,6 +57,8 @@ Projectile and laser wall logic must use `game.sys_getCombatBounds()` for the le
 ## 0.4 Skill Charge SP Source (2026-06-23)
 
 Combat charge now feeds skill points instead of rune rewards. `combat_skillCharge_onHit()` receives hit/kill events, splits gained charge into an actual retained bar and a temporary decaying bar, and calls `combat_skillCharge_tryAward()` when their total reaches 1.0. A successful full bar awards SP through `spawn_addSkillPoint()` and respects `CONFIG.gameplay.maxSkillPoints`.
+
+`combat_recomputeActiveSkills()` must not inject `skill_point` into `unlockedSlots`; the pinboard skill-point slot is retired. If old saves or legacy flows still contain `skill_point`, recompute should remove it and let the skill charge meter remain the only repeatable SP source.
 
 The old `combat_runeCharge_*` methods remain only as compatibility wrappers. New combat work must use `combat_skillCharge_*` and `UI_SKILL_CHARGE_*`; do not reintroduce `_runeCharge_draw` or write charge rewards into `runeInventory`.
 
@@ -94,7 +146,7 @@ Glacies keeps `cryo + pierce` as its vulnerability attrs, but those attrs also d
 - **弹药队列消耗与发射** (`combat_fireNextShot`, `combat_laser_fire`)
 - **持续照射状态机** (`combat_continuousLaser_update`)：照射词条激活时，每 0.5s 重算一次激光
 - **风系技能核心逻辑** (`combat_wind_triggerMagicCircle`, `combat_wind_executeCircleEffect`)
-- **战斗状态管理**（符文充能状态初始化等）
+- **战斗状态管理**（技能充能状态初始化等）
 
 ### 1.2 `src/combat/damage_calc.js`（纯伤害计算与统计）
 负责所有与数值计算、伤害评估相关的纯逻辑：

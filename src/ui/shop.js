@@ -401,6 +401,18 @@ export const shop_system = {
             const sk = (SKILL_DB || []).find(s => s.id === relic.skillId);
             if (window.showToast && sk) showToast(`解锁技能: ${sk.name}`);
         }
+        else if (relic.effect === 'unlock_potion_alchemy') {
+            this.potionAlchemyUnlocked = true;
+            if (!Array.isArray(this.knownPotionSpellIds)) this.knownPotionSpellIds = [];
+            if (!Array.isArray(this.potionRecipeHistory)) this.potionRecipeHistory = [];
+            this._selectedPotionRuneIndices = new Set();
+            if (window.showToast) showToast('贤者药匣已开启：炼金台新增药剂炼成。');
+            if (typeof this.ui_updatePotionAlchemyPanel === 'function') this.ui_updatePotionAlchemyPanel();
+            if (this.ui && typeof this.ui.updateSkillBar === 'function') {
+                this.ui.updateSkillBar(this.skillPoints || 0, this.activeSkills || []);
+            }
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        }
         else if (relic.effect === 'pink_peg_up') {
             this.pinkPegCount = (this.pinkPegCount || 0) + 3;
         }
@@ -549,7 +561,7 @@ export const shop_system = {
         }
 
         // ==================== [v2 即时感重塑] 新遗物即时效果分支 ====================
-        // 大部分被动遗物（猎人本能/符文共鸣核/末日计时器/余韵回响/混沌爆发/属性协议/殒命爆裂/回廊电弧/贪婪轮盘）
+        // 大部分被动遗物（猎人本能/技能共鸣核/末日计时器/余韵回响/混沌爆发/属性协议/殒命爆裂/回廊电弧/贪婪轮盘）
         // 只需要 ownedRelics 标记，运行时由 combat_system / projectile / round_start 钩子读取。
         // 这里仅处理需要"立即修改局内状态"的几个：mirror_magazine / element_injector / chaos_pact。
         if (relic.effect === 'mirror_magazine') {

@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 4219 | 函数数: 38 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 4347 | 函数数: 41 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -33,6 +33,8 @@
 | phase_gathering_createSession | method | `phase_gathering_createSession(marbleDef, marbleIndex)` |  |
 | phase_gathering_launchMarbleBatch | method | `phase_gathering_launchMarbleBatch(pos)` |  |
 | phase_handleInputStart | method | `phase_handleInputStart(pos)` |  |
+| phase_calcVenomEffectiveStacks | method | `phase_calcVenomEffectiveStacks(rawStacks)` |  |
+| phase_playThawFeedback | method | `phase_playThawFeedback(enemy)` |  |
 | phase_enemy_processTurn | method | `phase_enemy_processTurn(e)` | ⚠️ 巨型函数，见 @section 导航 |
 | phase_claimPendingRunes | method | `phase_claimPendingRunes()` |  |
 | phase_inWallClearTrigger | method | `phase_inWallClearTrigger()` |  |
@@ -44,6 +46,7 @@
 | phase_queueGreedyWheelPrelude | method | `phase_queueGreedyWheelPrelude(shot, spawnX, spawnY)` |  |
 | phase_handleGreedyWheelQueueEvent | method | `phase_handleGreedyWheelQueueEvent(shot)` |  |
 | phase_combat_update | method | `phase_combat_update(timeScale)` | ⚠️ 巨型函数，见 @section 导航 |
+| render_combat_launcher | method | `render_combat_launcher(timeScale, entityShiftX, entityShiftY, idle = false)` |  |
 | phase_gathering_attemptComplete | method | `phase_gathering_attemptComplete()` |  |
 | phase_gathering_update | method | `phase_gathering_update(timeScale = 1)` | ⚠️ 巨型函数，见 @section 导航 |
 | _updateDropDistribution | method | `_updateDropDistribution(entryX)` |  |

@@ -1,6 +1,6 @@
 # src\rune_system.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 499 | 函数数: 10 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 572 | 函数数: 13 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -12,7 +12,10 @@
 | getRuneId | function | `getRuneId(entry)` |  |
 | parseRuneGrid | function | `parseRuneGrid(grid, runewordDb)` |  |
 | calcRuneBaseStats | function | `calcRuneBaseStats(runeGrid, runeDb)` |  |
-| findPatternInSequence | function | `findPatternInSequence(runes, pattern, indices, idGrid)` |  |
+| findRunewordSpellMatches | function | `findRunewordSpellMatches(runeword, idGrid)` |  |
+| findCoreAxisMatches | function | `findCoreAxisMatches(pattern, idGrid, formula = {})` |  |
+| findLooseLineMatches | function | `findLooseLineMatches(pattern, idGrid)` |  |
+| findPatternInSequence | function | `findPatternInSequence(pattern, indices, idGrid)` |  |
 | sequenceMatchesPatternUnordered | function | `sequenceMatchesPatternUnordered(sliceRunes, pattern)` |  |
 | _removeRuneFromInventory | function | `_removeRuneFromInventory(runeInventory, runeObj)` |  |
 | rune_merge | function | `rune_merge(runeObjects, runeInventory)` |  |

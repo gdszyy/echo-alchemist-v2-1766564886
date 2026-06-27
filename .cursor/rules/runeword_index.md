@@ -2,6 +2,7 @@
 
 > **数据来源**：`src/rune_config.js` → `RUNEWORD_DB`
 > **用途**：Agent 快速查询所有词条的 ID、名称、符文组合、效果描述及实现位置，无需全量读取 `rune_config.js`。
+> **Spell Form V1**：表中的“符文组合”按法术公式解释；默认 `pattern[1]` 为中心核心符文，必须位于 3×3 中心格，`pattern[0]` / `pattern[2]` 为外环试剂，必须位于同一条穿心轴线两端（可反向）。
 
 ## 1. 词条总览（23 个）
 
@@ -72,6 +73,8 @@
 | `relic` | 拥有 `unlockRelic` 遗物（`effect:'unlock_skill'`） | 3 | 引力坍缩(`relic_gravity_core`)、时滞冻结(`relic_chrono_shard`)、不死鸟祝福(`relic_phoenix_feather`) |
 | `shop` | 局内商店购买（写入 `purchasedSkillIds`，`shopPrice` 定价） | 3 | 陨石轰击、棱镜超载、财富打击 |
 
+视觉层级：`combat_getSkillVisualTier()` 将 `base` 技能归为 `default`，将 `runeword` / `relic` / `shop` 技能归为 `premium`；默认技能只播放轻量点火，高价值技能会追加双段点火与有限目标铭刻脉冲。该层级仅影响表现，不改变技能来源或装配池。
+
 ### 技能装配（loadout）
 
 - **技能池 `unlockedSkills`**：四类来源并集，可超过 4 个。**装备 `equippedSkillIds`**：玩家选择进入战斗技能栏的子集（≤ `CONFIG.gameplay.maxEquippedSkills`，默认 4，受锁定的 2×2 布局约束）。`activeSkills` = 池中已装备项（按装备顺序），即技能栏渲染/可释放的内容。
@@ -137,7 +140,7 @@
 | 熔毁 (`runeword_meltdown`) | 熔毁新星 (`skill_meltdown_nova`) | 对所有敌人施加过热状态，温度拉至爆炸阈值的 80% |
 | 绝对零度 (`runeword_absolute_zero`) | 冰牢封印 (`skill_frost_prison`) | 冻结所有敌人 3 秒，冻结期间受到的伤害提升 30% |
 | 雷暴之语 (`runeword_thunderstorm`) | 雷神降临 (`skill_thunder_call`) | 对所有敌人各落一道天雷，伤害基于回合数 × 8 |
-| 动能激增 (`runeword_kinetic_surge`) | 动能爆发 (`skill_kinetic_burst`) | 下一发弹珠弹跳次数上限 +15，每次弹跳伤害额外 +3 |
+| 动能激增 (`runeword_kinetic_surge`) | 动能爆发 (`skill_kinetic_burst`) | 下一发弹珠弹跳次数上限 +15，每次弹跳伤害额外 +3；当前消耗 2 SP |
 | 剑刃风暴 (`runeword_blade_storm`) | 剑刃雨 (`skill_blade_rain`) | 召唤 5 道飞剑同时斩击随机敌人，每道伤害为回合数 × 4 |
 | 元素聚变 (`runeword_elemental_fusion`) | 棱光炮 (`skill_prismatic_shot`) | 下一发弹珠同时携带火/冰/雷三种属性，强制触发元素聚变判定 |
 

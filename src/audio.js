@@ -466,8 +466,11 @@ class SoundManager {
      */
     playTone(freq, type = 'sine', vol = 0.3, dur = 0.2) {
         if (this.muted) return;
+        const safeFreq = Number.isFinite(Number(freq)) ? Math.max(1, Number(freq)) : 220;
+        const safeVol = Number.isFinite(Number(vol)) ? Math.max(0, Number(vol)) : 0.3;
+        const safeDur = Number.isFinite(Number(dur)) ? Math.max(0.01, Number(dur)) : 0.2;
         // [Perf] 30ms 内同 freq+type 只播一次，避免战斗高峰每帧创建数十个 AudioNode
-        const _key = `tone:${type}:${freq | 0}`;
+        const _key = `tone:${type}:${safeFreq | 0}`;
         const _nowMs = performance.now();
         if (this.lastPlayTime[_key] && _nowMs - this.lastPlayTime[_key] < 30) return;
         this.lastPlayTime[_key] = _nowMs;
@@ -475,13 +478,13 @@ class SoundManager {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = type;
-        osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(vol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        osc.frequency.setValueAtTime(safeFreq, now);
+        gain.gain.setValueAtTime(safeVol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + safeDur);
         osc.connect(gain);
         gain.connect(this.sfxGain);
         osc.start(now);
-        osc.stop(now + dur);
+        osc.stop(now + safeDur);
     }
 
     // ─────────────────────────────────────────────

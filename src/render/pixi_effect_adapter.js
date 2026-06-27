@@ -138,23 +138,19 @@ export function collectionBeam_pixiDestroy(pixi) {
 }
 
 // ─── HealWave 适配器 ───────────────────────────────────────────
+const HEAL_LOW_PETAL_TINTS = ['#f9a8d4', '#86efac', '#fbcfe8', '#86efac', '#f9a8d4'];
 
 /**
  * 为 HealWave 创建 PixiJS 显示对象
- * @returns {{ glowSprite, ringSprite, innerRingSprite }|null}
+ * @returns {{ glowSprite: null, ringSprite, innerRingSprite, gfx }|null}
  */
 export function healWave_pixiCreate(healWave) {
     const container = pixiGetEffectContainer();
     if (!container) return null;
 
-    const glowTex = pixiGetEffectTexture('healGlow');
     const ringTex = pixiGetEffectTexture('healRing');
-    if (!glowTex || !ringTex) return null;
-
-    const glowSprite = new PIXI.Sprite(glowTex);
-    glowSprite.anchor.set(0.5);
-    glowSprite.blendMode = PIXI.BLEND_MODES.ADD;
-    container.addChild(glowSprite);
+    if (!ringTex) return null;
+    const glowSprite = null;
 
     const ringSprite = new PIXI.Sprite(ringTex);
     ringSprite.anchor.set(0.5);
@@ -166,19 +162,21 @@ export function healWave_pixiCreate(healWave) {
     innerRingSprite.blendMode = PIXI.BLEND_MODES.ADD;
     container.addChild(innerRingSprite);
 
-    return { glowSprite, ringSprite, innerRingSprite };
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+
+    return { glowSprite, ringSprite, innerRingSprite, gfx };
 }
 
 export function healWave_pixiSync(hw, pixi) {
-    const { glowSprite, ringSprite, innerRingSprite } = pixi;
+    const { glowSprite, ringSprite, innerRingSprite, gfx } = pixi;
 
     // 中心辉光
-    glowSprite.x = hw.x;
-    glowSprite.y = hw.y;
-    const gd = hw.glowRadius * 2;
-    glowSprite.width = gd;
-    glowSprite.height = gd;
-    glowSprite.alpha = Math.max(0, hw.glowLife * 0.6);
+    if (glowSprite) {
+        glowSprite.visible = false;
+        glowSprite.alpha = 0;
+    }
 
     // 主环
     ringSprite.x = hw.x;
@@ -195,6 +193,136 @@ export function healWave_pixiSync(hw, pixi) {
     innerRingSprite.width = ird;
     innerRingSprite.height = ird;
     innerRingSprite.alpha = Math.max(0, hw.innerLife * 0.7);
+
+    if (gfx) {
+        gfx.clear();
+        const quality = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
+        const isLow = quality === 'low';
+        const glowAlpha = Math.max(0, Math.min(1, hw.glowLife * 0.28));
+        if (glowAlpha > 0 && hw.glowRadius > 0) {
+            gfx.lineStyle(0);
+            gfx.beginFill(0xBBF7D0, glowAlpha * 0.18);
+            gfx.drawCircle(hw.x, hw.y, Math.max(8, hw.glowRadius * 0.44));
+            gfx.endFill();
+            gfx.lineStyle(0);
+            gfx.beginFill(0xF9A8D4, glowAlpha * 0.08);
+            gfx.drawCircle(hw.x, hw.y, Math.max(5, hw.glowRadius * 0.28));
+            gfx.endFill();
+            gfx.lineStyle(0);
+        }
+
+        if (hw.crossLife > 0 && hw.crossLen > 0) {
+            const cAlpha = Math.max(0, hw.crossLife);
+            const petals = hw.petals || [];
+            const petalCount = isLow ? Math.min(5, petals.length) : petals.length;
+            for (let i = 0; i < petalCount; i++) {
+                const petalIndex = isLow ? Math.floor(i * petals.length / petalCount) : i;
+                const petal = petals[petalIndex];
+                if (!petal) continue;
+                const a = petal.angle + hw.petalSpin * 0.12;
+                healWave_pixiTraceBloomPetal(
+                    gfx,
+                    hw,
+                    a,
+                    petal,
+                    hw.bloom || 0,
+                    cAlpha,
+                    isLow,
+                    isLow ? HEAL_LOW_PETAL_TINTS[i % HEAL_LOW_PETAL_TINTS.length] : null
+                );
+            }
+            gfx.lineStyle(0);
+        }
+
+        if (!isLow && hw.motes && hw.motes.length > 0) {
+            const moteFade = Math.max(0, Math.min(1, hw.life * 2.0));
+            for (const mote of hw.motes) {
+                const moteBloom = Math.max(0, Math.min(1, ((hw.bloom || 0) - mote.delay) / Math.max(0.01, 1 - mote.delay)));
+                if (moteBloom <= 0.01) continue;
+                const drift = (1 - Math.pow(1 - moteBloom, 2)) * hw.radius * 0.16;
+                const a = mote.angle + hw.petalSpin * 0.25;
+                const r = hw.radius * mote.orbit + drift;
+                gfx.lineStyle(0);
+                gfx.beginFill(pixiCssColor(mote.tint || '#bbf7d0'), moteFade * (1 - moteBloom * 0.45) * 0.38);
+                gfx.drawCircle(hw.x + Math.cos(a) * r, hw.y + Math.sin(a) * r, mote.size * (0.7 + moteBloom * 0.6));
+                gfx.endFill();
+            }
+        }
+
+        const coreAlpha = Math.max(0, Math.min(1, hw.glowLife * 0.58));
+        if (coreAlpha > 0) {
+            gfx.lineStyle(0);
+            gfx.beginFill(0xF7FEE7, coreAlpha);
+            gfx.drawCircle(hw.x, hw.y, Math.max(3, hw.glowRadius * 0.10));
+            gfx.endFill();
+            gfx.lineStyle(0);
+        }
+    }
+}
+
+function healWave_pixiTraceBloomPetal(gfx, hw, angle, petal, bloom, alpha, isLow = false, tintOverride = null) {
+    if (bloom <= 0.01 || alpha <= 0.01) return;
+    const localBloom = Math.max(0, Math.min(1, (bloom - (petal.delay || 0)) / Math.max(0.01, 1 - (petal.delay || 0))));
+    if (localBloom <= 0.01) return;
+    const open = localBloom * localBloom * (3 - 2 * localBloom);
+    const widthT = Math.max(0, Math.min(1, (localBloom - 0.16) / 0.84));
+    const widthOpen = widthT * widthT * (3 - 2 * widthT);
+    const petalFade = hw.petalFade ?? 1;
+    const bodyAlpha = alpha * petal.alpha * petalFade * (isLow ? 0.36 : 0.54) * (0.35 + open * 0.65);
+    if (bodyAlpha <= 0.01) return;
+
+    const hingeAngle = angle + (petal.fold || 0) * (1 - open);
+    const rootX = Math.cos(angle);
+    const rootY = Math.sin(angle);
+    const uX = Math.cos(hingeAngle);
+    const uY = Math.sin(hingeAngle);
+    const nX = -uY;
+    const nY = uX;
+    const flowerR = hw.maxRadius * (0.30 + petal.reach * 0.24);
+    const baseR = hw.maxRadius * (0.045 + 0.018 * open);
+    const petalLen = flowerR * (0.28 + open * 0.72);
+    const shoulderLen = petalLen * (0.42 + open * 0.08);
+    const crownLen = petalLen * (0.74 + open * 0.10);
+    const petalW = hw.maxRadius * (0.010 + (0.047 + 0.020 * petal.width) * widthOpen);
+    const curl = petal.curl * hw.maxRadius * (0.15 + open * 0.85);
+
+    const baseX = hw.x + rootX * baseR;
+    const baseY = hw.y + rootY * baseR;
+    const crownCurl = curl * 0.48;
+    const crownX = baseX + uX * petalLen + nX * curl * 0.24;
+    const crownY = baseY + uY * petalLen + nY * curl * 0.24;
+    const leftBaseX = baseX + nX * petalW * (0.10 + open * 0.10);
+    const leftBaseY = baseY + nY * petalW * (0.10 + open * 0.10);
+    const rightBaseX = baseX - nX * petalW * (0.10 + open * 0.10);
+    const rightBaseY = baseY - nY * petalW * (0.10 + open * 0.10);
+    const leftShoulderX = baseX + uX * shoulderLen + nX * petalW + nX * curl;
+    const leftShoulderY = baseY + uY * shoulderLen + nY * petalW + nY * curl;
+    const rightShoulderX = baseX + uX * shoulderLen - nX * petalW + nX * curl * 0.25;
+    const rightShoulderY = baseY + uY * shoulderLen - nY * petalW + nY * curl * 0.25;
+    const leftCrownX = baseX + uX * crownLen + nX * petalW * 0.76 + nX * crownCurl;
+    const leftCrownY = baseY + uY * crownLen + nY * petalW * 0.76 + nY * crownCurl;
+    const rightCrownX = baseX + uX * crownLen - nX * petalW * 0.76 + nX * crownCurl * 0.35;
+    const rightCrownY = baseY + uY * crownLen - nY * petalW * 0.76 + nY * crownCurl * 0.35;
+    const fillColor = pixiCssColor(tintOverride || petal.tint || '#f9a8d4');
+
+    const tracePath = () => {
+        gfx.moveTo(leftBaseX, leftBaseY);
+        gfx.bezierCurveTo(leftShoulderX, leftShoulderY, leftShoulderX, leftShoulderY, leftCrownX, leftCrownY);
+        gfx.bezierCurveTo(crownX + nX * petalW * 0.20, crownY + nY * petalW * 0.20, crownX - nX * petalW * 0.20, crownY - nY * petalW * 0.20, rightCrownX, rightCrownY);
+        gfx.bezierCurveTo(rightShoulderX, rightShoulderY, rightShoulderX, rightShoulderY, rightBaseX, rightBaseY);
+        gfx.quadraticCurveTo(baseX, baseY, leftBaseX, leftBaseY);
+        gfx.closePath();
+    };
+
+    gfx.lineStyle(0);
+    gfx.beginFill(fillColor, Math.max(0, bodyAlpha * (isLow ? 0.75 : 0.55)));
+    tracePath();
+    gfx.endFill();
+
+    gfx.lineStyle(0);
+    gfx.beginFill(fillColor, Math.max(0, bodyAlpha * 0.82));
+    tracePath();
+    gfx.endFill();
 }
 
 export function healWave_pixiDestroy(pixi) {
@@ -202,6 +330,7 @@ export function healWave_pixiDestroy(pixi) {
     if (pixi.glowSprite) { pixi.glowSprite.destroy(); pixi.glowSprite = null; }
     if (pixi.ringSprite) { pixi.ringSprite.destroy(); pixi.ringSprite = null; }
     if (pixi.innerRingSprite) { pixi.innerRingSprite.destroy(); pixi.innerRingSprite = null; }
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
 }
 
 // ─── LaserBeam 适配器 ──────────────────────────────────────────
@@ -352,6 +481,15 @@ export function shockwave_pixiSync(sw, pixi) {
     const { ringSprite, gfx } = pixi;
     if (sw.alpha <= 0) { if (gfx) gfx.clear(); if (ringSprite) ringSprite.alpha = 0; return; }
 
+    if (sw.kind === 'impact') {
+        shockwave_pixiSyncImpact(sw, pixi);
+        return;
+    }
+    if (sw.kind === 'assimilation') {
+        shockwave_pixiSyncAssimilation(sw, pixi);
+        return;
+    }
+
     const radius = Math.max(0.1, sw.radius);
     const t = Math.min(1, radius / sw.maxRadius);
     const color = pixiCssColor(sw.color);
@@ -401,6 +539,165 @@ export function shockwave_pixiSync(sw, pixi) {
         gfx.lineStyle(spoke.width, color, fade * 0.42);
         gfx.moveTo(sw.x + cos * inner, sw.y + sin * inner);
         gfx.lineTo(sw.x + cos * outer, sw.y + sin * outer);
+    }
+}
+
+function shockwave_pixiSyncImpact(sw, pixi) {
+    const { ringSprite, gfx } = pixi;
+    const radius = Math.max(0.1, sw.radius);
+    const t = Math.min(1, radius / sw.maxRadius);
+    const color = pixiCssColor(sw.color);
+    const dir = Number.isFinite(sw.directionAngle) ? sw.directionAngle : sw.seed;
+    const back = dir + Math.PI;
+    const spread = 1.15;
+    const damageRadius = Number.isFinite(sw.damageRadius) ? Math.max(0, sw.damageRadius) : sw.maxRadius;
+    const targetSplashRadius = sw.coverageRing && damageRadius > 0 ? damageRadius : radius;
+    const coverageProgress = sw.coverageRing ? (1 - Math.pow(1 - Math.min(1, t), 3)) : t;
+    const splashRadius = sw.coverageRing ? Math.max(2, targetSplashRadius * coverageProgress) : radius;
+    const coverageAlpha = sw.coverageRing ? sw.alpha * 0.72 * (1 - t * 0.42) : 0;
+
+    if (ringSprite) {
+        ringSprite.alpha = 0;
+    }
+    gfx.clear();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+
+    // @perf-impact: Explosion animated coverage splash - PixiJS draws lightweight expanding fills, arcs, and spokes under the existing shockwaveLimit budget.
+    if (sw.coverageRing && damageRadius > 0) {
+        gfx.lineStyle(0);
+        gfx.beginFill(color, Math.max(0, coverageAlpha * 0.13));
+        gfx.drawCircle(sw.x, sw.y, splashRadius);
+        gfx.endFill();
+        gfx.beginFill(0xFFFFFF, Math.max(0, coverageAlpha * 0.045 * (1 - t * 0.45)));
+        gfx.drawCircle(sw.x, sw.y, splashRadius * 0.52);
+        gfx.endFill();
+
+        gfx.lineStyle(Math.max(1.4, 3 - t * 1.15), color, Math.max(0, coverageAlpha));
+        gfx.drawCircle(sw.x, sw.y, splashRadius);
+        gfx.lineStyle(1.2, 0xFFFFFF, Math.max(0, coverageAlpha * 0.58));
+        gfx.drawCircle(sw.x, sw.y, Math.max(1, splashRadius * 0.985));
+
+        const ringCount = 2;
+        for (let k = 0; k < ringCount; k++) {
+            const rr = Math.max(4, splashRadius * (0.38 + k * 0.24 + t * 0.18));
+            const ringAlpha = coverageAlpha * (k === 0 ? 0.9 : 0.62);
+            gfx.lineStyle(k === 0 ? 1.9 : 1.5, k === 0 ? 0xFFFFFF : color, Math.max(0, ringAlpha));
+            for (const arc of sw.arcJitter || []) {
+                const start = arc.start + k * 0.18;
+                gfx.moveTo(sw.x + Math.cos(start) * rr, sw.y + Math.sin(start) * rr);
+                gfx.arc(sw.x, sw.y, rr, start, start + arc.span * 1.45);
+            }
+        }
+
+        for (const spoke of sw.spokes || []) {
+            const inner = splashRadius * (0.12 + t * 0.08);
+            const outer = splashRadius * Math.min(0.96, spoke.reach + 0.08);
+            const fade = coverageAlpha * 0.56 * (1 - t * 0.24);
+            gfx.lineStyle(Math.max(1.1, spoke.width * 0.85), color, Math.max(0, fade));
+            gfx.moveTo(sw.x + Math.cos(spoke.angle) * inner, sw.y + Math.sin(spoke.angle) * inner);
+            gfx.lineTo(sw.x + Math.cos(spoke.angle) * outer, sw.y + Math.sin(spoke.angle) * outer);
+        }
+    }
+
+    const coneAlpha = sw.alpha * (sw.coverageRing ? 0.28 : 0.62);
+    const coneWidth = ((sw.coverageRing ? 3.0 : 4.2) * (sw.intensity || 1)) * (1 - t * 0.28);
+    for (let i = -2; i <= 2; i++) {
+        const a = dir + i * spread / 4;
+        const inner = radius * 0.18;
+        const outer = radius * (0.72 + Math.abs(i) * 0.05);
+        const lineColor = i === 0 ? 0xFFFFFF : color;
+        const lineAlpha = coneAlpha * (1 - Math.abs(i) * 0.14);
+        gfx.lineStyle(coneWidth * (i === 0 ? 0.7 : 1), lineColor, Math.max(0, lineAlpha));
+        gfx.moveTo(sw.x + Math.cos(a) * inner, sw.y + Math.sin(a) * inner);
+        gfx.lineTo(sw.x + Math.cos(a) * outer, sw.y + Math.sin(a) * outer);
+    }
+
+    gfx.lineStyle(3.2, color, Math.max(0, sw.alpha * (sw.coverageRing ? 0.34 : 0.72)));
+    gfx.moveTo(sw.x + Math.cos(dir - spread * 0.62) * radius, sw.y + Math.sin(dir - spread * 0.62) * radius);
+    gfx.arc(sw.x, sw.y, radius, dir - spread * 0.62, dir + spread * 0.62);
+
+    gfx.lineStyle(1.5, 0xFFFFFF, Math.max(0, sw.alpha * (sw.coverageRing ? 0.18 : 0.32)));
+    gfx.moveTo(sw.x + Math.cos(back - spread * 0.35) * radius * 0.62, sw.y + Math.sin(back - spread * 0.35) * radius * 0.62);
+    gfx.arc(sw.x, sw.y, radius * 0.62, back - spread * 0.35, back + spread * 0.35);
+
+    for (const shard of sw.impactShards || []) {
+        const rawTravel = sw.coverageRing
+            ? Math.max(0, Math.min(1, (t - (shard.delay || 0)) / Math.max(0.2, 1 - (shard.delay || 0))))
+            : 1;
+        if (sw.coverageRing && rawTravel <= 0) continue;
+        const travel = 1 - Math.pow(1 - rawTravel, 3);
+        const startReach = sw.coverageRing ? (shard.startReach || 0.08) : 0;
+        const dist = (sw.coverageRing ? targetSplashRadius : radius) * (startReach + (shard.reach - startReach) * travel);
+        const sx = sw.x + Math.cos(shard.angle) * dist;
+        const sy = sw.y + Math.sin(shard.angle) * dist;
+        const s = shard.size;
+        const shardAngle = shard.angle + (shard.spin || 0) * travel;
+        const ca = Math.cos(shardAngle);
+        const sa = Math.sin(shardAngle);
+        const p1 = { x: sx + ca * s, y: sy + sa * s };
+        const p2 = { x: sx + (-ca * s * 0.6 + sa * s * 0.42), y: sy + (-sa * s * 0.6 - ca * s * 0.42) };
+        const p3 = { x: sx + (-ca * s * 0.25 - sa * s * 0.58), y: sy + (-sa * s * 0.25 + ca * s * 0.58) };
+        const shardAlpha = sw.alpha * shard.alpha * (sw.coverageRing ? Math.min(1, rawTravel * 3) : 1);
+        gfx.beginFill(color, Math.max(0, shardAlpha));
+        gfx.moveTo(p1.x, p1.y);
+        gfx.lineTo(p2.x, p2.y);
+        gfx.lineTo(p3.x, p3.y);
+        gfx.closePath();
+        gfx.endFill();
+    }
+}
+
+function shockwave_pixiSyncAssimilation(sw, pixi) {
+    const { ringSprite, gfx } = pixi;
+    const radius = Math.max(0.1, sw.radius);
+    const t = Math.min(1, radius / sw.maxRadius);
+    const pull = 1 - t;
+    const color = pixiCssColor(sw.color);
+
+    if (ringSprite) {
+        ringSprite.x = sw.x;
+        ringSprite.y = sw.y;
+        const d = radius * 2.1;
+        ringSprite.width = d;
+        ringSprite.height = d;
+        ringSprite.alpha = Math.max(0, sw.alpha * 0.18);
+        ringSprite.tint = color;
+    }
+    gfx.clear();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+
+    for (let k = 0; k < 2; k++) {
+        const rr = Math.max(2, radius * (0.78 + k * 0.22));
+        const alpha = sw.alpha * (k === 0 ? 0.82 : 0.45);
+        gfx.lineStyle(2.2 - k * 0.6, k === 0 ? color : 0xFFFFFF, Math.max(0, alpha));
+        for (let i = 0; i < 6; i++) {
+            const a = sw.seed + sw.glyphRotation + i * Math.PI * 2 / 6;
+            gfx.moveTo(sw.x + Math.cos(a + 0.08) * rr, sw.y + Math.sin(a + 0.08) * rr);
+            gfx.arc(sw.x, sw.y, rr, a + 0.08, a + 0.36);
+        }
+    }
+
+    for (const glyph of sw.glyphs || []) {
+        const a = glyph.angle + sw.glyphRotation;
+        const rr = radius * glyph.offset;
+        const gx = sw.x + Math.cos(a) * rr;
+        const gy = sw.y + Math.sin(a) * rr;
+        gfx.lineStyle(1.4, 0xFFFFFF, Math.max(0, sw.alpha * 0.76));
+        gfx.moveTo(gx, gy);
+        gfx.lineTo(
+            gx - Math.cos(a) * glyph.size * (1.8 + pull),
+            gy - Math.sin(a) * glyph.size * (1.8 + pull)
+        );
+    }
+
+    const spokeCount = 6;
+    for (let i = 0; i < spokeCount; i++) {
+        const a = sw.seed - sw.glyphRotation * 0.7 + i * Math.PI * 2 / spokeCount;
+        const outer = radius * (0.86 + 0.1 * Math.sin(sw.seed + i));
+        const inner = radius * (0.24 + pull * 0.22);
+        gfx.lineStyle(1.6, color, Math.max(0, sw.alpha * 0.5));
+        gfx.moveTo(sw.x + Math.cos(a) * outer, sw.y + Math.sin(a) * outer);
+        gfx.lineTo(sw.x + Math.cos(a) * inner, sw.y + Math.sin(a) * inner);
     }
 }
 
@@ -502,6 +799,9 @@ export function deathExplosion_pixiSync(de, pixi) {
     if (!gfx) return;
     gfx.clear();
     if (de.life <= 0) return;
+    gfx.blendMode = (de.variant !== 'venom' && de.tier === 'normal')
+        ? PIXI.BLEND_MODES.NORMAL
+        : PIXI.BLEND_MODES.ADD;
 
     // [剧毒火焰死亡] 毒焰溶解专属渲染
     if (de.variant === 'venom') { deathExplosion_pixiSyncVenom(de, gfx); return; }
@@ -556,6 +856,80 @@ export function deathExplosion_pixiSync(de, pixi) {
             gfx.moveTo(sx - s, sy);
             gfx.lineTo(sx + s * 0.95, sy - s * 0.58);
             gfx.lineTo(sx + s * 0.35, sy + s * 1.05);
+            gfx.closePath();
+            gfx.endFill();
+        }
+    }
+
+    // 1c. 普通死亡：裂纹崩开 + 棱片错位，避免读成扩散冲击波。
+    if (de.tier === 'normal') {
+        const splitAngle = de.normalSplitAngle || 0;
+        const ca = Math.cos(splitAngle), sa = Math.sin(splitAngle);
+        const open = Math.min(1, t * 1.35);
+        const toWorld = (lx, ly) => ({
+            x: de.x + ca * lx - sa * ly,
+            y: de.y + sa * lx + ca * ly,
+        });
+        const drawLocalPoly = (points, color, alpha) => {
+            if (alpha <= 0 || points.length < 3) return;
+            const first = toWorld(points[0][0], points[0][1]);
+            gfx.beginFill(color, alpha);
+            gfx.moveTo(first.x, first.y);
+            for (let i = 1; i < points.length; i++) {
+                const p = toWorld(points[i][0], points[i][1]);
+                gfx.lineTo(p.x, p.y);
+            }
+            gfx.closePath();
+            gfx.endFill();
+        };
+
+        drawLocalPoly([
+            [-14 - open * 3, -6],
+            [-2 - open * 5, -10],
+            [-5 - open * 4, 8],
+            [-16 - open * 2, 5],
+        ], 0x1E293B, de.life * 0.5);
+        drawLocalPoly([
+            [2 + open * 5, -9],
+            [15 + open * 3, -5],
+            [13 + open * 2, 7],
+            [4 + open * 4, 10],
+        ], 0x1E293B, de.life * 0.5);
+
+        for (const crack of de.normalCracks || []) {
+            const localT = Math.min(1, t * 1.5);
+            const half = crack.length * (0.3 + localT * 0.7) / 2;
+            const c = Math.cos(crack.angle), s = Math.sin(crack.angle);
+            const ox = -s * crack.offset, oy = c * crack.offset;
+            const p0 = { x: de.x + ox - c * half, y: de.y + oy - s * half };
+            const p1 = { x: de.x + ox - c * half * 0.25 - s * (-2.2 * crack.alpha), y: de.y + oy - s * half * 0.25 + c * (-2.2 * crack.alpha) };
+            const p2 = { x: de.x + ox + c * half * 0.25 - s * (1.8 * crack.alpha), y: de.y + oy + s * half * 0.25 + c * (1.8 * crack.alpha) };
+            const p3 = { x: de.x + ox + c * half, y: de.y + oy + s * half };
+            gfx.lineStyle(1.5, 0xCBD5E1, crack.alpha * de.life);
+            gfx.moveTo(p0.x, p0.y);
+            gfx.lineTo(p1.x, p1.y);
+            gfx.lineTo(p2.x, p2.y);
+            gfx.lineTo(p3.x, p3.y);
+        }
+        gfx.lineStyle(0);
+
+        for (const shard of de.normalShards || []) {
+            const center = toWorld(shard.along, shard.side * (shard.dist + open * 6));
+            const theta = splitAngle + shard.spinAngle;
+            const c = Math.cos(theta), s = Math.sin(theta);
+            const sz = shard.size;
+            const pts = [
+                { x: -sz, y: -sz * 0.25 },
+                { x: sz * 0.9, y: -sz * 0.55 },
+                { x: sz * 0.25, y: sz },
+            ].map(p => ({
+                x: center.x + c * p.x - s * p.y,
+                y: center.y + s * p.x + c * p.y,
+            }));
+            gfx.beginFill(pixiCssColor(shard.color), shard.alpha * de.life);
+            gfx.moveTo(pts[0].x, pts[0].y);
+            gfx.lineTo(pts[1].x, pts[1].y);
+            gfx.lineTo(pts[2].x, pts[2].y);
             gfx.closePath();
             gfx.endFill();
         }
@@ -752,9 +1126,11 @@ export function pierceCutEffect_pixiSync(pce, pixi) {
     if (!gfx) return;
     gfx.clear();
     if (!pce.active || pce.life <= 0) return;
+    const intensity = Math.max(0.25, Math.min(1, pce.intensity || 0.65));
+    gfx.blendMode = (pce.quality === 'low' || intensity < 0.58) ? PIXI.BLEND_MODES.NORMAL : PIXI.BLEND_MODES.ADD;
 
     const t = Math.min(1, pce.age / pce.duration);
-    const open = Math.sin(t * Math.PI) * 8;
+    const open = Math.sin(t * Math.PI) * (pce.openScale || 6);
     const halfL = pce.length / 2;
     const color = pixiCssColor(pce.color);
     const cos = Math.cos(pce.angle), sin = Math.sin(pce.angle);
@@ -790,22 +1166,22 @@ export function pierceCutEffect_pixiSync(pce, pixi) {
     };
 
     const cw = pce.cutWidth;
-    const slitAlpha = Math.min(1, pce.life * 1.35);
+    const slitAlpha = Math.min(1, pce.life * 1.35) * (pce.coreAlpha || 0.62);
 
     // 1. 外层热辉光（柔和锥形，替代 shadowBlur）
-    fillSpindle(cw * 1.25, color, pce.life * 0.16, 0.5, 0);
+    fillSpindle(cw * 1.18, color, pce.life * (pce.glowAlpha || 0.08), 0.5, 0);
     // 2. 上下两唇：沿轴张开，营造「被劈开」的张口
-    fillSpindle(cw * 0.5, color, pce.life * 0.5, 0.7, -open * 0.5);
-    fillSpindle(cw * 0.5, color, pce.life * 0.5, 0.7, open * 0.5);
+    fillSpindle(cw * 0.46, color, pce.life * (pce.lipAlpha || 0.30), 0.7, -open * 0.5);
+    fillSpindle(cw * 0.46, color, pce.life * (pce.lipAlpha || 0.30), 0.7, open * 0.5);
     // 3. 核心白热切口：极细、两端尖锐
-    fillSpindle(Math.max(0.6, cw * 0.3 * (0.55 + 0.45 * pce.life)), 0xFFFFFF, slitAlpha, 1.0, 0);
+    fillSpindle(Math.max(0.45, cw * 0.22 * (0.55 + 0.45 * pce.life)), 0xFFFFFF, slitAlpha, 1.0, 0);
 
     // 碎片三角形
     for (const chip of pce.chips) {
         const cx = rx(chip.along, chip.side * chip.lift);
         const cy = ry(chip.along, chip.side * chip.lift);
         const s = chip.size;
-        gfx.beginFill(color, chip.alpha * pce.life);
+        gfx.beginFill(color, chip.alpha * pce.life * (0.50 + intensity * 0.35));
         gfx.moveTo(cx - s, cy);
         gfx.lineTo(cx + s * 0.8, cy - s * 0.45);
         gfx.lineTo(cx + s * 0.35, cy + s * 0.85);
@@ -1293,12 +1669,12 @@ export function floatingText_pixiCreate(ft) {
     if (!container) return null;
 
     const style = new PIXI.TextStyle({
-        fontFamily: 'sans-serif',
-        fontWeight: 'bold',
+        fontFamily: ft.isDamageNumber ? 'Cinzel, serif' : 'sans-serif',
+        fontWeight: ft.isDamageNumber ? '700' : 'bold',
         fontSize: ft.fontSize,
         fill: ft.color,
         stroke: '#000000',
-        strokeThickness: Math.max(3, ft.fontSize / 5),
+        strokeThickness: ft.isDamageNumber ? Math.max(2, ft.fontSize / 6) : Math.max(3, ft.fontSize / 5),
         align: 'center',
     });
 
@@ -1325,17 +1701,19 @@ export function floatingText_pixiSync(ft, pixi) {
 
     text.x = ft.pos.x;
     text.y = ft.pos.y;
-    text.alpha = Math.max(0, ft.life);
+    const renderScale = typeof ft.getRenderScale === 'function' ? ft.getRenderScale() : 1;
+    text.scale.set(renderScale);
+    text.alpha = Math.max(0, ft.life) * (ft.isDamageNumber ? 0.92 : 1);
 
     if (iconSprite && pixi.iconImg) {
-        const iconSize = pixi.fontSize * 1.2;
+        const iconSize = pixi.fontSize * 1.2 * renderScale;
         const textWidth = text.width;
         const totalWidth = iconSize + 3 + textWidth;
         iconSprite.x = ft.pos.x - totalWidth / 2;
-        iconSprite.y = ft.pos.y - pixi.fontSize * 0.8;
+        iconSprite.y = ft.pos.y - pixi.fontSize * 0.8 * renderScale;
         iconSprite.width = iconSize;
         iconSprite.height = iconSize;
-        iconSprite.alpha = Math.max(0, ft.life);
+        iconSprite.alpha = Math.max(0, ft.life) * (ft.isDamageNumber ? 0.92 : 1);
         // 文字偏移
         text.x = ft.pos.x + (totalWidth / 2 - textWidth / 2);
     }
@@ -2011,6 +2389,202 @@ export function windMarkEffect_pixiSync(wm, pixi) {
 export function windMarkEffect_pixiDestroy(pixi) {
     if (!pixi) return;
     if (pixi.ringSprite) { pixi.ringSprite.destroy(); pixi.ringSprite = null; }
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
+// ─── BounceArcEffect 适配器（Phase 2.7 弹跳动能短弧）──────────────
+// @perf-impact: 单 Graphics 批绘，每敌人最多 3 组短弧（×2 双层）+ 小型命中环；瞬态 0.28s。
+
+/**
+ * 为 BounceArcEffect 创建 PixiJS 显示对象
+ * @param {object} be BounceArcEffect 实例
+ * @returns {{ gfx: PIXI.Graphics }}
+ */
+export function bounceArcEffect_pixiCreate(be) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+    return { gfx };
+}
+
+/**
+ * 同步 BounceArcEffect 状态到 PixiJS 显示对象
+ * @param {object} be BounceArcEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function bounceArcEffect_pixiSync(be, pixi) {
+    const { gfx } = pixi;
+    if (!gfx) return;
+    gfx.clear();
+    for (const arc of be.arcs) {
+        const anim = be._arcAnim ? be._arcAnim(arc) : { fade: Math.pow(Math.max(0, arc.life / arc.maxLife), 2.2), scale: 1 };
+        if (anim.fade <= 0) continue;
+        const phases = arc.helix ? [0, 1] : [0];
+        for (const ph of phases) {
+            const g = be._arcGeom(arc, ph, anim.scale);
+            const sx = be.x + g.sx, sy = be.y + g.sy;
+            const cx = be.x + g.cx, cy = be.y + g.cy;
+            const ex = be.x + g.ex, ey = be.y + g.ey;
+            // 外层弹性绿辉：降低亮度，短促弹出后迅速回收
+            gfx.lineStyle(Math.max(4, g.span * 0.18), 0x22C55E, Math.max(0, 0.20 * anim.fade));
+            gfx.moveTo(sx, sy);
+            gfx.quadraticCurveTo(cx, cy, ex, ey);
+            // 内层薄荷芯
+            gfx.lineStyle(Math.max(1.6, g.span * 0.075), 0xDCFCE7, Math.max(0, 0.46 * anim.fade));
+            gfx.moveTo(sx, sy);
+            gfx.quadraticCurveTo(cx, cy, ex, ey);
+        }
+        const pulseR = Math.max(4, Math.min(15, 11 * anim.scale));
+        gfx.lineStyle(1.4, 0xBBF7D0, Math.max(0, 0.16 * anim.fade));
+        gfx.drawCircle(be.x + arc.ox, be.y + arc.oy, pulseR);
+        // 三阶共鸣：命中点处小型绿色扩散环
+        if (arc.ring >= 0) {
+            gfx.lineStyle(2, 0x22C55E, Math.max(0, 0.22 * anim.fade));
+            gfx.drawCircle(be.x + arc.ox, be.y + arc.oy, arc.ring);
+        }
+    }
+}
+
+/**
+ * 销毁 BounceArcEffect 的 PixiJS 显示对象
+ */
+export function bounceArcEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
+// ─── ScatterBurstEffect 适配器（Phase 2.9 散射星爆）──────────────
+// @perf-impact: 单 Graphics 批绘，每敌人最多 4 个并发星爆，每个 4-12 条短线；共鸣末端四角星填充；瞬态 0.6s。
+
+/**
+ * 为 ScatterBurstEffect 创建 PixiJS 显示对象
+ * @param {object} se ScatterBurstEffect 实例
+ * @returns {{ gfx: PIXI.Graphics }}
+ */
+export function scatterBurstEffect_pixiCreate(se) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+    return { gfx };
+}
+
+/**
+ * 同步 ScatterBurstEffect 状态到 PixiJS 显示对象
+ * @param {object} se ScatterBurstEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function scatterBurstEffect_pixiSync(se, pixi) {
+    const { gfx } = pixi;
+    if (!gfx) return;
+    gfx.clear();
+    for (const b of se.bursts) {
+        const t = b.life / b.maxLife; // 1 → 0
+        if (t <= 0) continue;
+        const grow = 1 - t;
+        const reach = (b.resonance ? 20 : 14) * (0.4 + grow * 0.82);
+        for (const a of b.rays) {
+            const sx = se.x + b.ox + Math.cos(a) * 3;
+            const sy = se.y + b.oy + Math.sin(a) * 3;
+            const ex = se.x + b.ox + Math.cos(a) * reach;
+            const ey = se.y + b.oy + Math.sin(a) * reach;
+            gfx.lineStyle(b.resonance ? 1.5 : 1.2, 0xFACC15, Math.max(0, (b.resonance ? 0.62 : 0.48) * t));
+            gfx.moveTo(sx, sy);
+            gfx.lineTo(ex, ey);
+            // 共鸣：辐射线末端四角星闪烁
+            if (b.resonance) {
+                const flick = 0.5 + 0.5 * Math.sin(b.life * 0.05);
+                _pixiFourPointStar(gfx, ex, ey, 2.4, Math.max(0, 0.55 * t * flick));
+            }
+        }
+    }
+}
+
+/**
+ * 销毁 ScatterBurstEffect 的 PixiJS 显示对象
+ */
+export function scatterBurstEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
+    if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
+}
+
+// 四角星填充辅助（复用 scatter 弹体形状）
+function _pixiFourPointStar(gfx, cx, cy, r, alpha) {
+    if (alpha <= 0) return;
+    gfx.beginFill(0xFFF0A0, alpha);
+    gfx.moveTo(cx + r, cy);
+    for (let i = 1; i < 8; i++) {
+        const ang = (Math.PI / 4) * i;
+        const rad = (i % 2 === 0) ? r : r * 0.4;
+        gfx.lineTo(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad);
+    }
+    gfx.closePath();
+    gfx.endFill();
+}
+
+// ─── EchoRippleEffect 适配器（Phase 2.11 回响波纹）──────────────
+// @perf-impact: 单 Graphics 批绘，每敌人最多 3 组波纹，每组 3 圈同心 arc + 三阶 4 弧；瞬态 0.6s。
+
+/**
+ * 为 EchoRippleEffect 创建 PixiJS 显示对象
+ * @param {object} ee EchoRippleEffect 实例
+ * @returns {{ gfx: PIXI.Graphics }}
+ */
+export function echoRippleEffect_pixiCreate(ee) {
+    const container = pixiGetEffectContainer();
+    if (!container) return null;
+    const gfx = new PIXI.Graphics();
+    gfx.blendMode = PIXI.BLEND_MODES.ADD;
+    container.addChild(gfx);
+    return { gfx };
+}
+
+/**
+ * 同步 EchoRippleEffect 状态到 PixiJS 显示对象
+ * @param {object} ee EchoRippleEffect 实例
+ * @param {object} pixi 适配器对象
+ */
+export function echoRippleEffect_pixiSync(ee, pixi) {
+    const { gfx } = pixi;
+    if (!gfx) return;
+    gfx.clear();
+    const ringAlphas = [0.5, 0.3, 0.15];
+    const ringWidths = [2.6, 1.8, 1.0];
+    const maxR = 46;
+    for (const rp of ee.ripples) {
+        for (let k = 0; k < 3; k++) {
+            // 80ms 错相：第 k 圈延迟 k*80ms 开始扩散
+            const localAge = rp.age - k * 80;
+            if (localAge <= 0) continue;
+            const prog = Math.min(1, localAge / (rp.maxLife * 0.7));
+            const radius = 6 + prog * maxR;
+            const fade = 1 - prog;
+            gfx.lineStyle(ringWidths[k], 0x60A5FA, Math.max(0, ringAlphas[k] * fade));
+            gfx.drawCircle(ee.x + rp.ox, ee.y + rp.oy, radius);
+        }
+        // 三阶共鸣：4 条等距弧线从敌人身体向外扩散（回声定位）
+        if (rp.echoLoc) {
+            const prog = Math.min(1, rp.age / (rp.maxLife * 0.8));
+            const fade = 1 - prog;
+            const rad = 10 + prog * 54;
+            gfx.lineStyle(2.4, 0x93C5FD, Math.max(0, 0.6 * fade));
+            for (let a = 0; a < 4; a++) {
+                const start = (Math.PI / 2) * a + Math.PI / 4;
+                gfx.moveTo(ee.x + Math.cos(start - 0.4) * rad, ee.y + Math.sin(start - 0.4) * rad);
+                gfx.arc(ee.x, ee.y, rad, start - 0.4, start + 0.4);
+            }
+        }
+    }
+}
+
+/**
+ * 销毁 EchoRippleEffect 的 PixiJS 显示对象
+ */
+export function echoRippleEffect_pixiDestroy(pixi) {
+    if (!pixi) return;
     if (pixi.gfx) { pixi.gfx.destroy(); pixi.gfx = null; }
 }
 

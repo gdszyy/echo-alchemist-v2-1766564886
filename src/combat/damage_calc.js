@@ -144,7 +144,62 @@ export const DamageCalc = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 3. 闪电链触发（纯计算 + 递归）
+    // 3. 闪电 + 毒素联动
+    // ─────────────────────────────────────────────────────────────────────────
+
+    combat_lightningVenom_createProcKey(shotId = null) {
+        if (shotId !== null && typeof shotId !== 'undefined') return `shot:${shotId}`;
+        this._lightningVenomProcCounter = (this._lightningVenomProcCounter || 0) + 1;
+        return `adhoc:${this._lightningVenomProcCounter}`;
+    },
+
+    combat_lightningVenom_trigger(enemy, shotId = null, chainDepth = 0, procKey = null) {
+        if (!enemy || !enemy.active || (enemy.venomStacks || 0) <= 0) return null;
+
+        const key = procKey || this.combat_lightningVenom_createProcKey(shotId);
+        if (enemy._lightningVenomProcKey === key) return { triggered: false, key };
+        enemy._lightningVenomProcKey = key;
+
+        const venomCfg = (CONFIG.mechanics && CONFIG.mechanics.venom) || {};
+        const baseRatio = Math.max(0, venomCfg.lightningProcRatio ?? 0.35);
+        if (baseRatio <= 0) return { triggered: false, key };
+        const falloff = Math.max(0, Math.min(1, venomCfg.lightningProcChainFalloff ?? 0.85));
+        const minRatio = Math.max(0, venomCfg.lightningProcMinRatio ?? 0.20);
+        const ratio = Math.max(minRatio, baseRatio * Math.pow(falloff, Math.max(0, chainDepth || 0)));
+        if (ratio <= 0) return { triggered: false, key };
+
+        const venomStacks = Math.max(0, enemy.venomStacks || 0);
+        const effectiveStacks = typeof this.phase_calcVenomEffectiveStacks === 'function'
+            ? this.phase_calcVenomEffectiveStacks(venomStacks)
+            : (() => {
+                const linearStacks = Math.max(0, Math.floor(venomCfg.linearStacks ?? 30));
+                const overflowSqrtScale = Math.max(0, venomCfg.overflowSqrtScale ?? 6);
+                return venomStacks <= linearStacks
+                    ? venomStacks
+                    : linearStacks + Math.sqrt(venomStacks - linearStacks) * overflowSqrtScale;
+            })();
+        const venomRes = this.activeElementResonances && this.activeElementResonances['venom'];
+        const venomResParams = venomRes ? venomRes.params : null;
+        const dotMultiplier = venomResParams ? (venomResParams.dotMultiplier || 1.0) : 1.0;
+        const ignoreShield = venomResParams ? (venomResParams.ignoreShield || false) : false;
+        let procDmg = effectiveStacks * (venomCfg.dotPerStack || 0.8) * dotMultiplier * ratio;
+        if (ignoreShield && enemy.affixes && enemy.affixes.includes('shield')) procDmg *= 2;
+
+        const dmg = Math.max(1, Math.ceil(procDmg));
+        const result = enemy.takeDamage(dmg, null, true);
+        const hpDamage = result ? (result.hpDamage ?? result.actualDamage ?? 0) : 0;
+        if (hpDamage > 0 && typeof this.combat_recordDamage === 'function') {
+            this.combat_recordDamage(hpDamage, 'venom', 'main', shotId);
+        }
+        if (hpDamage > 0 && typeof this.spawn_createFloatingText === 'function') {
+            this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 38, `⚡☠️${Math.ceil(hpDamage)}`, '#a7f3d0', 12);
+        }
+
+        return { triggered: true, key, damage: dmg, hpDamage, killed: !!(result && result.killed) };
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 4. 闪电链触发（纯计算 + 递归）
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -164,13 +219,15 @@ export const DamageCalc = {
      * @param {number} chainChanceBonus - 共鸣概率加成
      * @param {boolean} isExtraChain - 是否为 thunder_scatter 触发的额外链（额外链不再触发 thunder_scatter，防止无限循环）
      * @param {object|null} chainGuaranteeState - 可选配方状态；_guaranteedLightningChains 会让前 N 次概率判定必定成功
+     * @param {string|null} lightningVenomProcKey - 同一射击内限制闪毒对同一目标只触发一次的键
      * @returns {boolean} 是否成功触发了闪电链
      */
-    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false, chainGuaranteeState = null) {
+    combat_lightning_triggerChain(sourceEnemy, dmg, history, level = 1, shotId = null, chainChanceBonus = 0, isExtraChain = false, chainGuaranteeState = null, lightningVenomProcKey = null) {
         // [修复1] 安全检查
         if (!sourceEnemy || !sourceEnemy.pos) return false;
         // [修复2] 容错处理
         history = history || [];
+        const procKey = lightningVenomProcKey || this.combat_lightningVenom_createProcKey(shotId);
         // 查找范围内的所有有效敌人 (取消 !history.includes(e) 限制，允许重复命中)
         const RANGE = 150;
         let targets = this.enemies.filter(e =>
@@ -269,6 +326,17 @@ export const DamageCalc = {
                 const hpDamage = result.hpDamage ?? result.actualDamage ?? 0;
                 this.combat_recordDamage(hpDamage, 'lightning', 'main', shotId);
 
+                if (!result.killed && hpDamage > 0 && typeof this.combat_lightningVenom_trigger === 'function') {
+                    const chainDepth = Math.max(1, history.length + 1);
+                    const venomProc = this.combat_lightningVenom_trigger(selected, shotId, chainDepth, procKey);
+                    if (venomProc && venomProc.killed) {
+                        if (typeof this.spawn_addScore === 'function') this.spawn_addScore(selected.maxHp, selected);
+                        if (typeof this._triggerDeathFX === 'function') {
+                            this._triggerDeathFX(selected, shotId, { cause: 'venom' });
+                        }
+                    }
+                }
+
                 // [修复] 闪电链伤害飘字：与主命中路径一致，受 showDamageNumbers 开关控制，使用雷属性紫色 #c084fc
                 if (this.showDamageNumbers && hpDamage > 0 && typeof this.spawn_createFloatingText === 'function') {
                     this.spawn_createFloatingText(selected.pos.x, selected.pos.y, `-${Math.ceil(hpDamage)}`, '#c084fc');
@@ -293,8 +361,8 @@ export const DamageCalc = {
                 // 递归
                 history.push(selected);
                 // 限制最大连锁次数防止死循环 (增加到 100 次)
-                if (history.length < 100) {
-                    this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId, 0, false, chainGuaranteeState);
+                if (selected.active && history.length < 100) {
+                    this.combat_lightning_triggerChain(selected, nextDmg, history, level, shotId, 0, false, chainGuaranteeState, procKey);
                 }
 
                 // ─────────────────────────────────────────────────────────────
@@ -312,7 +380,7 @@ export const DamageCalc = {
                             // 额外闪电链使用相同的 level，但独立的 history
                             // isExtraChain=true：额外链不会再次触发 thunder_scatter，防止无限循环
                             const extraHistory = [...history];
-                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId, 0, true, chainGuaranteeState);
+                            this.combat_lightning_triggerChain(selected, nextDmg, extraHistory, level, shotId, 0, true, chainGuaranteeState, procKey);
                         }
                     }
                 }
@@ -324,7 +392,7 @@ export const DamageCalc = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 4. 色差特效触发（通过 EventBus 事件，由 ui_system.js 监听并操作 DOM）
+    // 5. 色差特效触发（通过 EventBus 事件，由 ui_system.js 监听并操作 DOM）
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -354,7 +422,7 @@ export const DamageCalc = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 5. [词条 Hook] 绝对零度（absolute_zero）辅助方法
+    // 6. [词条 Hook] 绝对零度（absolute_zero）辅助方法
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -388,7 +456,7 @@ export const DamageCalc = {
     },
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 6. [词条 Hook] 元素聚变（elemental_fusion）触发检查
+    // 7. [词条 Hook] 元素聚变（elemental_fusion）触发检查
     // ─────────────────────────────────────────────────────────────────────────
 
     /**

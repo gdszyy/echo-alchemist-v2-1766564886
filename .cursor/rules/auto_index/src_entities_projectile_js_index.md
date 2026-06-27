@@ -1,6 +1,6 @@
 # src\entities\projectile.js 函数索引
 
-> 自动生成于 2026-06-23 | 总行数: 1661 | 函数数: 15 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 1957 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -21,11 +21,16 @@
 | performSlashAttack | method | `performSlashAttack(target, enemies)` |  |
 | _tryTriggerEchoBullet | method | `_tryTriggerEchoBullet()` |  |
 | _detonateOvercharge | method | `_detonateOvercharge()` |  |
+| releasePixiResources | method | `releasePixiResources()` |  |
 | destroy | method | `destroy(spawnCallback)` |  |
 | stickToEnemy | method | `stickToEnemy(enemy)` |  |
 | handleFlyingSwordFinish | method | `handleFlyingSwordFinish(host, game, isBottomExit = false)` |  |
 | draw | method | `draw(ctx)` |  |
+| _syncBulletGlow | method | `_syncBulletGlow()` |  |
 | _drawTrail | method | `_drawTrail(ctx)` |  |
+| _drawTrailV2 | method | `_drawTrailV2()` |  |
+| _resolveTrailColor | method | `_resolveTrailColor(cfg)` |  |
+| _drawTrailCanvas2D | method | `_drawTrailCanvas2D(ctx, perfQuality)` |  |
 
 ## 巨型函数内部节点 (@section 标记)
 

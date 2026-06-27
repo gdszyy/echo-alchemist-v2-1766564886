@@ -1,9 +1,9 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 4324 | 函数数: 58 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 5917 | 函数数: 91 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 6 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -12,9 +12,41 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | combat_createFloatingText | method | `combat_createFloatingText(x, y, text, color)` |  |
+| combat_spreadVenomStacks | method | `combat_spreadVenomStacks(sourceEnemy, targets, totalStacks)` |  |
+| combat_activatePotionSpell | method | `combat_activatePotionSpell()` |  |
+| combat_getPotionVfxProfile | method | `combat_getPotionVfxProfile(potionDef)` |  |
+| combat_resolvePotionVfxPoint | method | `combat_resolvePotionVfxPoint(targets = [], opts = {})` |  |
+| combat_getPotionVfxBudget | method | `combat_getPotionVfxBudget(targetMode = 'cluster_center')` |  |
+| combat_spawnPotionVfxParticle | method | `combat_spawnPotionVfxParticle(x, y, color, mode = 'spark', opts = {})` |  |
+| combat_emitPotionRadialParticles | method | `combat_emitPotionRadialParticles(point, color, mode, count, opts = {})` |  |
+| combat_emitPotionArcingTrail | method | `combat_emitPotionArcingTrail(profile, origin, point, color, targetMode)` |  |
+| combat_emitPotionTargetAccents | method | `combat_emitPotionTargetAccents(profile, targets, color, targetMode)` |  |
+| combat_emitPotionShortBolts | method | `combat_emitPotionShortBolts(point, count, radius = 46)` |  |
+| combat_playPotionShatterVFX | method | `combat_playPotionShatterVFX(profile, targets, ctx)` |  |
+| combat_playPotionBottleVFX | method | `combat_playPotionBottleVFX(potionDef, targets = [], opts = {})` |  |
+| combat_buildSpellFormVfxContext | method | `combat_buildSpellFormVfxContext(profile, spellDef, targets = [], opts = {})` |  |
+| combat_emitSpellFormCastCue | method | `combat_emitSpellFormCastCue(profile, ctx)` |  |
+| combat_emitSpellFormLabel | method | `combat_emitSpellFormLabel(profile, ctx, offset = 32)` |  |
+| combat_resolveSpellReleaseProfile | method | `combat_resolveSpellReleaseProfile(profile, preferred = null)` |  |
+| combat_playSpellOrbVFX | method | `combat_playSpellOrbVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellMineVFX | method | `combat_playSpellMineVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellOrbitVFX | method | `combat_playSpellOrbitVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellSlashVFX | method | `combat_playSpellSlashVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellBeamVFX | method | `combat_playSpellBeamVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellMeteorVFX | method | `combat_playSpellMeteorVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellSweepingLaserVFX | method | `combat_playSpellSweepingLaserVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellTowerVFX | method | `combat_playSpellTowerVFX(profile, targets = [], ctx)` |  |
+| combat_playSpellFormVFX | method | `combat_playSpellFormVFX(spellDef, targets = [], opts = {})` |  |
+| combat_applyPotionSpell | method | `combat_applyPotionSpell(potionDef, prepared)` |  |
 | combat_updateMulticastDisplay | method | `combat_updateMulticastDisplay(bonusAmount = 0)` |  |
 | combat_playMulticastTransferEffect | method | `combat_playMulticastTransferEffect(multicastValue)` |  |
+| combat_getSkillVisualTier | method | `combat_getSkillVisualTier(skill)` |  |
+| combat_getSkillVisualColor | method | `combat_getSkillVisualColor(skill)` |  |
+| combat_playSkillCastVFX | method | `combat_playSkillCastVFX(skill, opts = {})` |  |
+| combat_playSkillImpactVFX | method | `combat_playSkillImpactVFX(skill, targets, opts = {})` |  |
 | combat_activateSkill | method | `combat_activateSkill(skill)` | ⚠️ 巨型函数，见 @section 导航 |
+| combat_recomputeActiveSkills | method | `combat_recomputeActiveSkills(opts = {})` |  |
+| combat_activateSkillExtended | method | `combat_activateSkillExtended(skill, p, method)` | ⚠️ 巨型函数，见 @section 导航 |
 | combat_flyingSword_assignTarget | method | `combat_flyingSword_assignTarget(enemy)` |  |
 | combat_flyingSword_addSon | method | `combat_flyingSword_addSon(x, y, mother, level, config, delay = 0)` |  |
 | combat_wind_addAnchor | method | `combat_wind_addAnchor(x, y, bulletDamage = 2, bulletConfig = { wind: 1 })` |  |
@@ -52,14 +84,14 @@
 | _laser_blendRefractionColor | method | `_laser_blendRefractionColor(baseColor)` |  |
 | combat_updateHitProgress | method | `combat_updateHitProgress(val, target)` |  |
 | relic_runRoundStartHooks | method | `relic_runRoundStartHooks()` |  |
-| combat_skillCharge_init | method | `combat_skillCharge_init()` |  |
+| combat_skillCharge_init | method | `combat_skillCharge_init(preservePersistent = false)` |  |
 | combat_skillCharge_initUI | method | `combat_skillCharge_initUI()` |  |
 | combat_skillCharge_onHit | method | `combat_skillCharge_onHit(hitX, hitY, isKill = false)` |  |
 | combat_skillCharge_tryAward | method | `combat_skillCharge_tryAward()` |  |
 | combat_skillCharge_decay | method | `combat_skillCharge_decay(timeScale)` |  |
 | combat_skillCharge_updateUI | method | `combat_skillCharge_updateUI()` |  |
 | combat_skillCharge_syncLegacyState | method | `combat_skillCharge_syncLegacyState()` |  |
-| combat_runeCharge_init | method | `combat_runeCharge_init()` |  |
+| combat_runeCharge_init | method | `combat_runeCharge_init(preservePersistent = false)` |  |
 | combat_runeCharge_initUI | method | `combat_runeCharge_initUI()` |  |
 | combat_runeCharge_onHit | method | `combat_runeCharge_onHit(hitX, hitY, isKill = false)` |  |
 | combat_runeCharge_levelUp | method | `combat_runeCharge_levelUp()` |  |
@@ -68,7 +100,8 @@
 | combat_runeCharge_claimReward | method | `combat_runeCharge_claimReward()` |  |
 | combat_checkBossPhaseChange | method | `combat_checkBossPhaseChange()` |  |
 | combat_triggerBossEnrage | method | `combat_triggerBossEnrage(boss)` |  |
-| _triggerDeathFX | method | `_triggerDeathFX(enemy, shotId)` |  |
+| _triggerDeathFX | method | `_triggerDeathFX(enemy, shotId, options = {})` |  |
+| _triggerVenomDeathFX | method | `_triggerVenomDeathFX(enemy, x, y, tier)` |  |
 
 ## 巨型函数内部节点 (@section 标记)
 
@@ -81,6 +114,10 @@
 | `@section:skill_cooldown_and_cost` | 冷却时间检查与能量消耗 |
 | `@section:skill_effect_apply` | 技能效果应用（伤害/增益/召唤） |
 | `@section:skill_visual_feedback` | 技能视觉反馈与音效触发 |
+
+### combat_activateSkillExtended
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### combat_wind_executeCircleEffect
 

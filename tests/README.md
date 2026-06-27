@@ -10,6 +10,9 @@
 |---|---|---|---|
 | `validate_scenarios.js` | 静态校验 | Node.js（无需浏览器） | 验证 `TRAINING_SCENARIOS` 数据结构完整性 |
 | `validate_boss_vulnerability.mjs` | 静态校验 | Node.js（无需浏览器） | 验证 Boss 破绽谱重设计与旧 `weak_spot` 机制移除 |
+| `validate_rune_spell_forms.mjs` | 静态校验 | Node.js（无需浏览器） | 验证符文词条 Spell Form V1 的中心法阵匹配契约 |
+| `validate_potion_vfx_contract.mjs` | 静态校验 | Node.js（无需浏览器） | 验证药剂法术的药瓶形态字段与战斗 VFX helper 契约 |
+| `validate_spell_vfx_design.mjs` | 静态校验 | Node.js（无需浏览器） | 验证法术形态特效设计文档覆盖所有形态与实现契约 |
 | `ai_test_runner.js` | 运行时测试 | Puppeteer + 本地游戏服务 | 驱动浏览器进行实机行为验证 |
 
 ---
@@ -41,6 +44,44 @@ node tests/validate_boss_vulnerability.mjs
 - 战斗管线保留 Boss 破绽进度与易伤窗口入口
 - Boss 覆盖按实际命中次数和按实际伤害量两种累积方式
 - 回合缩放参数存在，后期破绽条件更苛刻
+
+### 1.2 符文法阵契约校验（无需启动游戏）
+
+```bash
+node tests/validate_rune_spell_forms.mjs
+```
+
+验证内容：
+- 词条默认必须组成穿过 3x3 中心的轴线法阵
+- `pattern[1]` 核心符文必须位于中心格
+- 外环试剂允许在同一轴线两端反向
+- 同一词条可通过多条穿心轴线提升等级
+- `spellFormula.shape = 'loose_line'` 保留旧式无序线匹配回退
+
+### 1.3 药剂药瓶 VFX 契约校验（无需启动游戏）
+
+```bash
+node tests/validate_potion_vfx_contract.mjs
+```
+
+验证内容：
+- 9 个 `POTION_SPELL_DB` 药剂都声明 `spellType`、`formId: 'bottle'`、`nestingMode: 'shatter'`
+- 每个药剂都声明 `vfxProfile` 的目标、碎裂样式与语义标签
+- 战斗层存在统一的 `combat_playPotionBottleVFX()` helper
+- 药瓶碎裂表现复用现有粒子、投射物爆破、同化脉冲、同化波与短电弧入口
+- `combat_playPotionShatterVFX()` 覆盖 `seal`、`mist_bloom`、`mark`、`shard_sigil`、`collapse_ring`、`overload_blast` 等具体碎裂样式
+
+### 1.4 法术形态特效设计覆盖校验（无需启动游戏）
+
+```bash
+node tests/validate_spell_vfx_design.mjs
+```
+
+验证内容：
+- `docs/rune_potion_spell_contract.md` 已链接到 `docs/spell_vfx_design.md`
+- 特效设计文档覆盖 `bottle`、`orb`、`mine`、`beam`、`orbit`、`slash`、`meteor`、`sweeping_laser`、`tower`
+- 文档包含表现矩阵、单形态规格、实现顺序和验收清单
+- 文档声明后续运行时入口、配置表、性能预算和 `@perf-impact` 约束
 
 ### 2. 运行时自动化测试（需要本地游戏服务）
 

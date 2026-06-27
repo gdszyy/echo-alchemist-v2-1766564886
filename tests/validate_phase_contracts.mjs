@@ -56,12 +56,17 @@ const bitmapIcons = read('src/bitmap_icons.js');
 const gameOver = read('src/ui/game_over.js');
 const runShop = read('src/ui/run_shop.js');
 const shop = read('src/ui/shop.js');
+const runeLauncher = read('src/ui/rune_launcher.js');
 const indexHtml = read('index.html');
 const spawnSystem = read('src/spawn_system.js');
 const combatSystem = read('src/combat_system.js');
+const particles = read('src/effects/particles.js');
+const pixiEffects = read('src/render/pixi_effect_adapter.js');
+const audioSystem = read('src/audio.js');
 const collisionSystem = read('src/combat/collision.js');
 const projectile = read('src/entities/projectile.js');
 const enemy = read('src/entities/enemy.js');
+const core = read('src/core.js');
 const config = read('src/config.js');
 const calcUtils = read('src/calc_utils.js');
 const systems = read('src/systems.js');
@@ -75,6 +80,39 @@ const enemySpriteManifest = read('assets/sprites/enemies/enemy_sprite_manifest.j
 check(has(uiSystem, /ui_resetCombatPhaseHud\s*\(options\s*=\s*\{\}\)/), 'ui_resetCombatPhaseHud exists');
 check(has(calcUtils, /calc_isEnemyInsideCombatWalls\s*\(enemy\)[\s\S]*sys_getCombatBounds[\s\S]*bottom\s*>\s*bounds\.top/), 'combat clear counting uses wall-intersection helper');
 check(!has(gamePhase, /pos\.y\s*>\s*0\s*&&\s*this\.phase_isEnemyClearable/), 'combat clear checks no longer gate enemies by pos.y > 0');
+check(!has(combatSystem, /unlockedSlots\.push\(['"]skill_point['"]\)/), 'skill recompute no longer injects pinboard skill_point slots');
+check(has(combatSystem, /unlockedSlots\.includes\(['"]skill_point['"]\)[\s\S]{0,180}filter\(t\s*=>\s*t\s*!==\s*['"]skill_point['"]\)/), 'skill recompute removes legacy skill_point slots');
+check(has(gamePhase, /\[\.\.\.\(this\.unlockedSlots\s*\|\|\s*\[\]\)\]\.filter\(t\s*=>\s*t\s*!==\s*['"]skill_point['"]\)/), 'pinboard generation filters retired skill_point slots');
+check(
+    has(config, /id:\s*['"]relic_sage_apothecary['"][\s\S]{0,260}effect:\s*['"]unlock_potion_alchemy['"]/) &&
+    has(config, /const\s+POTION_SPELL_DB\s*=\s*\[[\s\S]*potion_frost_seal[\s\S]*potion_overload_vial/) &&
+    has(config, /potionAlchemyFailRefundRatio:\s*0\.35/) &&
+    has(config, /POTION_SPELL_DB,/),
+    'sage apothecary relic and potion spell database are configured and exported'
+);
+check(
+    has(shop, /relic\.effect\s*===\s*['"]unlock_potion_alchemy['"][\s\S]{0,260}potionAlchemyUnlocked\s*=\s*true/) &&
+    has(runeLauncher, /ui_confirmPotionAlchemy\s*\(\)/) &&
+    has(runeLauncher, /_ui_resolvePotionRecipe\s*\(selectedRunes\)[\s\S]{0,1800}potion_prism_focus/) &&
+    has(indexHtml, /id=["']rune-tab-potion["'][\s\S]{0,120}ui_switchRuneTab\(['"]potion['"]\)/) &&
+    has(indexHtml, /id=["']rune-potion-panel["'][\s\S]*id=["']potion-confirm-btn["']/),
+    'sage apothecary unlocks the alchemy table potion tab and crafting flow'
+);
+check(
+    has(core, /potionAlchemyUnlocked\s*=\s*false/) &&
+    has(gameSystem, /preparedPotionSpell:\s*this\.preparedPotionSpell/) &&
+    has(gameSystem, /knownPotionSpellIds:\s*\(this\.knownPotionSpellIds\s*\|\|\s*\[\]\)\.slice\(\)/) &&
+    has(gameSystem, /this\.potionAlchemyUnlocked\s*=\s*!!state\.potionAlchemyUnlocked\s*\|\|\s*\(this\.ownedRelics\s*\|\|\s*\[\]\)\.includes\(['"]relic_sage_apothecary['"]\)/),
+    'potion alchemy run state is initialized, saved, and restored'
+);
+check(
+    has(combatSystem, /combat_activatePotionSpell\s*\(\)/) &&
+    has(combatSystem, /combat_applyPotionSpell\s*\(potionDef,\s*prepared\)/) &&
+    has(combatSystem, /prepared\.charges\s*=\s*Math\.max\(0,\s*\(Number\(prepared\.charges\)\s*\|\|\s*0\)\s*-\s*1\)/) &&
+    has(systems, /potionUnlocked[\s\S]{0,220}preparedPotion/) &&
+    has(systems, /game\.combat_activatePotionSpell\(\)/),
+    'prepared potion spells render in the skill bar and release without SP cost'
+);
 check(has(uiSystem, /ui_clearTransientOverlays\s*\(options\s*=\s*\{\}\)/), 'ui_clearTransientOverlays exists');
 check(has(uiSystem, /ui_abandonRunToMeta\s*\(\)/), 'ui_abandonRunToMeta exists');
 check(has(uiSystem, /if\s*\(this\.phase\s*!==\s*['"]combat['"]\)\s*\{\s*this\.ui_resetCombatPhaseHud\(\{\s*preserveStatusPanel:\s*this\.phase\s*===\s*['"]training['"]\s*\}\)/s), 'ui_updateUI resets combat HUD outside combat and preserves training status panel');
@@ -165,13 +203,26 @@ check(
     has(enemy, /const\s+veinCount\s*=\s*perfLevel\s*===\s*['"]low['"]\s*\?\s*4\s*:\s*7/) &&
     has(enemy, /ctx\.bezierCurveTo\(-depth\s*\*\s*0\.02[\s\S]{0,180}depth\s*\*\s*0\.46/) &&
     has(enemy, /const\s+ribCount\s*=\s*perfLevel\s*===\s*['"]low['"]\s*\?\s*4\s*:\s*6/) &&
-    has(enemy, /drawBreakCuts\(['"]livingArmor['"],\s*this\._livingArmorBreakTimer,\s*26/) &&
+    has(enemy, /_DEFENSE_TREE_SHIELD_MEMBRANE_SRCS\s*=\s*\[[\s\S]{0,360}overlay_defense_tree_shield_membrane/) &&
+    has(enemy, /kind\s*===\s*['"]livingArmor['"][\s\S]{0,160}_DEFENSE_TREE_SHIELD_MEMBRANE_SRCS/) &&
+    has(enemy, /flipX:\s*!isTree/) &&
+    has(enemy, /ctx\.scale\(layer\.flipX\s*===\s*false\s*\?\s*1\s*:\s*-1,\s*1\)/) &&
+    has(enemy, /style\s*===\s*['"]living['"]\s*\?\s*['"]livingArmor['"]/) &&
+    !has(enemy, /drawBreakCuts\(['"]livingArmor['"]/) &&
     has(enemy, /palette\.ray\s*\|\|\s*palette\.stroke/) &&
     has(enemy, /palette\.pressure\s*\|\|\s*palette\.stroke/) &&
     has(enemy, /_livingArmorBreakTimer\s*=\s*26[\s\S]{0,120}_triggerDefenseImpactFx\(['"]livingArmor['"],\s*source,\s*26,\s*\{\s*break:\s*true/) &&
     has(enemy, /_phaseShieldBlockTimer\s*=\s*Math\.max\(this\._phaseShieldBlockTimer\s*\|\|\s*0,\s*22\)/) &&
     has(enemy, /_lowDamageImmuneBlockTimer\s*=\s*Math\.max\(this\._lowDamageImmuneBlockTimer\s*\|\|\s*0,\s*18\)/),
     'defense block feedback records projectile-facing direction, falls back to front-facing energy shields, and keeps all shield-like types visually distinct'
+);
+check(
+    has(enemy, /_triggerShieldAssimilationFx\(source\s*=\s*null,\s*duration\s*=\s*22\)/) &&
+    has(enemy, /_drawShieldAssimilationFeedback\(ctx,\s*w,\s*h,\s*r,\s*perfLevel\s*=\s*['"]high['"]\)/) &&
+    has(enemy, /_shieldAssimilationTimer\s*>\s*0/) &&
+    has(enemy, /target\._grantShieldLayer\(1,\s*\{\s*cause:\s*['"]radiantAegis['"],\s*source:\s*this,\s*duration:\s*24\s*\}\)/) &&
+    !has(enemy, /target\._triggerDefenseImpactFx\(['"]radiantAegis['"],\s*null,\s*18\)/),
+    'radiantAegis shield spread uses a separate target-side shield assimilation effect instead of radiant block feedback'
 );
 check(
     has(enemy, /const\s+makeDamageResult\s*=\s*\(hpDamage,\s*extra\s*=\s*\{\}\)\s*=>\s*\{[\s\S]{0,520}hpDamage:\s*safeHpDamage[\s\S]{0,260}blockedDamage:\s*safeBlockedDamage[\s\S]{0,220}blockedBy:\s*resultBlockedBy[\s\S]{0,180}defenseBlocked:/) &&
@@ -269,9 +320,10 @@ check(
 );
 check(
     has(bitmapIcons, /EMITTER_BARREL_SRC\s*=\s*versionBitmapSrc\('assets\/ui\/sprites\/emitter_barrel_rotating_v5_runtime\.png'\)/) &&
-    has(bitmapIcons, /EMITTER_BARREL_DRAW_SIZE\s*=\s*100/) &&
-    has(bitmapIcons, /EMITTER_PORT_OFFSET_Y\s*=\s*76/),
-    'launcher uses the slimmer v5 cannon barrel with a raised muzzle anchor'
+    has(bitmapIcons, /EMITTER_DRAW_SIZE\s*=\s*156/) &&
+    has(bitmapIcons, /EMITTER_BARREL_DRAW_SIZE\s*=\s*110/) &&
+    has(bitmapIcons, /EMITTER_PORT_OFFSET_Y\s*=\s*82/),
+    'launcher uses the scaled v5 cannon barrel with a raised muzzle anchor'
 );
 check(
     has(gameSystem, /calcCombatLauncherGeometryToTarget\(this\.width,\s*this\.height,\s*targetPos\)[\s\S]{0,180}targetPos\.sub\(launcherGeometry\.port\)[\s\S]{0,180}pendingFireOrigin\s*=\s*launcherGeometry\.muzzle/),
@@ -294,13 +346,42 @@ check(
 );
 check(
     has(bitmapIcons, /EMITTER_RING_SRC\s*=\s*versionBitmapSrc\('assets\/ui\/sprites\/emitter_turret_ring_v1\.png'\)/) &&
-    has(bitmapIcons, /EMITTER_RING_DRAW_SIZE\s*=\s*96/) &&
+    has(bitmapIcons, /EMITTER_RING_DRAW_SIZE\s*=\s*104/) &&
     has(renderSystem, /const\s+ringImg\s*=\s*getUiBitmap\(EMITTER_RING_SRC\)/) &&
     has(renderSystem, /ctx\.translate\(cx,\s*cy\s*\+\s*recoilY\s*\+\s*4\)/) &&
     has(renderSystem, /ctx\.drawImage\(\s*ringImg/),
     'launcher renders generated rotating ring inside the base circle'
 );
 check(!has(spawnSystem, /spawn_createLauncherFireEffect/), 'old launcher particle/shockwave muzzle VFX is removed');
+check(
+    has(spawnSystem, /maxRadius:\s*Math\.max\(72,\s*Math\.min\(220,\s*radius\)\)/) &&
+    has(spawnSystem, /damageRadius:\s*radius/) &&
+    has(spawnSystem, /coverageRing:\s*true/) &&
+    has(spawnSystem, /spawn_createExplosionHitGust\(target,\s*originX,\s*originY,\s*opts\s*=\s*\{\}\)/) &&
+    has(spawnSystem, /explosion hit gust[\s\S]{0,180}spark\/ember burst per damaged enemy/) &&
+    has(projectile, /spawn_createProjectileExplosion\(this\.pos\.x,\s*this\.pos\.y[\s\S]{0,260}radius,\s*[\s\S]{0,140}isOvercharge:\s*true/) &&
+    has(projectile, /spawn_createExplosionHitGust\(en,\s*this\.pos\.x,\s*this\.pos\.y/) &&
+    has(combatSystem, /spawn_createExplosionHitGust\(other,\s*projectile\.pos\.x,\s*projectile\.pos\.y/) &&
+    has(combatSystem, /spawn_createExplosionHitGust\(other,\s*enemy\.pos\.x,\s*enemy\.pos\.y/) &&
+    has(particles, /this\.damageRadius\s*=\s*Number\.isFinite\(optionBag\.damageRadius\)[\s\S]{0,180}this\.coverageRing\s*=\s*!!optionBag\.coverageRing/) &&
+    has(particles, /const\s+targetSplashRadius\s*=\s*this\.coverageRing\s*&&\s*damageRadius\s*>\s*0\s*\?\s*damageRadius\s*:\s*radius/) &&
+    has(particles, /const\s+coverageProgress\s*=\s*this\.coverageRing\s*\?\s*\(1\s*-\s*Math\.pow\(1\s*-\s*Math\.min\(1,\s*t\),\s*3\)\)\s*:\s*t/) &&
+    has(particles, /const\s+splashRadius\s*=\s*this\.coverageRing\s*\?\s*Math\.max\(2,\s*targetSplashRadius\s*\*\s*coverageProgress\)\s*:\s*radius/) &&
+    has(particles, /const\s+spokeCount\s*=\s*isLow\s*\?\s*Math\.min\(5,\s*this\.spokes\.length\)\s*:\s*this\.spokes\.length/) &&
+    has(particles, /ctx\.arc\(this\.x,\s*this\.y,\s*splashRadius,\s*0,\s*Math\.PI\s*\*\s*2\)/) &&
+    has(particles, /const\s+rawTravel\s*=\s*this\.coverageRing[\s\S]{0,260}const\s+travel\s*=\s*1\s*-\s*Math\.pow\(1\s*-\s*rawTravel,\s*3\)/) &&
+    has(particles, /targetSplashRadius\s*:\s*radius\)\s*\*\s*\(startReach\s*\+\s*\(shard\.reach\s*-\s*startReach\)\s*\*\s*travel\)/) &&
+    !has(particles, /lineDashOffset\s*=\s*[^;\n]*t\s*\*/) &&
+    has(pixiEffects, /const\s+damageRadius\s*=\s*Number\.isFinite\(sw\.damageRadius\)/) &&
+    has(pixiEffects, /const\s+coverageAlpha\s*=\s*sw\.coverageRing/) &&
+    has(pixiEffects, /const\s+targetSplashRadius\s*=\s*sw\.coverageRing\s*&&\s*damageRadius\s*>\s*0\s*\?\s*damageRadius\s*:\s*radius/) &&
+    has(pixiEffects, /const\s+coverageProgress\s*=\s*sw\.coverageRing\s*\?\s*\(1\s*-\s*Math\.pow\(1\s*-\s*Math\.min\(1,\s*t\),\s*3\)\)\s*:\s*t/) &&
+    has(pixiEffects, /const\s+splashRadius\s*=\s*sw\.coverageRing\s*\?\s*Math\.max\(2,\s*targetSplashRadius\s*\*\s*coverageProgress\)\s*:\s*radius/) &&
+    has(pixiEffects, /gfx\.drawCircle\(sw\.x,\s*sw\.y,\s*splashRadius\)/) &&
+    has(pixiEffects, /const\s+rawTravel\s*=\s*sw\.coverageRing[\s\S]{0,240}const\s+travel\s*=\s*1\s*-\s*Math\.pow\(1\s*-\s*rawTravel,\s*3\)/) &&
+    !has(pixiEffects, /sw\.seed\s*\+\s*t\s*\*\s*0\.7/),
+    'projectile explosion VFX expands from a bright full circle, flies shards outward, and blows red particles off damaged enemies'
+);
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(c\)/), 'normal enemy spawn columns use inset arena centers');
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(startCol,\s*cols\)/), 'wave preset spawn columns use inset arena centers');
 check(has(spawnSystem, /sys_getCombatColumnCenterX\(sc,\s*chosen\.cols\)/), 'archetype spawn columns use inset arena centers');
@@ -320,9 +401,28 @@ check(has(gamePhase, /_defenseBarrierArrivedThisTurn\s*=\s*false[\s\S]{0,100}_de
 check(has(gamePhase, /_restoreLivingArmorForTurn[\s\S]{0,160}_tickPhaseShieldForTurn[\s\S]{0,160}_tickArmorSporeForTurn/), 'enemy turn start restores living armor, advances phase shield, and distributes armor spores');
 check(
     has(enemy, /_tickBossPhysicsForTurn\s*\(\)[\s\S]{0,2600}bossType\s*===\s*['"]devourer['"][\s\S]{0,2600}bossType\s*===\s*['"]ouroboros['"]/) &&
-    has(enemy, /_tickBossMechanicsForTurn\s*\(game\)[\s\S]{0,1200}_tickTeslaNetwork\(game\)[\s\S]{0,1200}_tickGlaciesFrostSeams\(game\)[\s\S]{0,1200}_tickViridisSporeArmor\(game\)[\s\S]{0,1200}_tickDevourerMawField\(game\)[\s\S]{0,1200}_tickChimeraMawField\(game\)[\s\S]{0,1200}_tickOuroborosOrbit\(game\)/) &&
+    has(enemy, /_tickBossMechanicsForTurn\s*\(game\)[\s\S]{0,1200}_tickTeslaNetwork\(game\)[\s\S]{0,1200}_tickGlaciesFrostSeams\(game\)[\s\S]{0,1200}_tickViridisSporeArmor\(game\)[\s\S]{0,1200}_tickDevourerMawField\(game\)[\s\S]{0,1200}_tickChimeraMawField\(game,\s*\{\s*summon:\s*false\s*\}\)[\s\S]{0,1200}_tickOuroborosOrbit\(game\)/) &&
     has(enemy, /startTurnAction\s*\(game\)[\s\S]{0,220}_tickBossPhysicsForTurn\(\)[\s\S]{0,2600}_tickBossMechanicsForTurn\(game\)/),
     'Boss turn start uses centralized physics and mechanics tick gateways'
+);
+check(has(enemy, /if\s*\(!skipMove\s*&&\s*this\._isChimeraBoss\?\.\(\)\)\s*\{[\s\S]{0,120}this\._chimeraSummonFeedersForTurn\(game\)/), 'Chimera summons thermal feeds after normal action resolution instead of turn-start tick');
+check(
+    has(config, /ignis:\s*\{[\s\S]*?moveInterval:\s*3/) &&
+    has(config, /glacies:\s*\{[\s\S]*?moveInterval:\s*4/) &&
+    has(config, /mikro:\s*\{[\s\S]*?moveInterval:\s*4/) &&
+    has(config, /devourer:\s*\{[\s\S]*?moveInterval:\s*3/) &&
+    has(config, /viridis:\s*\{[\s\S]*?moveInterval:\s*4/) &&
+    has(config, /tesla:\s*\{[\s\S]*?moveInterval:\s*3/) &&
+    has(config, /chimera:\s*\{[\s\S]*?moveInterval:\s*4/) &&
+    has(config, /ouroboros:\s*\{[\s\S]*?moveInterval:\s*4/),
+    'Boss movement intervals stay slow: 3 or 4 turns per move'
+);
+check(
+    has(enemy, /const\s+interval\s*=\s*Math\.max\(2,\s*this\._moveInterval\s*\|\|\s*3\)/) &&
+    has(spawnSystem, /const\s+defaultMoveInterval\s*=\s*Math\.max\(2,\s*bossCfg\.moveInterval\s*\|\|\s*3\)/) &&
+    !has(gamePhase, /else\s+if\s*\(\s*e\.berserked\s*\)[\s\S]{0,80}e\._willMoveThisTurn\s*=\s*true/) &&
+    !has(enemy, /_moveCooldown\s*=\s*0;\s*[\s\S]{0,140}狂暴模式/),
+    'Boss berserk movement still respects the slow movement cooldown'
 );
 check(
     has(gamePhase, /render_combat_defeatLine\s*\(\s*this\.ctx\s*\)/) &&
@@ -532,6 +632,14 @@ check(has(gamePhase, /runShopStarterBoostDamageRounds[\s\S]*flatDamageBonus[\s\S
 check(has(gamePhase, /import\s*\{\s*calc_getCirclePolygonCollision,\s*calc_getCircleArcCollision\s*\}\s*from\s*['"]\.\/combat\/collision_shapes\.js['"]/), 'combat aim guide imports shared collision shape helpers');
 check(has(gamePhase, /function\s+getCombatAimEnemyHit[\s\S]*enemy\.collisionShape\s*===\s*['"]polygon['"][\s\S]*calc_getCirclePolygonCollision[\s\S]*enemy\.collisionShape\s*===\s*['"]arc['"][\s\S]*calc_getCircleArcCollision/), 'combat aim guide respects polygon and arc enemy collision shapes');
 check(has(gamePhase, /function\s+buildCombatAimScatterOffsets[\s\S]*extraScatterShots[\s\S]*scatterAngleReduction[\s\S]*Math\.floor\(scatterCount\s*\/\s*2\)\s*\+\s*\(scatterCount\s*%\s*2\)/), 'combat aim guide mirrors scatter layer branch count and resonance angle rules');
+check(
+    has(combatSystem, /const\s+laserLevel\s*=\s*Math\.max\(0,\s*toFiniteNumber\(recipe\.laser,\s*recipe\.isLaser\s*\?\s*1\s*:\s*0\)\)/) &&
+    has(combatSystem, /const\s+pierceLevel\s*=\s*Math\.max\(0,\s*toFiniteNumber\(recipe\.pierce,\s*0\)\)/) &&
+    has(combatSystem, /const\s+mainWidth\s*=\s*3\s*\+\s*\(laserLevel\s*\*\s*4\)\s*\+\s*\(recipe\.explosive\s*\?\s*10\s*:\s*0\)/) &&
+    has(audioSystem, /const\s+safeFreq\s*=\s*Number\.isFinite\(Number\(freq\)\)/) &&
+    has(audioSystem, /osc\.frequency\.setValueAtTime\(safeFreq,\s*now\)/),
+    'laser shots with isLaser but no laser level normalize finite beam/audio parameters'
+);
 check(has(gamePhase, /const\s+allPegTypes\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'gathering random peg pool only includes pure bounce and damage pegs');
 check(has(read('src/pinboard_modules.js'), /const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'module pinboard random peg pool only includes pure bounce and damage pegs');
 check(!has(read('src/pinboard_modules.js'), /const\s+defaultLayout\s*=\s*createDefaultModuleLayout\(count,\s*defaultSlots\)/), 'pinboard normalization does not refill intentionally emptied active slots');
@@ -559,6 +667,8 @@ check(has(gamePhase, /const\s+inheritedMulticast\s*=\s*Math\.max\(0,\s*Math\.flo
 check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD has a three-session charge stack container');
 check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack[\s\S]{0,900}(?:session-charge-row|gathering-ammo-panel)[\s\S]{0,420}session-charge-multicast/), 'gathering HUD renders per-marble charge and multicast rows');
 check(has(read('src/ui/hud.js'), /UI_HIT_PROGRESS[\s\S]{0,220}_hud_renderSessionChargeStack/), 'hit progress updates refresh the per-marble charge stack');
+check(has(read('src/ui/hud.js'), /ui_getCanvasPointForElement\s*\(el,\s*options\s*=\s*\{\}\)[\s\S]{0,900}canvasRect\.left[\s\S]{0,240}scaleX/), 'gathering HUD converts DOM target centers into canvas coordinates');
+check(has(spawnSystem, /gathering-ammo-panel\[data-marble-index="\$\{chargeSession\.marbleIndex\}"\][\s\S]{0,420}ui_getCanvasPointForElement\(targetPanel\)/), 'gathering hit feedback targets the matching per-marble ammo panel');
 check(has(runShop, /kind:\s*['"]starter_boost['"]/), 'first run-shop visit can generate a free starter boost item');
 check(has(runShop, /runShopStarterBoostDamageRounds/), 'starter boost item displays a temporary damage duration');
 check(has(runShop, /ensureInventoryForCurrentVisit[\s\S]*_runShopInventoryGeneratedForRound/), 'run shop inventory is generated once per active visit');

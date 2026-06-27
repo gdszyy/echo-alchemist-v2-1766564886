@@ -12,7 +12,16 @@ UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合
 | `src/ui/hud.js` | HUD 渲染（弹药、配方、伤害统计、收集队列） | `ui_updateAmmoUI`、`ui_renderRecipeHUD`、`ui_updateDamageStats` 等 |
 | `src/ui/shop.js` | 商店/遗物选择界面渲染 | `ui_renderShop`、`ui_showRelicSelection`、`ui_selectRelic` 等 |
 | `src/ui/run_shop.js` | 局内商店/商人到访入口与底部倒计时 | `ui_updateRunShopScheduleUI`、`ui_showRunShop`、`ui_buyRunShopItem` 等 |
-| `src/ui/rune_launcher.js` | 符文发射器界面（背包、网格、选择弹出层、合成重铸） | `ui_openRuneLauncher`、`ui_updateRuneGrid`、`ui_doRuneMerge` 等 |
+| `src/ui/rune_launcher.js` | 炼金台界面（符文配置、背包、网格、合成重铸、药剂炼成、图鉴） | `ui_openRuneLauncher`、`ui_updateRuneGrid`、`ui_doRuneMerge`、`ui_confirmPotionAlchemy` 等 |
+
+### 1.1 炼金台药剂炼成（2026-06-26）
+
+`relic_sage_apothecary` 解锁后，`#rune-tab-potion` 才显示。药剂炼成 UI 必须继续留在 `src/ui/rune_launcher.js`，因为它直接消费 `runeInventory` 并刷新同一套库存卡片。
+
+- 可见标题使用“炼金台”，但历史文件名和 DOM 主容器 `phase-rune-launcher` 保持不变。
+- 药剂面板入口：`ui_updatePotionAlchemyPanel()`、`_ui_resolvePotionRecipe()`、`ui_confirmPotionAlchemy()`。
+- 失败配方消耗选中符文并返还 `runFragments`，比例读取 `CONFIG.gameplay.potionAlchemyFailRefundRatio`。
+- 药剂槽显示在 `systems.js` 的 `UIManager.updateSkillBar()` 中，点击后调用战斗层 `combat_activatePotionSpell()`；UI 不直接结算药剂战斗效果。
 
 ## 2. 模块加载方式
 
@@ -168,7 +177,7 @@ for (const subsystem of _subsystems) {
 | `meta_getResourceCount(resourceId)` | 获取资源数量 |
 | `meta_spendResource(resourceId, amount)` | 消耗资源 |
 | `ui_updateUI()` | 主 UI 更新入口（每帧调用） |
-| `ui_resetCombatPhaseHud()` | 阶段切换时清理战斗专属 HUD 残留；`training` 可保留态势面板但必须清掉配方、技能、伤害数字和符文充能 UI |
+| `ui_resetCombatPhaseHud()` | 阶段切换时清理战斗专属 HUD 残留；`training` 可保留态势面板但必须清掉配方、技能、伤害数字和技能充能 UI |
 | `ui_clearTransientOverlays()` | 进入 meta/shop/truth_book/gameover 等终止或局外阶段时清理 Boss 入场、混沌轮盘、遗物层、符文选择器、模块编辑器和 Toast 等高层临时覆盖物 |
 | `ui_confirmSelection()` | 确认弹珠选择；在纯净精华模式下完成合法性校验、符文写回与双倍同化率状态落地 |
 | `meta_applyUpgrades()` | 应用升级效果 |
@@ -349,6 +358,12 @@ for (const subsystem of _subsystems) {
 - Rune fusion preview copy must call `_moduleEditor_describeRuneTargets()` so the picker names the target slot and module, not only the rune count.
 - `_moduleEditor_buildRunePreviewChainHtml()` must include a visible target-position line; the canvas overlay remains the visual source of truth for the exact peg landing points.
 - Unequipping a module intentionally leaves `currentModuleLayout[slotIdx] = null`. UI code must not call normalization paths that refill that slot with `dense_stagger`; only a newly unlocked slot may receive a starter module automatically.
+
+## 2026-06-26 Gathering Energy Target Coordinates
+
+- Canvas effects must not use raw `getBoundingClientRect()` viewport coordinates as in-game coordinates. Convert DOM target centers through `ui_getCanvasPointForElement()` before passing them to `EnergyOrb`, particles, shockwaves, or other canvas-space visuals.
+- Multi-marble gathering hit feedback must target `.gathering-ammo-panel[data-marble-index]` for the triggering session. The legacy `#gauge-shell` / `#session-charge-stack` center is only a fallback when no per-marble panel is visible.
+- If the per-marble charge stack is stale when the first hit feedback is created, refresh `_hud_renderSessionChargeStack()` before resolving the panel target.
 
 ## 2026-06-24 Combat Bottom Console V2
 

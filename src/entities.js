@@ -32,12 +32,13 @@ import {
     Vec2, showToast, rotateTowards 
 } from './utils/math_utils.js';
 import { 
-    Particle, SlashEffect, PierceCutEffect, CollectionBeam, Shockwave, LaserBeam,
+    Particle, SlashEffect, PierceCutEffect, CollectionBeam, Shockwave, ImpactBlastWave, AssimilationPulseWave, LaserBeam,
     FloatingText, EnergyOrb, LightningBolt, FireWave,
     IceWave, DeathExplosion, HealWave,
     GreedyWheelEffect, DoomsdayClockEffect, BladeStormRing, BladeStormVortex, SwordScar, RewardDropEffect,
     MuzzleFlashV2, FiringBurst, AffixSkillVFX,
-    BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect
+    BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect,
+    BounceArcEffect, ScatterBurstEffect, EchoRippleEffect
 } from './effects/particles.js';
 import { Enemy, setEnemyAudioProvider } from './entities/enemy.js';
 import { Projectile, setProjectileAudioProvider } from './entities/projectile.js';
@@ -2400,11 +2401,10 @@ class DropBall {
                 if (Math.random() < assimilationChance && assimilationChance>0) {
 	                    peg.type = ballType;
 	                    
-	                    // [新增] 同化钉子特效：爆炸 + 浮动文字
+	                    // [同化特效] 铭刻脉冲 + 浮动文字；不再叠通用爆炸冲击波。
 	                    const attrColor = this.def.getColor();
 	                    const attrName = CONFIG.ui.attributeDisplay[ballType] ? CONFIG.ui.attributeDisplay[ballType].name : "Assimilation";
 	                    game.spawn_createAssimilationPulse(peg.pos.x, peg.pos.y, attrColor);
-						game.spawn_createShockwave(peg.pos.x, peg.pos.y, attrColor);
 	                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 20, attrName, attrColor);
 	                    
 	                    game.spawn_createParticle(peg.pos.x, peg.pos.y, attrColor);
@@ -5429,6 +5429,8 @@ export {
     PierceCutEffect,
     CollectionBeam,
     Shockwave,
+    ImpactBlastWave,
+    AssimilationPulseWave,
     LaserBeam,
     FloatingText,
     EnergyOrb,
@@ -5447,6 +5449,7 @@ export {
     FiringBurst,
     AffixSkillVFX,
     BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect,
+    BounceArcEffect, ScatterBurstEffect, EchoRippleEffect,
     Player,
     RuneLoot,
     FieldLootItem,

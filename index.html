@@ -176,6 +176,7 @@
         }
         #rune-tab-launcher,
         #rune-tab-management,
+        #rune-tab-potion,
         #rune-tab-codex {
             min-width: 0;
             height: 34px;
@@ -188,6 +189,7 @@
         }
         #rune-tab-launcher[data-active="true"],
         #rune-tab-management[data-active="true"],
+        #rune-tab-potion[data-active="true"],
         #rune-tab-codex[data-active="true"] {
             background: rgba(14, 116, 144, 0.38) !important;
             border-color: rgba(56, 189, 248, 0.72) !important;
@@ -204,6 +206,7 @@
         }
         #rune-launcher-content:not(.hidden),
         #rune-management-panel:not(.hidden),
+        #rune-potion-panel:not(.hidden),
         #rune-codex-panel:not(.hidden) {
             display: flex !important;
             flex-direction: column;
@@ -211,11 +214,13 @@
         }
         #rune-launcher-content > div,
         #rune-management-panel > div:not(#rune-action-result),
+        #rune-potion-panel > div,
         #rune-codex-panel > div {
             margin-bottom: 0 !important;
         }
         #rune-launcher-content > div,
         #rune-management-panel > div:not(#rune-action-result),
+        #rune-potion-panel > div,
         #rune-codex-panel > div:not(:first-child) {
             border: 1px solid var(--launcher-line);
             border-radius: 8px;
@@ -223,6 +228,7 @@
             padding: 12px;
         }
         #rune-codex-panel > div:first-child,
+        #rune-potion-panel > div:first-child,
         #rune-management-panel > div:first-child {
             color: #b6c5da;
             border: 0;
@@ -236,6 +242,7 @@
         }
         #rune-inventory-container,
         #rune-management-inventory,
+        #potion-rune-inventory,
         #rune-active-runewords,
         #rune-codex-list,
         #rune-resonance-list,
@@ -243,7 +250,8 @@
             gap: 8px !important;
         }
         #rune-inventory-container,
-        #rune-management-inventory {
+        #rune-management-inventory,
+        #potion-rune-inventory {
             min-height: 56px !important;
             max-height: 188px;
             overflow-y: auto;
@@ -344,6 +352,7 @@
             }
             #rune-tab-launcher,
             #rune-tab-management,
+            #rune-tab-potion,
             #rune-tab-codex {
                 font-size: 0.64rem !important;
                 padding-left: 4px !important;
@@ -4773,7 +4782,7 @@
         }
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
-    <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260624-round-toast-live2-combat-console-pass10-round-boss-preview-clean1">
+    <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260626-skill-charge-right-panel">
 </head>
 <body>
 <div id="app-wrapper">
@@ -4864,7 +4873,6 @@
                 <div id="combat-status-note" class="combat-status-note">等待战斗开始</div>
             </div>
             <div id="sp-panel" class="flex flex-wrap gap-2 pointer-events-none transition-opacity duration-300"></div>
-            <button id="skill-editor-open-btn" type="button" class="skill-editor-open-btn pointer-events-auto" style="display:none;">✎ 技能</button>
         </div>
 
         <!-- 中间：战斗阶段保持空场，技能充能已下沉到底部技能舱 -->
@@ -4992,7 +5000,7 @@
                 <button onclick="game.ui_closeRuneLauncher()" class="rune-launcher-close-btn text-slate-400 hover:text-white transition-colors">
                     <span class="text-2xl">⬅️</span>
                 </button>
-                <h2 class="text-2xl font-[Cinzel] text-purple-100 tracking-widest">符文發射器</h2>
+                <h2 class="text-2xl font-[Cinzel] text-purple-100 tracking-widest">炼金台</h2>
                 <!-- 局外符文碎片计数，合成动画的目标元素 -->
                 <div id="launcher-shard-display" class="flex items-center gap-1 bg-purple-900/40 border border-purple-500/30 rounded-full px-3 py-1 text-sm">
                     <span class="filter drop-shadow-[0_0_4px_rgba(168,85,247,0.8)]">🔮</span>
@@ -5004,6 +5012,7 @@
             <div class="flex gap-2 mb-5 border-b border-slate-700/50 pb-3">
                 <button id="rune-tab-launcher" data-active="true" aria-selected="true" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 配置</button>
                 <button id="rune-tab-management" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('management')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">⚗️ 管理</button>
+                <button id="rune-tab-potion" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('potion')" style="display:none;" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">🧪 药剂</button>
                 <button id="rune-tab-codex" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 圖鑑</button>
             </div>
 
@@ -5122,6 +5131,82 @@
                 <!-- 操作结果提示 -->
                 <div id="rune-action-result" class="hidden mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl"></div>
             </div><!-- end #rune-management-panel -->
+
+            <!-- 药剂炼成面板（贤者药匣解锁） -->
+            <div id="rune-potion-panel" class="hidden">
+                <div id="potion-alchemy-locked" class="text-xs text-slate-400/70 mb-3 leading-relaxed">
+                    获得贤者药匣后，可在这里把符文炼成不消耗 SP 的药剂法术。
+                </div>
+                <div id="potion-alchemy-workbench" class="hidden potion-workbench">
+                    <div class="potion-current-strip">
+                        <div class="potion-section-kicker">当前药匣</div>
+                        <div id="potion-current-card" class="min-h-[58px]"></div>
+                    </div>
+
+                    <div class="potion-furnace-card">
+                        <div class="potion-furnace-orbit" aria-hidden="true">
+                            <span class="potion-orbit-dot dot-a"></span>
+                            <span class="potion-orbit-dot dot-b"></span>
+                            <span class="potion-orbit-dot dot-c"></span>
+                            <span class="potion-orbit-dot dot-d"></span>
+                        </div>
+                        <div class="potion-furnace-core">
+                            <div class="potion-furnace-label">炼金炉心</div>
+                            <div class="potion-furnace-rule">投料即消耗 · 封装前未知</div>
+                        </div>
+                        <div id="potion-draft-runes" class="potion-draft-runes" aria-label="已投入符文"></div>
+                        <div class="potion-ledger-row">
+                            <span class="potion-section-kicker">投料账本</span>
+                            <div class="flex items-center gap-2">
+                                <span id="potion-rune-selected-count" class="potion-ledger-count">0 / 4</span>
+                                <button id="potion-clear-btn" onclick="game.ui_clearPotionSelection()" class="potion-link-button">放弃炼成</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="potion-status-card">
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <div>
+                                <div class="potion-section-kicker">结构状态</div>
+                                <div class="text-[11px] text-slate-500 mt-1">只显示稳定性，不揭示药剂结果。</div>
+                            </div>
+                            <span class="potion-unknown-seal">?</span>
+                        </div>
+                        <div id="potion-preview-card" class="potion-preview-state">投入符文后只显示结构是否稳定；最终药剂会在封装后揭示。</div>
+                        <button id="potion-confirm-btn"
+                            onclick="game.ui_confirmPotionAlchemy()"
+                            disabled
+                            class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
+                            继续投料
+                        </button>
+                    </div>
+
+                    <div class="potion-inventory-card">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="potion-section-kicker">符文仓库</div>
+                            <div class="text-[10px] text-amber-300/70">点击即投入，不能撤回</div>
+                        </div>
+                        <div id="potion-rune-inventory" class="potion-rune-inventory">
+                            <div id="potion-rune-empty" class="w-full text-center text-slate-600 text-xs py-2">暂无符文</div>
+                        </div>
+                    </div>
+
+                    <div class="potion-notes-card">
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <div>
+                                <div class="potion-section-kicker">炼金笔记</div>
+                                <div class="text-[11px] text-slate-500 mt-1">只记录已封装揭示的药剂。</div>
+                            </div>
+                            <span id="potion-notes-count" class="potion-notes-count">0 / 0</span>
+                        </div>
+                        <div id="potion-alchemy-notes" class="potion-alchemy-notes">
+                            <div class="potion-notes-empty">尚无记录。完成一次封装后，药剂会写入笔记。</div>
+                        </div>
+                    </div>
+
+                    <div id="potion-action-result" class="hidden mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl"></div>
+                </div>
+            </div><!-- end #rune-potion-panel -->
 
             <!-- 词条图鉴面板 -->
             <div id="rune-codex-panel" class="hidden">
@@ -5349,6 +5434,7 @@
                     </div>
                 </div>
                 <div id="skill-bar" class="skill-bar-panel pointer-events-auto z-50"></div>
+                <button id="skill-editor-open-btn" type="button" class="skill-editor-open-btn pointer-events-auto" style="display:none;" title="技能装配" aria-label="技能装配"></button>
             </div>
         </div>
 
@@ -5638,7 +5724,7 @@
 
 
 <script>
-const APP_ASSET_CACHE_VERSION = '20260624-round-boss-preview-clean1';
+const APP_ASSET_CACHE_VERSION = '20260626-pass12-elite-golem-combos';
 
 async function clearStaleAssetCaches() {
     if (!('caches' in window)) return;

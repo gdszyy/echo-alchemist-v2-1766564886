@@ -1,4 +1,4 @@
----
+﻿---
 description: "符文系统完整规范（智能掉落、网格拼图、合成重铸；旧充能符文已迁移为技能充能）"
 globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/combat_system.js"]
 ---
@@ -39,9 +39,13 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
 - **解析算法变更 (Task 1 升级)**: 
   - `parseRuneGrid` 函数现在会统计同一词条被多条路径匹配的次数，将该次数作为词条的 `level` 写入返回的 `activatedRunewords` 数组中每个对象。
   - 移除了「同一词条仅激活一次」的限制，允许通过天胡布局提升词条等级。
-- **匹配逻辑优化 (当前)**:
-  - **无序匹配**: 移除了对符文顺序的严格限制。现在只要在同一条路径（横、竖、斜）上凑齐词条所需的符文，无论顺序如何均可激活。
-  - **内部实现**: 由 `sequenceMatchesPattern` (严格顺序) 升级为 `sequenceMatchesPatternUnordered` (基于频率统计的无序匹配)。
+- **Spell Form V1 / 法阵匹配 (当前)**:
+  - **符文组合 = 法术**：`RUNEWORD_DB.pattern` 不再只是材料清单，而是法术公式。默认 3 符文公式按“外环试剂 + 中心核心 + 外环试剂”解释。
+  - **法阵 = 形态 + 嵌套形式**：默认形态为穿过 3x3 中心格的轴线（中横、中竖、两条对角线）；默认嵌套形式为 `pattern[1]` 核心符文必须位于中心格，`pattern[0]` / `pattern[2]` 作为外环试剂位于同一轴线两端，端点允许反向。
+  - **组合限制**：非中心线（如顶行、底行、左右边列）不再激活词条；材料齐但核心符文不在中心也不激活。个别特殊词条可在 `RUNEWORD_DB` 中设置 `spellFormula.shape = 'loose_line'` 回退旧版同一路径无序匹配。
+  - **升等逻辑**：同一词条每匹配一条穿心轴线，`level +1`；默认最多可由四条轴线叠到 Lv.4。
+  - **内部实现**：`parseRuneGrid()` 通过 `findRunewordSpellMatches()` 分发到 `findCoreAxisMatches()` 或旧版 `findLooseLineMatches()`。
+  - **2026-06-26 收口规范**：符文法术与药剂炼成的完整合约见 `docs/rune_potion_spell_contract.md`。后续修改药剂炼成、法阵形态、嵌套合法性、`POTION_SPELL_DB` 或 `RUNEWORD_DB` 法术化字段时，以该文档为准；旧 `rune_design_v5`、`rune_system_redesign`、`skill_system_alchemy_redesign` 与风剑词条任务稿均已归档，不再作为实现依据。
 - **交互优化 (当前)**:
   - **预测匹配**: 在符文选择器中，系统会预计算库存中每个符文放入目标格子后是否能触发新词条（或提升现有词条等级）。
   - **智能排序**: 能够触发新词条的符文会被自动前置到列表首位。
@@ -75,6 +79,7 @@ globs: ["src/rune_system.js", "src/rune_config.js", "src/loot_system.js", "src/c
   - 新增 `effectId` (字符串，效果唯一标识)。
   - 新增 `baseParams` (对象，Lv.1 时的基础参数)。
   - 新增 `perLevelParams` (对象，每级递增参数，Lv.N 时的参数 = baseParams + (N-1) * perLevelParams)。
+  - 3 符文 `pattern` 默认按 Spell Form V1 解析：`pattern[1]` 是中心核心，`pattern[0]` / `pattern[2]` 是外环试剂；可选 `spellFormula.shape = 'loose_line'` 用于特殊回退。
   - 包含 13 个全新设计的词条（7 个元素专属 + 6 个复合机制）。
 
 ## 6. Boss 符文掉落系统 (`combat_system.js` + `config.js`)

@@ -26,12 +26,12 @@ let TRAINING_SCENARIOS;
 try {
     // 构造最小 mock 环境
     const mockEnv = `
-        class Enemy { constructor() {} }
-        class Vec2 { constructor(x, y) { this.x = x; this.y = y; } }
         const game = {};
         const eventBus = { emit: () => {} };
         const EVENT_TYPES = {};
         const CONFIG = { gameplay: {}, balance: {} };
+        const buildEnemyV2Scenarios = () => [];
+        const buildV2MatrixScenarios = () => [];
     `;
     // 提取 TRAINING_SCENARIOS 定义
     const match = source.match(/const TRAINING_SCENARIOS\s*=\s*(\{[\s\S]*?\n\};)/);
@@ -100,6 +100,7 @@ const validCategoryIds = (TRAINING_SCENARIOS.categories || []).map(c => c.id);
 check(validCategoryIds.includes('enemy'),    '分类 enemy 存在');
 check(validCategoryIds.includes('attribute'),'分类 attribute 存在');
 check(validCategoryIds.includes('boss'),     '分类 boss 存在');
+check(validCategoryIds.includes('skill'),    '分类 skill 存在');
 check(validCategoryIds.includes('runeword'), '分类 runeword 存在');
 check(validCategoryIds.includes('relic'),    '分类 relic 存在 ✦ 新增');
 
@@ -157,6 +158,24 @@ requiredBossIds.forEach(id => {
     check(!!sc, `Boss 场景 ${id} 存在`);
     if (sc) {
         check(sc.categoryId === 'boss', `${id}.categoryId === 'boss'`);
+        if (sc.bulletConfig) {
+            const missingKeys = REQUIRED_BULLET_KEYS.filter(k => !(k in sc.bulletConfig));
+            check(missingKeys.length === 0, `${id}.bulletConfig 包含所有必填键（缺少: ${missingKeys.join(', ')}）`);
+        }
+        check(typeof sc.name === 'string' && sc.name.length > 0, `${id}.name 非空`);
+        check(typeof sc.desc === 'string' && sc.desc.length > 0, `${id}.desc 非空`);
+    }
+});
+
+const requiredSkillIds = [
+    'active_skill_sandbox'
+];
+
+requiredSkillIds.forEach(id => {
+    const sc = scenarios.find(s => s.id === id);
+    check(!!sc, `技能场景 ${id} 存在`);
+    if (sc) {
+        check(sc.categoryId === 'skill', `${id}.categoryId === 'skill'`);
         if (sc.bulletConfig) {
             const missingKeys = REQUIRED_BULLET_KEYS.filter(k => !(k in sc.bulletConfig));
             check(missingKeys.length === 0, `${id}.bulletConfig 包含所有必填键（缺少: ${missingKeys.join(', ')}）`);

@@ -57,6 +57,7 @@ globs: ["src/game_phase.js"]
 
 - **生成入口**：模块化钉盘由 `phase_gathering_initPachinko_v2()` 调用 `buildModuleEntities()` 构造各模块实体。
 - **默认钉盘**：缺失或长度不匹配的 `currentModuleLayout` 必须通过 `createDefaultModuleLayout(totalSlots, CONFIG.gameplay.moduleDefaultSlots)` 初始化；当前初始盘面只开放首行 5 个 `dense_stagger` 1x1 模块，全部为普通交错钉板，不包含默认转盘、弹力角或异形机关；后续通过局内商店按 `moduleUnlockOrder` 扩展剩余槽位。
+- **技能点槽退役**：`skill_point` 不再作为钉盘特殊槽生成。`phase_gathering_initPachinko_v2()` / legacy 入口必须过滤旧存档或旧逻辑带入的 `skill_point`；SP 的稳定来源统一为战斗技能充能条。
 - **居中解锁顺序**：模块化钉盘使用 `CONFIG.gameplay.moduleCols = 5` 与 `moduleUnlockOrder` 控制可编辑/可构建槽位。业务层与编辑器不得再假设“前 N 个 row-major 槽已解锁”；必须通过 `getActiveModuleSlots()` / `getActiveModuleSlotSet()` 获取激活槽。
 - **模块接缝**：`moduleSpacingX/Y` 默认为 `0`；默认 `dense_stagger` 依靠同一交错节奏跨模块连续铺排。新增默认组件时必须按倍化弹珠半径审计圆钉两两中心距，挡板/杯口/导流翼必须使用 barrier，不能用近距离圆钉硬拼。
 - **组件实例**：`currentModuleLayout` 的管理单位是钉盘组件实例 `{ id, uid, pegStates, pluginStates }`；多格组件的非锚点槽位使用 `{ ref: anchorIdx }`。旧版字符串布局只允许在 `ensureModuleLayoutInstances()` 中兼容升级。
@@ -114,6 +115,7 @@ globs: ["src/game_phase.js"]
   - `-100 < temp <= -50`：根据温度概率冰冻（0% ~ 100% 线性增加）。
 - **冰冻衰减机制**：若判定被冰冻，则 `e.isFrozenCurrentTurn = true` 且 `e.frozenCount` 增加 1。该计数用于在 `Enemy.applyTemp` 中衰减后续的降温效果（系数为 `0.9 ^ frozenCount`）。
 - **温度回暖**：每回合结算时，负温度减半（`Math.ceil(e.temp / 2)`），正温度自然衰减或造成燃烧伤害。
+- **毒素 DoT（2026-06-26）**：`phase_enemy_processTurn()` 通过 `phase_calcVenomEffectiveStacks()` 计算有效毒层，读取 `CONFIG.mechanics.venom.linearStacks` 与 `overflowSqrtScale`：前段线性，溢出层按 `sqrt` 边际递减。过热仍结算 2 次，冻结仍暂停但保留层数；敌人回合扫描波命中时若检测到刚解冻，必须先调用 `phase_playThawFeedback()` 清除冻结行动标记并播放解冻反馈，再额外结算 1 次毒素回合伤害，并乘以冰霜共鸣的 `frozenPhysDmgBonus`。毒素 DoT 伤害统计必须记录为 `venom`。
 - **Ignis 温压例外（2026-06-22）**：`bossType === 'ignis'` 时，100℃以上的正温结算不得调用普通燃烧 DoT。`phase_enemy_processTurn()` 会把 `temp - 100` 加上 `bossConfigs.ignis.furnacePressureBaseGain` 转为 `furnacePressure`，温压达到 `furnacePressureThreshold` 时触发 `Enemy._grantRadiantAegisPulse()`；cryo 命中和负温结算按配置比例泄压。该逻辑只属于 Ignis，不得影响普通敌人的过热路径。
 - **Tesla 导体网络（2026-06-22）**：`Enemy.startTurnAction()` 在 Tesla 未暴露破绽、未被冻结时调用 `_tickTeslaNetwork(game)`。该 tick 会先电击随机非 Boss 敌人并转为导体，再按导体数量/充能状态结算 `teslaFieldPower`、召唤进度和非重叠导体生成。`phase_enemy_startLogic()` 同时递减导体 `_teslaChargedTurns`，到期移除由 Tesla 机制授予的临时 `haste`。
 
@@ -176,7 +178,7 @@ globs: ["src/game_phase.js"]
 | `devourer` | 噬神者 | Mini-Boss | 深渊胃域拉拽并召唤 `maw_thrall`，吞噬胃域内敌人转化为护盾；狂暴后全屏候选 |
 | `viridis` | 绿色山峡 | 大 Boss | 孢子活甲网络，治疗与专属侍体累积孢甲资源；狂暴后集中自疗并强化孢甲循环 |
 | `tesla` | 特斯拉山峡 | 大 Boss | 导体网络场强：每回合电击并转化导体，场强提升行动与召唤压力，cryo / bounce 可反制 |
-| `chimera` | 奇美拉 | 大 Boss | 每回合随机热核吞噬 1 名敌人，温度转热/寒层并在冷热抵消时生成流彩护盾；吞噬后召唤 +100°C / -100°C 养料 |
+| `chimera` | 奇美拉 | 大 Boss | 每回合先吞噬两个目标，左侧倾向低温、右侧倾向高温；吞噬结算后召唤 2-3 名不带 `berserk` 的热核养料，左侧低温、右侧高温；温度按绝对值一比一转热核/冰核，冷热抵消时 100% 生成流彩护盾，狂暴后护盾量翻倍 |
 | `ouroboros` | 奥罗波罗斯 | 大 Boss | 六附体每回合轮转，当前附体决定词缀、主机制和动态破绽谱 |
 
 ## 6. Boss 遗物与 round-start 延迟奖励处理

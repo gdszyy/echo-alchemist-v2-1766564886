@@ -513,10 +513,15 @@ export const render_system = {
      */
     render_floatingTexts(timeScale) {
         for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
-            this.floatingTexts[i].update(timeScale);
-            this.floatingTexts[i].draw(this.ctx);
-            if (this.floatingTexts[i].life <= 0) {
-                if (this.floatingTexts[i]._pixi) { floatingText_pixiDestroy(this.floatingTexts[i]._pixi); this.floatingTexts[i]._pixi = null; }
+            const floatingText = this.floatingTexts[i];
+            floatingText.update(timeScale);
+            floatingText.draw(this.ctx);
+            if (floatingText.life <= 0) {
+                const owner = floatingText._floatingDamageOwner;
+                if (owner && this._floatingDamageTextsByEnemy && this._floatingDamageTextsByEnemy.get(owner) === floatingText) {
+                    this._floatingDamageTextsByEnemy.delete(owner);
+                }
+                if (floatingText._pixi) { floatingText_pixiDestroy(floatingText._pixi); floatingText._pixi = null; }
                 this.floatingTexts.splice(i, 1);
             }
         }
@@ -575,37 +580,38 @@ export const render_system = {
             ? (1 - Math.pow(1 - reloadProgress, 3))
             : 1;
         const chamberX = 0;
-        const chamberY = 7 * bodyScale + recoilY;
+        const chamberY = recoilY;
         const magazine = {
-            y: 43 * bodyScale + recoilY,
-            centers: [-29, -18, -7, 7, 18, 29].map(x => x * bodyScale),
+            y: 42.7 * bodyScale + recoilY,
+            centers: [-32.5, -22, -11, 0, 11, 22].map(x => x * bodyScale),
         };
         const damageReadout = {
-            x: -49 * bodyScale,
-            y: 12 * bodyScale + recoilY,
+            x: -44.3 * bodyScale,
+            y: 10.5 * bodyScale + recoilY,
         };
         const burstReadout = {
-            x: 43 * bodyScale,
-            y: 35 * bodyScale + recoilY,
+            x: 38.5 * bodyScale,
+            cellTopY: -17.5 * bodyScale + recoilY,
+            labelY: 33 * bodyScale + recoilY,
         };
 
         const drawDamageReadout = () => {
             ctx.save();
             ctx.globalAlpha *= revealT;
             const value = String(profile.damage);
-            const maxValueWidth = 23 * bodyScale;
-            let valueSize = 10 * bodyScale;
+            const maxValueWidth = 25 * bodyScale;
+            let valueSize = 11.2 * bodyScale;
             ctx.translate(damageReadout.x, damageReadout.y);
             ctx.rotate(-Math.PI / 2);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'rgba(103, 232, 249, 0.82)';
-            ctx.font = `bold ${4.6 * bodyScale}px Cinzel`;
-            ctx.fillText('DMG', 0, -5.8 * bodyScale);
+            ctx.font = `bold ${5.2 * bodyScale}px Cinzel`;
+            ctx.fillText('DMG', 0, -6.4 * bodyScale);
             ctx.fillStyle = '#f8fafc';
             do {
                 ctx.font = `bold ${valueSize}px Cinzel`;
-                if (ctx.measureText(value).width <= maxValueWidth || valueSize <= 5 * bodyScale) break;
+                if (ctx.measureText(value).width <= maxValueWidth || valueSize <= 5.8 * bodyScale) break;
                 valueSize -= 0.5 * bodyScale;
             } while (true);
             if (glowFx) {
@@ -619,22 +625,48 @@ export const render_system = {
         const drawBurstReadout = () => {
             ctx.save();
             ctx.globalAlpha = 0.96 * revealT;
+            const maxCells = 6;
+            const activeCells = Math.max(1, Math.min(maxCells, Math.round(profile.multicastCount || 1)));
+            const cellW = 9.6 * bodyScale;
+            const cellH = 6.2 * bodyScale;
+            const cellStep = 7.4 * bodyScale;
+            const cellX = burstReadout.x - 2.2 * bodyScale;
+            const tubeTop = burstReadout.cellTopY - cellH * 0.74;
+            const tubeH = (maxCells - 1) * cellStep + cellH * 1.48;
+            ctx.beginPath();
+            ctx.roundRect(cellX - cellW * 0.94, tubeTop, cellW * 1.88, tubeH, 3.4 * bodyScale);
+            ctx.fillStyle = 'rgba(3, 7, 18, 0.68)';
+            ctx.fill();
+            for (let i = 0; i < maxCells; i++) {
+                const lit = i >= maxCells - activeCells;
+                const y = burstReadout.cellTopY + i * cellStep;
+                ctx.beginPath();
+                ctx.roundRect(cellX - cellW / 2, y - cellH / 2, cellW, cellH, 2 * bodyScale);
+                ctx.fillStyle = lit
+                    ? `rgba(251, 191, 36, ${0.48 + pulse * 0.2})`
+                    : 'rgba(3, 7, 18, 0.9)';
+                if (glowFx && lit) {
+                    ctx.shadowColor = '#f59e0b';
+                    ctx.shadowBlur = _sb(3 + chargeProgress * 4 + pulse * 3);
+                }
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = lit
+                    ? `rgba(254, 243, 199, ${0.26 + pulse * 0.18})`
+                    : 'rgba(148, 163, 184, 0.18)';
+                ctx.lineWidth = 0.55 * bodyScale;
+                ctx.stroke();
+            }
             ctx.fillStyle = '#fef3c7';
-            ctx.font = `bold ${8 * bodyScale}px Cinzel`;
+            ctx.font = `bold ${8.6 * bodyScale}px Cinzel`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             if (glowFx) {
                 ctx.shadowColor = '#f59e0b';
-                ctx.shadowBlur = _sb(4 + chargeProgress * 4 + pulse * 3);
+                ctx.shadowBlur = _sb(3 + chargeProgress * 3 + pulse * 2);
             }
-            ctx.fillText(`x${profile.multicastCount}`, burstReadout.x, burstReadout.y);
+            ctx.fillText(`x${profile.multicastCount}`, burstReadout.x - 0.5 * bodyScale, burstReadout.labelY);
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = `rgba(251, 191, 36, ${0.24 + pulse * 0.18})`;
-            ctx.lineWidth = 0.9 * bodyScale;
-            ctx.beginPath();
-            ctx.moveTo(burstReadout.x - 8.5 * bodyScale, burstReadout.y + 6.2 * bodyScale);
-            ctx.lineTo(burstReadout.x + 8.5 * bodyScale, burstReadout.y + 6.2 * bodyScale);
-            ctx.stroke();
             ctx.restore();
         };
 
@@ -652,7 +684,7 @@ export const render_system = {
                     ctx.shadowBlur = _sb(4);
                 }
                 if (smallIcon) {
-                    const iconSize = 9.8 * bodyScale;
+                    const iconSize = 13.2 * bodyScale;
                     ctx.globalAlpha = 0.96 * revealT;
                     ctx.drawImage(smallIcon, x - iconSize / 2, magazine.y - iconSize / 2, iconSize, iconSize);
                 } else {
@@ -664,12 +696,12 @@ export const render_system = {
                 }
                 ctx.shadowBlur = 0;
                 ctx.globalAlpha = revealT;
-                ctx.font = `bold ${5.3 * bodyScale}px Cinzel`;
+                ctx.font = `bold ${7 * bodyScale}px Cinzel`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const stackText = String(entry.value);
-                const textY = magazine.y + 11.8 * bodyScale;
-                ctx.lineWidth = 2 * bodyScale;
+                const textY = magazine.y + 13.4 * bodyScale;
+                ctx.lineWidth = 2.3 * bodyScale;
                 ctx.strokeStyle = 'rgba(3, 7, 18, 0.92)';
                 ctx.strokeText(stackText, x, textY);
                 ctx.fillStyle = '#fef3c7';

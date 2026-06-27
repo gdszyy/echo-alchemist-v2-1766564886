@@ -17,6 +17,7 @@
 | **T1：Boss 破绽契约校验** | `tests/validate_boss_vulnerability.mjs` | Node.js，无需浏览器 | 每次修改 Boss 破绽谱、Boss 伤害结算或普通波次机会布局后执行 | < 30s |
 | **T1：Boss 本体资产校验** | `tests/validate_boss_sprite_assets.mjs` | Node.js，无需浏览器 | 每次新增或替换 Boss 本体 Sprite 后执行 | < 30s |
 | **T1：Boss 破绽资产校验** | `tests/validate_boss_vulnerability_assets.mjs` | Node.js，无需浏览器 | 每次新增或替换 Boss 破绽 PNG Overlay 后执行 | < 30s |
+| **T1：符文法阵契约校验** | `tests/validate_rune_spell_forms.mjs` | Node.js，无需浏览器 | 每次修改 `parseRuneGrid()`、`RUNEWORD_DB.pattern` 或 `spellFormula` 后执行 | < 30s |
 | **T2：试炼场实机验证** | 浏览器内 `TrainingGround` 沙盒 | 游戏内置，需部署 | 部署到测试环境后，AI 或人工操作 | 按需 |
 | **T3：Puppeteer 自动化** | `tests/ai_test_runner.js` | Puppeteer，需本地游戏服务 | 完整回归测试 | 2~5min |
 
@@ -31,7 +32,7 @@
 ```js
 {
     id: 'snake_case_unique_id',       // 全局唯一，用于 Puppeteer 脚本定位
-    categoryId: 'enemy|attribute|boss|runeword|relic',  // 必须属于已注册分类
+    categoryId: 'enemy|attribute|skill|boss|runeword|relic',  // 必须属于已注册分类
     name: '简短中文名',                // 在 UI Tab 中显示
     icon: '🔤',                       // Emoji 图标
     desc: '[分类标签] 详细描述...',    // 以 [分类标签] 开头，说明测试目标
@@ -66,6 +67,7 @@
 |---------|------|-----------|-------------|
 | `enemy` | 敌人词条 | 4+ | 护盾、分身、精英、Boss 词条行为 |
 | `attribute` | 属性弹珠 | 4+ | 元素弹珠伤害、符文词条触发 |
+| `skill` | 主动技能 | 1+ | `SKILL_DB` 任意技能选择、SP 调整、强化下一发与全场技能释放 |
 | `boss` | Boss 机制 | 2+ | Boss 专属技能、阶段切换与破绽视觉逐档验收 |
 | `runeword` | 符文词条 | 4+ | focused_fire / mass_collapse / kinetic_decay / echo_shot |
 | `relic` | 遗物/精华 | **8** | 保底、精华全链路、存档持久化（见 2.3 节） |
@@ -86,6 +88,8 @@
 ---
 
 ## 3. Puppeteer 自动化测试脚本（`tests/ai_test_runner.js`）
+
+> **本地 npm 测试环境端口**：根项目 `npm start` 默认监听 `http://localhost:3002`，T2 试炼场实机验证与 T3 Puppeteer 自动化默认都应使用该 URL。启动前先按 AGENTS.md 的本地服务规范检查 `:3002` 是否已有可复用服务；只有 3002 被占用且不可复用时，才临时改用其他端口并记录原因。
 
 ### 3.1 套件列表
 
@@ -109,7 +113,7 @@ pnpm add puppeteer
 npm start
 
 # 运行全部套件
-node tests/ai_test_runner.js --url http://localhost:3000
+node tests/ai_test_runner.js --url http://localhost:3002
 
 # 运行指定套件
 node tests/ai_test_runner.js --suite relic
@@ -140,7 +144,8 @@ AI 处理失败的标准流程：
 
 ### 4.1 校验项目
 
-- 分类完整性：5 个分类（enemy / attribute / boss / runeword / relic）全部存在
+- 分类完整性：核心分类（enemy / attribute / skill / boss / runeword / relic）全部存在
+- `skill` 分类与 `active_skill_sandbox` 场景存在，用于主动技能沙盒测试
 - 场景总数 >= 30
 - `relic` 分类场景数 >= 8
 - 8 个必须场景 ID 全部存在且 `categoryId === 'relic'`
@@ -211,7 +216,21 @@ node tests/validate_enemy_spawn_runtime.mjs
 node tests/validate_phase_contracts.mjs
 ```
 
-### 4.6 Boss 破绽契约校验
+### 4.6 符文法阵契约校验
+
+`tests/validate_rune_spell_forms.mjs` 静态锁定 Spell Form V1 的词条解析规则：
+- 默认 3 符文词条必须组成穿过 3x3 中心的轴线法阵。
+- `pattern[1]` 必须位于中心格；`pattern[0]` / `pattern[2]` 位于同一轴线两端且允许反向。
+- 非中心线或核心符文错位不得激活词条。
+- 同一词条每多匹配一条穿心轴线，词条等级递增。
+- `spellFormula.shape = 'loose_line'` 仍可回退旧版同路径无序匹配。
+
+运行方式：
+```bash
+node tests/validate_rune_spell_forms.mjs
+```
+
+### 4.7 Boss 破绽契约校验
 
 `tests/validate_boss_vulnerability.mjs` 静态锁定 Boss 破绽重设计：
 - `spawn_system.js` 不得重新出现旧 `weak_spot` 普通波次低血量弱点怪。

@@ -134,14 +134,24 @@
 - [ ] 图鉴卡片补齐未发现、已发现、可激活、已激活、材料不足等状态。
 - [ ] 移动端检查长列表滚动、弹窗关闭、Tab 切换和底部确认区不被浏览器安全区遮挡。
 
-### 4.2 P1 遗物 / 商店 / 真理之书
+### 4.2 P1 药剂炼成闭环与法阵 MVP
+
+> 规划入口见 [`potion_alchemy_development_plan.md`](potion_alchemy_development_plan.md)；权威规则见 [`rune_potion_spell_contract.md`](rune_potion_spell_contract.md)。
+
+- [ ] C1 中断与覆盖边界：关闭炼金台、切 Tab、进入战斗、刷新恢复时，已投入符文不返还且草稿状态可解释。
+- [ ] C2 法阵选择 MVP：第一版用按钮/分段控件选择 `bottle`、`orb`、`beam`、`meteor`、`tower`，不先做手绘识别。
+- [ ] C3 法阵合法性表：扩展 `_potionAlchemyDraft` 记录 `formId`、`nestingMode`、`slotType`，并校验 `spellType x formId`。
+- [ ] C4 `spellContent` 解析：从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容，并保留旧 `potionId` 存档兼容。
+- [ ] C5 `spellTree` 存档：封装结果保存草稿树，后续 C6 嵌套和 C7 战斗释放都基于该结构推进。
+
+### 4.3 P1 遗物 / 商店 / 真理之书
 
 - [ ] 统一卡片头部：名称、稀有度、来源、代价、收益、禁用原因。
 - [ ] 商店购买、遗物选择、图鉴条目使用同一套“可用 / 不足 / 已拥有 / 已满级”状态语法。
 - [ ] 设计局内商人首访免费“临时加成类”商品池：明确每种加成的持续范围、数值、互斥规则、刷新/购买限制与 UI 文案；当前实现仅用 `starter_aid_bundle` 占位援助包承接第 3 回合新手保护（护盾/碎片即时发放，基础伤害临时持续 2 回合）。
 - [ ] 真理之书补充核心机制验证入口，优先覆盖符文充能、子弹替换、DropPity、智能掉落和 V2 大型敌人。
 
-### 4.3 P2 位图化视觉重构
+### 4.4 P2 位图化视觉重构
 
 - [x] 敌人美术风格母题收口：新增 `docs/design/enemy_geometric_whetstone_style.md`，将 V2 敌人统一为“几何磨石块基座 + 镶嵌核心”，并同步引用到位图规格、敌人 V2 视觉文档、资源协议和资产影响评估。
 - [x] 敌人资产重生成计划：新增 `docs/design/enemy_asset_regeneration_plan.md`，按 Batch A-E 规划 V2 基底、Composite、Overlay/Icon、Normal/Elite fallback 与 Boss 概念预研。

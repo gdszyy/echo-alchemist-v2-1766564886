@@ -1,6 +1,6 @@
 # src\ui\hud.js 函数索引
 
-> 自动生成于 2026-06-24 | 总行数: 1517 | 函数数: 24 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 1634 | 函数数: 31 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -16,6 +16,12 @@
 | _attributeChipAssetUrl | function | `_attributeChipAssetUrl(key)` |  |
 | _attributeIconAssetUrl | function | `_attributeIconAssetUrl(key)` |  |
 | _buildAttributeChip | function | `_buildAttributeChip(entry, className = '')` |  |
+| _buildCombatAttributePlaceholder | function | `_buildCombatAttributePlaceholder(slotIndex)` |  |
+| _buildCombatAttributeMoreSlot | function | `_buildCombatAttributeMoreSlot(hiddenEntries)` |  |
+| _buildCombatAttributeSlots | function | `_buildCombatAttributeSlots(profile, maxSlots = 4)` |  |
+| _buildCombatQueueAttributeIcon | function | `_buildCombatQueueAttributeIcon(entry, className = '')` |  |
+| _buildCombatQueueAttributeMoreIcon | function | `_buildCombatQueueAttributeMoreIcon(hiddenEntries)` |  |
+| _buildCombatQueueAttributeIcons | function | `_buildCombatQueueAttributeIcons(profile, maxIcons = 4)` |  |
 | _playRuneAcquireReveal | function | `_playRuneAcquireReveal(runeDef, runeLevel, delay = 0)` |  |
 | ui_updateMultiplierUI | method | `ui_updateMultiplierUI()` |  |
 | ui_saveShotDamage | method | `ui_saveShotDamage()` |  |
@@ -29,6 +35,7 @@
 | _hud_getGatheringSessionViewModels | method | `_hud_getGatheringSessionViewModels()` |  |
 | _hud_renderSessionChargeStack | method | `_hud_renderSessionChargeStack()` |  |
 | _hud_updateLegacyHitProgress | method | `_hud_updateLegacyHitProgress(val, target)` |  |
+| ui_getCanvasPointForElement | method | `ui_getCanvasPointForElement(el, options = {})` |  |
 | ui_updateUICache | method | `ui_updateUICache()` |  |
 | ui_updateGatheringQueueUI | method | `ui_updateGatheringQueueUI()` |  |
 | ui_updateAmmoUI | method | `ui_updateAmmoUI()` |  |

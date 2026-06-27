@@ -491,6 +491,12 @@ export const game_system = {
         this._roundStartResolverTotalCount = 0;
         this._lastFiredAmmoSnapshot = null; // [bullet-charge-fix] 上回合实际发射的子弹快照
         this.ownedRelics = [];
+        this.potionAlchemyUnlocked = false;
+        this.preparedPotionSpell = null;
+        this.knownPotionSpellIds = [];
+        this.potionRecipeHistory = [];
+        this._potionAlchemyDraft = null;
+        this._selectedPotionRuneIndices = new Set();
         
         // 补充遗物相关的重置字段
         this.pinkPegCount = 0;
@@ -2969,6 +2975,12 @@ export const game_system = {
                 doomsdayTimerTriggerCount: this._doomsdayTimerTriggerCount || 0,
                 // [v2 即时感重塑] 混沌契约伤害倍率（持久化避免存档读档后丢失）
                 chaosPactDamageMult: this.chaosPactDamageMult || 1,
+                // 药剂炼成（贤者药匣）
+                potionAlchemyUnlocked: !!this.potionAlchemyUnlocked,
+                preparedPotionSpell: this.preparedPotionSpell ? JSON.parse(JSON.stringify(this.preparedPotionSpell)) : null,
+                knownPotionSpellIds: (this.knownPotionSpellIds || []).slice(),
+                potionRecipeHistory: (this.potionRecipeHistory || []).map(item => ({ ...item })).slice(-10),
+                potionAlchemyDraft: this._potionAlchemyDraft ? JSON.parse(JSON.stringify(this._potionAlchemyDraft)) : null,
                 // 符文
                 runeInventory: (this.runeInventory || []).slice(),
                 runeGrid: (this.runeGrid || Array(9).fill(null)).slice(),
@@ -3123,6 +3135,12 @@ export const game_system = {
             this.playerShield = state.playerShield || 0;
             this._doomsdayTimerTriggerCount = state.doomsdayTimerTriggerCount || 0;
             this.chaosPactDamageMult = state.chaosPactDamageMult || 1;
+            this.potionAlchemyUnlocked = !!state.potionAlchemyUnlocked || (this.ownedRelics || []).includes('relic_sage_apothecary');
+            this.preparedPotionSpell = state.preparedPotionSpell ? JSON.parse(JSON.stringify(state.preparedPotionSpell)) : null;
+            this.knownPotionSpellIds = (state.knownPotionSpellIds || []).slice();
+            this.potionRecipeHistory = (state.potionRecipeHistory || []).slice();
+            this._potionAlchemyDraft = state.potionAlchemyDraft ? JSON.parse(JSON.stringify(state.potionAlchemyDraft)) : null;
+            this._selectedPotionRuneIndices = new Set();
 
             // --- 恢复符文 ---
             this.runeInventory = (state.runeInventory || []).slice();
@@ -3252,6 +3270,7 @@ export const game_system = {
             // --- 恢复技能 ---
             this.skillPoints = state.skillPoints || 0;
             this.ui.updateSkillPoints(this.skillPoints);
+            this.ui?.updateSkillBar?.(this.skillPoints || 0, this.activeSkills || []);
 
             // --- 恢复统计 ---
             this.runKillCount = state.runKillCount || 0;

@@ -422,8 +422,11 @@ Pass10 坐标约束：
 | 右翼技能点 | left 31.5%，top 1.5%，w 47%，h 24% | 最多 5 点，空槽由面板底图承载，满点叠加亮态宝石 |
 | 右翼技能按钮 | left 28.2%，top 25.9%，w 55.2%，h 55.8% | 按 2x2 素材槽百分比定位，不沿用旧 40px 绝对坐标 |
 | 右翼技能充能 | left 25.8%，right 22.2%，bottom 11.4%，h 5-7px | 直接贴底部横轨，`#combat-charge-bar-shell` 不再绘制额外底板 |
+| 右翼技能编辑 | right 0，bottom 0，40x40 热区 | 使用 `assets/ui/sprites/skill_editor_button.png` 贴合右下菱形槽；`#skill-editor-open-btn` 不再放在顶部栏 |
 
 后续不得再把 `skill_charge_panel_9s.png` 或旧端点 Sprite 当作右翼底部充能底板叠在选中面板上；该面板自己的横轨是唯一底图，DOM 只负责 actual/temp fill。
+
+2026-06-26 右下技能装配入口补充：技能编辑按钮从左上顶部栏移入右翼面板右下角。为避免覆盖按钮，运行时可将技能充能轨缩短为上段状态读数；编辑按钮视觉资产来自绿幕源 `skill_editor_button_raw.png`，透明成品为 `skill_editor_button.png`，不包含文字、数字或动态内容。
 
 ### 18.3 Pass11 发射器承载当前弹信息
 

@@ -3,6 +3,11 @@ description: "音频系统的架构约定、延迟初始化机制、音效方法
 globs: ["src/audio.js", "src/core.js"]
 ---
 
+## Tone Parameter Safety
+
+- `SoundManager.playTone(freq, type, vol, dur)` must sanitize numeric inputs before passing them to Web Audio `AudioParam.setValueAtTime()` or ramp APIs.
+- Gameplay callers can still pass derived values, but `freq`, `vol`, and `dur` must become finite fallback values inside `playTone` so a malformed recipe cannot crash the audio graph.
+
 ## Local sample preview layer
 
 - `SoundManager` may preload local wav samples from `assets/audio-local/sfx/` and prefer them inside existing public methods such as `playShoot`, `playHit`, `playEnemyHit`, `playLightning`, `playExplosion`, `playPowerup`, `playEffect('split'|'shatter')`, `playMagic`, `playSlash`, and `playCollect`.

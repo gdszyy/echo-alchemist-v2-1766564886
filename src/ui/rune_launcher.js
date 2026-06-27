@@ -18,7 +18,7 @@ import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY, RARITY_DISPLAY, ELEMENT_RESONANCE_D
 import { parseRuneGrid, calcRuneBaseStats, getRuneId, rune_merge, rune_reforge, getNewRunewordsOnPlacement } from '../rune_system.js';
 import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
-import { SKILL_DB, CONFIG } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生 + 技能装配上限
+import { SKILL_DB, CONFIG, POTION_SPELL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生 + 技能装配上限
 import { getRuneIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A6] 位图符文图标
 
 /**
@@ -127,6 +127,7 @@ export const rune_launcher_system = {
         this.ui_switchRuneTab('launcher');
         // 初始化发射器内符文碎片计数显示
         this._ui_updateLauncherShardCount();
+        if (typeof this.ui_updatePotionAlchemyPanel === 'function') this.ui_updatePotionAlchemyPanel();
         this.ui_initRuneGrid();
         this.ui_updateRuneGrid();
         // 关闭气泡提示（玩家已进入发射器）
@@ -634,6 +635,7 @@ export const rune_launcher_system = {
         this._ui_renderLauncherInventory();
         this._ui_renderManagementInventory();
         this._ui_updateRuneActionButtons();
+        if (typeof this.ui_updatePotionAlchemyPanel === 'function') this.ui_updatePotionAlchemyPanel();
     },
 
 
@@ -1240,19 +1242,466 @@ export const rune_launcher_system = {
         }, 3000);
     },
 
+    // ==================== 药剂炼成（贤者药匣） ====================
+
+    _ui_isPotionAlchemyUnlocked() {
+        return !!(this.potionAlchemyUnlocked || (this.ownedRelics || []).includes('relic_sage_apothecary'));
+    },
+
+    _ui_getPotionRuneEntry(idx) {
+        const entry = this.runeInventory && this.runeInventory[idx];
+        if (!entry) return null;
+        const id = getRuneId(entry);
+        const def = RUNE_DB.find(r => r.id === id);
+        if (!def) return null;
+        return {
+            index: idx,
+            id,
+            def,
+            level: (typeof entry === 'object' && entry.level) ? entry.level : 1,
+            element: def.element || def.baseStat,
+        };
+    },
+
+    _ui_getSelectedPotionRunes() {
+        if (!this._selectedPotionRuneIndices) this._selectedPotionRuneIndices = new Set();
+        const len = this.runeInventory ? this.runeInventory.length : 0;
+        for (const idx of Array.from(this._selectedPotionRuneIndices)) {
+            if (idx >= len) this._selectedPotionRuneIndices.delete(idx);
+        }
+        return Array.from(this._selectedPotionRuneIndices)
+            .sort((a, b) => a - b)
+            .map(idx => this._ui_getPotionRuneEntry(idx))
+            .filter(Boolean);
+    },
+
+    _ui_estimatePotionRuneValue(runeInfo) {
+        const rarityBonus = { common: 6, rare: 9, epic: 13, legendary: 18 }[runeInfo.def.rarity] || 6;
+        return rarityBonus * Math.max(1, runeInfo.level || 1);
+    },
+
+    _ui_resolvePotionRecipe(selectedRunes) {
+        const runes = selectedRunes || [];
+        const refund = Math.floor(
+            runes.reduce((sum, r) => sum + this._ui_estimatePotionRuneValue(r), 0)
+            * (CONFIG.gameplay.potionAlchemyFailRefundRatio || 0.35)
+        );
+        if (runes.length < 2 || runes.length > 4) {
+            return { success: false, reason: '选择 2-4 个符文开始调制。', refund };
+        }
+
+        const elements = runes.map(r => r.element);
+        const levelSum = runes.reduce((sum, r) => sum + (r.level || 1), 0);
+        const counts = elements.reduce((acc, e) => {
+            acc[e] = (acc[e] || 0) + 1;
+            return acc;
+        }, {});
+        const has = (e) => elements.includes(e);
+        const count = (e) => counts[e] || 0;
+        const choose = (id) => (POTION_SPELL_DB || []).find(p => p.id === id);
+
+        let potion = null;
+        if (has('laser') && levelSum >= 4) potion = choose('potion_prism_focus');
+        else if (has('overcharge') && (has('pyro') || has('lightning'))) potion = choose('potion_overload_vial');
+        else if (count('cryo') >= 2) potion = choose('potion_frost_seal');
+        else if (count('pyro') >= 2) potion = choose('potion_molten_flask');
+        else if (has('lightning') && (count('lightning') >= 2 || has('bounce') || has('overcharge'))) potion = choose('potion_storm_lure');
+        else if (has('pierce') && (count('pierce') >= 2 || has('scatter'))) potion = choose('potion_blade_shadow');
+        else if (has('bounce') && (has('pyro') || has('overcharge'))) potion = choose('potion_collapse_vial');
+        else if (has('echo')) potion = choose('potion_echo_phial');
+        else if (has('venom') && (count('venom') >= 2 || has('scatter'))) potion = choose('potion_venom_mist');
+
+        if (!potion) {
+            return {
+                success: false,
+                reason: `未形成稳定配方。确认后会消耗符文并返还 ${refund} 局内碎片。`,
+                refund,
+                elements,
+                levelSum,
+            };
+        }
+
+        const quality = Math.max(1, Math.min(3, Math.floor(levelSum / runes.length)));
+        const purityBonus = elements.every(e => e === elements[0]) ? 1 : 0;
+        const qualityBonus = quality >= 3 ? 1 : 0;
+        const charges = Math.max(1, Math.min(potion.maxCharges || 3, (potion.baseCharges || 1) + purityBonus + qualityBonus));
+        return {
+            success: true,
+            potion,
+            quality,
+            charges,
+            maxCharges: potion.maxCharges || charges,
+            sourceRunes: runes.map(r => ({ id: r.id, level: r.level, element: r.element })),
+            elements,
+            levelSum,
+            refund,
+        };
+    },
+
+    _ui_getPotionAlchemyDraft() {
+        if (!this._potionAlchemyDraft) {
+            this._potionAlchemyDraft = {
+                state: 'empty',
+                consumedRunes: [],
+            };
+        }
+        if (!Array.isArray(this._potionAlchemyDraft.consumedRunes)) {
+            this._potionAlchemyDraft.consumedRunes = [];
+        }
+        return this._potionAlchemyDraft;
+    },
+
+    _ui_resetPotionAlchemyDraft() {
+        this._potionAlchemyDraft = {
+            state: 'empty',
+            consumedRunes: [],
+        };
+        if (!this._selectedPotionRuneIndices) this._selectedPotionRuneIndices = new Set();
+        this._selectedPotionRuneIndices.clear();
+    },
+
+    _ui_getPotionDraftRunes() {
+        const draft = this._ui_getPotionAlchemyDraft();
+        return (draft.consumedRunes || []).filter(Boolean);
+    },
+
+    _ui_renderPotionDraftRunes() {
+        const container = document.getElementById('potion-draft-runes');
+        const workbench = document.getElementById('potion-alchemy-workbench');
+        const draft = this._ui_getPotionAlchemyDraft();
+        const runes = this._ui_getPotionDraftRunes();
+        if (workbench) workbench.dataset.draftState = draft.state || 'empty';
+        if (!container) return;
+        container.innerHTML = '';
+        for (let i = 0; i < 4; i++) {
+            const rune = runes[i];
+            const slot = document.createElement('div');
+            slot.className = `potion-draft-rune${rune ? '' : ' is-empty'}`;
+            if (rune) {
+                slot.innerHTML = `
+                    <div class="potion-draft-rune__icon">${_ui_buildRuneIconHTML(rune.def, rune.level)}</div>
+                    <div class="potion-draft-rune__level">Lv.${rune.level || 1}</div>
+                `;
+                slot.title = `${rune.def?.name || rune.id || '符文'} Lv.${rune.level || 1}（已消耗）`;
+            } else {
+                slot.innerHTML = '<span class="potion-draft-rune__empty-dot"></span>';
+                slot.title = '空投料槽';
+            }
+            container.appendChild(slot);
+        }
+    },
+
+    _ui_calcPotionDraftRefund(runes, result = null) {
+        if (result && typeof result.refund === 'number') return Math.max(0, result.refund);
+        return Math.floor(
+            (runes || []).reduce((sum, r) => sum + this._ui_estimatePotionRuneValue(r), 0)
+            * (CONFIG.gameplay.potionAlchemyFailRefundRatio || 0.35)
+        );
+    },
+
+    _ui_consumePotionRune(idx) {
+        if (!this._ui_isPotionAlchemyUnlocked()) return;
+        if (!Array.isArray(this.runeInventory) || idx < 0 || idx >= this.runeInventory.length) return;
+        const info = this._ui_getPotionRuneEntry(idx);
+        if (!info) return;
+        const draft = this._ui_getPotionAlchemyDraft();
+        if ((draft.consumedRunes || []).length >= 4) {
+            showToast('本次炼成最多投入 4 个符文。');
+            return;
+        }
+        this.runeInventory.splice(idx, 1);
+        draft.consumedRunes.push({
+            id: info.id,
+            def: info.def,
+            level: info.level,
+            element: info.element,
+        });
+        draft.state = draft.consumedRunes.length >= 2 ? 'spell_ready' : 'feeding';
+        showToast(`投入符文：${info.def.name} Lv.${info.level}`);
+        this._ui_renderPotionAlchemyInventory();
+        this._ui_updatePotionAlchemyPreview();
+        this._ui_updateRuneInventoryDisplay();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        try { audio.playTone(620, 'triangle', 0.05, 0.06); } catch (e) {}
+    },
+
+    ui_updatePotionAlchemyPanel() {
+        const unlocked = this._ui_isPotionAlchemyUnlocked();
+        const tabPotion = document.getElementById('rune-tab-potion');
+        const panel = document.getElementById('rune-potion-panel');
+        const locked = document.getElementById('potion-alchemy-locked');
+        const workbench = document.getElementById('potion-alchemy-workbench');
+        if (tabPotion) tabPotion.style.display = unlocked ? '' : 'none';
+        if (!panel) return;
+        if (!unlocked) {
+            if (locked) locked.classList.remove('hidden');
+            if (workbench) workbench.classList.add('hidden');
+            if (!panel.classList.contains('hidden')) this.ui_switchRuneTab('launcher');
+            return;
+        }
+        if (locked) locked.classList.add('hidden');
+        if (workbench) workbench.classList.remove('hidden');
+        this._ui_renderPotionCurrent();
+        this._ui_renderAlchemyNotes();
+        this._ui_renderPotionAlchemyInventory();
+        this._ui_renderPotionDraftRunes();
+        this._ui_updatePotionAlchemyPreview();
+    },
+
+    _ui_renderPotionCurrent() {
+        const el = document.getElementById('potion-current-card');
+        if (!el) return;
+        const prepared = this.preparedPotionSpell;
+        const def = prepared ? (POTION_SPELL_DB || []).find(p => p.id === prepared.potionId) : null;
+        if (!def) {
+            el.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🧪</span>
+                    <div>
+                        <div class="text-sm font-bold text-slate-300">空药剂槽</div>
+                        <div class="text-xs text-slate-500">炼成后会显示在战斗技能栏。</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        el.innerHTML = `
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">${def.icon}</span>
+                <div class="min-w-0 flex-1">
+                    <div class="text-sm font-bold" style="color:${def.color}">${def.name}</div>
+                    <div class="text-xs text-slate-400">${def.desc}</div>
+                </div>
+                <div class="text-xs font-bold text-amber-200">${prepared.charges || 0}/${prepared.maxCharges || def.maxCharges}</div>
+            </div>
+        `;
+    },
+
+    _ui_renderAlchemyNotes() {
+        const container = document.getElementById('potion-alchemy-notes');
+        const countEl = document.getElementById('potion-notes-count');
+        if (!container) return;
+        const allPotions = POTION_SPELL_DB || [];
+        const knownIds = new Set(this.knownPotionSpellIds || []);
+        const knownPotions = allPotions.filter(p => p && knownIds.has(p.id));
+        if (countEl) countEl.textContent = `${knownPotions.length} / ${allPotions.length}`;
+        if (knownPotions.length === 0) {
+            container.innerHTML = '<div class="potion-notes-empty">尚无记录。完成一次封装后，药剂会写入笔记。</div>';
+            return;
+        }
+        container.innerHTML = knownPotions.map(potion => `
+            <div class="potion-note-entry">
+                <div class="potion-note-entry__icon" style="color:${potion.color || '#6ee7b7'}">${potion.icon || '🧪'}</div>
+                <div class="potion-note-entry__body">
+                    <div class="potion-note-entry__name" style="color:${potion.color || '#e2e8f0'}">${potion.name}</div>
+                    <div class="potion-note-entry__meta">装药 ${potion.baseCharges || 1}-${potion.maxCharges || potion.baseCharges || 1} · 已揭示</div>
+                    <div class="potion-note-entry__desc">${potion.desc || '已记录的炼金药剂。'}</div>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    _ui_renderPotionAlchemyInventory() {
+        const container = document.getElementById('potion-rune-inventory');
+        const emptyEl = document.getElementById('potion-rune-empty');
+        const countEl = document.getElementById('potion-rune-selected-count');
+        if (!container) return;
+        if (!this._selectedPotionRuneIndices) this._selectedPotionRuneIndices = new Set();
+        const draft = this._ui_getPotionAlchemyDraft();
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'potion-rune-empty') child.remove();
+        });
+        if (countEl) countEl.textContent = `${draft.consumedRunes.length} / 4 已投入`;
+        if (!this.runeInventory || this.runeInventory.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        this.runeInventory.forEach((runeEntry, idx) => {
+            const info = this._ui_getPotionRuneEntry(idx);
+            if (!info) return;
+            const card = document.createElement('div');
+            card.className = [
+                'rune-list-card cursor-pointer select-none',
+            ].join(' ');
+            card.innerHTML = `
+                <div class="rune-list-card__icon" style="font-size:22px;">${_ui_buildRuneIconHTML(info.def, info.level)}</div>
+                <div class="rune-list-card__body">
+                    <div class="rune-list-card__title">${info.def.name}</div>
+                    <div class="rune-list-card__meta">${info.element} · Lv.${info.level}</div>
+                </div>
+                <span class="text-emerald-300 text-[10px] shrink-0">投入</span>
+            `;
+            card.addEventListener('click', () => {
+                this._ui_consumePotionRune(idx);
+            });
+            container.appendChild(card);
+        });
+    },
+
+    _ui_updatePotionAlchemyPreview() {
+        const preview = document.getElementById('potion-preview-card');
+        const confirmBtn = document.getElementById('potion-confirm-btn');
+        if (!preview || !confirmBtn) return;
+        const draftRunes = this._ui_getPotionDraftRunes();
+        const result = this._ui_resolvePotionRecipe(draftRunes);
+        if (draftRunes.length < 2) {
+            this._ui_getPotionAlchemyDraft().state = draftRunes.length > 0 ? 'feeding' : 'empty';
+            this._ui_renderPotionDraftRunes();
+            preview.innerHTML = `
+                <div class="text-sm font-bold text-slate-300 mb-1">炉内尚未成法</div>
+                <div class="text-xs text-slate-500">已投入 ${draftRunes.length} 个符文。继续投料；投入符文不会返还。</div>
+            `;
+            confirmBtn.disabled = true;
+            confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200';
+            confirmBtn.textContent = '继续投料';
+            return;
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-emerald-700/70 text-emerald-100 border border-emerald-400/60 hover:bg-emerald-600/80 cursor-pointer transition-all duration-200 shadow-[0_0_8px_rgba(16,185,129,0.25)]';
+        if (result.success) {
+            this._ui_getPotionAlchemyDraft().state = 'form_ready';
+            this._ui_renderPotionDraftRunes();
+            preview.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">◎</span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-emerald-300">结构稳定，可以封装</div>
+                        <div class="text-xs text-slate-400">最终药剂会在手动接触后揭示。</div>
+                        <div class="text-xs text-slate-500 mt-1">已投入 ${draftRunes.length} 个符文，成本已支付。</div>
+                    </div>
+                </div>
+            `;
+            confirmBtn.textContent = this.preparedPotionSpell ? '手动接触并覆盖旧药剂' : '手动接触封装';
+        } else {
+            if (draftRunes.length < 4) {
+                this._ui_getPotionAlchemyDraft().state = 'feeding';
+                this._ui_renderPotionDraftRunes();
+                preview.innerHTML = `
+                    <div class="text-sm font-bold text-amber-300 mb-1">结构未稳，可继续投料</div>
+                    <div class="text-xs text-slate-400">炉内已有 ${draftRunes.length} 个符文，但尚未形成可封装结构。</div>
+                    <div class="text-xs text-slate-500 mt-1">继续投入符文可能稳定，也可能坍塌。</div>
+                `;
+                confirmBtn.disabled = true;
+                confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200';
+                confirmBtn.textContent = '继续投料';
+                return;
+            }
+            this._ui_getPotionAlchemyDraft().state = 'failed';
+            this._ui_renderPotionDraftRunes();
+            preview.innerHTML = `
+                <div class="text-sm font-bold text-rose-300 mb-1">结构坍塌，炼成失败</div>
+                <div class="text-xs text-slate-400">已投入符文不会返还，可领取失败返还。</div>
+            `;
+            confirmBtn.textContent = '领取失败返还';
+        }
+    },
+
+    ui_clearPotionSelection() {
+        const draftRunes = this._ui_getPotionDraftRunes();
+        if (draftRunes.length > 0) {
+            const ok = typeof window.confirm === 'function'
+                ? window.confirm('放弃本次炼成？已投入符文不会返还。')
+                : true;
+            if (!ok) return;
+            const result = this._ui_resolvePotionRecipe(draftRunes);
+            const refund = this._ui_calcPotionDraftRefund(draftRunes, result);
+            this.runFragments = (this.runFragments || 0) + refund;
+            if (!Array.isArray(this.potionRecipeHistory)) this.potionRecipeHistory = [];
+            this.potionRecipeHistory.push({ outcome: 'aborted', refund, round: this.round || 1 });
+            this.potionRecipeHistory = this.potionRecipeHistory.slice(-10);
+            this._ui_showPotionActionResult(`炼成中断，返还 ${refund} 局内碎片`, 'error');
+            showToast(`炼成中断，返还 ${refund} 局内碎片。`);
+        }
+        this._ui_resetPotionAlchemyDraft();
+        this._ui_renderPotionAlchemyInventory();
+        this._ui_updatePotionAlchemyPreview();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+    },
+
+    ui_confirmPotionAlchemy() {
+        if (!this._ui_isPotionAlchemyUnlocked()) return;
+        const draftRunes = this._ui_getPotionDraftRunes();
+        if (draftRunes.length < 2 || draftRunes.length > 4) {
+            showToast('继续投料后才能封装。');
+            return;
+        }
+        const result = this._ui_resolvePotionRecipe(draftRunes);
+
+        if (!Array.isArray(this.potionRecipeHistory)) this.potionRecipeHistory = [];
+        if (result.success) {
+            if (this.preparedPotionSpell && (this.preparedPotionSpell.charges || 0) > 0) {
+                const ok = typeof window.confirm === 'function'
+                    ? window.confirm('封装新药剂会废弃当前药剂，确认继续？')
+                    : true;
+                if (!ok) return;
+            }
+            this.preparedPotionSpell = null;
+            this.preparedPotionSpell = {
+                potionId: result.potion.id,
+                charges: result.charges,
+                maxCharges: result.maxCharges,
+                quality: result.quality,
+                sourceRunes: result.sourceRunes,
+                createdRound: this.round || 1,
+            };
+            if (!Array.isArray(this.knownPotionSpellIds)) this.knownPotionSpellIds = [];
+            if (!this.knownPotionSpellIds.includes(result.potion.id)) this.knownPotionSpellIds.push(result.potion.id);
+            this.potionRecipeHistory.push({ outcome: 'success', potionId: result.potion.id, round: this.round || 1, levelSum: result.levelSum });
+            this._ui_showPotionActionResult(`炼成成功：${result.potion.name} ${result.charges}/${result.maxCharges}`, 'success');
+            showToast(`炼成药剂：${result.potion.name}`);
+            try { audio.playTone(880, 'sine', 0.12, 0.18); } catch (e) {}
+        } else {
+            const refund = this._ui_calcPotionDraftRefund(draftRunes, result);
+            this.runFragments = (this.runFragments || 0) + refund;
+            this.potionRecipeHistory.push({ outcome: 'failure', refund, round: this.round || 1, elements: result.elements || [] });
+            this._ui_showPotionActionResult(`配方失稳，返还 ${refund} 局内碎片`, 'error');
+            showToast(`配方失稳，返还 ${refund} 局内碎片。`);
+            try { audio.playTone(260, 'sawtooth', 0.08, 0.12); } catch (e) {}
+        }
+
+        this.potionRecipeHistory = this.potionRecipeHistory.slice(-10);
+        this._ui_resetPotionAlchemyDraft();
+        this._ui_updateRuneInventoryDisplay();
+        this.ui_updateRuneGrid();
+        this.ui_updatePotionAlchemyPanel();
+        this.ui?.updateSkillBar?.(this.skillPoints || 0, this.activeSkills || []);
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+    },
+
+    _ui_showPotionActionResult(message, type) {
+        const el = document.getElementById('potion-action-result');
+        if (!el) return;
+        el.textContent = message;
+        el.className = [
+            'mb-4 text-sm font-bold text-center py-2 px-3 rounded-xl',
+            type === 'success'
+                ? 'bg-green-900/30 border border-green-500/50 text-green-300'
+                : 'bg-red-900/30 border border-red-500/50 text-red-300',
+        ].join(' ');
+        el.classList.remove('hidden');
+        clearTimeout(this._potionActionResultTimer);
+        this._potionActionResultTimer = setTimeout(() => {
+            el.classList.add('hidden');
+        }, 3000);
+    },
+
 
     // ==================== 词条图鉴 ====================
 
     /**
      * ui_switchRuneTab - 切换符文发射器面板的 Tab
-     * @param {'launcher'|'codex'} tab - 目标 Tab
+     * @param {'launcher'|'management'|'potion'|'codex'} tab - 目标 Tab
      */
     ui_switchRuneTab(tab) {
         const launcherContent = document.getElementById('rune-launcher-content');
         const managementPanel = document.getElementById('rune-management-panel');
+        const potionPanel = document.getElementById('rune-potion-panel');
         const codexPanel = document.getElementById('rune-codex-panel');
         const tabLauncher = document.getElementById('rune-tab-launcher');
         const tabManagement = document.getElementById('rune-tab-management');
+        const tabPotion = document.getElementById('rune-tab-potion');
         const tabCodex = document.getElementById('rune-tab-codex');
         if (!launcherContent || !codexPanel) return;
 
@@ -1270,17 +1719,20 @@ export const rune_launcher_system = {
         // 默认隐藏全部内容
         launcherContent.classList.add('hidden');
         if (managementPanel) managementPanel.classList.add('hidden');
+        if (potionPanel) potionPanel.classList.add('hidden');
         codexPanel.classList.add('hidden');
 
         if (tab === 'launcher') {
             launcherContent.classList.remove('hidden');
             setActive(tabLauncher, true);
             setActive(tabManagement, false);
+            setActive(tabPotion, false);
             setActive(tabCodex, false);
         } else if (tab === 'management') {
             if (managementPanel) managementPanel.classList.remove('hidden');
             setActive(tabLauncher, false);
             setActive(tabManagement, true);
+            setActive(tabPotion, false);
             setActive(tabCodex, false);
             // 更新管理页选中计数
             if (typeof this._ui_updateRuneActionButtons === 'function') this._ui_updateRuneActionButtons();
@@ -1289,10 +1741,23 @@ export const rune_launcher_system = {
                 const c = this._selectedRuneIndices ? this._selectedRuneIndices.size : 0;
                 sel.textContent = `${c} / 3`;
             }
+        } else if (tab === 'potion') {
+            if (!this._ui_isPotionAlchemyUnlocked()) {
+                showToast('需要获得贤者药匣才能炼成药剂。');
+                this.ui_switchRuneTab('launcher');
+                return;
+            }
+            if (potionPanel) potionPanel.classList.remove('hidden');
+            setActive(tabLauncher, false);
+            setActive(tabManagement, false);
+            setActive(tabPotion, true);
+            setActive(tabCodex, false);
+            this.ui_updatePotionAlchemyPanel();
         } else {
             codexPanel.classList.remove('hidden');
             setActive(tabLauncher, false);
             setActive(tabManagement, false);
+            setActive(tabPotion, false);
             setActive(tabCodex, true);
             this.ui_renderRuneCodex();
         }

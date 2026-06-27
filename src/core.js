@@ -213,7 +213,7 @@ class Game {
         this.currentPlayerPower = 0;
         this.pinkPegCount = 0;      
         this.hasCombatWall = false; 
-        this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽（技能点槽由符文词条解锁后动态加入）
+        this.unlockedSlots = ['multicast']; // 初始特殊槽：仅连击槽；SP 由技能充能条发放
         this.slotCount = 1; // 初始1个槽位
         this.activeSkills = []; // 当前装备到技能栏的技能（equippedSkillIds 的有序映射）
         this.unlockedSkills = []; // [技能装配] 已解锁技能池（四类来源并集，可超过装备上限）
@@ -242,6 +242,12 @@ class Game {
         this.sonSwordQueue = []; 
         this.swordQis = []; 
         this.ownedRelics = [];
+        this.potionAlchemyUnlocked = false;
+        this.preparedPotionSpell = null;
+        this.knownPotionSpellIds = [];
+        this.potionRecipeHistory = [];
+        this._potionAlchemyDraft = null;
+        this._selectedPotionRuneIndices = new Set();
         this.relicSelectionCount = 0; // 遗物选择计数器（用于前三次推荐逻辑）
         this.pendingRoundStartRewards = []; // 下一回合开始统一结算的延迟奖励队列
         this._roundStartResolverActive = false;

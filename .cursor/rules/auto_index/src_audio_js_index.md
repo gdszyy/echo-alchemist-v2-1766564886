@@ -1,6 +1,6 @@
 # src\audio.js 函数索引
 
-> 自动生成于 2026-06-22 | 总行数: 672 | 函数数: 20 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 1047 | 函数数: 29 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -12,11 +12,20 @@
 | constructor | method | `constructor()` |  |
 | _createReverbNode | method | `_createReverbNode(decay = 0.8, duration = 2.0)` |  |
 | _connectToPegBus | method | `_connectToPegBus(node)` |  |
+| _preloadLocalSamples | method | `_preloadLocalSamples()` |  |
+| _loadSample | method | `_loadSample(key)` |  |
+| _rand | method | `_rand(min, max)` |  |
+| _resolveRange | method | `_resolveRange(value)` |  |
+| _pickSampleKey | method | `_pickSampleKey(keyOrGroup)` |  |
+| _connectOutput | method | `_connectOutput(node, output = 'master')` |  |
+| _playSample | method | `_playSample(key, options = {})` |  |
 | createNoiseBuffer | method | `createNoiseBuffer()` |  |
 | createRollingSound | method | `createRollingSound()` |  |
 | toggleMute | method | `toggleMute()` |  |
 | resume | method | `resume()` |  |
 | suspend | method | `suspend()` |  |
+| setSfxVolume | method | `setSfxVolume(volume)` |  |
+| setBgmVolume | method | `setBgmVolume(volume)` |  |
 | playTone | method | `playTone(freq, type = 'sine', vol = 0.3, dur = 0.2)` |  |
 | playHit | method | `playHit(type = 'normal', speed = 5)` |  |
 | playShoot | method | `playShoot()` |  |
@@ -43,3 +52,4 @@
 | `@section:effect_split` | split：分裂/弹道分叉触发，triangle 600→900Hz 上扬 |
 | `@section:effect_regen` | regen：敌人回血，sine 500→700Hz 上扬 |
 | `@section:effect_shatter` | shatter：破碎效果（冰冻击碎等），白噪声爆发 |
+| `@section:effect_venom_death` | venom_death：剧毒火焰溶解死亡，低频咕噜下滑 + 高通腐蚀噪声嘶嘶 |

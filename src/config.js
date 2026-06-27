@@ -490,7 +490,14 @@ const CONFIG = {
         },
         // 毒素属性 (Venom)
         venom: {
-            dotPerStack: 0.8,         // 每层毒素每次结算的基础伤害系数
+            dotPerStack: 0.8,         // 每层有效毒素每次结算的基础伤害系数
+            linearStacks: 30,         // 前 N 层按完整层数结算，保证低层数手感
+            overflowSqrtScale: 6,     // 超出线性段后按 sqrt(overflow) 放大，形成边际递减
+            thawExtraTickMultiplier: 1.0, // 解冻时额外结算 1 次毒素回合伤害
+            pyroExplosionSpreadRatio: 0.27, // 爆燃扩散的毒层比例，默认对齐热量消耗比例
+            lightningProcRatio: 0.35, // 闪电命中中毒目标时立即触发的单次毒 tick 比例
+            lightningProcChainFalloff: 0.85, // 闪电链每深入一跳后闪毒比例递减
+            lightningProcMinRatio: 0.20 // 闪毒链跳比例下限，防止深链完全失去反馈
         },
         // 超载属性 (Overcharge)
         overcharge: {
@@ -685,7 +692,7 @@ const CONFIG = {
                 furnacePressurePulsePct: 0.02, // 温压脉冲授予最大生命 2% 的流光护盾
                 berserkedFireSplashRadius: 80, // 狂暴后火焰溅射半径（像素）
                 berserkedFireSplashDamage: 5,  // 狂暴后火焰溅射伤害
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 haste 词缀，但降低前期压迫感）
+                moveInterval: 3,          // 每 3 回合移动一次；haste 只强化机制频率，不再让 Boss 连续位移
                 themeWeights: { pyro: 1.5, pierce: 1.5 }
             },
             glacies: {
@@ -707,7 +714,7 @@ const CONFIG = {
                 frostSeamPierceBonusDamage: 0.20, // pierce 切断霜缝时本次命中增伤
                 frostSeamCryoSkipTurns: 1, // cryo 切断霜缝后冻结 Glacies 下一次霜缝 tick
                 frostSeamLandingBonusTargets: 1, // 跳跃落地时额外缝合目标
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（有 regen 词缀，移动较慢）
+                moveInterval: 4,          // 每 4 回合移动一次；留出霜缝缝合与反制窗口
                 themeWeights: { cryo: 1.5, pierce: 1.3 }
             },
             mikro: {
@@ -719,7 +726,7 @@ const CONFIG = {
                 berserkedCloneChance: 1.0, // 狂暴后分身概率 100%
                 cloneDamageReductionPerClone: 0.10, // 每个存活分身提供的减伤比例
                 cloneDamageReductionMax: 0.50,       // 分身减伤上限（5个分身即达上限）
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注分裂，移动较慢）
+                moveInterval: 4,          // 每 4 回合移动一次；让分裂与治疗网络成为主压力
                 themeWeights: { lightning: 1.5, scatter: 1.5 }
             },
             devourer: {
@@ -742,7 +749,7 @@ const CONFIG = {
                 devourerDigestHealPct: 0.08,        // DEPRECATED：旧版吞噬回血比例，现由 hp += 猎物当前血量取代
                 devourerDigestShieldPerFeed: 2,     // DEPRECATED：旧版每次喂养固定加盾，现改为按猎物现有护盾叠加
                 devourerFeedAffixes: ['devour', 'shield'],
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（吞噬后需要靠近）
+                moveInterval: 3,          // 每 3 回合移动一次；胃域拉拽和召唤承担主要压迫
                 themeWeights: { bounce: 1.5, laser: 1.5 }
             },
             viridis: {
@@ -768,7 +775,7 @@ const CONFIG = {
                 sporeArmorVenomDamagePct: 0.45,
                 sporeArmorCounterVenomStacks: 2,
                 sporeArmorCorrodeTurns: 2,
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（专注治疗，移动缓慢）
+                moveInterval: 4,          // 每 4 回合移动一次；让孢甲资源循环完整展开
                 themeWeights: { pyro: 1.5, venom: 1.4 }
             },
             tesla: {
@@ -799,30 +806,32 @@ const CONFIG = {
                 teslaGroundedTurns: 1,
                 teslaGroundedGainMult: 0.35,
                 teslaConductorAffixes: ['clone'],
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（有 haste 词缀，移动较快）
+                moveInterval: 3,          // 每 3 回合移动一次；导体网络承担速度压力
                 themeWeights: { cryo: 1.5, bounce: 1.3 }
             },
             chimera: {
                 name: '混沌融合体·奇美拉',
                 isBigBoss: true,
-                affixes: ['berserk', 'devour'],
+                affixes: ['devour'],
                 vulnerability: { attrs: ['venom', 'laser'], label: '污染胃域', mode: 'damage', damageRatio: 0.09 },
                 initTemp: 60,             // 初始温度（半狂暴状态）
-                berserkedTempThreshold: 100, // 狂暴后温度阈值
-                berserkedBlastOnHitChance: 0.25, // 狂暴后受击触发全场爆炸概率
-                chimeraDigestInterval: 2,
-                chimeraBerserkDigestInterval: 1,
-                chimeraSummonMaxPerTurn: 1,
-                chimeraMaxFeeders: 5,
+                chimeraDigestInterval: 1,
+                chimeraDevourTargetsPerTurn: 2,
+                chimeraBerserkShieldMult: 2,
+                chimeraSummonMinPerTurn: 2,
+                chimeraSummonMaxPerTurn: 3,
+                chimeraMaxFeeders: 8,
                 chimeraSummonHpPct: 0.14,
                 chimeraDigestHealPct: 0.06,
-                chimeraDigestShieldPerFeed: 2,
-                chimeraThermalStackUnit: 100,
+                chimeraDigestShieldPerFeed: 0,
+                chimeraThermalStackUnit: 1,
+                chimeraThermalStackCap: 9999,
                 chimeraThermalAbsorbMinTemp: 24,
-                chimeraThermalShieldPct: 0.06,
                 chimeraThermalFeedTemps: [100, -100],
-                chimeraFeedAffixes: ['berserk'],
-                moveInterval: 2,          // 常规模式：每 2 回合移动一次（混沌体，移动较频繁）
+                chimeraLeftFeedTemp: -100,
+                chimeraRightFeedTemp: 100,
+                chimeraFeedAffixes: [],
+                moveInterval: 4,          // 每 4 回合移动一次；左右双侧吞噬与养料召唤承担主压力
                 themeWeights: { venom: 1.5, laser: 1.5 }
             },
             ouroboros: {
@@ -870,7 +879,7 @@ const CONFIG = {
                 orbitHealPct: 0.05,
                 rotationInterval: 1,        // 六附体每回合转位一次
                 berserkedRotationInterval: 1, // 狂暴后每回合切换
-                moveInterval: 3,          // 常规模式：每 3 回合移动一次（永恒回声，移动最慢）
+                moveInterval: 4,          // 每 4 回合移动一次；六附体轮转是主机制
                 themeWeights: { pierce: 1.2, cryo: 1.2, lightning: 1.2 }
             }
         },
@@ -909,7 +918,7 @@ const CONFIG = {
                 devourer: { role: 'maw_thrall', affixes: ['devour', 'shield'], tags: ['mawFeed'] },
                 viridis:  { role: 'spore_vassal', affixes: ['regen', 'healer', 'armorSpore'], tags: ['sporeArmor'] },
                 tesla:    { role: 'conductor', affixes: ['clone'], tags: ['teslaConductor'] },
-                chimera:  { role: 'chaos_feed', affixes: ['berserk'], tags: ['chaosFeed'] },
+                chimera:  { role: 'chaos_feed', affixes: [], tags: ['chaosFeed'] },
                 ouroboros:{ role: 'orbit_echo', affixes: ['shield', 'haste', 'regen'], tags: ['orbitAttachment'] }
             }
         }
@@ -920,6 +929,7 @@ const CONFIG = {
 	        initWindPegs: 0,
 	        initSwordPegs: 0,
 	        baseDamage: 1,
+        potionAlchemyFailRefundRatio: 0.35,
         greedyWheelChance: 0.75,
         greedyWheelIntervalFrames: 24,
         greedyWheelPreludeFrames: 22,
@@ -1281,26 +1291,26 @@ const CONFIG = {
         //   大BOSS / 6+ 词条 → 炫彩流光边框
         // 铁边框：哑光铁灰色
         borderTierIronColor: '#6b7280',
-        borderTierIronWidth: 2.5,
+        borderTierIronWidth: 1.25,
         borderTierIronGlow: '#9ca3af',
         borderTierIronGlowBlur: 6,
         // 铜边框：暖铜橙色
         borderTierBronzeColor: '#b45309',
-        borderTierBronzeWidth: 3,
+        borderTierBronzeWidth: 1.5,
         borderTierBronzeGlow: '#d97706',
         borderTierBronzeGlowBlur: 8,
         // 银边框：冷银白色
         borderTierSilverColor: '#94a3b8',
-        borderTierSilverWidth: 3,
+        borderTierSilverWidth: 1.5,
         borderTierSilverGlow: '#e2e8f0',
         borderTierSilverGlowBlur: 10,
         // 金边框：流光金色（与精英装饰 E4 共用流光逻辑）
         borderTierGoldColor: '#facc15',
-        borderTierGoldWidth: 3.5,
+        borderTierGoldWidth: 1.75,
         borderTierGoldGlow: '#fde68a',
         borderTierGoldGlowBlur: 14,
         // 炫彩流光边框：彩虹渐变循环（大BOSS / 6+ 词条）
-        borderTierRainbowWidth: 4,
+        borderTierRainbowWidth: 2,
         borderTierRainbowGlowBlur: 18,
 
         // 晶化切面：叠加层最大透明度
@@ -1802,6 +1812,17 @@ const RELIC_DB = [
         tags: ['主动技能', '防线'],
         recommendTip: '兼顾防守与清场的主动技能，适合稳住防线。'
     },
+    {
+        id: 'relic_sage_apothecary',
+        name: '贤者药匣',
+        icon: '🧪',
+        desc: '解锁炼金台的药剂炼成。消耗符文调制一次性药剂法术；药剂不消耗 SP、无冷却，只消耗装药量。',
+        rarity: 'legendary',
+        effect: 'unlock_potion_alchemy',
+        maxStacks: 1,
+        tags: ['药剂炼成', '符文转化'],
+        recommendTip: '把多余符文炼成不耗 SP 的备用法术，适合把失配符文转化为临场解法。'
+    },
 
     // 走私者系列：立即给予符文（按稀有度分为4个版本）
     {
@@ -1879,30 +1900,30 @@ const RELIC_DB = [
         tags: ['伤害提升', '集火'],
         recommendTip: '聚焦残血敌人，单点击杀效率大幅提升！'
     },
-    // 符文共鸣核：每次击杀，符文充能条额外 +8%
+    // 技能共鸣核：每次击杀，技能充能条额外 +8%
     {
         id: 'rune_resonance_core',
-        name: '符文共鸣核',
+        name: '技能共鸣核',
         icon: '💠',
-        desc: '战斗阶段：子弹每次击杀敌人，符文充能条额外 +8%。',
+        desc: '战斗阶段：子弹每次击杀敌人，技能充能条额外 +8%。',
         rarity: 'rare',
         effect: 'rune_resonance_core',
         maxStacks: 1,
         recommended: true,
-        tags: ['符文加速', '击杀奖励'],
-        recommendTip: '击杀越多，符文充能越快，构筑成型速度暴增！'
+        tags: ['技能充能', '击杀奖励'],
+        recommendTip: '击杀越多，技能充能越快，SP 周转速度暴增！'
     },
     {
         id: 'rune_siphon',
-        name: '符文虹吸管',
+        name: '技能虹吸管',
         icon: '〽️',
-        desc: '战斗阶段：子弹每次命中都会额外获得 +2% 符文充能；若该次命中击杀敌人，改为 +4%。',
+        desc: '战斗阶段：子弹每次命中都会额外获得 +2% 技能充能；若该次命中击杀敌人，改为 +4%。',
         rarity: 'rare',
         effect: 'rune_siphon',
         maxStacks: 1,
         recommended: true,
-        tags: ['符文加速', '持续命中'],
-        recommendTip: '不只奖励击杀，连刮痧命中也能稳定推进符文充能。'
+        tags: ['技能充能', '持续命中'],
+        recommendTip: '不只奖励击杀，连刮痧命中也能稳定推进技能充能。'
     },
     {
         id: 'opening_salvo',
@@ -2083,7 +2104,7 @@ const SKILL_DB = [
         unlockRuneword: 'runeword_kinetic_surge', // 解锁词条：动能激增
         name: '動能爆發',
         icon: '🔄',
-        cost: 1,
+        cost: 2,
         color: '#34d399',
         desc: '下一发弹珠弹跳次数上限 +15，且每次弹跳伤害额外 +3。',
         params: {
@@ -2155,9 +2176,10 @@ const SKILL_DB = [
         icon: '✨',
         cost: 1,
         color: '#c4b5fd',
-        desc: '向最靠近防线的 3 个敌人各发射一枚奥术飞弹，每枚造成 回合数 × 3 伤害。',
+        desc: '向最靠近防线的 3 个敌人各发射一枚奥术飞弹，每枚造成 4 + 回合数 × 3 伤害。',
         params: {
             targetCount: 3,
+            flatDamage: 4,
             roundMult: 3,
             particleColor: '#c4b5fd'
         }
@@ -2170,9 +2192,9 @@ const SKILL_DB = [
         icon: '🔋',
         cost: 1,
         color: '#fcd34d',
-        desc: '下一发弹珠基础伤害 +8、弹跳上限 +3、连射 +1。',
+        desc: '下一发弹珠基础伤害 +6、弹跳上限 +3、连射 +1。',
         params: {
-            flatDamage: 8,
+            flatDamage: 6,
             bounceBonus: 3,
             multicastBonus: 1,
             floatText: 'CHARGED!',
@@ -2259,9 +2281,9 @@ const SKILL_DB = [
         icon: '🎯',
         cost: 2,
         color: '#f87171',
-        desc: '下一发弹珠必定暴击（造成 200% 伤害），并附加 +6 基础伤害。',
+        desc: '下一发弹珠必定暴击（造成 200% 伤害），并附加 +8 基础伤害。',
         params: {
-            flatDamage: 6,
+            flatDamage: 8,
             critChance: 1,
             critDamage: 2,
             floatText: 'PRECISION!',
@@ -2375,6 +2397,146 @@ const SKILL_DB = [
     }
 ];
 
+// ==================== 药剂炼成法术数据库 ====================
+// 由“贤者药匣”解锁。药剂法术不消耗 SP、无冷却，仅消耗 preparedPotionSpell.charges。
+const POTION_SPELL_DB = [
+    {
+        id: 'potion_frost_seal',
+        name: '霜封药剂',
+        icon: '❄️',
+        color: '#67e8f9',
+        recipeLabel: '冰霜 + 冰霜',
+        spellType: 'status',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'all_enemies', shatterStyle: 'mist_bloom', trailMode: 'mist', burstMode: 'shard', label: '霜封碎裂', radius: 118 },
+        baseCharges: 2,
+        maxCharges: 4,
+        desc: '冻结全场并造成少量冰属性伤害。',
+        params: { tempDown: 40, freezeFrames: 60, roundMult: 2 }
+    },
+    {
+        id: 'potion_molten_flask',
+        name: '熔火药瓶',
+        icon: '🔥',
+        color: '#fb923c',
+        recipeLabel: '火焰 + 火焰',
+        spellType: 'burst',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'all_enemies', shatterStyle: 'blast', trailMode: 'ember', burstMode: 'ember', label: '熔火碎裂', radius: 112 },
+        baseCharges: 2,
+        maxCharges: 4,
+        desc: '灼热全场并造成火属性伤害。',
+        params: { tempUp: 45, roundMult: 2 }
+    },
+    {
+        id: 'potion_storm_lure',
+        name: '引雷药剂',
+        icon: '⚡',
+        color: '#a78bfa',
+        recipeLabel: '雷电 + 雷电/弹射/过载',
+        spellType: 'status',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'primary_enemy', shatterStyle: 'mark', trailMode: 'spark', burstMode: 'spark', label: '引雷标记', radius: 82 },
+        baseCharges: 2,
+        maxCharges: 4,
+        desc: '对高生命目标落雷，并触发一次连锁闪电。',
+        params: { chainLevel: 8, roundMult: 2 }
+    },
+    {
+        id: 'potion_blade_shadow',
+        name: '刃影药剂',
+        icon: '🗡️',
+        color: '#e2e8f0',
+        recipeLabel: '穿透 + 穿透/散射',
+        spellType: 'construct',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'selected_targets', shatterStyle: 'shard_sigil', trailMode: 'shard', burstMode: 'shard', label: '刃影出鞘', radius: 74 },
+        baseCharges: 2,
+        maxCharges: 4,
+        desc: '召唤飞剑斩击随机敌人。',
+        params: { swordCount: 2, roundMult: 3 }
+    },
+    {
+        id: 'potion_collapse_vial',
+        name: '坍缩试剂',
+        icon: '🌀',
+        color: '#818cf8',
+        recipeLabel: '弹射 + 火焰/过载',
+        spellType: 'burst',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'cluster_center', shatterStyle: 'collapse_ring', trailMode: 'mist', burstMode: 'spark', label: '坍缩碎裂', radius: 118 },
+        baseCharges: 1,
+        maxCharges: 2,
+        desc: '在目标区域制造坍缩冲击，伤害并推离敌人。',
+        params: { radius: 95, roundMult: 3, pushRows: 0.5 }
+    },
+    {
+        id: 'potion_echo_phial',
+        name: '回响药剂',
+        icon: '🔁',
+        color: '#34d399',
+        recipeLabel: '回响 + 任意符文',
+        spellType: 'ammo_enchant',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'ammo_socket', shatterStyle: 'seal', trailMode: 'spark', burstMode: 'spark', label: '回响封装', radius: 58 },
+        baseCharges: 3,
+        maxCharges: 4,
+        desc: '强化下一颗弹药，额外获得连射与回响复制倾向。',
+        params: { multicastBonus: 1, copyChance: 0.45 }
+    },
+    {
+        id: 'potion_venom_mist',
+        name: '毒雾药剂',
+        icon: '☣️',
+        color: '#86efac',
+        recipeLabel: '剧毒 + 剧毒/散射',
+        spellType: 'status',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'all_enemies', shatterStyle: 'mist_bloom', trailMode: 'venom', burstMode: 'venom', label: '毒雾释散', radius: 126 },
+        baseCharges: 2,
+        maxCharges: 4,
+        desc: '向全场扩散毒雾并叠加中毒。',
+        params: { venomStacks: 3, roundMult: 1 }
+    },
+    {
+        id: 'potion_prism_focus',
+        name: '棱光聚焦剂',
+        icon: '🌈',
+        color: '#f0abfc',
+        recipeLabel: '激光 + 任意符文（总等级 ≥ 4）',
+        spellType: 'ammo_enchant',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'ammo_socket', shatterStyle: 'seal', trailMode: 'spark', burstMode: 'spark', label: '棱光封装', radius: 62 },
+        baseCharges: 1,
+        maxCharges: 2,
+        desc: '强化下一颗弹药，追加激光、穿透与伤害。',
+        params: { laserBonus: 2, pierceBonus: 2, damageBonus: 6 }
+    },
+    {
+        id: 'potion_overload_vial',
+        name: '过载药剂',
+        icon: '💥',
+        color: '#f87171',
+        recipeLabel: '过载 + 火焰/雷电',
+        spellType: 'burst',
+        formId: 'bottle',
+        nestingMode: 'shatter',
+        vfxProfile: { targetMode: 'primary_enemy', shatterStyle: 'overload_blast', trailMode: 'ember', burstMode: 'spark', label: '过载裂解', radius: 122 },
+        baseCharges: 1,
+        maxCharges: 2,
+        desc: '对核心目标引发过载爆破，范围伤害并升温。',
+        params: { radius: 90, roundMult: 5, tempUp: 25 }
+    }
+];
+
 
 // ==================== Boss 配置数据库 ====================
 /**
@@ -2437,7 +2599,7 @@ const BOSS_DB = [
     {
         id: 'boss_chimera',
         name: '混沌融合体·奇美拉',
-        affixes: ['berserk', 'devour'],
+        affixes: ['devour'],
         // 破绽谱：毒素 (Venom) 与 激光 (Laser) —— 扰乱热核 / 精准剖解
         themeWeights: { venom: 3.0, laser: 3.0 }
     },
@@ -2586,6 +2748,7 @@ export {
     RELIC_DB,
     BOARD_STRUCTURE_RELICS,
     SKILL_DB,
+    POTION_SPELL_DB,
     BOSS_DB,
     ENEMY_CURVE_CONFIG,
 };

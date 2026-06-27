@@ -7,7 +7,7 @@
 ## 1. 模块职责边界
 
 `systems.js` 包含两个主要的独立子系统，均采用组合模式（Composition）挂载到全局 `Game` 实例上：
-*   `TrainingGround` (`game.trainingGround`)：试炼场系统，提供沙盒环境测试敌人词缀、子弹属性与 Boss 机制。
+*   `TrainingGround` (`game.trainingGround`)：试炼场系统，提供沙盒环境测试敌人词缀、子弹属性、主动技能与 Boss 机制。
 *   `TruthBook` (`game.truthBook`)：真理之书系统，提供游戏内图鉴与机制说明。
 
 ## 2. 试炼场场景化配置 (TrainingGround)
@@ -21,7 +21,7 @@
 ```javascript
 {
     id: 'unique_scenario_id',    // [必填] 全局唯一标识符
-    categoryId: 'enemy',         // [必填] 所属分类（'enemy' | 'attribute' | 'boss'）
+    categoryId: 'enemy',         // [必填] 所属分类（如 'enemy' | 'attribute' | 'skill' | 'boss'）
     name: '场景显示名称',          // [必填] 右侧边栏显示的按钮文本
     icon: '🛡️',                  // [可选] 按钮前缀图标（Emoji）
     desc: '场景说明文字',          // [可选] 右下角显示的机制说明
@@ -58,6 +58,7 @@
 *   **DOM 动态生成**：`#phase-training` 及其内部的控制面板、右侧边栏完全由 `TrainingGround.initUI()` 动态创建，**并未硬编码在 `index.html` 中**。
 *   **右侧边栏 (Sidebar)**：包含分类 Tab 和场景列表。切换分类由 `switchCategory(id)` 处理，点击场景由 `loadScenario(id)` 处理。
 *   **演示触发收栏**：`triggerScenarioAction()` 默认会调用 `collapseSidebar()`，让战斗区域腾出空间；需要持续阅读状态说明的验收场景可设置 `keepSidebarOpenOnDemo: true`。
+*   **主动技能测试**：`skill` 分类使用 `active_skill_sandbox` 场景和底部“技能测试”面板。面板可选择任意 `SKILL_DB` 技能、调整/补满 SP，并通过 `activateSkillForTest()` 临时切换到 combat 语义调用正式 `combat_activateSkill()`；退出试炼场时必须恢复进入前的技能、SP、弹药、词条和回合上下文快照。
 *   **Boss 入场动画特殊处理**：试炼场不走完整的战斗阶段（`phase === 'training'`），因此在 `loadScenario` 中有专门针对 `categoryId === 'boss'` 的硬编码逻辑：强制将 `e._pendingEntrance = false` 并设置 `e.entranceTimer = 1` 以激活 Boss 入场动画。
 *   **Boss 破绽视觉验收**：`boss_vulnerability_break` 场景是破绽 Overlay 的逐档验收入口。它通过 `BOSS_VULNERABILITY_VISUAL_BOSSES` / `BOSS_VULNERABILITY_VISUAL_STATES` 轮播 8 个 Boss 的 `0/25/50/75/break/exposed/recover` 状态，并直接写入 `_bossVulnerabilityVisualRatio`、`_bossVulnerabilityExposedTurns`、`_bossVulnerabilityBreakTimer`、`_bossVulnerabilityRecoverTimer` 等视觉状态字段；该场景只用于验收，不代表实战伤害触发流程。
 *   **Ouroboros 六附体验收**：`boss_ouroboros` 场景用于实机查看六附体轮转、轨道节点、`附X/断N` 状态短标签和动态破绽谱。场景本身只调用 `spawn_spawnBoss('ouroboros', true)` 与 `phase_enemy_startLogic()`，附体切换和封印必须由 `Enemy._tickOuroborosOrbit()` / `_interruptOuroborosAttachment()` 驱动，禁止在试炼场里写死视觉状态替代实战逻辑。`boss_ouroboros_attachment_slots` 场景用于逐槽验收 Boss 环上的六个附体槽贴图；它必须通过真实 Boss 实例的 `_applyOuroborosAttachment(normalizedIndex, game, { feedback: false })` 切换槽位，并由 `Enemy._drawOuroborosOrbitAttachments()` 绘制 `assets/sprites/bosses/ouroboros_slots/ouroboros_slot_<slotId>.png`。该场景不得调用 `_ouroborosSpawnEchoes()`，不得用普通敌人或会移动的 `orbit_echo` 伴生敌冒充槽位；`orbit_echo` 只用于正式裂群/召唤机制的伴生敌资源验收。
@@ -110,7 +111,7 @@
 | `enemy_affix` | 普通/精英敌人词缀演示 |
 | `enemy_v2` | 多格敌人、V2 基底与专属形体 |
 | `attribute` | 弹药属性、元素反应与子弹演示 |
-| `core` | 技能/符文充能、子弹替换、掉落保底、智能符文掉落 |
+| `core` | 技能充能、子弹替换、掉落保底、智能符文掉落 |
 
 ## 3.3 符文词条场景分类 (`categoryId: 'runeword'`)
 
