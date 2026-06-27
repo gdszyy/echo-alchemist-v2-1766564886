@@ -1,0 +1,22 @@
+{
+  "frameSize": 256,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "placeholder": false,
+  "single": true,
+  "styleFamily": "elite_golem_affix_base_pass11_haste_streamlined_limbs",
+  "generated": "elite_golem_haste_pass11_streamlined_limbs_2026_06_26",
+  "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_bases_pass11/elite_golem_haste_front_256_pass11.png",
+  "sourceExport": "assets/sprites/enemies/elites/golem_affix_bases/pass11/elite_golem_haste_front_256_pass11.png",
+  "compositionContract": "top HP clearance, cropped upper two-thirds body, no shoulder spikes or thrusters, streamlined limb silhouette",
+  "headLanguage": "streamlined rounded head, one yellow horizontal visor eye, yellow flow grooves on smooth limbs",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 256
+    }
+  }
+}

@@ -21,7 +21,17 @@
     "gravityWell": "enemy_gravity_core_3x3.png"
   },
   "affixIcons": {
+    "berserk": "affix_berserk.png",
+    "haste": "affix_haste.png",
+    "healer": "affix_healer.png",
+    "clone": "affix_clone.png",
+    "jump": "affix_jump.png",
     "devour": "affix_devour.png",
+    "lowDamageImmune": "affix_lowDamageImmune.png",
+    "deflectShell": "affix_deflectShell.png",
+    "armorSpore": "affix_armorSpore.png",
+    "siegeBreaker": "affix_siegeBreaker.png",
+    "overloadReactor": "affix_overloadReactor.png",
     "heavyArmor": "affix_heavyArmor.png",
     "deflectionWard": "affix_deflectionWard.png",
     "echoRelay": "affix_echoRelay.png",
@@ -275,6 +285,51 @@
       ],
       "placeholder": false
     },
+    "prism:1x3:prism": {
+      "resourceId": "enemy_prism_prism_1x3_imagegen_pass1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_prism_prism_1x3_imagegen_pass1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_prism_prism_1x3_imagegen_pass1_idle.json",
+      "baseArchetype": "prism",
+      "footprint": "1x3",
+      "affixes": [
+        "prism"
+      ],
+      "placeholder": false,
+      "styleFamily": "enemy_exact_composites_pass1",
+      "generated": "imagegen_exact_composites_pass1_2026_06_27",
+      "sourceConcept": "docs/design/concepts/enemy_exact_composites_pass1/prism_alpha.png",
+      "notes": "Exact prism composite. Keeps the 1x3 refraction silhouette and embedded white/cyan refraction core."
+    },
+    "hive:2x3:hive": {
+      "resourceId": "enemy_hive_hive_2x3_imagegen_pass1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_hive_hive_2x3_imagegen_pass1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_hive_hive_2x3_imagegen_pass1_idle.json",
+      "baseArchetype": "hive",
+      "footprint": "2x3",
+      "affixes": [
+        "hive"
+      ],
+      "placeholder": false,
+      "styleFamily": "enemy_exact_composites_pass1",
+      "generated": "imagegen_exact_composites_pass1_2026_06_27",
+      "sourceConcept": "docs/design/concepts/enemy_exact_composites_pass1/hive_alpha.png",
+      "notes": "Exact hive composite. Uses a 2x3 multi-chamber stone incubator silhouette with embedded alchemical egg pods."
+    },
+    "gravityWell:3x3:gravityWell": {
+      "resourceId": "enemy_gravity_well_gravitywell_3x3_imagegen_pass1",
+      "spritePath": "assets/sprites/enemies/composites/enemy_gravity_well_gravitywell_3x3_imagegen_pass1_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_gravity_well_gravitywell_3x3_imagegen_pass1_idle.json",
+      "baseArchetype": "gravityWell",
+      "footprint": "3x3",
+      "affixes": [
+        "gravityWell"
+      ],
+      "placeholder": false,
+      "styleFamily": "enemy_exact_composites_pass1",
+      "generated": "imagegen_exact_composites_pass1_2026_06_27",
+      "sourceConcept": "docs/design/concepts/enemy_exact_composites_pass1/gravity_well_alpha.png",
+      "notes": "Exact gravityWell composite. Preserves the 3x3 ring-furnace silhouette, central black core, and inward gravity grid."
+    },
     "orbitEcho:aegis": {
       "resourceId": "enemy_ouroboros_orbit_echo_aegis_1x1",
       "spritePath": "assets/sprites/enemies/composites/enemy_ouroboros_orbit_echo_aegis_1x1_idle.png",
@@ -346,6 +401,277 @@
       "bossMinionRole": "orbit_echo",
       "slotId": "surge",
       "placeholder": false
+    },
+    "eliteGolemAffixCombo:1x1:": {
+      "resourceId": "enemy_elite_golem_noaffix_1x1_pass13",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_noaffix_1x1_pass13_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_noaffix_1x1_pass13_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [],
+      "placeholder": false,
+      "styleFamily": "elite_golem_noaffix_base_pass13",
+      "generated": "elite_golem_noaffix_base_pass13_2026_06_27",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_noaffix_pass13/elite_golem_noaffix_front_256_pass13.png",
+      "headLanguage": "neutral sealed stone helm, muted amber core, no affix-specific signal",
+      "notes": "No-affix original body for the 1x1 elite golem family. Overlay-only affixes such as shield or regen do not change this body key."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore": {
+      "resourceId": "enemy_elite_golem_armorSpore_1x1_pass10",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_1x1_pass10_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_1x1_pass10_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_base_pass10_regenerated_head_language",
+      "generated": "elite_golem_affix_bases_pass10_regenerated_head_shapes_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_bases_pass10/elite_golem_armorSpore_front_256_pass10.png",
+      "headLanguage": "organic spore cyclops head, one green glowing eye",
+      "notes": "Pass10 regenerated single-affix elite golem base with oversized head silhouette and emissive eye identity. Multi-affix combinations remain pass7."
+    },
+    "eliteGolemAffixCombo:1x1:berserk": {
+      "resourceId": "enemy_elite_golem_berserk_1x1_pass10",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_berserk_1x1_pass10_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_berserk_1x1_pass10_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "berserk"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_base_pass10_regenerated_head_language",
+      "generated": "elite_golem_affix_bases_pass10_regenerated_head_shapes_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_bases_pass10/elite_golem_berserk_front_256_pass10.png",
+      "headLanguage": "broken rage head, one eye burning with flame",
+      "notes": "Pass10 regenerated single-affix elite golem base with oversized head silhouette and emissive eye identity. Multi-affix combinations remain pass7."
+    },
+    "eliteGolemAffixCombo:1x1:haste": {
+      "resourceId": "enemy_elite_golem_haste_1x1_pass11",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_haste_1x1_pass11_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_haste_1x1_pass11_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "haste"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_base_pass11_haste_streamlined_limbs",
+      "generated": "elite_golem_haste_pass11_streamlined_limbs_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_bases_pass11/elite_golem_haste_front_256_pass11.png",
+      "headLanguage": "streamlined rounded head, one yellow horizontal visor eye, yellow flow grooves on smooth limbs",
+      "notes": "Pass11 replaces only the haste single-affix elite golem: no shoulder spikes, fins, rockets, or jump-like thruster silhouette; speed identity comes from smooth limbs and yellow flow channels. Other single-affix bases remain pass10; multi-affix combinations remain pass7."
+    },
+    "eliteGolemAffixCombo:1x1:jump": {
+      "resourceId": "enemy_elite_golem_jump_1x1_pass10",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_1x1_pass10_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_1x1_pass10_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_base_pass10_regenerated_head_language",
+      "generated": "elite_golem_affix_bases_pass10_regenerated_head_shapes_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_bases_pass10/elite_golem_jump_front_256_pass10.png",
+      "headLanguage": "lighter aerodynamic thruster head, two blue glowing eyes",
+      "notes": "Pass10 regenerated single-affix elite golem base with oversized head silhouette and emissive eye identity. Multi-affix combinations remain pass7."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+berserk": {
+      "resourceId": "enemy_elite_golem_armorSpore_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "berserk"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_berserk_front_256_pass12.png",
+      "headLanguage": "green spores plus red burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+haste": {
+      "resourceId": "enemy_elite_golem_armorSpore_haste_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_haste_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_haste_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "haste"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_haste_front_256_pass12.png",
+      "headLanguage": "spore curves plus yellow visor and streamlined limbs",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+jump": {
+      "resourceId": "enemy_elite_golem_armorSpore_jump_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_jump_front_256_pass12.png",
+      "headLanguage": "green cyclops spores plus blue compact propulsion",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:berserk+haste": {
+      "resourceId": "enemy_elite_golem_haste_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_haste_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_haste_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "berserk",
+        "haste"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_haste_berserk_front_256_pass12.png",
+      "headLanguage": "yellow flow limbs plus red burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:berserk+jump": {
+      "resourceId": "enemy_elite_golem_jump_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "berserk",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_jump_berserk_front_256_pass12.png",
+      "headLanguage": "blue propulsion plus red burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:haste+jump": {
+      "resourceId": "enemy_elite_golem_jump_haste_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_haste_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_haste_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "haste",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_jump_haste_front_256_pass12.png",
+      "headLanguage": "blue propulsion plus yellow streamlined limbs",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+berserk+haste": {
+      "resourceId": "enemy_elite_golem_armorSpore_haste_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_haste_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_haste_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "berserk",
+        "haste"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_haste_berserk_front_256_pass12.png",
+      "headLanguage": "green spores plus yellow flow plus red burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+berserk+jump": {
+      "resourceId": "enemy_elite_golem_armorSpore_jump_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "berserk",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_jump_berserk_front_256_pass12.png",
+      "headLanguage": "green spores plus blue jets plus red burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+haste+jump": {
+      "resourceId": "enemy_elite_golem_armorSpore_jump_haste_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_haste_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_haste_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "haste",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_jump_haste_front_256_pass12.png",
+      "headLanguage": "green spores plus blue compact jets plus yellow flow",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:berserk+haste+jump": {
+      "resourceId": "enemy_elite_golem_jump_haste_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_haste_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_jump_haste_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "berserk",
+        "haste",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_jump_haste_berserk_front_256_pass12.png",
+      "headLanguage": "blue jets plus yellow flow plus red burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
+    },
+    "eliteGolemAffixCombo:1x1:armorSpore+berserk+haste+jump": {
+      "resourceId": "enemy_elite_golem_armorSpore_jump_haste_berserk_1x1_pass12",
+      "spritePath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_haste_berserk_1x1_pass12_idle.png",
+      "manifestPath": "assets/sprites/enemies/composites/enemy_elite_golem_armorSpore_jump_haste_berserk_1x1_pass12_idle.json",
+      "baseArchetype": "eliteGolemAffixCombo",
+      "footprint": "1x1",
+      "affixes": [
+        "armorSpore",
+        "berserk",
+        "haste",
+        "jump"
+      ],
+      "placeholder": false,
+      "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+      "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+      "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_armorSpore_jump_haste_berserk_front_256_pass12.png",
+      "headLanguage": "four-affix apex with spores, jets, flow, and burning eye",
+      "notes": "Pass12 regenerated cross-affix elite golem body art. The sprite itself carries the combined affix identity; no labels, status badges, or overlay art are required for these four core affixes."
     }
   }
 }

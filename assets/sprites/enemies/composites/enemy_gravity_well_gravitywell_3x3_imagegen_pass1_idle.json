@@ -1,0 +1,23 @@
+{
+  "frameSize": 384,
+  "frameWidth": 384,
+  "frameHeight": 384,
+  "placeholder": false,
+  "single": true,
+  "generated": "imagegen_exact_composites_pass1_2026_06_27",
+  "sourceConcept": "docs/design/concepts/enemy_exact_composites_pass1/gravity_well_alpha.png",
+  "rawSource": "docs/design/concepts/enemy_exact_composites_pass1/gravity_well_raw.png",
+  "sourceConceptLabel": "gravityWell exact composite",
+  "postprocess": "built-in imagegen chroma-key source, alpha removal, fitted to runtime footprint",
+  "nativeHollowDesign": true,
+  "readabilityDesign": "3x3 gravity core preserves concentric ring gaps and a central black core",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 384,
+      "frameHeight": 384
+    }
+  }
+}

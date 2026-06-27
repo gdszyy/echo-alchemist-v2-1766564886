@@ -1,0 +1,22 @@
+{
+  "frameSize": 256,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "placeholder": false,
+  "single": true,
+  "styleFamily": "elite_golem_affix_base_pass10_regenerated_head_language",
+  "generated": "elite_golem_affix_bases_pass10_regenerated_head_shapes_2026_06_26",
+  "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_bases_pass10/elite_golem_armorSpore_front_256_pass10.png",
+  "sourceExport": "assets/sprites/enemies/elites/golem_affix_bases/pass10/elite_golem_armorSpore_front_256_pass10.png",
+  "compositionContract": "top HP clearance, cropped upper two-thirds body, regenerated oversized head silhouette and emissive eye language",
+  "headLanguage": "organic spore cyclops head, one green glowing eye",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 256
+    }
+  }
+}

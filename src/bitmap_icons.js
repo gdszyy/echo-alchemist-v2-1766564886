@@ -13,7 +13,7 @@
 // Task 5.A5 — 弹药法球图标映射（属性 32×32）
 // key 对应 recipe 中的属性名 / MarbleDefinition.type
 // ============================================================
-const BITMAP_ASSET_VERSION = '20260624-round-boss-preview-clean1';
+const BITMAP_ASSET_VERSION = '20260625-enemy-affix-muted1';
 
 function versionBitmapSrc(path) {
     if (!path) return path;
@@ -106,6 +106,12 @@ export const RELIC_ICON_MAP = {
     optical_lens:              '/assets/icons/relic/optical_lens.png',
     pink_slime:                '/assets/icons/relic/pink_slime.png',
     energy_shield:             '/assets/icons/relic/energy_shield.png',
+    guardian_barrier:          '/assets/icons/relic/guardian_barrier.png',
+    fate_reroll_token:         '/assets/icons/relic/fate_reroll_token.png',
+    relic_reroll_seal:         '/assets/icons/relic/relic_reroll_seal.png',
+    hunter_instinct:           '/assets/icons/relic/hunter_instinct.png',
+    rune_resonance_core:       '/assets/icons/relic/rune_resonance_core.png',
+    doomsday_timer:            '/assets/icons/relic/doomsday_timer.png',
     unlock_recall:             '/assets/icons/relic/unlock_recall.png',
     unlock_multicast:          '/assets/icons/relic/unlock_multicast.png',
     unlock_split:              '/assets/icons/relic/unlock_split.png',
@@ -327,12 +333,12 @@ export function getUiBitmap(path) {
 }
 
 export const EMITTER_BASE_SRC = versionBitmapSrc('/assets/ui/sprites/emitter_base_v3.png');
-export const EMITTER_BARREL_SRC = versionBitmapSrc('/assets/ui/sprites/emitter_barrel_rotating_v5_runtime.png');
-export const EMITTER_RING_SRC = versionBitmapSrc('/assets/ui/sprites/emitter_turret_ring_v1.png');
-export const EMITTER_DRAW_SIZE = 144;
-export const EMITTER_BARREL_DRAW_SIZE = 100;
-export const EMITTER_RING_DRAW_SIZE = 96;
-export const EMITTER_PORT_OFFSET_Y = 76;
+export const EMITTER_BARREL_SRC = versionBitmapSrc('assets/ui/sprites/emitter_barrel_rotating_v5_runtime.png');
+export const EMITTER_RING_SRC = versionBitmapSrc('assets/ui/sprites/emitter_turret_ring_v1.png');
+export const EMITTER_DRAW_SIZE = 156;
+export const EMITTER_BARREL_DRAW_SIZE = 110;
+export const EMITTER_RING_DRAW_SIZE = 104;
+export const EMITTER_PORT_OFFSET_Y = 82;
 export const AIM_GUIDE_NODE_SRCS = {
     origin: versionBitmapSrc('/assets/ui/sprites/aim_guide_node_origin.png'),
     wall: versionBitmapSrc('/assets/ui/sprites/aim_guide_node_wall.png'),
@@ -400,13 +406,47 @@ export const COMBAT_UI_BITMAP_SRCS = [
 // 防御层 HUD 图标映射（伤害跳字中护盾 icon）
 // key 对应 takeDamage 中 blockedBy 的返回值
 // ============================================================
+export const ENEMY_AFFIX_ICON_MAP = {
+    berserk:          versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_berserk.png'),
+    haste:            versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_haste.png'),
+    healer:           versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_healer.png'),
+    clone:            versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_clone.png'),
+    jump:             versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_jump.png'),
+    devour:           versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_devour.png'),
+    regen:            versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_regen.png'),
+    heavyArmor:       versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_heavyArmor.png'),
+    shield:           versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_shield.png'),
+    radiantAegis:     versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_radiantAegis.png'),
+    energyArmor:      versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_energyArmor.png'),
+    phaseShield:      versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_phaseShield.png'),
+    livingArmor:      versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_livingArmor.png'),
+    deflectionWard:   versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_deflectionWard.png'),
+    lowDamageImmune:  versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_lowDamageImmune.png'),
+    deflectShell:     versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_deflectShell.png'),
+    armorSpore:       versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_armorSpore.png'),
+    siegeBreaker:     versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_siegeBreaker.png'),
+    overloadReactor:  versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_overloadReactor.png'),
+    echoRelay:        versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_echoRelay.png'),
+    prism:            versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_prism.png'),
+    hive:             versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_hive.png'),
+    gravityWell:      versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_gravityWell.png'),
+    siege:            versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_siege.png'),
+    carrier:          versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_carrier.png'),
+    runeBearer:       versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_rune_bearer.svg'),
+    adaptiveRune:     versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_adaptive_rune.svg'),
+};
+
+export function getEnemyAffixIconSrc(affixId) {
+    return ENEMY_AFFIX_ICON_MAP[affixId] || null;
+}
+
 export const DEFENSE_ICON_MAP = {
-    shield:         versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_shield.png'),
-    radiantAegis:   versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_radiantAegis.png'),
-    energyArmor:    versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_energyArmor.png'),
-    phaseShield:    versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_phaseShield.png'),
-    livingArmor:    versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_livingArmor.png'),
-    ward:           versionBitmapSrc('/assets/ui/icons/enemy_affixes/affix_deflectionWard.png'),
+    shield:         ENEMY_AFFIX_ICON_MAP.shield,
+    radiantAegis:   ENEMY_AFFIX_ICON_MAP.radiantAegis,
+    energyArmor:    ENEMY_AFFIX_ICON_MAP.energyArmor,
+    phaseShield:    ENEMY_AFFIX_ICON_MAP.phaseShield,
+    livingArmor:    ENEMY_AFFIX_ICON_MAP.livingArmor,
+    ward:           ENEMY_AFFIX_ICON_MAP.deflectionWard,
 };
 
 /**
@@ -427,6 +467,7 @@ export function preloadUiBitmaps() {
         COMBAT_WALL_TOP_SRC,
         COMBAT_DEFEAT_LINE_SRC,
         ...COMBAT_UI_BITMAP_SRCS,
+        ...Object.values(ENEMY_AFFIX_ICON_MAP),
         ...Object.values(DEFENSE_ICON_MAP),
     ];
     paths.forEach(p => getUiBitmap(p));

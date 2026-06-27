@@ -1,0 +1,27 @@
+{
+  "frameSize": 256,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "placeholder": false,
+  "single": false,
+  "styleFamily": "elite_golem_affix_combo_pass12_regenerated_cross_assets",
+  "generated": "elite_golem_affix_combos_pass12_cross_assets_2026_06_26",
+  "sourceConcept": "docs/design/concepts/enemy_elite_golem_affix_combos_pass12/elite_golem_jump_haste_berserk_front_256_pass12.png",
+  "sourceExport": "assets/sprites/enemies/elites/golem_affix_combos/pass12/elite_golem_jump_haste_berserk_front_256_pass12.png",
+  "compositionContract": "top HP clearance, cropped upper two-thirds body, integrated full-body affix combo art, no labels or overlays",
+  "affixes": [
+    "jump",
+    "haste",
+    "berserk"
+  ],
+  "headLanguage": "blue jets + yellow flow + red burning eye",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 256
+    }
+  }
+}

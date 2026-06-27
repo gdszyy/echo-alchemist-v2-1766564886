@@ -1,5 +1,19 @@
 # 敌人奖励边框与词条特效迭代方案
 
+> 2026-06-27 no-affix 原版补齐：1x1 精英魔像家族新增 `eliteGolemAffixCombo:1x1:` 空词条基准资源，文件为 `enemy_elite_golem_noaffix_1x1_pass13_idle`。完全无词条的 elite，以及只带 `shield`、`regen` 等 overlay-only 词条的 elite，都先读这个原版本体，再叠对应 overlay；它们不回退 `residue:1x1:`。
+
+> 2026-06-26 当前收口结论：1x1 精英敌人只要携带 `armorSpore`、`jump`、`haste`、`berserk` 四个核心词条中的任意非空子集，就走整张精英魔像本体资产替换方案。额外携带 `shield`、`regen` 等非核心词条时，不参与这四个核心词条的本体资产键计算，也不得导致回退旧精英魔像素材。当前有效链路与下一步边界见 `docs/design/enemy_elite_golem_affix_current_state.md`；先不继续生产更多美术资产，下一步只定非核心词条的呈现形式。
+
+> 2026-06-26 pass12 交叉组合素材更新：11 个多词条精英魔像组合资源切到 `enemy_elite_golem_<combo>_1x1_pass12_idle`。组合图以完整敌人本体承载词条，不使用标签、overlay 或程序叠色；`armorSpore` 保留绿色孢孔/独眼语言，`jump` 保留蓝色紧凑推进器，`haste` 沿用 pass11 圆肩流线肢体与黄色横条眼，`berserk` 保留单眼冒火和红色裂隙。单词条仍为 `armorSpore/jump/berserk=pass10`、`haste=pass11`。
+
+> 2026-06-26 pass11 haste 单词条返工：`eliteGolemAffixCombo:1x1:haste` 切到 `enemy_elite_golem_haste_1x1_pass11_idle`。本轮专门拉开 haste 与 jump 的剪影差异：取消肩部尖角、侧翼、推进器和蓝色喷射语言，改用圆肩、黄色横条眼、流线前臂/腿部和导风能量线表现速度。`armorSpore`、`jump`、`berserk` 仍用 pass10，多词条组合已在 pass12 同步。
+
+> 2026-06-26 pass10 基础素材重生成：四个单词条精英魔像基础素材切到 `enemy_elite_golem_<affix>_1x1_pass10_idle`，重新以完整敌人美术素材表现词条，不再依赖程序叠色草图。头部轮廓承担核心识别：`armorSpore` 是自然曲线孢孔头与绿色发光独眼，`jump` 是更轻的推进器/双蓝眼头，`haste` 是导风流线头与黄色横条眼，`berserk` 是破裂狂暴头且其中一只眼睛冒火。多词条组合暂保留 pass7，待基础头部语言确认后再同步组合资产。
+
+> 2026-06-26 实装预览：`armorSpore`、`jump`、`haste`、`berserk` 四个精英魔像词条的 pass7 组合资产已接入 `eliteGolemAffixCombo:1x1:*` 资源键，共 15 个组合。运行时命中 `type='elite'`、1x1、且包含这四个核心词条中至少一个的敌人；资源键只按这四个词条的交集选择 pass7 本体，所以额外携带 `shield`、`regen` 等通用词条不会打回旧精英魔像素材。命中的精英魔像使用整张美术 sprite 承载核心词条语义，并跳过旧的词条印章、位图 overlay、目标 fallback 与状态小标签，保留 HP/防御 HUD 供实机预览读数。
+> 2026-06-26 pass8 基础素材调整：四个单词条精英魔像基础素材切到 `enemy_elite_golem_<affix>_1x1_pass8_idle`，在 pass7 裁切和石质写实风格上放大头部/面罩读点，并给 `armorSpore`、`jump`、`haste` 补强绿色、蓝色、黄色发光材质；`berserk` 保留红色狂暴发光语言并同步放大头部。多词条组合仍保留 pass7，待基础方向确认后再批量同步。
+> 2026-06-26 pass9 基础素材调整：四个单词条精英魔像基础素材切到 `enemy_elite_golem_<affix>_1x1_pass9_idle`，进一步放大头部，并把眼睛/头部剪影作为差异化识别点：`armorSpore` 为绿色发光独眼，`jump` 为蓝色发光双眼，`haste` 为黄色横条发光眼，`berserk` 为红色裂隙狂暴眼。多词条组合仍保留 pass7，待头部语言确认后再批量同步。
+
 本文档用于承接当前敌人美术迭代：奖励敌人的“金边”可读性、通用词条的差异化视觉设计，以及护盾拦截、偏折屏障、跳跃等需要事件反馈的特效层。它不替代 `enemy_visual_design_v2.md`，而是在既有“几何磨石块基座 + 镶嵌核心”母题上补齐奖励层、词条层和触发层的执行规则。
 
 > 2026-06-23 迭代：遗物奖励层不再使用悬浮皇冠、中心晶核或单纯发光描边，改为嵌入敌人轮廓内侧的金属材质装饰框：暗金厚底、亮金细边、四角 L 形角标、铆钉与上下/侧边小凸起。`low` 档也保留同一材质轮廓，只关闭动态模糊和高光。
@@ -7,6 +21,8 @@
 > 2026-06-22 首轮落地：`src/entities/enemy.js` 已将奖励视觉入口收束为 `rewardType='relic'` 金边；补齐 `shield` / `deflectionWard` 的拦截与破碎短计时反馈；`jump` 在真实越过阻挡时播放不改碰撞的伪 3D 起跳/腾空表现。后续位图 reward frame 与 Overlay PNG 仍按本方案继续推进。
 
 > 2026-06-24 落地：`shield` 与 `radiantAegis` 已生成正式 footprint-aware PNG overlay，覆盖 1x1 到 3x3 资产族；Boss 默认按 3x2 取图。普通护盾层仍保留 `盾N` 状态徽记和命中/破碎 Canvas 反馈，但常驻美术层不再缺失。UI icon 侧同步接入：敌方护盾层数指标显示 `affix_shield.png`，`radiantAegis` 使用正式 `affix_radiantAegis.png`。
+> 2026-06-25 落地：敌人行动预告从 emoji/文字小牌升级为位图词条仪表面板，复用 `ENEMY_AFFIX_ICON_MAP`、倒计时环、威胁刻度与指向箭头。补齐 `berserk`、`haste`、`healer`、`clone`、`jump`、`lowDamageImmune`、`deflectShell`、`armorSpore`、`siegeBreaker`、`overloadReactor` 的透明 PNG UI icon，并接入图鉴、试炼场词缀 chip、敌人信息抽屉与 manifest。
+> 2026-06-25 返工：上述 10 个词条 UI icon 已降饱和重导出。图标底色改为黑曜石/暗金仪表盘，机制色只保留为低强度核心线、晶脉或刻度，避免回退到高饱和技能按钮风格。
 > 2026-06-24 追补：敌人本体 HUD 的防御数值不再混入 `_drawStatusBadges()` 文字短标签。`shield` / `radiantAegis` 由 `_drawDefenseHudBadges()` 常驻绘制在 HP 数字旁，直接使用 `affix_shield.png` / `affix_radiantAegis.png` + 数值，受击浮字只保留瞬时反馈。
 > 2026-06-24 追补：护盾挡伤反馈不再使用全身脉冲作为唯一表现。`Enemy.takeDamage()` 会记录防御层命中来源：有 `source.pos` / `source.vel` 的子弹或激光走“面向弹道方向的侧向抵挡”，无方向的属性结算、扩盾、补盾走“正面护面”。`shield`、`phaseShield`、`deflectionWard`、`radiantAegis`、`energyArmor`、`livingArmor`、`lowDamageImmune` 使用不同颜色语言和折射纹理；挡击版绘制更厚的弧形能量幕、层叠波前、压缩纹，并在 high/medium 叠加沿命中方向推进的线性渐变。`phaseShield` 额外使用错相断续波前，`livingArmor` 在弧幕内叠加黄绿生物甲脉络、甲结和分叉裂纹，`lowDamageImmune` 使用硬壳压痕，避免玩家把所有护盾读成同一种轻微波纹。
 

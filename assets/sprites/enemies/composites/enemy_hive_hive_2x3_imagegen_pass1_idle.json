@@ -1,0 +1,23 @@
+{
+  "frameSize": 384,
+  "frameWidth": 256,
+  "frameHeight": 384,
+  "placeholder": false,
+  "single": true,
+  "generated": "imagegen_exact_composites_pass1_2026_06_27",
+  "sourceConcept": "docs/design/concepts/enemy_exact_composites_pass1/hive_alpha.png",
+  "rawSource": "docs/design/concepts/enemy_exact_composites_pass1/hive_raw.png",
+  "sourceConceptLabel": "hive exact composite",
+  "postprocess": "built-in imagegen chroma-key source, alpha removal, fitted to runtime footprint",
+  "nativeHollowDesign": true,
+  "readabilityDesign": "2x3 hive uses native chamber gaps and embedded alchemical egg pods",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 384
+    }
+  }
+}

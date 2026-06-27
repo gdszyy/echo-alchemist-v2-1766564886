@@ -4,6 +4,7 @@
  * 单一资源键来源（与 assets/sprites/enemies/enemy_sprite_manifest.json 同步）。
  *
  * 资源键格式：`<baseArchetype>:<cols>x<rows>:<sortedAffixSet>`
+ *   - 1×1 精英魔像原版：`eliteGolemAffixCombo:1x1:`（affixSet 为空）
  *   - 1×1 普通残渣：`residue:1x1:`（affixSet 为空）
  *   - 3×1 装甲横梁：`bastion:3x1:heavyArmor`
  *   - 2×2 深渊胃囊：`maw:2x2:devour`
@@ -52,6 +53,22 @@ const _DEFAULT_DIRS = {
 };
 
 const _DEFAULT_COMPOSITES = {
+    'eliteGolemAffixCombo:1x1:':                                  'enemy_elite_golem_noaffix_1x1_pass13_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore':                         'enemy_elite_golem_armorSpore_1x1_pass10_idle',
+    'eliteGolemAffixCombo:1x1:berserk':                            'enemy_elite_golem_berserk_1x1_pass10_idle',
+    'eliteGolemAffixCombo:1x1:haste':                              'enemy_elite_golem_haste_1x1_pass11_idle',
+    'eliteGolemAffixCombo:1x1:jump':                               'enemy_elite_golem_jump_1x1_pass10_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+berserk':                 'enemy_elite_golem_armorSpore_berserk_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+haste':                   'enemy_elite_golem_armorSpore_haste_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+jump':                    'enemy_elite_golem_armorSpore_jump_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:berserk+haste':                      'enemy_elite_golem_haste_berserk_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:berserk+jump':                       'enemy_elite_golem_jump_berserk_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:haste+jump':                         'enemy_elite_golem_jump_haste_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+berserk+haste':           'enemy_elite_golem_armorSpore_haste_berserk_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+berserk+jump':            'enemy_elite_golem_armorSpore_jump_berserk_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+haste+jump':              'enemy_elite_golem_armorSpore_jump_haste_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:berserk+haste+jump':                 'enemy_elite_golem_jump_haste_berserk_1x1_pass12_idle',
+    'eliteGolemAffixCombo:1x1:armorSpore+berserk+haste+jump':      'enemy_elite_golem_armorSpore_jump_haste_berserk_1x1_pass12_idle',
     'residue:1x1:':                     'enemy_residue_1x1_native_hollow_idle',
     'bastion:3x1:heavyArmor':           'enemy_bastion_heavyarmor_3x1_idle',
     'maw:2x2:devour':                   'enemy_maw_devour_2x2_native_hollow_idle',
@@ -59,6 +76,9 @@ const _DEFAULT_COMPOSITES = {
     'carrier:3x2:carrier':              'enemy_carrier_carrier_3x2_idle',
     'echoSpire:1x2:echoRelay':          'enemy_spire_echorelay_1x2_idle',
     'deflector:2x1:deflectionWard':     'enemy_ward_deflection_2x1_idle',
+    'prism:1x3:prism':                  'enemy_prism_prism_1x3_imagegen_pass1_idle',
+    'hive:2x3:hive':                    'enemy_hive_hive_2x3_imagegen_pass1_idle',
+    'gravityWell:3x3:gravityWell':      'enemy_gravity_well_gravitywell_3x3_imagegen_pass1_idle',
     'orbitEcho:aegis':                  'enemy_ouroboros_orbit_echo_aegis_1x1_idle',
     'orbitEcho:graft':                  'enemy_ouroboros_orbit_echo_graft_1x1_idle',
     'orbitEcho:brood':                  'enemy_ouroboros_orbit_echo_brood_1x1_idle',
@@ -92,7 +112,17 @@ const _DEFAULT_ARCHETYPE_ICONS = {
 };
 
 const _DEFAULT_AFFIX_ICONS = {
+    berserk:    'affix_berserk.png',
+    haste:      'affix_haste.png',
+    healer:     'affix_healer.png',
+    clone:      'affix_clone.png',
+    jump:       'affix_jump.png',
     devour:     'affix_devour.png',
+    lowDamageImmune: 'affix_lowDamageImmune.png',
+    deflectShell: 'affix_deflectShell.png',
+    armorSpore: 'affix_armorSpore.png',
+    siegeBreaker: 'affix_siegeBreaker.png',
+    overloadReactor: 'affix_overloadReactor.png',
     heavyArmor: 'affix_heavyArmor.png',
     deflectionWard: 'affix_deflectionWard.png',
     echoRelay:  'affix_echoRelay.png',
@@ -179,6 +209,69 @@ const _TARGETING_OVERLAY_AFFIXES = new Set([
     'deflectShell',
 ]);
 
+export const STATIC_FOOTPRINT_OVERLAY_AFFIXES = Object.freeze([
+    'shield',
+    'radiantAegis',
+    'regen',
+    'healer',
+    'clone',
+    'lowDamageImmune',
+    'siegeBreaker',
+    'deflectShell',
+    'runeBearer',
+]);
+
+const _STATIC_FOOTPRINT_OVERLAY_AFFIX_SET = new Set(STATIC_FOOTPRINT_OVERLAY_AFFIXES);
+
+const _ELITE_GOLEM_AFFIX_COMBO_SET = new Set([
+    'armorSpore',
+    'jump',
+    'haste',
+    'berserk',
+]);
+
+const _BASE_ARCHETYPE_VISUAL_AFFIX = {
+    bastion: 'heavyArmor',
+    maw: 'devour',
+    deflector: 'deflectionWard',
+    echoSpire: 'echoRelay',
+    prism: 'prism',
+    hive: 'hive',
+    siege: 'siege',
+    carrier: 'carrier',
+    gravityWell: 'gravityWell',
+};
+
+export function isStaticFootprintOverlayAffix(affix) {
+    return _STATIC_FOOTPRINT_OVERLAY_AFFIX_SET.has(String(affix));
+}
+
+function _getEliteGolemAffixComboAffixes(affixes) {
+    if (!Array.isArray(affixes) || affixes.length === 0) return [];
+    const comboAffixes = affixes
+        .map(String)
+        .filter(affix => _ELITE_GOLEM_AFFIX_COMBO_SET.has(affix));
+    return [...new Set(comboAffixes)];
+}
+
+function _isEliteGolemAffixComboCandidate(enemy, cols, rows) {
+    if (!enemy || enemy.type !== 'elite' || cols !== 1 || rows !== 1) return false;
+    const arch = enemy.baseArchetype;
+    return !arch || arch === 'residue' || arch === 'eliteGolemAffixCombo';
+}
+
+function _getCompositeVisualAffixes(baseArchetype, affixes = []) {
+    const out = [];
+    const requiredAffix = _BASE_ARCHETYPE_VISUAL_AFFIX[baseArchetype];
+    if (requiredAffix) out.push(requiredAffix);
+
+    for (const affix of affixes || []) {
+        if (isStaticFootprintOverlayAffix(affix)) continue;
+        if (_ELITE_GOLEM_AFFIX_COMBO_SET.has(affix)) out.push(affix);
+    }
+    return [...new Set(out.filter(Boolean))];
+}
+
 function _resolveOverlayVariantFile(affix, fileOrDef, footprint = '1x1') {
     if (!fileOrDef) return null;
     if (typeof fileOrDef === 'object') {
@@ -221,9 +314,9 @@ export function loadEnemyVisualAssetManifest() {
         return Promise.resolve(_manifest);
     }
 
-    _manifestPromise = fetch(MANIFEST_PATH)
+    _manifestPromise = fetch(MANIFEST_PATH, { cache: 'no-store' })
         .then(r => r.ok ? r.json() : Promise.reject(new Error('manifest http ' + r.status)))
-        .then(json => { _manifest = json; return _manifest; })
+        .then(json => { _manifest = _mergeManifestWithDefaults(json); return _manifest; })
         .catch(err => {
             console.warn('[enemy_visual_assets] manifest 加载失败，使用内嵌默认值:', err.message);
             _manifest = _buildDefaultManifest();
@@ -269,6 +362,23 @@ function _buildDefaultManifest() {
 }
 
 /** 读取当前 manifest（同步），未加载时返回内嵌默认值。 */
+function _mergeManifestWithDefaults(json) {
+    const defaults = _buildDefaultManifest();
+    const incoming = json || {};
+    return {
+        ...defaults,
+        ...incoming,
+        directories: { ...defaults.directories, ...(incoming.directories || {}) },
+        archetypeIcons: { ...defaults.archetypeIcons, ...(incoming.archetypeIcons || {}) },
+        affixIcons: { ...defaults.affixIcons, ...(incoming.affixIcons || {}) },
+        overlays: { ...defaults.overlays, ...(incoming.overlays || {}) },
+        dynamicOverlays: { ...defaults.dynamicOverlays, ...(incoming.dynamicOverlays || {}) },
+        frames: { ...defaults.frames, ...(incoming.frames || {}) },
+        archetypes: { ...defaults.archetypes, ...(incoming.archetypes || {}) },
+        composites: { ...defaults.composites, ...(incoming.composites || {}) },
+    };
+}
+
 export function getEnemyVisualAssetManifest() {
     if (_manifest) return _manifest;
     return _buildDefaultManifest();
@@ -312,9 +422,15 @@ export function buildEnemyAssetKey(enemy) {
 
     const cols = (enemy && enemy.gridCols) || 1;
     const rows = (enemy && enemy.gridRows) || 1;
+    const affixes = (enemy && enemy.affixes) || [];
+    const eliteComboAffixes = _getEliteGolemAffixComboAffixes(affixes);
+    if (_isEliteGolemAffixComboCandidate(enemy, cols, rows)) {
+        return `eliteGolemAffixCombo:${cols}x${rows}:${normalizeAffixSet(eliteComboAffixes)}`;
+    }
+
     let arch = enemy && enemy.baseArchetype;
     if (!arch) arch = (cols === 1 && rows === 1) ? 'residue' : 'unknown';
-    const affixKey = normalizeAffixSet((enemy && enemy.affixes) || []);
+    const affixKey = normalizeAffixSet(_getCompositeVisualAffixes(arch, affixes));
     return `${arch}:${cols}x${rows}:${affixKey}`;
 }
 

@@ -1,0 +1,22 @@
+{
+  "frameSize": 256,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "placeholder": false,
+  "single": true,
+  "styleFamily": "elite_golem_noaffix_base_pass13",
+  "generated": "elite_golem_noaffix_base_pass13_2026_06_27",
+  "sourceConcept": "docs/design/concepts/enemy_elite_golem_noaffix_pass13/elite_golem_noaffix_front_256_pass13.png",
+  "sourceExport": "assets/sprites/enemies/elites/golem_affix_bases/pass13/elite_golem_noaffix_front_256_pass13.png",
+  "compositionContract": "top HP clearance, cropped upper-body elite golem, no affix-specific color language or overlay baked into the body",
+  "headLanguage": "neutral sealed stone helm, muted amber core, no speed, jump, spore, or rage silhouette",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 256,
+      "frameHeight": 256
+    }
+  }
+}

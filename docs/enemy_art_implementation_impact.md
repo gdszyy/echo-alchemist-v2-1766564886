@@ -117,6 +117,59 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 | P3 | 预设波次系统。 | 至少 5 类 preset 可按回合权重出现，并能安全回退随机生成。 |
 | P4 | 组合资产扩展。 | 通过脚本生成资产清单，逐步填充高频组合。 |
 
+## 7.4 词条呈现形式矩阵（2026-06-27 决策稿）
+
+当前已经跑通的 `eliteGolemAffixCombo` 方案覆盖 `armorSpore`、`berserk`、`haste`、`jump` 四个词条在普通 1x1 精英敌人上的任意组合：资源键走组合 Sprite，优先级高于普通 overlay。后续所有“基座 + 这四个词条任意子集”的正式资源也归入同一类组合底图替换方案：命名使用 `<baseArchetype>:<cols>x<rows>:<sortedVisualAffixSet>`，其中 `sortedVisualAffixSet` 只包含基座专属词条和 `armorSpore/berserk/haste/jump` 四个视觉身份词条，不包含 `shield`、`regen`、`healer`、`clone` 等 overlay-only 词条。先查 composite，缺失时回退到基座 Sprite + 现有 overlay / Canvas fallback。是否真实生成该组合仍由相性规则和导演投放决定；本节只定义一旦组合出现时的视觉解析方式。
+
+2026-06-27 补齐 no-affix 基准：普通 1x1 精英魔像家族的空词条键固定为 `eliteGolemAffixCombo:1x1:`，资源为 `enemy_elite_golem_noaffix_1x1_pass13_idle`。完全无词条的 elite 和只带 `shield`、`regen` 等 overlay-only 词条的 elite 都使用这个原版本体；overlay 只叠加在其上，不改变主体资源键，也不回退到 `residue:1x1:`。
+
+除这四个词条外，其它词条按以下呈现层级处理，暂不生产新美术资产：
+
+| 呈现层级 | 适用词条 | 视觉决策 | 资源/代码走向 |
+|---|---|---|---|
+| 基座主形体 | `heavyArmor`、`devour`、`deflectionWard`、`echoRelay`、`prism`、`hive`、`siege`、`carrier`、`gravityWell` | 定义身体、占格、碰撞轮廓和主机制，不作为普通 1x1 overlay；基座专属词条彼此互斥。 | `archetypes` / `composites` 主体资源；缺失时走 `_drawArchetypeBody()`。 |
+| 组合底图替换 | `armorSpore`、`berserk`、`haste`、`jump` | 已跑通 1x1 普通精英组合；未来扩展到“任意基座 + 任意子集”。这些词条会改变 silhouette、姿态或材质节奏，优先整体重画。 | `eliteGolemAffixCombo` 与后续 base composite；不在本轮生产资产。 |
+| 静态 footprint overlay | `shield`、`radiantAegis`、`regen`、`healer`、`clone`、`lowDamageImmune`、`siegeBreaker`、`deflectShell`、`runeBearer` | 不重画主体，只在真实 footprint 上叠边缘、节点、徽记或轻量结构；不得遮挡基座 silhouette。 | `overlays`；需要尺寸变体时沿用 `_2x1` / `_3x2` / `_3x3` footprint-aware 规则。 |
+| 动态状态 overlay | `energyArmor`、`phaseShield`、`livingArmor`、`overloadReactor`、`adaptiveRune` | 视觉取决于运行时状态：蓄能/空、相位激活/失效、活甲血量档、过载层级、记录属性。 | `dynamicOverlays`，由 `resolveDynamicEnemyOverlayPaths(enemy)` 按状态选择。 |
+| 事件/触发反馈 | `deflectShell`、`armorSpore`、`livingArmor`、`phaseShield`、`energyArmor`、`overloadReactor`、`runeBearer`、`adaptiveRune` | 常驻层之外必须有短反馈：偏折、孢子飞线、护甲代伤、相位失效、蓄能转盾、过载计数、临时词条轮换、属性切换。 | 优先复用 Canvas fallback / HUD badge；后续如做位图，放入 `assets/sprites/enemies/vfx/`，不混入常驻 overlay。 |
+
+具体读法：
+- `shield` / `radiantAegis`：保持 footprint-aware 护盾膜 + HP 旁 HUD badge，受击时播放方向膜反馈，不重画敌人主体。
+- `haste + shield` 这类组合不生成新的主体素材：`haste` 决定主体 composite，`shield` 只叠护盾 overlay。所有 overlay-only 词条同理，不得改变已经命中的主体素材 key。
+- `regen` / `healer` / `clone`：常驻为轻量 overlay 或徽记，关键读法来自回合触发时的短线、治疗流、分身生成反馈，不进入组合底图。
+- `lowDamageImmune` / `siegeBreaker` / `deflectShell`：属于机制边框类，优先做材质化边缘 overlay；其中 `deflectShell` 的偏折只在反弹/弹跳法线被改写时播放事件反馈。
+- `energyArmor` / `phaseShield` / `livingArmor` / `overloadReactor`：状态多档，必须走 dynamic overlay，不得只做单张静态图。
+- `runeBearer` / `adaptiveRune`：奖励/构筑词条，位于 reward frame 与通用 overlay 之间；`runeBearer` 显示符文槽和临时词条小副徽记，`adaptiveRune` 只换核心色、纹路和元素状态，不重画主体。
+
+### 7.4.1 静态 footprint overlay 落地规格
+
+静态 footprint overlay 的职责是“让玩家一眼知道这只敌人额外带了什么机制”，但不改变敌人的身份、体型和主体美术。它必须绘制在组合底图 / 基底 Sprite 之上、事件触发特效和 HUD 数字之下；如果敌人已经命中 `eliteGolemAffixCombo` 或某个大型基座 composite，overlay 只能附着在其真实 footprint 外缘或内部槽位上，不能重新定义 silhouette。
+
+共用规则：
+- P0 实装约定：`src/data/enemy_visual_assets.js` 暴露 `STATIC_FOOTPRINT_OVERLAY_AFFIXES` 与 `isStaticFootprintOverlayAffix()`；这些词条必须只进入 `overlayPaths`，不得参与 `eliteGolemAffixCombo` 或大型基座 composite 的主体资源键。
+- 资源仍放在 `assets/sprites/enemies/overlays/`，命名保持 `overlay_affix_<affix>.png`；需要尺寸适配时使用现有 `_2x1`、`_1x2`、`_2x2`、`_3x1`、`_1x3`、`_2x3`、`_3x2`、`_3x3` 后缀。
+- 画面中心必须留透明洞或低透明区，不能盖住核心、头部、血量液体或 elite golem 的核心词条本体。
+- 同一敌人同时拥有多个静态 overlay 时，读法优先级为：防御生存层（`shield` / `radiantAegis` / `lowDamageImmune`）> 机制边框层（`deflectShell` / `siegeBreaker`）> 构筑奖励层（`runeBearer`）> 辅助行为层（`regen` / `healer` / `clone`）。后续如果实机显得过载，优先保留前两层，辅助行为降级到 UI icon / 触发反馈。
+- 静态 overlay 不承担数值显示；层数、百分比、临时词条和倒计时继续由 HUD badge、行动预告或敌人信息面板表达。
+
+| 词条 | 常驻美术 | 触发/受击反馈 | 资产与实装要求 |
+|---|---|---|---|
+| `shield` | 贴合 footprint 的青白玻璃薄膜，边缘 4-6 个节点，中心透明；大型敌人分段贴边，不画完整泡泡球。 | 挡伤时沿命中方向弹出短弧膜，最后一层破裂时用同族膜轻微错位淡出。 | 已有 footprint-aware PNG；HP 旁显示护盾层数 badge。 |
+| `radiantAegis` | 比 `shield` 更高阶的流彩菱环 / 多色节点，仍然贴边，不能遮住主体。 | 自增、扩盾、挡伤、破裂分别用短促流彩脉冲；破裂只短闪，不常驻爆光。 | 已有 footprint-aware PNG；数值显示走 `radiantAegis` HUD badge。 |
+| `regen` | 细绿藤线 / 液体回流线，贴裂缝和石槽，面积小于主体 20%；不画治疗十字。 | 回血时从底部或边槽向核心回流一条短线，HP 数字旁给绿色短促反馈。 | 当前已有 1x1 overlay；大型变体优先做边槽回流节点，不简单拉伸。 |
+| `healer` | 粉金小星芒或医疗铭文槽，靠近核心但不盖核心；读作“会治疗别人”。 | 治疗触发时用短连线指向目标，目标上闪一次小星芒。 | 当前已有 1x1 overlay；若做大型变体，使用多个小端口，不从中心硬连线。 |
+| `clone` | 紫色镜像裂片 / 双影边缘，贴在左右外缘或背侧；不能生成第二个完整敌人影子。 | 分裂时母体边缘剥离一张半透明剪影，随后生成子体。 | 当前已有 1x1 overlay；大型敌人默认只显示裂片，不鼓励大型 clone。 |
+| `lowDamageImmune` | 灰白硬壳、厚金属压边、低反差凹痕；读作“低伤打不穿”。 | 低于阈值的命中显示硬壳压痕、短反震和“过低/Blocked”类浮字；不播放大爆光。 | 已有 footprint-aware PNG；属于机制边框，不能替换主体。 |
+| `siegeBreaker` | 橙铜撞角、底部齿、加固铆钉或前缘装甲楔；读作“撞防线”。 | 攻击防线 / 屏障时沿接触边闪一次压痕和碎屑线，按现有防线受击反馈结算。 | 已有 footprint-aware PNG；常驻只做加固件，不做大规模攻击特效。 |
+| `deflectShell` | 青蓝偏折壳、斜切硬边、少量旋向刻线；只表达会改写反弹法线。 | 只有反弹 / 弹跳方向被改写时播放切向折射线和短方向箭，不影响穿透、激光或普通直击反馈。 | 已有 footprint-aware PNG；若限制为 1x1 生成，非 1x1 资源仅作测试/兜底。 |
+| `runeBearer` | 紫金嵌入式符文槽、轮换刻度、小副徽记位；比普通词条更像掉落/构筑目标。 | 回合开始轮换临时词条时，符文槽拨动 3-4 帧；死亡掉落用常规符文领取链路。 | 当前为 SVG 占位；正式图仍走静态 overlay，临时词条副徽记不写进主体图。 |
+
+验收标准：
+1. 在 `eliteGolemAffixCombo:1x1:`、单核心词条 elite golem、大型基座 composite 上叠加同一 overlay，主体资源 key 不变化。
+2. 在 1x1、2x1、3x1、2x3、3x2、3x3 足迹下，overlay 覆盖真实碰撞 footprint，不缩在中心 1x1。
+3. 关闭或缺失 PNG 时，Canvas fallback / HUD badge 仍能读出机制，但不能出现旧式顶部文字牌作为主要呈现。
+4. 多 overlay 同屏时不得遮住 HP、核心和基座职责；若过载，按上方优先级降级辅助行为层。
+
 ## 7.5 资源目录与 manifest（V2 美术接入）
 
 为了把外部生成的敌人美术接入运行时，仓库现在固化了以下统一目录约定。所有解析逻辑由 `resolveEnemyVisualAsset(enemy)`（位于 `src/data/enemy_visual_assets.js`）统一处理，SpriteRenderer 与试炼场 UI 共享同一组资源键，**不再允许在多处重复硬编码命名**。
@@ -124,13 +177,14 @@ V2 专属词条已经具备基础绘制识别，但还需要补齐“常驻、�
 | 资源类型 | 目录 | 命名规范 | 当前已接入 |
 |---|---|---|---|
 | 基底 Sprite Sheet（多帧 idle/hit） | `assets/sprites/enemies/archetypes/` | `enemy_<base>_<cols>x<rows>.png` + 同名 `.json` | bastion / maw / deflector / echoSpire / prism / hive / siege / gravityCore（占位） |
-| 组合 Sprite（baseArchetype + 主词条 + 占格） | `assets/sprites/enemies/composites/` | `enemy_<base>_<affix>_<cols>x<rows>_idle.png` + 同名 `.json` | residue 1×1 / bastion+heavyArmor 3×1 / maw+devour 2×2 / siege+siege 3×2 / spire+echoRelay 1×2 / ward+deflectionWard 2×1 |
+| 组合 Sprite（baseArchetype + 主词条 + 占格） | `assets/sprites/enemies/composites/` | `enemy_<base>_<affix>_<cols>x<rows>_idle.png` + 同名 `.json` | residue 1×1 / bastion+heavyArmor 3×1 / maw+devour 2×2 / siege+siege 3×2 / carrier+carrier 3×2 / spire+echoRelay 1×2 / ward+deflectionWard 2×1 / prism+prism 1×3 / hive+hive 2×3 / gravityWell+gravityWell 3×3 |
 | 通用词条覆盖层 | `assets/sprites/enemies/overlays/` | `overlay_affix_<affix>.png` | shield / regen / berserk / haste / healer / clone |
 | 基底 UI 图标 | `assets/ui/icons/enemy_archetypes/` | `archetype_<base>.png`（保留旧名 `enemy_<base>_<...>.png` 兼容） | bastion / maw / siege（专属图标） + V2 全 8 基底 64×64 头像 |
 | 词条 UI 图标 | `assets/ui/icons/enemy_affixes/` | `affix_<affix>.png` | devour / heavyArmor / siege / shield / regen |
 
 > 中央索引文件：[`assets/sprites/enemies/enemy_sprite_manifest.json`](../assets/sprites/enemies/enemy_sprite_manifest.json)。
-> 每条 composite 条目都使用 `<baseArchetype>:<cols>x<rows>:<sortedAffixSet>` 作为键，例如 `bastion:3x1:heavyArmor`、`siege:3x2:siege`、`residue:1x1:`（空 affixSet 末尾留冒号）。
+> 每条 composite 条目都使用 `<baseArchetype>:<cols>x<rows>:<sortedAffixSet>` 作为键，例如 `eliteGolemAffixCombo:1x1:`（1x1 精英魔像原版）、`bastion:3x1:heavyArmor`、`siege:3x2:siege`、`residue:1x1:`（普通残渣空 affixSet，末尾留冒号）。
+2026-06-27 补充：`prism:1x3:prism`、`hive:2x3:hive`、`gravityWell:3x3:gravityWell` 已由内置 imagegen + chroma-key 透明管线补齐精确 composite。源图、alpha 图与预览位于 `docs/design/concepts/enemy_exact_composites_pass1/` 与 `docs/design/enemy_exact_composites_pass1_preview.png`；运行时 PNG/JSON 位于 `assets/sprites/enemies/composites/`，并已同步 `enemy_sprite_manifest.json` 与 `src/data/enemy_visual_assets.js` 的内嵌默认索引。
 
 2026-06-22 补充：敌人针对词缀的生成前清单独立记录在 [`docs/enemy_targeting_asset_todo.md`](enemy_targeting_asset_todo.md)。其中 `carrier` 使用显示名“铸巢母架”，第 5 格空舱需要在本体、collision frame 与图标中同时保留；`livingArmor` / `armorSpore` / `phaseShield` 等状态型资产走 `dynamicOverlays`，由 `resolveDynamicEnemyOverlayPaths(enemy)` 按当前状态选择。不存在的 PNG 不应提前写入 `enemy_sprite_manifest.json`，避免资源命中状态误报。
 

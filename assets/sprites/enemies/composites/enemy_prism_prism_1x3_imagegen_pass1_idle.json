@@ -1,0 +1,23 @@
+{
+  "frameSize": 128,
+  "frameWidth": 128,
+  "frameHeight": 384,
+  "placeholder": false,
+  "single": true,
+  "generated": "imagegen_exact_composites_pass1_2026_06_27",
+  "sourceConcept": "docs/design/concepts/enemy_exact_composites_pass1/prism_alpha.png",
+  "rawSource": "docs/design/concepts/enemy_exact_composites_pass1/prism_raw.png",
+  "sourceConceptLabel": "prism exact composite",
+  "postprocess": "built-in imagegen chroma-key source, alpha removal, fitted to runtime footprint",
+  "nativeHollowDesign": true,
+  "readabilityDesign": "tall 1x3 prism keeps a carved refraction line and dark stone silhouette",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 1,
+      "fps": 1,
+      "frameWidth": 128,
+      "frameHeight": 384
+    }
+  }
+}

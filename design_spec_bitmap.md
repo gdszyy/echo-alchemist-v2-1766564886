@@ -2,6 +2,8 @@
 
 本文档基于对 `echo-alchemist-v2` 现有代码库的深入分析，为后续的 UI 自动生成切图与敌人 Sprite 序列化提供精确的设计规格与实施指南。
 
+> 生成具体资产时，还必须读取 [`docs/art_asset_generation_guidelines.md`](docs/art_asset_generation_guidelines.md)。该文档把本规格的总体风格拆成可直接引用的场景化要求、prompt 模板、透明管线和验收清单。
+
 ## 1. 整体视觉风格定位
 
 当前游戏采用了深色背景、高对比度发光（Glow/Neon）以及带有暗黑奇幻（Dark Fantasy）与炼金术（Alchemy）元素的视觉语言。代码中大量使用了 `slate-900`、`purple-500`、`emerald-400` 等 Tailwind 色彩，并配合 `Cinzel` 衬线字体与 `backdrop-blur` 毛玻璃效果。
@@ -84,6 +86,10 @@
 为了保持灵活性，**不建议**将所有状态（如冰冻、燃烧）直接画死在基础 Sprite 中。建议采用 **「基础 Sprite + 状态特效层」** 的渲染方式：
 
 > 2026-06-23 补充：奖励边框和词条 Overlay 必须拆层。当前敌人奖励美术只面向带遗物敌人的独立“金属材质装饰框”，需要细金边、角标、铆钉/小凸起等实体边框信号；`shield`、`regen`、`jump` 等词条只作为机制覆层或触发反馈，不承担掉落价值表达。详细规格见 [`docs/design/enemy_affix_visual_iteration_plan.md`](docs/design/enemy_affix_visual_iteration_plan.md)。
+
+> 2026-06-25 补充：护盾命中瞬间的方向护盾膜使用两套透明 PNG 资产池：普通护盾使用 `assets/sprites/enemies/overlays/overlay_defense_glass_shield_membrane*.png` 的青白玻璃膜，不带彩色流光；相位护盾与流彩护盾（`phaseShield`/`radiantAegis`）使用 `assets/sprites/enemies/overlays/overlay_defense_flow_shield_membrane*.png` 的流光泡泡膜。`src/entities/enemy.js` 在命中时随机锁定 2-3 张素材并按伤害方向旋转、翻转、缩放、错相叠放到敌人碰撞外轮廓外侧；膜层应贴近敌人外轮廓，命中与破盾只允许低回弹、短位移。破盾时沿用同一套 PNG 膜做轻微外散、错位和淡出，不再叠加白色锯齿/切线。资产只表现泡泡薄膜、轻量受击边缘和必要折射，靠敌人一侧必须做 alpha 羽化；不允许回退成实体盾牌、六边形扩散、爆炸粒子、外突射线或常驻词条装饰。
+
+> 2026-06-25 补充：活体护甲/树盾（`livingArmor`）命中与破甲反馈同样使用方向 PNG 膜，但资产池独立为 `assets/sprites/enemies/overlays/overlay_defense_tree_shield_membrane*.png`。该资产应表现贴身的琥珀树脂薄膜、藤蔓纤维和叶脉折射，而不是木板盾、叶子图标或绿色矢量弧线；破甲时沿用同一套素材轻微错位淡出，不再画旧的切线/锯齿。
 
 > 2026-06-22 补充：Boss 破绽视觉先按透明 PNG Overlay 接入，不替换 Boss 基础 Sprite。统一使用 `384 × 256`、中心锚点 `(192, 128)`、`assets/sprites/enemies/bosses/<bossId>/vulnerability/` 目录与 `vuln_25/50/75/break/exposed/recover/weak_mask` 命名；完整契约与 Ignis 样板 Prompt 见 [`docs/boss_vulnerability_asset_contract.md`](docs/boss_vulnerability_asset_contract.md)。
 

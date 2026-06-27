@@ -97,6 +97,8 @@
 | ~~`assets/ui/icons/boss_preview/boss_unknown_seal.png` / `_tiny.png`~~ | ✅ **已生成并接入** | 96×96 / 32×32 | 替换当前 CSS 几何剪影；未知状态不得泄露具体 Boss 外形 |
 | ~~`assets/ui/icons/boss_preview/boss_<bossId>_preview.png` / `_tiny.png`~~ | ✅ **已生成并接入** | 96×96 / 32×32 | Boss ID：`ignis/glacies/mikro/devourer/viridis/tesla/chimera/ouroboros`；与 Boss 本体重绘风格一致 |
 | ~~`assets/ui/icons/enemy_affixes/affix_energyArmor.png` / `affix_phaseShield.png` / `affix_livingArmor.png`~~ | ✅ 已生成：敌人头顶防御 HUD 图标 | 1248×1248 源图，HUD 缩放使用 | 蓄能甲、相位护盾、活体护甲的 HUD 专用高质位图；仅用于 `_drawDefenseHudBadges()`，不要复用大尺寸敌人 Overlay |
+| ~~`assets/ui/icons/enemy_affixes/affix_berserk.png` / `affix_haste.png` / `affix_healer.png` / `affix_clone.png` / `affix_jump.png`~~ | ✅ 已低饱和返工并接入 | 256×256 透明 PNG，UI 缩放使用 | 高频行动/基础词条图标；暗金/黑曜石盘面 + 克制机制色，行动预告、图鉴、试炼场词缀 chip、敌人信息抽屉共用 |
+| ~~`assets/ui/icons/enemy_affixes/affix_lowDamageImmune.png` / `affix_deflectShell.png` / `affix_armorSpore.png` / `affix_siegeBreaker.png` / `affix_overloadReactor.png`~~ | ✅ 已低饱和返工并接入 | 256×256 透明 PNG，UI 缩放使用 | 敌人针对词缀图标；从既有 overlay / 组合图提炼，已登记 `ENEMY_AFFIX_ICON_MAP` 与 manifest，避免高饱和大色块 |
 | ~~`assets/ui/sprites/orbital_link_flow_*.png`~~ | ✅ **已生成**（透明 PNG） | 8×8 | `_0.png` ~ `_3.png`，循环 |
 | ~~`assets/ui/sprites/orbital_intake_*.png`~~ | ✅ **已生成**（透明 PNG） | 32×32 | `_0.png` ~ `_3.png`；吸入轨迹粒子 |
 | ~~`assets/ui/panels/replace_ammo_bg.png`~~ | ✅ **已生成** | 720×1280 | 炼金工坊促視构图，中部低对比区域 |
@@ -146,17 +148,19 @@
 
 ## 4. 已知不一致项（需在 art pass 中解决）
 
-- `#phase-selection` 卡片顶部的属性图标当前用 emoji，需要替换为 `assets/ui/sprites/attr_icon_*.png`（与 `assets/icons/ammo` 同源即可）。
-- `#phase-rune-launcher` 当前完全无背景，导致与 `#phase-shop` / `#phase-selection` 视觉割裂；优先级 P0/P1。
+- 2026-06-25 巡检：`#phase-selection` 卡片顶部属性图标已通过 `assets/ui/sprites/attribute_icons/*.png` 和 `replace_card_attr_slot.png` 接入；后续新增属性时只需同步补 `ATTRIBUTE_ICON_MAP` 与 `attribute_icons/`。
+- 2026-06-25 巡检：`#phase-rune-launcher` 已通过 `rune_launcher_9s.png`、`rune_grid_bg_9s.png` 与符文槽位 Sprite 接入，不再视为“完全无背景”缺口。
 - `#combat-rune-charge-ui` 已在 2026-06-23 改为技能充能仪表，旧 `combat_rune_charge_*` 仅作为历史素材保留；现行资源为 `skill_charge_*` 系列，并通过 `src/styles/bitmap_ui.css` 接入。
-- `assets/icons/relic/` 已较完整（55+ 个），但 `assets/icons/rune/` 与新增符文同步滞后；新增符文时必须同时提供位图。
-- 已生成的 `top_bar_panel.png` 与 `top_bar_9s.png` 同名混乱，建议归档 `top_bar_panel.png`（已被 9-Slice 替代）。
+- 2026-06-25 巡检：`assets/icons/rune/` 已覆盖 `RUNE_DB` 17/17；遗物侧仍有 14 个 `RELIC_DB` ID 未进入 `RELIC_ICON_MAP`，本轮已补 `guardian_barrier` / `fate_reroll_token` / `relic_reroll_seal` / `hunter_instinct` / `rune_resonance_core` / `doomsday_timer`，并已覆盖遗物选择、商店、掉落飞卡和暂停页当前遗物列表，详见 [`asset_gap_index.md`](asset_gap_index.md) §3。
+- 2026-06-25 巡检：`top_bar_panel.png` 已不存在，当前仅保留 `top_bar_9s.png`；该命名混乱项已收口。
 
 ---
 
 ## 5. 文档索引
 
 - 视觉规格根：[`design_spec_bitmap.md`](../design_spec_bitmap.md)
+- 美术资产生成规范：[`docs/art_asset_generation_guidelines.md`](art_asset_generation_guidelines.md)
+- 当前资产缺口与生成排期：[`docs/asset_gap_index.md`](asset_gap_index.md)
 - 位图样式接入：[`src/styles/bitmap_ui.css`](../src/styles/bitmap_ui.css)
 - 图标映射模块：[`src/bitmap_icons.js`](../src/bitmap_icons.js)
 - UI 系统模块：[`src/ui_system.js`](../src/ui_system.js)、[`src/ui/`](../src/ui/)
@@ -307,15 +311,15 @@
 
 | 遗物 ID | 名称 | 占位 emoji | 图标尺寸 | 视觉建议 |
 |---|---|---|---|---|
-| `rune_siphon` | 符文虹吸管 | 〽️ | 64×64 | 细长玻璃虹吸管抽取青蓝符文能量，底部有小型炼金阀门 |
+| `rune_siphon` | 技能虹吸管 | 〽️ | 64×64 | 细长玻璃虹吸管抽取青蓝技能能量，底部有小型炼金阀门 |
 | `ammo_bandolier` | 炼金弹带 | 🎞️ | 64×64 | 皮革弹带挂满发光弹珠，金属扣环，legendary 金边 |
 | `opening_salvo` | 开幕齐射管 | 📯 | 64×64 | 黄铜多管发射器向外齐射，带橙金 muzzle flash |
 | `thunder_coil` | 雷暴线圈 | ⚡ | 64×64 | 铜制线圈缠绕蓝紫电弧，中心有可导流的闪电子弹 |
 | `ember_fuse` | 余烬保险丝 | 🧨 | 64×64 | 半熔断保险丝与炽热余烬核心，边缘带小型火花 |
-| `hunter_instinct` | 猎人本能 | 🎯 | 64×64 | 红色十字准星叠加血滴；冷色金属外框 |
-| `rune_resonance_core` | 符文共鸣核 | 💠 | 64×64 | 紫色结晶核心 + 共鸣波纹环（与 `relic_aura_<tier>.png` 协调） |
+| `hunter_instinct` | 猎人本能 | 🎯 | 64×64 | ✅ 已生成：金色爪形准星 + 青色扫描环 + 橙色弱点核心 |
+| `rune_resonance_core` | 技能共鸣核 | 💠 | 64×64 | ✅ 已生成：紫青技能结晶核心 + 金属外环 + 共鸣节点 |
 | `mirror_magazine` | 镜像弹夹 | 🪞 | 64×64 | 双子弹折射镜面，左右对称构图 |
-| `doomsday_timer` | 末日计时器 | ⏱️ | 64×64 | 黑金沙漏 + 红色秒针；刻度盘隐约可见骷髅 |
+| `doomsday_timer` | 末日计时器 | ⏱️ | 64×64 | ✅ 已生成：黑金沙漏/爆弹轮廓 + 红色倒计时核心 |
 | `echo_reverberation` | 余韵回响 | 🔔 | 64×64 | 钟形 + 多重声波同心圆，淡金色 |
 | `element_injector` | 元素注入器 | 💉 | 64×64 | 玻璃试管中三色液体（火/冰/雷）旋绕，**epic 紫边** |
 | `chaos_burst` | 混沌爆发 | 💥 | 64×64 | 紫色裂纹球 + 边缘湍流，**cursed 红黑边** |
@@ -525,6 +529,8 @@ Runtime shell 状态：2026-06-24 已先接入 DOM/CSS 布局验证，随后接�
 - `assets/ui/sprites/combat_current_ammo_core_socket_runtime_candidate.png`
 - `assets/ui/sprites/combat_damage_analysis_button_runtime_candidate.png`
 - `assets/ui/sprites/combat_rune_config_button_runtime_candidate.png`
+- `assets/ui/sprites/skill_editor_button_raw.png`
+- `assets/ui/sprites/skill_editor_button.png`
 - `assets/ui/sprites/skill_sp_gem_hex_empty_runtime_candidate.png`
 - `assets/ui/sprites/skill_sp_gem_hex_full_runtime_candidate.png`
 - `assets/ui/sprites/attribute_chips/attribute_chip_*.png`
@@ -533,3 +539,5 @@ Runtime shell 状态：2026-06-24 已先接入 DOM/CSS 布局验证，随后接�
 这些文件仍按 `_runtime_candidate` 或运行时候选小件管理，不标记为最终已配齐。正式左右翼、宝石、按钮框、属性芯片和属性 ICON 仍需按绿幕/chroma key 与 9-slice 流程进入最终命名后再登记为已配齐。属性 ICON 已先作为透明 PNG 符号层接入研磨属性 chip、战斗左翼属性 chip 与发射器底部属性孔。
 
 2026-06-24 Pass10 更新：用户选中的右翼面板已接入为 `combat_console_right_selected_runtime_candidate.png`，顶部最多 5 个技能点、中央 2x2 技能槽、底部横向技能充能轨均按该素材槽位定位。旧宽版右翼、旧右下端点、旧横向 SP 宝石已移至 `assets/ui/archive/combat_console_v2_replaced_pass10/`，避免继续误用。底部技能充能条不再叠加 `skill_charge_panel_9s.png` 外壳，DOM 仅叠加 actual/temp fill。
+
+2026-06-26 技能装配入口更新：`#skill-editor-open-btn` 已从顶部栏左侧移入 `#combat-bottom-dock .combat-skill-pane` 右下角专用按钮位。新按钮使用 `assets/ui/sprites/skill_editor_button.png`，绿幕源图保留为 `skill_editor_button_raw.png`；该按钮不烘焙文字，运行时仍通过 `title` / `aria-label` 表达“技能装配”。
