@@ -1,6 +1,6 @@
 # src\render\pixi_filter_manager.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 590 | 函数数: 20 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 590 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
