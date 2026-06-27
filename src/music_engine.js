@@ -101,23 +101,29 @@ class MusicEngine {
         dB.connect(dfb); dfb.connect(dA);      // 交叉反馈 → 左右乒乓
         dA.connect(panL); dB.connect(panR);
         panL.connect(this.musicGain); panR.connect(this.musicGain);
-        this.leadBus.connect(this.delaySend); // 嘶吼带回声
+        // [去糊] lead 总线先高通（120Hz）切主奏低频浑浊，再分进回声/侧链/混响
+        this.leadHPF = this.ctx.createBiquadFilter();
+        this.leadHPF.type = 'highpass'; this.leadHPF.frequency.value = 120; this.leadHPF.Q.value = 0.7;
+        this.leadBus.connect(this.leadHPF);
+        this.leadHPF.connect(this.delaySend); // 嘶吼带回声
         this.hatBus.connect(this.delaySend);  // 镲带宽度
 
         // (3) 合成 IR 混响（保留，零采样）：lead + drone + fx 的湿声
-        this.reverb = soundManager._createReverbNode(0.7, 2.2);
-        const wet = this.ctx.createGain(); wet.gain.value = 0.32;
+        this.reverb = soundManager._createReverbNode(0.7, 1.5);   // [去糊] 2.2→1.5 收混响拖尾
+        const wet = this.ctx.createGain(); wet.gain.value = 0.22; // [去糊] 0.32→0.22 收湿量
         this._wet = wet;
         this.reverb.connect(this.musicGain);
-        this.leadBus.connect(this.pumpBus);    // 干（进侧链泵）
-        this.leadBus.connect(wet);             // 湿（混响尾不泵，自然呼吸）
+        this.leadHPF.connect(this.pumpBus);    // 干（进侧链泵）
+        this.leadHPF.connect(wet);             // 湿（混响尾不泵，自然呼吸）
         this.droneBus.connect(this.pumpBus);   // 干（进侧链泵）
         this.droneBus.connect(wet);
         this.fxBus.connect(wet);               // 过渡音也吃一点混响空间
-        // 清理混响低频浑浊：湿声先高通再进混响（不混响低频，保持低端干净）
+        // 清理混响低频浑浊：湿声先高通(320)再低通(6500)暗化，再进混响（低端干净 + 尾巴不刺）
         this._wetHPF = this.ctx.createBiquadFilter();
-        this._wetHPF.type = 'highpass'; this._wetHPF.frequency.value = 250;
-        wet.connect(this._wetHPF); this._wetHPF.connect(this.reverb);
+        this._wetHPF.type = 'highpass'; this._wetHPF.frequency.value = 320;  // [去糊] 250→320
+        this._wetLPF = this.ctx.createBiquadFilter();                        // [去糊] 新增湿声低通
+        this._wetLPF.type = 'lowpass'; this._wetLPF.frequency.value = 6500;
+        wet.connect(this._wetHPF); this._wetHPF.connect(this._wetLPF); this._wetLPF.connect(this.reverb);
 
         // (4) 母线胶水 —— 规范 master glue：先温和总线压缩（统一动态、收住峰值），
         //     再过 tanh 软削波饱和；slow-ish attack 放过 kick 瞬态，保留冲击力。
@@ -130,7 +136,11 @@ class MusicEngine {
         this.masterSat = this.ctx.createWaveShaper();
         this.masterSat.curve = this._makeSoftClipCurve(1.6);
         this.masterSat.oversample = '2x';
-        this.musicGain.connect(this.musicComp);
+        // [去糊] 母线 300Hz 低中频 dip，清 200–500Hz "泥巴区"堆积
+        this.masterEQ = this.ctx.createBiquadFilter();
+        this.masterEQ.type = 'peaking'; this.masterEQ.frequency.value = 300; this.masterEQ.Q.value = 1.0; this.masterEQ.gain.value = -2.5;
+        this.musicGain.connect(this.masterEQ);
+        this.masterEQ.connect(this.musicComp);
         this.musicComp.connect(this.masterSat);
         this.masterSat.connect(this.out);
 

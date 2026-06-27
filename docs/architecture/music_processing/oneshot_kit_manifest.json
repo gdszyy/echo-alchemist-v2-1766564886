@@ -1,0 +1,482 @@
+[
+ {
+  "id": "001_Crash_DOOFPSY_Zenhiser",
+  "role": "crash",
+  "note": null,
+  "baseHz": null,
+  "long": true,
+  "gain": 0.55,
+  "durMs": 3000,
+  "kb": 48.2
+ },
+ {
+  "id": "004_Closed_Hat",
+  "role": "hat",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.55,
+  "durMs": 103,
+  "kb": 3.2
+ },
+ {
+  "id": "004_SEPT_Conga",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 420,
+  "kb": 5.2
+ },
+ {
+  "id": "005_FX_Kick_D",
+  "role": "kickfx",
+  "note": "D#",
+  "baseHz": 38.89,
+  "long": false,
+  "gain": 0.95,
+  "durMs": 363,
+  "kb": 7.0
+ },
+ {
+  "id": "006_One_Shot_G_SPIRALPSY_Zenhiser",
+  "role": "synth",
+  "note": "G",
+  "baseHz": 49.0,
+  "long": false,
+  "gain": 0.72,
+  "durMs": 920,
+  "kb": 11.0
+ },
+ {
+  "id": "014_Tambourine_ELEMENTSOFPSY_Zenhiser",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 454,
+  "kb": 7.6
+ },
+ {
+  "id": "020_Percussion",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 394,
+  "kb": 7.7
+ },
+ {
+  "id": "023_SEPT_Open_Hat",
+  "role": "hatopen",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.55,
+  "durMs": 220,
+  "kb": 5.1
+ },
+ {
+  "id": "023_SEPT_Tabla",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 413,
+  "kb": 5.1
+ },
+ {
+  "id": "024_Kick_C_PROGTRANCE_Zenhiser",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 243,
+  "kb": 3.3
+ },
+ {
+  "id": "028_One_Shot_A_SPIRALPSY_Zenhiser",
+  "role": "synth",
+  "note": "A",
+  "baseHz": 55.0,
+  "long": true,
+  "gain": 0.72,
+  "durMs": 2600,
+  "kb": 41.8
+ },
+ {
+  "id": "029_SEPT_Cowbell",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 275,
+  "kb": 3.9
+ },
+ {
+  "id": "031_FX_Impact_SEROTONINTRANCE_Zenhiser",
+  "role": "impact",
+  "note": null,
+  "baseHz": null,
+  "long": true,
+  "gain": 0.85,
+  "durMs": 3000,
+  "kb": 47.9
+ },
+ {
+  "id": "076_Bass_Hit_F_PSYONESHOTS_Zenhiser",
+  "role": "bass",
+  "note": "F#",
+  "baseHz": 46.25,
+  "long": false,
+  "gain": 0.92,
+  "durMs": 377,
+  "kb": 3.5
+ },
+ {
+  "id": "108_Bass_Hit_A_PSYBASSONESHOTS_Zenhiser",
+  "role": "bass",
+  "note": "A#",
+  "baseHz": 58.27,
+  "long": true,
+  "gain": 0.92,
+  "durMs": 1500,
+  "kb": 13.6
+ },
+ {
+  "id": "121_Synth_Hit_138bpm_G_PROGTRANCE_Zenhiser",
+  "role": "synth",
+  "note": "G",
+  "baseHz": 783.99,
+  "long": false,
+  "gain": 0.72,
+  "durMs": 357,
+  "kb": 4.0
+ },
+ {
+  "id": "129_Synth_Hit_FX_F_PSYTOOLBOX_Zenhiser",
+  "role": "synth",
+  "note": "F#",
+  "baseHz": 92.5,
+  "long": false,
+  "gain": 0.72,
+  "durMs": 276,
+  "kb": 3.1
+ },
+ {
+  "id": "159_Synth_Hit_G_PSYONESHOTS_Zenhiser",
+  "role": "synth",
+  "note": "G#",
+  "baseHz": 51.91,
+  "long": false,
+  "gain": 0.72,
+  "durMs": 638,
+  "kb": 7.1
+ },
+ {
+  "id": "BOS_DPT_136_FX_Reverse_Cymbal_One_Shot_Class",
+  "role": "crash",
+  "note": null,
+  "baseHz": null,
+  "long": true,
+  "gain": 0.55,
+  "durMs": 3000,
+  "kb": 48.1
+ },
+ {
+  "id": "BOS_DPT_Kick_One_Shot_Futurasound",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 390,
+  "kb": 3.7
+ },
+ {
+  "id": "BOS_DPT_Kick_One_Shot_Makeway",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 420,
+  "kb": 4.5
+ },
+ {
+  "id": "BOS_DPT_Snare_One_Shot_Proud",
+  "role": "snare",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.85,
+  "durMs": 189,
+  "kb": 3.2
+ },
+ {
+  "id": "BOS_EN_Bass_Synth_One_Shot_Kick_It_F",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 296,
+  "kb": 5.2
+ },
+ {
+  "id": "Bass_A_01",
+  "role": "bass",
+  "note": "A#",
+  "baseHz": 58.27,
+  "long": false,
+  "gain": 0.92,
+  "durMs": 461,
+  "kb": 3.7
+ },
+ {
+  "id": "FSS_ATE2_fx_kick_reverb_down",
+  "role": "impact",
+  "note": null,
+  "baseHz": null,
+  "long": true,
+  "gain": 0.85,
+  "durMs": 3000,
+  "kb": 48.1
+ },
+ {
+  "id": "FSS_ATE2_fx_percussion_martini",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 1100,
+  "kb": 17.0
+ },
+ {
+  "id": "FSS_ATE2_shaker_free",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 375,
+  "kb": 7.9
+ },
+ {
+  "id": "FSS_DPPE_Hat_Open_Azenz",
+  "role": "hatopen",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.55,
+  "durMs": 340,
+  "kb": 8.6
+ },
+ {
+  "id": "FSS_DPPE_Kick_Sky",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 261,
+  "kb": 2.9
+ },
+ {
+  "id": "PM_PS_Kick_One_Shot_Raw_Punch_Bump",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 220,
+  "kb": 2.5
+ },
+ {
+  "id": "PM_PS_Kick_One_Shot_Raw_Punch_High_Ping",
+  "role": "kick",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 1.0,
+  "durMs": 325,
+  "kb": 4.8
+ },
+ {
+  "id": "PTV2_BassHits_007_E",
+  "role": "bass",
+  "note": "E",
+  "baseHz": 41.2,
+  "long": false,
+  "gain": 0.92,
+  "durMs": 694,
+  "kb": 6.5
+ },
+ {
+  "id": "PTV2_BassHits_016_F",
+  "role": "bass",
+  "note": "F",
+  "baseHz": 43.65,
+  "long": false,
+  "gain": 0.92,
+  "durMs": 525,
+  "kb": 5.2
+ },
+ {
+  "id": "PTV2_BassHits_017_G",
+  "role": "bass",
+  "note": "G",
+  "baseHz": 49.0,
+  "long": false,
+  "gain": 0.92,
+  "durMs": 888,
+  "kb": 7.9
+ },
+ {
+  "id": "SH_Bass_Layer",
+  "role": "bass",
+  "note": null,
+  "baseHz": 43.7,
+  "long": false,
+  "gain": 0.92,
+  "durMs": 471,
+  "kb": 9.9
+ },
+ {
+  "id": "SH_Complextro_Element_5",
+  "role": "synth",
+  "note": null,
+  "baseHz": 43.7,
+  "long": false,
+  "gain": 0.72,
+  "durMs": 575,
+  "kb": 7.8
+ },
+ {
+  "id": "STCR2_PTAR_Kit_One_Shot_Bladerunner_Synth_Modulated_Squelch_F_min",
+  "role": "synth",
+  "note": "F#",
+  "baseHz": 46.25,
+  "long": true,
+  "gain": 0.72,
+  "durMs": 2449,
+  "kb": 39.5
+ },
+ {
+  "id": "ZEN_DRD_145_synth_fx_one_shot_brewhouse_Fm",
+  "role": "synth",
+  "note": "F",
+  "baseHz": 87.31,
+  "long": true,
+  "gain": 0.72,
+  "durMs": 2600,
+  "kb": 41.8
+ },
+ {
+  "id": "ZEN_EQUI_142_uplifter_fx_one_shot_skycharge",
+  "role": "riser",
+  "note": null,
+  "baseHz": null,
+  "long": true,
+  "gain": 0.6,
+  "durMs": 4000,
+  "kb": 63.8
+ },
+ {
+  "id": "ZEN_EQUI_clap_one_shot_tour",
+  "role": "clap",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.75,
+  "durMs": 195,
+  "kb": 4.3
+ },
+ {
+  "id": "ZEN_EQUI_shaker_one_shot_teotihuacan",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 162,
+  "kb": 3.9
+ },
+ {
+  "id": "ZEN_FRPSY_crash_one_shot_double",
+  "role": "crash",
+  "note": null,
+  "baseHz": null,
+  "long": true,
+  "gain": 0.55,
+  "durMs": 3000,
+  "kb": 48.2
+ },
+ {
+  "id": "ZEN_FRPSY_percussion_one_shot_precision_reverb",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 1100,
+  "kb": 14.9
+ },
+ {
+  "id": "ZEN_PPT_145_synth_fx_fx_one_shot_byzantium_D",
+  "role": "synth",
+  "note": "D#",
+  "baseHz": 38.89,
+  "long": true,
+  "gain": 0.72,
+  "durMs": 2600,
+  "kb": 41.8
+ },
+ {
+  "id": "ZEN_PPT_percussion_one_shot_amaranth",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 176,
+  "kb": 2.5
+ },
+ {
+  "id": "ZEN_PPT_percussion_one_shot_bistre",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 192,
+  "kb": 2.8
+ },
+ {
+  "id": "ZEN_PPT_percussion_one_shot_blaze",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 241,
+  "kb": 3.2
+ },
+ {
+  "id": "Zenhiser_UPTDK_248_Tambourine_Dry",
+  "role": "perc",
+  "note": null,
+  "baseHz": null,
+  "long": false,
+  "gain": 0.62,
+  "durMs": 341,
+  "kb": 6.6
+ }
+]

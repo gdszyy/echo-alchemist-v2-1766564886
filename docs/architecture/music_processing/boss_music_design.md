@@ -102,7 +102,74 @@
 | `allowLead:false` | 调参 | 关掉原 acid 长啸——ignis 的喷发是节奏化的，acid lead 反而冲淡辨识度 |
 | `_applyIntensity` 加 `needLead` 地板 | 调参(全局收益) | 模态/签名层在低强度也保底可闻，threat 拖动时不被压没（所有签名 Boss 受益） |
 
-**辨识度**：ignis 现在是全 8 Boss 里**唯一以 tom 四踩取代 kick**者，节奏骨架自带签名，不再与其它 boss 共用一套四踩。验证：node 烟测确认 calm `kick=0 / furnace=8 / modal=16 / heat=4`，rage `kick=0 / furnace=16 / modal=8 / heat=16 / wood=4 / tom=4`，与「倒挂弧 + 节奏化喷发」设计一致。
+**辨识度（v2，⚠ 已被下方「深挖 v3」取代——v2 用户仍不满意）**：ignis 当时是全 8 Boss 里**唯一以 tom 四踩取代 kick**者。验证：node 烟测确认 calm `kick=0 / furnace=8 / modal=16 / heat=4`，rage `kick=0 / furnace=16 / modal=8 / heat=16 / wood=4 / tom=4`，与「倒挂弧 + 节奏化喷发」设计一致。
+
+**深挖 v3（hybrid 偏 Demo2 · 2026-06-25 · 见索引 M-01）** ⚠ 其中「`_arrScene` bar%16/%32 **定循环** + calm/rage 直接定 gate」部分已被下方 **深挖 v4 段落状态机** 取代；v3 的音色 / bass 句法 / 狂暴=build 方向**全部沿用**。
+
+> 触发：v2（全程基于 `熔炉之门 MIDI` 这一版 demo）落地后，用户**仍不满意**第一个 boss。这一轮把 Boss 目录下的**两版** demo 一起逐分轨对比——`熔炉之门 MIDI`(=Demo1，v2 的来源) vs `熔炉之门 MIDI (1)`(=Demo2)——发现两版**方向相反**，用户选「混合（偏 Demo2）」。
+
+两版 demo 对比（同名不同编配）：
+
+| 维度 | Demo1（v2 来源） | Demo2（v3 偏向） |
+|---|---|---|
+| root / bpm | E / 146 | **F / 148** |
+| 鼓 | **TOM 驱动、无 kick**（炉腔低 tom 四踩） | **四踩 KICK 驱动**（Kick×183），tom 退为色彩 |
+| bass | 低 E pedal/drone（几乎单音） | **滚动 root+5th**（827 音、4.78 音/秒、71% root + 18% 五度；busy `1.1.\|1.1.\|1.1.\|5.5.`、rage `1.1.\|1.1.\|1.1.\|1.-.`） |
+| 打击色彩 | 木鱼 accent | **Vibraslap×360 嗡鼓**买路 |
+| 旋律 | 密 Phrygian，狂暴**坍缩回根**（倒挂弧） | root-pedal 上**对答 call-response**（和声锁 1=31%/2=27%/7=15%/5=10%） |
+| 狂暴弧 | 旋律退场、能量交给节奏（**变薄**） | 织体**变密**（正常 build） |
+
+**hybrid 决策（偏 Demo2，两版长处合并）**：**保留** Demo1 的熔炉签名（`heatPulse` 定根温压脉冲 + 炉腔低 tom，但 tom 从「取代 kick」降级为「反拍叠加层」）；**找回** Demo2 的四踩 KICK 打桩、滚动 root+5th bass、vibraslap 嗡鼓、root-pedal 对答旋律；并把狂暴弧从 v2 的「坍缩/泄气」**反转**为「递增 build」。
+
+→ 引擎 v3 改动（已落 `dark_psy_engine_demo.html`）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `drumMode:'furnaceKick'`（替 `tribalTom`） | 改句法 | 四踩 **KICK** 找回 Demo2 打桩 + 炉腔低 tom 退为**反拍叠加层**（`s%4===2` 落两 kick 之间，保熔炉签名又不撞 sub）；rage 末拍 pickup + 偶拍 tom 连打=加码 |
+| `bassFill:'furnaceRoll' / 'furnaceRollDrive'`（替 `furnacePedal/Drive`） | 改句法 | 滚动 root+5th：calm `1.1.\|1.1.\|1.1.\|5.5.`（8 音/bar）；rage 直 8 分 + 16 分填充 + 八度顶（16 音/bar）=**递增不变薄** |
+| `playVibraslap(t,gain)` | 新增声部 | vibraslap 嗡鼓：非谐金属舌叮当 + 带通噪声「braaap」rattle，走 hatBus 坐顶端不糊低频；对应 Demo2 Vibraslap×360 |
+| `sig.vibraslap`（替 `woodAccent`） | 改句法 | calm 反拍买路（`s%4===2`）→ rage 8 分加密（`s%2===0`）=build；鼓全退的 intro/breakdown 段跟 `_arrGate` 静默 |
+| `modalLine` 反转 | 改段落 | calm root-pedal 对答 `[0,2,11,0,7,2,0,11]`；rage `[0,7,11,7,2,11,0,7]` 并加 downbeat 召唤音=**前景加码**（非坍缩回根） |
+| `_arrScene` rage 反转 | 改段落 | 旧版 climax 砍旋律（`modal:0`）→ 新版 modal 恒 ≥1、峰值 2，tom/bass/vibraslap 全程加密=喷发即 build |
+| root **E→F**(43.65Hz) / bpm **146→148**(rage 152) / padChord `[0,1,7,12]→[0,2,7,11]` | 调参 | 以 Demo2 为准：F 根、稍快、和声床换 root+2+5+maj7（去掉 b2/八度堆叠的撞味） |
+
+> 旧 `tribalTom` / `furnacePedal` / `furnaceDrive` / `playWood` / `sig.woodAccent` 方法**保留在文件中未删**（无 profile 引用，留作 A-B 回滚）。
+
+**辨识度（v3）**：ignis 不再靠「撤 kick」区分，而是「**四踩 KICK + 炉腔低 tom 反拍叠层 + vibraslap 嗡鼓 + root-pedal 对答 + 喷发递增 build**」的组合签名；熔炉味由 `heatPulse` 定根温压脉冲 + `furnaceTom` 腔体音色承载，不再依赖撤 kick。与 chimera（E↔D# 高 tom 乱滚、无 kick、188）、glacies（保 kick 叠高 tom shimmer、145）三者鼓型清晰区分。验证：mount-independent node 测全过——`furnaceRoll`=`1.1.\|1.1.\|1.1.\|5.5.`(8/bar)、`furnaceRollDrive` build(16/bar 含五度+八度)、`furnaceKick` calm `kick×4 + furnaceTom×4`、rage `kick×4 + tom×9`(build) + furnaceTom×4 层、rage modal 12 > calm 8、vibraslap intro 0 / calm 4 / rage 8。
+
+**深挖 v4（段落状态机 state-driven section pools · 2026-06-25 · 取代 v3 的定循环 · 见索引 M-01）**
+
+> 触发：v3 落地后用户**仍不满意**，并给出关键诊断——「原版其实并不存在一个一直循环的小节规律。一直是一相对稳定的节奏型 + 其他音轨的加花；然后在几个小节后做一个过渡」，要求**系统拆分音乐分段**（哪些是 intro / buildup / drop），按段综合音轨分析，并让 **bass 与合成轮换形成变体**。
+
+逐分段实测（两版 demo 一致，以 Demo2 root F / 148 BPM / 115 小节为准）：曲子是 **intro → buildup → drop → groove → synth-lead → breakdown** 的 through-composed 结构，**不是**定长循环：
+
+| 段落 | demo 小节(Demo2) | kick | bass | synth/旋律 | 说明 |
+|---|---|---|---|---|---|
+| intro | 0–7 | 关 | 关 | 余烬主奏前景 | synth-only 起手 |
+| buildup | 8–38 | **关** | 渐进滚入→重 | 背景 | bass 加密但**仍无 kick** |
+| drop | 39–46 | **四踩开** | 重驱动 | 退背景 | KICK 落点 |
+| groove | 47–67 | 开 | 中 | **与 bass 逐句轮换前景** | 稳定节奏型 |
+| synth-lead | 68–91 | 开 | 退一步 | 主奏前景 | lead 主导 |
+| breakdown | 92+ | **关** | 滚动收束 | 余烬回前景 | 卸力 |
+
+关键：**kick 只在 drop/groove/synth-lead（约 bars 39–91）出现，intro/buildup/breakdown 全程无 kick**；bass 与 synth **按乐句让位轮换**（bassOnly 53% / both 26% / synthOnly 12%）；各分轨 distinct pattern 数极高（bass 49 种 / synth 29–55 种）= through-composed 而非循环一小节。
+
+→ 引擎 v4 改动（已落 `dark_psy_engine_demo.html`，**仅 ignis**；glacies 仍走 `_arrSceneGlacies` per-bar 闸门，互不影响）：
+
+| 改动 | 类型 | 说明 |
+|---|---|---|
+| `_secTick / _secGate / _secBegin / _ignisSecDefs / _secPools`（取代 ignis 的 `_arrScene` bar%16/%32 定循环） | 新机制 | 段落状态机：6 个命名段（各 8 bar），每段一套层闸门 `{tom,bass,heat,modal,perc,lead}` + `energy` 旗 + 行为旗（ramp/rotate/enter）。`_onBarStart` 每小节头推进 |
+| **战斗状态只 steer 段落池** | 新机制 | `_secCombat`：calm 走 `[intro,buildup,groove,synthLead,breakdown,groove]`、rage 走 `[drop,synthLead,drop,groove]`；段落 `energy` 再回贴 `this.section` 驱动既有 rage-keyed 加花（只有 drop 是 rage 能量）。**战斗状态不再直接定 gate** |
+| kick 段落门控 | 改段落 | `_arrGate.tom`：intro/buildup/breakdown=0(鼓全退，旋律前景) / groove/synthLead=1(四踩) / drop climax=2。还原 demo「kick 只在响段」 |
+| bass↔synth 逐句轮换 | 新句法 | groove 段 `rotate`：奇句 `modal=2/bass=1`(synth 前景、bass 退) / 偶句 `modal=0/bass=2`(bass 驱动、synth 出)=用户要的「bass 轮换跟合成形成变体」 |
+| `modalPool`(4 乐句) + `_bassColor`(末拍 5th/4th/b7/b3) 逐句轮换 | 新句法 | `_phraseGlobal` 每 4 小节换旋律句与 bass 末拍音程=through-composed 变体（非循环一小节） |
+| `playFurnaceKick` | 新增声部 | 更深·更「铁」的熔炉 kick（sine sub 180→38 深扫 + 三角炉腔共鸣 + 方波锤头咔 + 软削粒面），替段落机里的 `playKick` |
+| `playEmberLead` | 新增声部 | 余烬前景主奏（intro/synthLead/breakdown 的 `lead` 闸门）：锯+三角八度叠 + 5.5Hz 颤音 + 低通扫 → leadBus(+混响尾)，比背景 modal 高一八度坐前景=**音轨数↑** |
+| 过渡 | 新句法 | 自然段尾前一小节 riser 预告；战斗强跳=乐句边界 slam（rage→drop 冲击+真镲 / calm→breakdown 下沉 downlifter） |
+
+> v3 的 `_arrScene`（ignis 分支）、`furnacePedal/Drive`、`tribalTom` 等**保留未删**（无 ignis 引用，留作 A-B 回滚）；glacies 仍用 `_arrScene`→`_arrSceneGlacies`。
+
+**辨识度（v4）**：ignis 现在是「**段落状态机驱动的 through-composed 熔炉**」——稳定节奏型 + 加花 + 每几小节过渡，kick 按段进出，bass↔synth 逐句让位轮换，战斗状态只换「段落池」。验证：mount-independent node 单测 **27/27 全过**——段序 intro→buildup→groove→synthLead→breakdown→groove(各 8 bar)、kick 仅 groove/synthLead 在场、bass 仅 intro 离场、lead 仅 intro/synthLead/breakdown 在场、buildup bass 段内 1→2 渐进、groove 两乐句 gate 不同(轮换非循环)、bassColor 逐句 7/5/10/3、战斗→rage 在乐句边界 slam 进 drop、rage 冷启从 drop 起手。
 
 ---
 
@@ -387,11 +454,11 @@
 
 ### 3.7 混沌融合体·奇美拉 chimera（venom / laser，大 Boss）
 
-**机制速览**：狂暴(berserk，初始温度 60=半狂暴) + 吞噬，热量叠层、受击触发全场爆炸、热吸收成盾。破绽=污染胃域(venom/laser 累计伤害 9%)。
+**机制速览**：左右热核吞噬 + 流彩转盾。每回合召唤 2-3 个热核养料，左侧低温、右侧高温；每次吞噬两个目标，左侧倾向低温、右侧倾向高温；热核/冰核按温度一比一累计，冷热抵消 100% 转为流彩护盾，狂暴后护盾量翻倍。破绽=污染胃域(venom/laser 累计伤害 9%)。
 
 **提炼风味**：不稳定的混沌拼接体——音高发飘、组织错位、随时炸开的狂暴脉冲。
 
-**音乐映射**：Darkpsy 混沌味，156 BPM。A 叠 **#4/b5 三全音**制造不安定张力。lead 故意**失稳音高漂移**(detune/pitch drift)；不和谐的融合织体；突发爆裂 accent。**签名**：音高失稳 + 不定时爆发冲击(对应受击全场爆炸)。狂暴(温度满)时爆发更密、失真更脏。
+**音乐映射**：Darkpsy 混沌味，156 BPM。A 叠 **#4/b5 三全音**制造不安定张力。lead 故意**失稳音高漂移**(detune/pitch drift)；不和谐的融合织体；冷热核心抵消时用短促盾脉冲 accent。**签名**：音高失稳 + 冷热相位互相抵消的脉冲节奏。护盾越厚，低频侧链越重。
 
 **Suno 风格串**
 
@@ -410,7 +477,7 @@
 - **鼓**：n50 主导(92) + n33，偏 tom/conga 而非四踩 → 异色打击。
 - **lead/synth**：稀疏长音(常态 0.64/s、medDur 1.5 拍)带 **b5 三全音 + 6**；狂暴加 b3 → 引擎 lead 慢音 + 三全音 + 缓慢 detune 漂移叠加根音失稳。
 - **常态 / 狂暴（分段实测）**：常态 E 为根、D# 作色；狂暴 **D# 反客为主压过 E**（导音夺权）= 听感「身份崩塌」。→ 引擎狂暴把根音漂移幅度/频率拉大 + `impact` 不定时穿插 + synth 上三全音，制造混沌融合。
-- **撞味提醒**：root E 与 ignis 同；但 chimera 靠 **E↔D# 半音失稳**（188 BPM），ignis 靠 **E 弗里几亚 b2/b5**（146 BPM），机制与速度都不同，不撞。
+- **撞味提醒**：~~root E 与 ignis 同~~ → ignis v3 已改 **root F / 148**（见 §3.1「深挖 v3」），与 chimera root E **连根音都不同**；chimera 再靠 **E↔D# 半音失稳**（188 BPM）拉开，更不撞。
 
 **深挖 v2（逐分轨 MIDI 实测 · 2026-06-25 · 见索引 M-07）**
 
@@ -439,7 +506,7 @@
 
 **辨识度**：chimera 是全 8 Boss 里**唯一「root 与 maj7 导音互搏 + 几乎无 kick 的滚动高 tom + 双根漂移 howl」**者（188 最快、100s 最短）。验证：node 烟测确认 calm `kick=0(无四踩) / tom=8(滚动高 tom) / drift=1(双根 howl) / bass=8`；rage `tom=20(满 16 分 tom 滚) / drift=2(含 maj7 夺权那记) / bass=12`，与「失稳→崩塌」设计一致。
 
-**撞味提醒**：root E 与 ignis 同——但 chimera 是 **E↔D# 导音夺权 + chaosTom 无 kick 高 tom 滚(188)**；ignis 是 **E 弗里几亚 b2/b5 + furnaceTom 低炉腔 tom 四踩(146)**。两者鼓都「无 kick」却完全不同：chimera 高 tom 乱滚、ignis 低 tom 规整四踩。chaosDrift 漂移 howl 与 viridis 呼吸 pad、tesla zap 均不撞。
+**撞味提醒**：~~root E 与 ignis 同~~ → ignis v3 已改 **root F + 四踩 KICK(148)**（见 §3.1「深挖 v3」），与 chimera **不再同根、鼓型也彻底分开**：chimera 是 **E↔D# 导音夺权 + chaosTom 无 kick 高 tom 乱滚(188)**，ignis 是 **F 四踩 KICK + furnaceTom 炉腔低 tom 反拍叠层(148)**。chaosDrift 漂移 howl 与 viridis 呼吸 pad、tesla zap 均不撞。
 
 ---
 
@@ -552,6 +619,187 @@ the chase breaks off, the drive winding down, the pursuer receding into the dark
 - **越线打点 & 卸力** → `onThreatZone` riser/impact 与退区 downlifter 时长 **保留**(riser 0.8 / downlifter 0.7s)。参考：成品 stinger 成对、间隔 ~1.4s ≈ 169BPM 一小节；引擎半小节级的 0.7–0.8s 打点在同一量级。
 - **区阈值** → `_zoneOf` **0.3/0.6/0.85 保留**：阈值是**玩法手感**(距离驱动)，成品时间线能量前置、非干净四区，不可由其反推。
 - **参考事实 / 推荐后续**：chase 参考 **BPM≈169**、root **D#≈38.9Hz**(D#1，与 glacies/devourer/ouroboros 同根族)、root+五度协和铺底。**推荐后续**(本轮未动 tempo)：threat 进 danger/critical 时用 `glideBpm` 把 BPM 朝 **~169** 平滑提速耦合，落实 Style 串「accelerating as the gap collapses」；威胁轴现仍不触 tempo。
+
+---
+
+### 3.10 连接层和声床 + 签名融合（去割裂 · 全 8 Boss 通用 · 2026-06-25）
+
+> 触发：试听反馈「独有签名显得很割裂」。诊断：每个 Boss 的签名（windCry / fifthStab / metalGliss / 各类 stab）是**孤立单发**事件，落在一片**空的中频**里——大 Boss 多数 `allowOoh:false / allowLead:false`，而 drone 只铺 sub（≤300Hz lowpass），200Hz–2kHz 没有任何持续声音托底，签名一响就像「凭空蹦出来又凭空消失」。采用**最大胆**方案：① 加一层贯穿全程的和声胶水床；② 把暴露的离格签名重新融进床里。
+
+**① 连接层和声床 `padBus` / `_startPad` / `_retunePad` / `_stopPad`**
+
+- **路由**：`padBus(0.09) → pumpBus + wet`。干声入 pumpBus → 随每记 kick 被 `duck()` 侧链泵动（和鼓同呼吸，不糊底鼓）；湿声入混响，给签名一个**有混响的中频场**可融。
+- **音色**：调式中立的**五度叠置** `degs=[12,19,24,31]`＝root / 5th / 八度 / 十二度。四个音级 mod 12 只有 **0(root) 与 7(5th)**，**任何 Boss 调式都不撞**（故意不用 `_padChord`——那会把 ouroboros 的 b2+b5 这类不协和长挂成噪音床）。前两声三角、后两声正弦，gains `[0.34,0.26,0.2,0.12]` 上薄下厚。
+- **流动**：lowpass 820Hz + 极慢正弦 LFO（0.05Hz、深度 260）让滤波「呼吸」，不是死 pad；起声 3.5s 慢淡入。
+- **动态**：`setSection` 里 rage 抬到 **0.115**、常态收到 **0.08**；跟随 `_rootOffset`（`_onBarStart` 移调 + `setSection`）用 `setTargetAtTime` 平滑retune，始终托住当前调中心。`start()` 起、`stop()` 0.5s 淡出收。
+
+**② 签名融合（先审计：仅 windCry 是「离格旋律单发」，其余 stab 已在格或为织体）**
+
+- **windCry 重新上格**：ouroboros 终曲木管悲鸣由 `s0/s10` 移到 **`s0/s8`**（正落在 kick 位），不再漂在反拍格点外；每小节仍恰好 2 记（不破坏既有计数校验）。
+- **reed 叹息解决**：`playReed` 加 `glideTo` 参数——长音尾部（`t+dur*0.85`）线性滑奏到**和声床内音**：`s0` b2(deg37)→root(deg36)、`s8` maj7(deg47)→maj6(deg45)。暴露的张力音不再硬切收尾，而是「叹一口气落回床上」，与 pad 的 root/5th 协和收束。`glideTo=null` 时行为不变（向后兼容其它调用）。
+
+**校验**：转写谐波台 `_cohesion_check.js` **43/43 通过**（pad 建 4 振荡器、音级/频率正确、mode-neutral 全为 root/5th、移调 retune、reed 滑奏目标与时点、windCry 仅 s0/s8 触发且 calm 静默）；三处接缝（pad 三法 / playReed / windCry dispatch）经权威 Read 花括号-括号-方括号**全平衡**。
+
+---
+
+### 3.11 去「铁道口警铃」：签名节奏从死格改乐句化（glacies / mikro / ouroboros · 2026-06-25）
+
+> 触发：试听「霜变结晶玻璃铃太割裂、一直敲、像铁道口警铃；裂变母体狂暴、永恒回声狂暴同病」。诊断：三处签名都在**死规整格点**上以**单一或不谐音高**连发，相对原 Suno MIDI 的真实 onset 完全失真。回去重挖三条 stem 取真实 onset grid + 音高校正（`midi_mine.py`，root 自测/`--root=D#`）。
+
+**glacies `glassBells`**（实测 Synth：重拍锚 s0/s4/s12 强、拍 3 弱；音高 root/maj3/5th；rage 转疏+断奏 s0/s6/s10、meddur 0.59 短）
+- 旧：calm 每反拍 `s%4===2`（s2/6/10/14）单音 `bells[phrase%3]`——4 击/小节同一音高 = 警铃。
+- 新：calm `{s0→root, s4→maj3, s12→5th}`（落实测重拍、**留拍 3**），rage `{s0→root, s6→5th, s10→maj3}`；连续铃**走三和弦琶音**，每乐句 `(idx+phrase)%3` 旋转换位（bar0≠bar4）；calm 长音 1.6s 叠成 shimmer、rage 0.85s 断奏。仍 3 击/小节，但音高**各不相同**。
+
+**mikro 狂暴 `fissionStutter` + `guitarChug`**（实测 Guitar 全曲仅 11 个稀疏根音、偶 8 分；Synth 虽 16 分连发但是持续音不是颗粒爆）
+- 旧：fission 每 8 分爆（×`fissBase`4 颗 = 32 颗/小节）＋ guitar 每 8 分 chug = 双层机关枪墙。
+- 新：fission 只在 **2 小节乐句切分点**爆（偶小节 s6 / 奇小节 s6+s14）= 每 2 小节喘息一次；guitar 退成**拍点 punctuation**（s0/s8 ＋奇小节尾 s14），密度砍 **>70%**。八度散射 `octaveScatter`（s4/s10）不动。
+
+**ouroboros 狂暴 `fxCycle`**（实测 FX：三音 deg **0/5/8 = root/4th/b6** 各≈200 等权；rage meddur 1.49 = 持续不是短促）
+- 旧：`fxCycleDeg=[1,6,9]`（b2/b5/6 最不谐三音）每 8 分一发、0.5s 短促 = klaxon。
+- 新：音高改回实测 **[0,5,8]**（协和哀句色）；rage 改**三音叹句 s0/s6/s10**（空出拍 2、拍 4 喘息）、拉长到 **1.3s** 持续=回声叠响而非短促警铃；calm 仍 `fxPeriod=8` 半拍缓转。
+
+**校验**：转写台 `_alarm_fix_check.js` **13/13 通过**（fxCycle rage 3/小节 ⊆{0,6,10} 且只用 0/5/8、calm 2/小节；bells calm/rage 各 3/小节、每小节 3 个**相异**和弦音、乐句旋转 bar0≠bar4、丢弃旧反拍 s2/s14；fission ≤2/小节砍 >70%、guitar ≤3/小节）；size-guard 全文 UTF-8 完整解码（79466 B），花括号 283/283 · 括号 1387/1387 · 方括号 81/81 全平衡，`_scheduleSignatures` 方法独立 brace-walk 深度归零。
+
+---
+
+### 3.12 去「警铃」第二刀：音色 + 混音效果器（glacies / mikro / ouroboros · 2026-06-25）
+
+> 触发：节奏乐句化后试听「问题减少了但还是有问题——是不是**音色和混音效果器**上的差距」。诊断：剩余警铃感不在音符，而在**合成音色**与 **FX 路由**——三处签名的振荡器/滤波器本身就是警报器音色，且每击参数恒定（无力度/失谐变化）、干声前置（贴脸、不进混响）。
+
+**glacies `playGlassBell`**（音色元凶 = 非谐管钟泛音 2.76 = 金属敲击 clang）
+- 泛音串 `[1,2.76,5.4,8.93]→[1,2.0,3.01,4.76]`：删掉 2.76 管钟比，换近八度＋柔三泛音＋微高空气 = 玻璃而非铁钟。
+- 逐击力度 `vel`（实测 Synth vel 63-127）→ gain ×(0.5..1)；弱击起音更软（0.012→最长 0.042s）化解「敲击」瞬态。
+- 泛音间微失谐（±~3.5 cents）= 玻璃 beating，逐击不同相 → 去机械重复。
+- 调度按琶音音级散**声像**（pan=(idx-1)×0.4±jitter）＋力度浮动 → 连续三击 gain|pan|detune **无一相同**。
+- 圆顶低通（freq×6+1800Hz）去脆刺；**额外 `_wet` 送**（0.6）让铃声晕进冰雾 shimmer（实测 calm meddur≈4.8 长叠）而非前景叮当。
+
+**mikro `_fissionStutter`**（音色元凶 = 同音颗粒墙）
+- 旧：intensity 1.0 时 `round(4×3)=12` 颗**同音**加速串 = 突突机关枪。
+- 新：颗粒数封顶 7（`round(base×(1+intensity))`）；每颗下行半音 `freq×2^(-i/12)` = 裂变塌缩**级联**；间隔渐缩放缓（0.92→0.94）。靠**音程位移**而非同音连发出增殖感。
+
+**ouroboros `playEchoCry`**（音色元凶 = 高 Q 共振扫频锯齿 = 克拉克松）
+- 共振 **Q 8→3**：去窄带共鸣警笛峰；带通中心扫 `freq×4→1.4` 改 `freq×3→1.3` 更柔。
+- 加**八度下身正弦**（freq×0.5，混入 0.4）= 暖芯，化解尖啸。
+- 软起音 0.02→0.04s 去「按喇叭」瞬态；逐击力度（实测 FX vel 3-99 宽）＋微失谐（±5 cents）。
+- 路由从纯 fxBus 干声 → **同时送 `delaySend`（真乒乓延迟尾）＋额外 `_wet`（混响）** = 名副其实的「永恒回声」晕开，而非贴脸短促警笛。
+
+**校验**：转写台 `_timbre_fix_check.js` **18/18 通过**——确认 2.76 clang 已除、新泛音串、力度软↔硬 gain 拉开、连续三击 gain|pan|detune 三元组互异、声像横向铺开；echoCry Q===3、八度下身存在、同时连到 delaySend 与 _wet、逐击力度浮动；fission 颗粒≤7、每颗音高严格下行且互异。Node 成功解析并运行全部被改方法的忠实转写（= 花括号配平、无语法错）。
+
+> 注：本沙箱 Bash 挂载视图对本文件**持续短读/截断尾部**（缺 `</script>`、花括号少计 2），与 NTFS 真值不符——以**文件工具 Read** 为准（已逐段复核 5 处改动就位、类体 156→908 闭合、`</script>`/`</body>`/`</html>` 976-978 完整）。故全文配平以 Read ＋转写台 node 解析为权威，不采信挂载层 brace 计数（见 `CLAUDE.md` §4 双视图不一致）。
+
+---
+
+### 3.13 保存预设·钢琴 `playPiano`（冻结快照 · 2026-06-25）
+
+> 来源：§3.12 给 glacies `glassBell` 去警铃（删 2.76 管钟泛音换近谐串）后，意外得到一个**近钢琴**音色，用户认可、要求存档命名为「钢琴」。
+> 用途：可复用的命名声部；作为**冻结快照**——后续若为 boss 战另调钢琴变体，新起方法，**不动 `playPiano`**。
+
+**配方** `playPiano(t,freq,dur=1.6,gain=0.3,vel=1,pan=0)`
+- 振荡：4 路正弦，近谐泛音 `[1,2.0,3.01,4.76]`、幅度 `[1,0.34,0.15,0.07]`；泛音间微失谐 ±~3.5 cent = beating。
+- 包络：逐击力度 `gain×(0.5+0.5·vel)`；起音 `0.012+(1-vel)×0.03`s（弱击更软）；各泛音衰减 `dur×(1-i×0.16)`（高泛音先死＝自然琴尾）。
+- 滤波：圆顶低通 `freq×6+1800Hz` Q0.5 去脆刺。
+- 混音：`pn→fxBus`（干声临场）＋ `pn→gw(0.6)→_wet`（额外混响尾）；逐击 `pan` 散声场。
+- 现状：`playGlassBell` 直接委托 `playPiano`；glacies 玻璃铃即此音色。
+
+**Boss 战续作**：用户反馈纯钢琴用于 boss 战「呆」，选定走 **Suno 参考流程**（见同目录 `suno_boss_piano_prompts.md`）——由 Suno 生成「钢琴演绎 boss 战」参考音频，我再提炼成引擎参数、另调 boss 钢琴变体（不覆盖本快照）。
+
+---
+
+### 3.14 Boss 钢琴变体 `playBossPiano`（Suno「Pulse Breaker」提炼 · 2026-06-25）
+
+> 来源：§3.13 选定的 Suno 参考流程落地。用户回传 `Pulse Breaker MIDI.zip`（6 stem：Synth/Drums/FX/Vocals/**Keyboard**/Bass）作为「钢琴怎么演绎 boss 战」的参考。用 `midi_mine.py` 逐轨深挖，**Keyboard=钢琴轨**。
+> 目的：给 boss/狂暴段一版**撑得起战斗、不呆**的钢琴，**不动**冻结的 `playPiano`（§3.13）。
+
+**Pulse Breaker 钢琴轨实测（root=C 归一）**
+
+| 维度 | 实测 | 含义 |
+|---|---|---|
+| 音域 | 八度 5–7 为主（reg6=271/reg5=100/reg7=85），medpitch 77≈F5 | **钢琴坐高**，低盘交给 bass，不弹低八度 power octave |
+| 调式 | deg top：root98 · 4th83 · b6 71 · 5th56 · b7 50 · M3 46 · M7 33 · b2 29 | **弗里几亚属**（root/b2/M3/4/5/b6/b7）＝异域/反派色，重 root·4th·b6 |
+| 节奏 | grid[16] 峰值 s0·s6·s8·s10（36/50/38/47） | **八分反拍切分**：强拍 0/8＋反拍「ands」6/10，顶着鼓推 |
+| 力度 | vmin/med/max 51/83/95 | 真有起伏（mp→ff，跨度 44），非等响 |
+| 时值 | meddur≈1.0 拍 | **四分延音**＝踏板叠响，不是断奏机关枪 16 分 |
+| 密度 | dens 2.71（bass 3.75 更忙） | 钢琴是旋律/和声 lead，**不当节奏引擎** |
+
+> 框架佐证：**Bass** 低区八分直推（meddur0.5、grid 偶数步全亮、vel127）＋**Drums** 四踩 kick（grid s0/4/8/12 爆）扛住低盘与拍点，钢琴才能坐高发亮。
+
+**6 维 → 引擎决策**（对齐 `suno_boss_piano_prompts.md` 的提炼清单）
+- 音域/声部密度 → 旋律保持高、另叠**低八度 triangle body** 补下盘重量。
+- 节奏型 → dispatch 在 rage arp **加回拍3锚 s8**（`{0,6,10}`→`{0,6,8,10}`），贴实测 s0/s6/s8/s10。
+- 力度与起音 → 逐击 vel→响度＋**更短促锤击起音**（`0.004+(1-vel)×0.012`，比钢琴 0.012 起更狠）。
+- 音色处理 → **开亮低通**（`freq×8+3200` Q0.9，盖过鼓/bass）＋多一阶高泛音（6×）＋**方波咬边**＝亮且糙。
+- 与鼓/bass 叠法 → 一路进 **pumpBus** 被 kick 侧链泵动＝随四踩呼吸；干声进 fxBus。
+- 段落动态 → 仅 **rage** 用 `playBossPiano`，calm 仍走温和 `playGlassBell`（→`playPiano`）。
+
+**配方** `playBossPiano(t,freq,dur=0.85,gain=0.24,vel=1,pan=0)`
+- 振荡：5 路正弦近谐泛音 `[1,2,3.01,4.76,6.0]` 幅度 `[1,0.40,0.22,0.12,0.06]`（比钢琴多一阶、上泛音更响）＋ **低八度 triangle**（0.5×，幅 0.5）body ＋ **square**（1×，幅 0.05）咬边；逐泛音微失谐 ±~4.5cent。
+- 包络：`gain×(0.55+0.45·vel)`；锤击起音 `0.004+(1-vel)×0.012`s；高泛音先死 `dur×(1-i×0.13)`。
+- 滤波：开亮低通 `freq×8+3200Hz` Q0.9（vs 钢琴 `freq×6+1800` Q0.5）。
+- 路由：`pn→fxBus`（干）＋`gd(0.5)→delaySend`（反拍乒乓回声）＋`gw(0.42)→_wet`（混响尾）＋`gp(0.45)→pumpBus`（kick 侧链泵）。
+
+**接线**（`_scheduleSignatures` 的 `glassBells` 分支）
+```js
+const arp = rage ? {0:0,6:2,8:0,10:1} : {0:0,4:1,12:2}; // rage +s8 拍3锚
+...
+if(rage) this.playBossPiano(t,this._noteFreq(bells[idx]),0.85,0.24,vel,pan); // boss 段
+else     this.playGlassBell(t,this._noteFreq(bells[idx]),1.6,0.30,vel,pan);  // 常态
+```
+> `playBossPiano` 是通用方法，任何 boss 想要「糙亮钢琴 lead」都可调；当前仅 glacies rage 接入。
+
+**冻结边界**：`playPiano` 泛音/低通/路由**零改动**（校验断言其仍 `[1,2,3.01,4.76]`、`freq×6+1800`、仅 fxBus+_wet）。
+
+**校验**：`_boss_piano_check.js`（mock AudioContext 转写 playPiano+playBossPiano+dispatch）→ **17/17 PASS**（音色更亮/糙/重、4 总线路由、力度起伏、起音更快、playPiano 未被污染、rage→bossPiano·calm→glassBell、rage 网格 s0/6/8/10）；Read 工具核对方法 655–676 大括号配平。
+
+---
+
+### 3.15 段落编排控制器 `_arrSceneGlacies`（glacies 原型 · 2026-06-25）
+
+> 来源：用户指出「音乐还是太单调」，根因是**音色 / 音轨数量 / 编排**——「原版其实并不存在一个一直循环的小节规律，一直是一相对稳定的节奏型 + 其他音轨的加花，然后在几个小节后做一个过渡；要去看哪些是 intro / buildup / drop，系统去分析、拆分音乐分段、综合分段的音轨去分析；**钢琴部分在这个例子中应该属于加花**」。
+> 数据印证：`arr.py`（分段编排分析器，复用 `midi_mine.py`）对 Pulse Breaker 参考做共享小节网格分析——**Bass duty 0.78 + Drums 0.72 = backbone（骨架）**；**Keyboard duty 0.53 / cv 0.58 = 加花**（突发、且在终曲硬 drop 80-94 几乎缺席，密度 0.3）；同一时刻通常只有 2-4 stem 在响。证实「骨架常驻 + 加花来去 + 分段过渡」。
+> 范围：**仅 glacies 原型**（opt-in，profile 加 `arrange:true`），先 A/B 再推广其余 7 boss。
+
+**机制**：`_arrScene(bar,section)` 顶部按 `this.bossId` 分流——`==='glacies'` 走新方法 `_arrSceneGlacies`（返回闸门集 `{kick,bass,bells,shimmer,chime,vox}`），其余落回原 ignis 逻辑（闸门集 `{tom,bass,heat,modal,perc}`，两套不共键、互不污染）。活路径仍是 `_onBarStart`→`_arrScene`（每小节头由 sequencer 调用）；ignis 的 v4 `_secTick`/`_secGate` 草稿**无调用点=惰性死码**，不影响本控制器。
+
+**闸门约定**：`kick 0关/1四踩`｜`bass 0关/1开`｜`bells 0加花离席 / 1疏(仅重拍锚) / 2密(全琶音)`｜`shimmer 0/1 高tom`｜`chime 0/1 冰锥`｜`vox 0/1 缝针(仅rage)`。**骨架=kick+bass 在所有有能量段恒为 1**；**加花=bells（玻璃铃 calm / `playBossPiano` rage）+ shimmer + chime + vox 按段进出**。
+
+常态 32 小节 through-composed：
+
+| 段 | bars(1-idx) | kick | bass | bells | shimmer | chime | 含义 |
+|---|---|---|---|---|---|---|---|
+| intro | 1–4 | 0 | 0 | 2 | 0 | 1 | 玻璃铃前景独奏，无鼓无 bass（参考 synth-only 起手） |
+| build | 5–8 | 1 | 1 | **0** | 1 | 1 | 骨架单独确立、加花暂退（groove 先立住） |
+| drop | 9–16 | 1 | 1 | 2 | 1 | 1 | 加花在 drop 揭幕、铃密 |
+| breakdown | 17–20 | 0 | 0 | 2 | 0 | 1 | 鼓退、剥到玻璃铃（呼吸） |
+| build2 | 21–24 | 1 | 1 | **0** | 1 | 1 | 骨架再立、加花退 |
+| drop2 | 25–28 | 1 | 1 | 1 | 1 | 0 | 铃疏铺在 groove 上 |
+| climax | 29–32 | 1 | 1 | **0** | 1 | 0 | 鼓主导收尾、**加花离席**（贴参考终曲硬 drop 钢琴退场） |
+
+狂暴 16 小节（递增 build，但加花仍来去）：`build①(1-4) bells1 vox0`→`build②(5-8) bells2 vox1 chime让位`→`drop(9-12) 全开`→`vent(13-16) bells0`（加花离席让骨架+缝针透气，循环回 build 再砸=去「一直循环」）。
+
+**接线**（各闸门的消费点，均防御式 `!ag||key===undefined||key>0` 回退原行为）：`kick`→四踩 kick 分支；`bass`→`_scheduleBass` 顶部 `bass===0 return`（与 ignis 共用）；`bells`→`glassBells` 分支（`bl===0` 跳过；`bl===1` 用稀疏 arp `rage{0,8}/calm{0,12}`；`bl===2` 全琶音）；`shimmer/chime/vox`→各自签名行。
+
+**come-and-go 实测**：bells 常态 duty **0.63**（20/32 在场，落在参考 0.45–0.75 带内），在两个 build + climax 离席，在 intro/drop/breakdown 在场——与「钢琴=加花、峰段离席」一致。
+
+**隔离**：其余 6 boss 无 `arrange`→`_arrGate=null`→所有消费点回退原并行；ignis `arrange:true` 但 `bossId!=='glacies'`→落回原 ignis 闸门，且无 glassBells/shimmer/chime/vox 签名，零影响。
+
+**校验**：`glacies_sched_test.js`（内嵌 `_arrSceneGlacies` 原文逐字 + arp 选择器，纯逻辑跑 32+16 小节）→ **13/13 PASS**（骨架 24 段全 1、bells 来去含 0 与 2、duty 0.63、intro/build/drop/breakdown/climax 各段断言、bells 疏<密、rage vox/vent）；Read 工具核对 `_arrScene`/`_arrSceneGlacies`(485–517)、kick(613)、glassBells(1086–1099)、shimmer/chime/vox(1100–1102)、bass(999) 全部大括号配平。
+> 注：本文件所在仓库挂载对该 HTML **整文件 bash/node 读会短读截断**（实测 stat 79466B 但流止于 mikro profile），故全文件 `node --check` 不可靠；改用「Read 工具核对配平 + 内嵌原文逻辑跑测」二段校验。
+
+---
+
+### 3.16 glacies 钢琴暗化：大三→小三 + 下行根音进行（2026-06-25）
+
+**起因**：用户反馈「钢琴的和弦进行不太像紧张刺激的 boss 站」。诊断属实——原 glacies 钢琴是**静止的 D# 大三和弦琶音**：`rootCycle [0,0,0,0]`（无和声运动）+ `padChord [0,4,7,12]` + `bellDeg` = root/maj3/5th。明亮协和、无张力曲线，听感偏冰晶氛围而非战斗；且与 §3.14 实测参考（Pulse Breaker Keyboard = 弗里几亚·暗）方向相反（glacies 当初 §3.2 是**故意**设计成亮的）。
+
+**改动（仅 glacies profile，对其余 7 boss 零影响）**：
+
+- `bellDeg` calm `[36,40,43]→[36,39,43]`、rage `[48,52,55]→[48,51,55]`：maj3(4)→b3(3)，玻璃铃 / boss 钢琴琶音变**小三和弦**（root/b3/5th，**保留纯五度**=boss 重量，不削成阴郁小调）。
+- `padChord [0,4,7,12]→[0,3,7,12]`：sustained pad 床同步转小调——否则 pad 的 maj3 会与 bells 的 b3 形成低频交叉撞响（cross-relation 糊低频）。
+- `rootCycle [0,0,0,0]→[0,0,-2,-3]`：每 4 小节相位根音 **root→root→b7→b6 下行沉降**，补上「和声进行」（原为静止踏板）。由 `phrase=floor(bar/4)` 索引，转调经 `_retunePad/_retuneDrone` 平滑，bells/bass 经 `_noteFreq(_rootOffset+deg)` 自动跟随。与段落弧**巧合对齐**：drop(b8-15) 沉到 −2/−3、climax(b28-31) 落最低 −3=压迫顶点，intro/breakdown 回根=留白。
+
+**为何「暗化」而非「换概念」**：glacies rage 的暗色张力本就散在别处（`stitchVox`=b2 缝针 stutter、`frostDrop` bass=b3 冰裂）；钢琴转小三后与它们统一，且保留纯五度 + 四踩骨架=仍是有重量的 boss，而非单纯阴郁氛围。
+
+**校验**：`glacies_dark_test.js`（内嵌新值 + `_arrSceneGlacies` 原文逐字）→ **18/18 PASS**：① bells calm/rage 与 pad 均小调（pc `[0,3,7]`、含 b3 无 maj3、留五度）；② `rootCycle` 有运动·含负偏移下行·回根，drop/climax 沉到最低、intro/breakdown 在根；③ **回归**——段落门控（骨架 24 段全 1、bells 来去含 0/2、duty 0.63、intro/climax/rage vent）未被本次和声改动破坏。沿用「Read 工具核对 + 内嵌逻辑跑测」二段校验（整文件挂载读仍会短读截断）。
 
 ---
 
