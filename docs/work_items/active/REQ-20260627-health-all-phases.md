@@ -1,6 +1,6 @@
 # REQ-20260627-health-all-phases
 
-Status: Verifying
+Status: Implementing
 Owner: Codex
 Started: 2026-06-27
 
@@ -10,8 +10,10 @@ Continue from `docs/health_all_phases_goal_handoff.md` and advance Echo Alchemis
 
 Current checkpoint focus:
 
-- [ ] Checkpoint 0: baseline verification.
-- [ ] Checkpoint 1: P1 interaction health, starting with rune launcher information architecture and pinboard fusion feedback.
+- [x] Checkpoint 0: baseline verification.
+- [ ] Checkpoint 1: P1 interaction health.
+  - [x] Pinboard fusion feedback is visible from the rune launcher configuration tab.
+  - [ ] Remaining P1 items: full launcher information hierarchy, codex card states, mobile long-list safe-area review, reward/shop/truth-book card grammar.
 
 Deferred checkpoints remain tracked in the handoff document:
 
@@ -42,12 +44,22 @@ Deferred checkpoints remain tracked in the handoff document:
   - `node --check src/entities/enemy.js`: passed.
   - `node tests/validate_scenarios.js`: 128/128 passed.
   - `node tests/validate_phase_contracts.mjs`: 171/171 passed.
+- 2026-06-27 Checkpoint 1 partial, pinboard fusion launcher feedback:
+  - `git diff --check`: passed; Windows LF/CRLF warnings only.
+  - `node --check src/ui/rune_launcher.js`: passed.
+  - `node --check src/ui_system.js`: passed.
+  - `node --check src/systems.js`: passed.
+  - `node tests/validate_scenarios.js`: 128/128 passed.
+  - `node tests/validate_phase_contracts.mjs`: 173/173 passed.
+  - `node tests/validate_pinboard_mechanisms.mjs`: 15/15 passed.
+  - `node tests/ai_test_runner.js --suite pinboard --url http://localhost:3002`: not run; repository has no `puppeteer` dependency installed.
+  - Codex in-app browser check at `http://localhost:3002/`: page loaded, launcher DOM and `#rune-pinboard-fusion-summary` existed, no console error logs.
 
 ## Sync Gates
 
-- Auto index: not required for Checkpoint 0; no source files changed.
-- Module docs: not required for Checkpoint 0; no state/API/architecture changed.
-- Progress docs: request card created; TODO/P1 status unchanged.
+- Auto index: updated for `src/ui/rune_launcher.js` and `src/ui_system.js` through `scripts/generate_index.py`.
+- Module docs: `.cursor/rules/ui_system.md` updated with the pinboard-fusion launcher feedback contract.
+- Progress docs: `docs/p0_interaction_optimization_todo.md` updated for the completed feedback-chain item.
 - Process insights: pending; add only if a non-obvious coupling or recurring trap is discovered.
-- Temporary files: pending; no scratch files should remain in active docs.
-- Verification: Checkpoint 0 baseline passed.
+- Temporary files: no scratch files added. Dev server was started for browser check and closed by PID.
+- Verification: Checkpoint 0 baseline passed; Checkpoint 1 partial batch passed available static checks and in-app browser DOM check.

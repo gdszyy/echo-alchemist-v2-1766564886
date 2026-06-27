@@ -2995,6 +2995,7 @@ export const ui_system = {
         if (typeof this.phase_gathering_initPachinko === 'function') {
             this.phase_gathering_initPachinko(false);
         }
+        if (typeof this._ui_updatePinboardFusionDisplay === 'function') this._ui_updatePinboardFusionDisplay();
         this._moduleEditor_closePicker();
         this._moduleEditorSelectedSlotIdx = slotIdx;
         this._moduleEditorSelectedComponentUid = null;
@@ -3153,6 +3154,7 @@ export const ui_system = {
         if (typeof this.phase_gathering_initPachinko === 'function') {
             this.phase_gathering_initPachinko(false);
         }
+        if (typeof this._ui_updatePinboardFusionDisplay === 'function') this._ui_updatePinboardFusionDisplay();
         this._moduleEditor_closePicker();
         this._moduleEditorSelectedSlotIdx = slotIdx;
         this._moduleEditorSelectedComponentUid = null;
@@ -3405,6 +3407,7 @@ export const ui_system = {
             if (result.ok && typeof this.phase_gathering_initPachinko === 'function') {
                 this.phase_gathering_initPachinko(false);
             }
+            if (result.ok && typeof this._ui_updatePinboardFusionDisplay === 'function') this._ui_updatePinboardFusionDisplay();
             this._moduleEditor_closePicker();
             this.ui_renderModuleEditorControls();
         });

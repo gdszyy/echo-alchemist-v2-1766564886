@@ -644,6 +644,8 @@ check(has(gamePhase, /const\s+allPegTypes\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]da
 check(has(read('src/pinboard_modules.js'), /const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'module pinboard random peg pool only includes pure bounce and damage pegs');
 check(!has(read('src/pinboard_modules.js'), /const\s+defaultLayout\s*=\s*createDefaultModuleLayout\(count,\s*defaultSlots\)/), 'pinboard normalization does not refill intentionally emptied active slots');
 check(has(read('src/ui_system.js'), /_moduleEditor_describeRuneTargets[\s\S]*槽位[\s\S]*_moduleEditor_buildRunePreviewChainHtml[\s\S]*作用位置/), 'pinboard rune fusion preview names the target module slot');
+check(has(indexHtml, /id=["']rune-pinboard-fusion-summary["']/), 'rune launcher has a pinboard fusion feedback container');
+check(has(read('src/ui/rune_launcher.js'), /_ui_updatePinboardFusionDisplay[\s\S]*_moduleEditor_collectFusionSummary[\s\S]*发射器可用线索/), 'rune launcher renders pinboard fusion hints from module editor summary');
 check(has(config, /id:\s*['"]pinboard_second_row['"][\s\S]*effect:\s*['"]module_row_unlock['"][\s\S]*targetSlots:\s*10/), 'relic database includes second-row pinboard unlock relic');
 check(!has(config, /name:\s*['"]旧/), 'relic database no longer contains relic names starting with 旧');
 

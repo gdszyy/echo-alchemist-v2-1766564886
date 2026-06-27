@@ -15,10 +15,10 @@
 | `src\game_phase.js` | 4347 | 41 | **4** | 15 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
 | `src\spawn_system.js` | 3905 | 67 | **3** | 10 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
 | `src\game_system.js` | 3574 | 62 | **4** | 7 | [src_game_system_js_index.md](src_game_system_js_index.md) |
-| `src\ui_system.js` | 3413 | 57 | **2** | 5 | [src_ui_system_js_index.md](src_ui_system_js_index.md) |
+| `src\ui_system.js` | 3416 | 57 | **2** | 5 | [src_ui_system_js_index.md](src_ui_system_js_index.md) |
 | `src\render\pixi_effect_adapter.js` | 3006 | 93 | **1** | 0 | [src_render_pixi_effect_adapter_js_index.md](src_render_pixi_effect_adapter_js_index.md) |
 | `src\config.js` | 2754 | 1 | 0 | 0 | [src_config_js_index.md](src_config_js_index.md) |
-| `src\ui\rune_launcher.js` | 2628 | 52 | 0 | 6 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
+| `src\ui\rune_launcher.js` | 2703 | 55 | 0 | 6 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
 | `src\entities\projectile.js` | 1957 | 20 | **1** | 7 | [src_entities_projectile_js_index.md](src_entities_projectile_js_index.md) |
 | `src\pinboard_modules.js` | 1685 | 77 | 0 | 0 | [src_pinboard_modules_js_index.md](src_pinboard_modules_js_index.md) |
 | `src\ui\hud.js` | 1634 | 31 | **2** | 4 | [src_ui_hud_js_index.md](src_ui_hud_js_index.md) |

@@ -359,6 +359,13 @@ for (const subsystem of _subsystems) {
 - `_moduleEditor_buildRunePreviewChainHtml()` must include a visible target-position line; the canvas overlay remains the visual source of truth for the exact peg landing points.
 - Unequipping a module intentionally leaves `currentModuleLayout[slotIdx] = null`. UI code must not call normalization paths that refill that slot with `dense_stagger`; only a newly unlocked slot may receive a starter module automatically.
 
+## 2026-06-27 Pinboard Fusion Launcher Feedback
+
+- `#rune-pinboard-fusion-summary` in the launcher configuration tab is the visible bridge from pinboard rune fusion to launcher/runeword planning.
+- `_ui_updatePinboardFusionDisplay()` must read the module editor fusion summary through `_moduleEditor_collectFusionSummary()` and render only a read-only summary: fused peg element/count, gathering impact, and related launcher runeword hints.
+- Pinboard fusion still changes gathering peg attributes only; it must not directly activate 3x3 launcher runewords or bypass `parseRuneGrid()`.
+- Module editor actions that rebuild the board after fusion, unequip, or component replacement should refresh `_ui_updatePinboardFusionDisplay()` when the launcher is visible, especially in PC sidebar mode.
+
 ## 2026-06-26 Gathering Energy Target Coordinates
 
 - Canvas effects must not use raw `getBoundingClientRect()` viewport coordinates as in-game coordinates. Convert DOM target centers through `ui_getCanvasPointForElement()` before passing them to `EnergyOrb`, particles, shockwaves, or other canvas-space visuals.

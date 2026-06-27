@@ -1,6 +1,6 @@
 # src\ui\rune_launcher.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 2628 | 函数数: 52 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 2703 | 函数数: 55 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -10,6 +10,8 @@
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
 | _ui_buildRuneIconHTML | function | `_ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '')` |  |
+| _ui_escapeHtml | function | `_ui_escapeHtml(value)` |  |
+| _ui_getStatInfo | function | `_ui_getStatInfo(key)` |  |
 | ui_openRuneLauncher | method | `ui_openRuneLauncher()` |  |
 | _ui_updateLauncherShardCount | method | `_ui_updateLauncherShardCount()` |  |
 | ui_closeRuneLauncher | method | `ui_closeRuneLauncher()` |  |
@@ -43,6 +45,7 @@
 | _ui_renderPotionCurrent | method | `_ui_renderPotionCurrent()` |  |
 | _ui_renderAlchemyNotes | method | `_ui_renderAlchemyNotes()` |  |
 | _ui_renderPotionAlchemyInventory | method | `_ui_renderPotionAlchemyInventory()` |  |
+| _ui_updatePinboardFusionDisplay | method | `_ui_updatePinboardFusionDisplay()` |  |
 | _ui_updatePotionAlchemyPreview | method | `_ui_updatePotionAlchemyPreview()` |  |
 | ui_clearPotionSelection | method | `ui_clearPotionSelection()` |  |
 | ui_confirmPotionAlchemy | method | `ui_confirmPotionAlchemy()` |  |

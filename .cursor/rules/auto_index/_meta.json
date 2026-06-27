@@ -66,7 +66,7 @@
     },
     {
       "file": "src\\ui_system.js",
-      "lines": 3413,
+      "lines": 3416,
       "funcs": 57,
       "sections": 5,
       "mega_funcs": 2,
@@ -90,8 +90,8 @@
     },
     {
       "file": "src\\ui\\rune_launcher.js",
-      "lines": 2628,
-      "funcs": 52,
+      "lines": 2703,
+      "funcs": 55,
       "sections": 6,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_ui_rune_launcher_js_index.md"

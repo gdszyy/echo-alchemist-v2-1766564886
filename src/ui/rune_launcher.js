@@ -46,6 +46,18 @@ function _ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '') {
     return `<span class="rune-icon-frame ${rarityClass} ${lvClass}${extraClass ? ' ' + extraClass : ''}">${iconContent}<span class="rune-lv-badge">${lvLabel}</span></span>`;
 }
 
+function _ui_escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;');
+}
+
+function _ui_getStatInfo(key) {
+    return STAT_DISPLAY[key] || { name: key, icon: '' };
+}
+
 /**
  * 符文发射器 UI 方法集合
  * 通过 bind(this) 组合模式作为实例方法注入到 Game 实例
@@ -540,6 +552,7 @@ export const rune_launcher_system = {
 
         // 5. 更新激活词条列表
         this._ui_updateActivatedRunewordsDisplay(activatedRunewords);
+        this._ui_updatePinboardFusionDisplay();
 
         // 6. 计算符文基础属性层数加成
         const baseStats = calcRuneBaseStats(this.runeGrid, RUNE_DB);  // [Mixin 正常用法：读取 Game 实例状态]
@@ -1540,6 +1553,67 @@ export const rune_launcher_system = {
         });
     },
 
+    /**
+     * 更新钉板符文融合摘要，让发射器配置页能看到采集侧的词条线索。
+     * 该摘要只读现有 pegStates / pegs，不改变 3x3 词条解析或采集结算。
+     * @private
+     */
+    _ui_updatePinboardFusionDisplay() {
+        const summaryEl = document.getElementById('rune-pinboard-fusion-summary');
+        const totalEl = document.getElementById('rune-pinboard-fusion-total');
+        const listEl = document.getElementById('rune-pinboard-fusion-list');
+        if (!summaryEl || !listEl) return;
+
+        const summary = (typeof this._moduleEditor_collectFusionSummary === 'function')
+            ? this._moduleEditor_collectFusionSummary()
+            : { entries: [], totalCount: 0, totalLevel: 0 };
+        const entries = Array.isArray(summary.entries) ? summary.entries : [];
+        listEl.innerHTML = '';
+
+        if (entries.length <= 0) {
+            summaryEl.classList.add('hidden');
+            if (totalEl) totalEl.textContent = '0';
+            return;
+        }
+
+        summaryEl.classList.remove('hidden');
+        if (totalEl) totalEl.textContent = `${summary.totalCount || 0} 钉 / Lv.${summary.totalLevel || 0}`;
+
+        entries.slice(0, 4).forEach(item => {
+            const statInfo = _ui_getStatInfo(item.element);
+            const runeIds = Array.isArray(item.runeIds) && item.runeIds.length > 0
+                ? item.runeIds
+                : RUNE_DB.filter(r => r.element === item.element || r.baseStat === item.element).map(r => r.id);
+            const hintNames = [];
+            runeIds.forEach(runeId => {
+                const hints = (typeof this._moduleEditor_getRunewordHintsForRune === 'function')
+                    ? this._moduleEditor_getRunewordHintsForRune(runeId, 4)
+                    : (RUNEWORD_DB || [])
+                        .filter(rw => Array.isArray(rw.pattern) && rw.pattern.includes(runeId))
+                        .slice(0, 4)
+                        .map(rw => rw.name || rw.id);
+                hints.forEach(name => {
+                    if (name && !hintNames.includes(name)) hintNames.push(name);
+                });
+            });
+
+            const card = document.createElement('div');
+            card.className = 'rune-list-card rune-list-card--pinboard';
+            const hintsText = hintNames.length > 0
+                ? `发射器可用线索：${hintNames.slice(0, 4).join(' / ')}`
+                : '暂无直接词条线索，可作为采集属性补强。';
+            card.innerHTML = `
+                <div class="rune-list-card__body">
+                    <div class="rune-list-card__title">${_ui_escapeHtml(statInfo.icon || '')} ${_ui_escapeHtml(statInfo.name || item.element)} <span class="text-xs text-cyan-300 font-normal">x${item.count || 0}</span></div>
+                    <div class="rune-list-card__meta">采集命中后写入弹药属性；3×3 词条仍在配置区激活。</div>
+                    <div class="text-[10px] text-amber-300 mt-1">${_ui_escapeHtml(hintsText)}</div>
+                </div>
+                <span class="text-cyan-300 text-xs font-bold whitespace-nowrap">Lv.${item.levelTotal || 0}</span>
+            `;
+            listEl.appendChild(card);
+        });
+    },
+
     _ui_updatePotionAlchemyPreview() {
         const preview = document.getElementById('potion-preview-card');
         const confirmBtn = document.getElementById('potion-confirm-btn');
@@ -1728,6 +1802,7 @@ export const rune_launcher_system = {
             setActive(tabManagement, false);
             setActive(tabPotion, false);
             setActive(tabCodex, false);
+            if (typeof this._ui_updatePinboardFusionDisplay === 'function') this._ui_updatePinboardFusionDisplay();
         } else if (tab === 'management') {
             if (managementPanel) managementPanel.classList.remove('hidden');
             setActive(tabLauncher, false);
