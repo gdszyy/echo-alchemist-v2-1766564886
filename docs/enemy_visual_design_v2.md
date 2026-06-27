@@ -286,6 +286,8 @@
 
 生成数量上，`2×2` 敌人同屏建议不超过 2 个，`2×3` 与 `3×2` 同屏建议不超过 1 个，`3×3` 同屏只能出现 1 个，并且应暂停其他大型基底生成。大型基底可以携带一个通用词条作为变体，但不建议在同一敌人身上叠加两个以上通用词条。
 
+2026-06-26 实现收口：基座与常规词条相性表集中在 `src/wave_presets.js` 的 `ENEMY_BASE_AFFIX_COMPATIBILITY`。大型基底默认最多保留 1 个相性允许的通用 Overlay；例如 `bastion/heavyArmor` 可以叠 `shield`，但不能叠 `haste`、`jump`、`clone`、`healer`。新增基座形体或专属词条时，必须同步补 `normalizeEnemyAffixesForArchetype()` 的规则、预设静态校验和运行时生成校验。
+
 ## 9. 推荐落地顺序
 
 第一步应先把现有 `heavyArmor` 与 `devour` 从“普通词条视觉”提升为“基底专属词条视觉”。其中 `heavyArmor` 已经接近完成，只需要补充正式的 `3×1` 视觉规范、碰撞边界和图鉴说明；`devour` 则应从单格词条升级为默认 `2×2` 深渊胃囊，并调整 `food_chain` 阵型中的吞噬核心尺寸。

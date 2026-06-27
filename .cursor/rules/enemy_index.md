@@ -18,7 +18,31 @@
 | `prism` | 折光棱柱 | prism | 1×3 | R16 | 不限 |
 | `hive` | 孵化巢 | hive | 2×3 | R18 | ≤ 1 |
 | `siege` | 攻城履带 | siege | 3×2 | R22 | ≤ 1 |
+| `carrier` | 铸巢母架 | carrier | 3×2 | R28 | ≤ 1 |
 | `gravityWell` | 引力炉心 | gravityWell | 3×3 | R30 | ≤ 1（出现时跳过其他大型基底） |
+
+### 0.1 基座 / 常规词条相性契约（2026-06-26）
+
+基座专属词条的唯一权威表在 `src/wave_presets.js`：
+
+- `ENEMY_BASE_EXCLUSIVE_AFFIXES`：从 `ENEMY_WAVE_PRESET_ARCHETYPES[*].affix` 自动收集，禁止进入 `spawn_generateAffixes()` 的普通随机池。
+- `ENEMY_BASE_AFFIX_COMPATIBILITY`：每个基座的 `requiredAffixes`、`allowedExtraAffixes`、`blockedAffixes`、`maxExtraAffixes` 相性表。
+- `normalizeEnemyAffixesForArchetype(archetype, affixes)`：预设波次、随机大型基座、Boss 入场冲击波命中已有基座时必须调用的规范化入口。
+- `filterRandomEnemyAffixWeights(weights)`：普通随机词条权重过滤入口；即使 `AFFIX_WEIGHT_CURVES` 保留历史权重，也不会让基座专属词条随机落到 1×1 精英身上。
+
+当前原则：基座词条决定“身体与主机制”，普通词条只能作为一个可读的轻量 Overlay。大型基座默认最多叠 1 个相性允许的常规词条；`bastion/heavyArmor` 可叠 `shield`、`regen`、`berserk` 等防御/压迫类词条，但必须剔除 `haste`、`jump`、`clone`、`healer` 等会破坏“重型慢速横梁”身份的词条。
+
+| 基座 | 必带词条 | 允许的常规叠加方向 | 必须排斥的核心冲突 |
+|---|---|---|---|
+| `bastion` | `heavyArmor` | 防御、再生、低伤免疫、撞城 | `haste` / `jump` / `clone` / `healer` |
+| `maw` | `devour` | 护盾、再生、少量分裂、相位防护 | 高机动、治疗者、狂暴、反弹壳 |
+| `deflector` | `deflectionWard` | 护盾、再生、蓄能/相位防御 | 高机动、分裂、治疗、狂暴 |
+| `echoSpire` | `echoRelay` | 护盾、再生、治疗中继 | 高机动、分裂、狂暴、攻城 |
+| `prism` | `prism` | 护盾、再生、蓄能/相位防御 | 高机动、分裂、治疗、狂暴 |
+| `hive` | `hive` | 护盾、再生、治疗、活甲/孢子 | 高机动、分裂、狂暴、攻城 |
+| `siege` | `siege` | 护盾、狂暴、活甲、过载、撞城 | `haste` / `jump` / `clone` / `healer` / `regen` |
+| `carrier` | `carrier` | 防御、再生、活甲、相位防护 | 高机动、分裂、治疗、狂暴、过载 |
+| `gravityWell` | `gravityWell` | 护盾、再生、流彩/蓄能/相位防御 | 高机动、分裂、治疗、狂暴、攻城 |
 
 ### V2 词条行为速查
 
@@ -222,7 +246,7 @@
 |---|---|---|---|---|---|---|
 | `viridis` | 翠绿共生体·维里迪斯 | **R33** | 进阶测试段（regen+healer+孢甲） | regen + healer + livingArmor + armorSpore | pyro、venom | 专属孢子侍体和治疗会累积 `viridisSporeBloom`，达到阈值为自身/侍体补活体护甲；火焰/毒素会蚀甲并削资源；狂暴后自疗并加速孢甲循环 |
 | `tesla` | 雷霆幻影·特斯拉 | **R40** | 速度地狱段（haste+clone） | haste + clone | cryo、bounce | 每回合电击敌人转为导体；导体越多场强越高，场强提升行动与召唤压力 |
-| `chimera` | 混沌融合体·奇美拉 | **R47** | 混沌段（berserk+devour） | berserk + devour | venom、laser | 每回合随机吞噬 1 名敌人并召唤 +100°C / -100°C 热核养料；吞噬温度转热/寒层，冷热抵消生成流彩护盾；狂暴吸收层数翻倍 |
+| `chimera` | 混沌融合体·奇美拉 | **R47** | 混沌段（热核吞噬） | devour | venom、laser | 每回合先吞噬两个目标，左侧倾向低温、右侧倾向高温；吞噬结算后生成 2-3 名不带 berserk 的热核养料，左侧低温、右侧高温；吞噬温度按绝对值一比一转热核/冰核，冷热抵消 100% 生成流彩护盾，狂暴后护盾量翻倍 |
 | `ouroboros` | 永恒回声·奥罗波罗斯 | **R54** | 终极考验段（六附体轮转） | 六附体（见下） | 动态六组 | 六个附体槽每回合转位，当前前位附体授予 Boss 词缀与主机制；打满当前破绽会封印该附体并跳到下一个可用槽 |
 
 ### 3.3 奥罗波罗斯词缀轮转规则
@@ -279,7 +303,7 @@
 | `bossOwnerId` | 该敌人归属的 Boss ID，如 `ignis` / `tesla` / `chimera` |
 | `bossMinionRole` | 机制角色，如 `furnace_guard`、`conductor`、`chaos_feed` |
 | `bossMechanicTags` | 后续 Boss 机制识别用标签，如 `furnacePressure`、`teslaConductor`、`chaosFeed`、`thermalFeed` |
-| `affixes` | 该 Boss 专属敌人的词缀画像；Ignis 当前为 `shield + radiantAegis`，Mikro 当前为 `clone + healer`（`fission_cell`，计入母体分裂减伤），Devourer 当前为 `devour + shield`（`maw_thrall`，会被深渊胃域拉拽/吞噬），Viridis 当前为 `regen + healer + armorSpore`（孢子侍体），Tesla 当前为 `clone`（被电击或 lightning 命中后临时获得 `haste`），Chimera 当前为 `berserk`（`chaos_feed` / `thermalFeed`，召唤时带 +100°C 或 -100°C），Ouroboros 当前为 `shield + haste + regen`（轨道回声） |
+| `affixes` | 该 Boss 专属敌人的词缀画像；Ignis 当前为 `shield + radiantAegis`，Mikro 当前为 `clone + healer`（`fission_cell`，计入母体分裂减伤），Devourer 当前为 `devour + shield`（`maw_thrall`，会被深渊胃域拉拽/吞噬），Viridis 当前为 `regen + healer + armorSpore`（孢子侍体），Tesla 当前为 `clone`（被电击或 lightning 命中后临时获得 `haste`），Chimera 当前为无额外词缀（`chaos_feed` / `thermalFeed`，召唤时左侧低温、右侧高温），Ouroboros 当前为 `shield + haste + regen`（轨道回声） |
 
 强化分支也会写入 `bossOwnerId`，但 `bossMinionRole` 使用 `boss_empowered`，用于区分“完全转化的专属敌人”和“被冲击波强化的普通敌人”。这些字段已进入 `sys_saveRunState()` / `sys_loadRunState()`。
 
@@ -326,18 +350,18 @@ Viridis 不再只是高血量治疗 Boss，而是围绕 `livingArmor` / `armorSp
 
 ### 3.9 Devourer / Chimera 吞噬机制互换（2026-06-24）
 
-Devourer 接管“胃域拉拽 + 养料循环”的深渊语义；Chimera 改为围绕温度层和流彩护盾的热核循环：
+Devourer 接管“胃域拉拽 + 养料循环”的深渊语义；Chimera 改为围绕温度核心和流彩护盾的热核循环：
 
 | Boss | 规则 | 行为 |
 |---|---|---|
 | Devourer | 深渊胃域 | `_tickDevourerMawField(game)` 在正常行动前拉拽胃域内非 Boss 敌人，并按 `devourerSummonInterval` 召唤 `maw_thrall` 养料 |
 | Devourer | 胃域吞噬 | `_selectTurnIntent()` 预告 `devourer_maw`；执行时 `_devourerDevourTargets()` 吞噬胃域内所有非 Boss 目标，按 `devourerDigestShieldPerFeed` 和被吞护盾层数转为自身护盾 |
 | Devourer | 狂暴 | `berserkedDevourRange = 99` 让胃域候选扩为全屏；消化冷却使用 `devourerBerserkDigestInterval` |
-| Chimera | 随机热核吞噬 | `_selectTurnIntent()` 预告 `chimera_thermal_devour`；执行时 `_chimeraDevourTargets()` 随机吞噬 1 名非 Boss 敌人，不再拉拽或继承毒、冻结、相位失效等负面状态 |
-| Chimera | 温度层 | 被吞目标温度绝对值达到 `chimeraThermalAbsorbMinTemp` 后，按 `chimeraThermalStackUnit = 100` 转为热层或寒层；狂暴时本次获得层数 ×2 |
-| Chimera | 流彩护盾 | 热层和寒层互相抵消，抵消层数写入 `chimeraRadiantConversions`，并通过 `_grantRadiantAegisPulse(..., rearmBroken: true)` 转为流彩护盾 |
-| Chimera | 热核养料 | 每次成功吞噬后 `_chimeraSpawnFeeders()` 召唤 1 个 `bossOwnerId='chimera'` / `bossMinionRole='chaos_feed'` / `bossMechanicTags=['chaosFeed','thermalFeed']` 的专属敌人，温度随机为 +100°C 或 -100°C |
-| 视觉 | 状态提示 | Devourer 显示深渊胃域和 `噬N`；Chimera 显示热/寒/流状态短标签与热核反应环；Glacies 霜缝目标显示 `霜缝N-减伤%` 并在身体上绘制冰框与减伤字样 |
+| Chimera | 每回合热核吞噬 | `_selectTurnIntent()` 预告 `chimera_thermal_devour`；执行时 `_chimeraDevourTargets()` 默认吞噬 2 名目标，左侧候选倾向低温、右侧候选倾向高温，不再拉拽或继承毒、冻结、相位失效等负面状态；`chimeraDigestInterval = 1`，旧存档残留冷却会在奇美拉回合 tick 中归零 |
+| Chimera | 温度核心 | 被吞目标温度绝对值达到 `chimeraThermalAbsorbMinTemp` 后，按 `chimeraThermalStackUnit = 1` 一比一转为热核或冰核；`boss.berserked` 不翻倍核心层数，只翻倍最终护盾输出 |
+| Chimera | 核心转盾 | 热核和冰核互相抵消，抵消层数写入兼容字段 `chimeraRadiantConversions`，并通过 `_grantChimeraRadiantShield()` 100% 转为相同数值的 `radiantAegis` 流彩护盾；狂暴阶段乘以 `chimeraBerserkShieldMult = 2` |
+| Chimera | 热核养料 | `_tickChimeraMawField(game, { summon: false })` 在回合入口只维护旧冷却；正常动作结算后由 `_chimeraSummonFeedersForTurn()` 调用 `_chimeraSpawnFeeders()` 召唤 2-3 个 `bossOwnerId='chimera'` / `bossMinionRole='chaos_feed'` / `bossMechanicTags=['chaosFeed','thermalFeed']` 的专属敌人，左侧温度为 `chimeraLeftFeedTemp=-100`，右侧为 `chimeraRightFeedTemp=100`，且不携带 `berserk` |
+| 视觉 | 状态提示 | Devourer 显示深渊胃域和 `噬N`；Chimera 显示热核/冰核/流彩转盾状态短标签与热核反应环；Glacies 霜缝目标显示 `霜缝N-减伤%` 并在身体上绘制冰框与减伤字样 |
 
 ### 3.10 Ouroboros 六附体轮转（2026-06-23）
 
@@ -373,7 +397,7 @@ Ouroboros 的终局语义从“三组词缀轮换”升级为六个附体槽位�
 > - **修正前**：`spawn_scheduleNextBoss` 使用随机间隔（7~9 回合），导致 Boss 出场回合不可预测，无法与主题段落精确对齐。
 > - **修正后**：改为直接读取 `ENEMY_CURVE_CONFIG.THEME_SEGMENTS[n].endRound` 作为固定出场回合，实现与八大主题段落的严格对齐。
 > - **isBigBoss 修正**：阈值从 `>= 3` 改为 `>= 4`，确保 Devourer（第4个）正确识别为 Mini-Boss。
-> - **BOSS_DB 修正**：chimera 的 `affixes` 补充 `berserk`，与 `bossConfigs` 保持一致。
+> - **BOSS_DB 修正**：chimera 的 `affixes` 已移除 `berserk`，与当前热核养料不带狂暴词条的配置保持一致。
 
 | 参数 | 值 | 说明 |
 |---|---|---|
@@ -447,14 +471,14 @@ finalHP = max(
 | `boss.teslaFieldPower` | number | tesla 专用：导体网络当前场强 |
 | `boss._teslaSummonCharge` | number | tesla 专用：场强累积召唤进度 |
 | `enemy._teslaChargedTurns` | number | tesla 导体专用：临时 haste / 充能剩余回合 |
-| `boss._berserkedBlastOnHitChance` | number | chimera 兼容旧狂暴爆炸字段；当前核心机制以热核吞噬 / 流彩护盾为主 |
+| `boss._berserkedBlastOnHitChance` | number | chimera 旧狂暴爆炸字段已停用；当前核心机制以热核吞噬 / 流彩护盾转化为主 |
 | `boss.chimeraFeedStacks` | number | chimera 专用：已吞噬目标累计数 |
 | `boss.chimeraInheritedStatusCount` | number | chimera 专用：温度层吸收累计显示兼容字段，不再表示继承负面状态 |
-| `boss.chimeraHeatStacks` | number | chimera 专用：未抵消热层 |
-| `boss.chimeraFrostStacks` | number | chimera 专用：未抵消寒层 |
-| `boss.chimeraRadiantConversions` | number | chimera 专用：冷热抵消并转为流彩护盾的累计层数 |
-| `boss._chimeraDigestCooldown` | number | chimera 专用：热核吞噬冷却 |
-| `boss._chimeraSummonCooldown` | number | chimera 兼容字段；当前热核养料随成功吞噬即时召唤 |
+| `boss.chimeraHeatStacks` | number | chimera 专用：未抵消热核层数 |
+| `boss.chimeraFrostStacks` | number | chimera 专用：未抵消冰核层数 |
+| `boss.chimeraRadiantConversions` | number | chimera 专用：冷热抵消并转为流彩护盾的累计数值（字段名保留用于存档兼容） |
+| `boss._chimeraDigestCooldown` | number | chimera 专用：热核吞噬冷却；当前配置为每回合可用 |
+| `boss._chimeraSummonCooldown` | number | chimera 兼容字段；当前热核养料由正常动作结算后的 `_chimeraSummonFeedersForTurn()` 统一召唤 |
 | `boss._berserkedRotation` | boolean | ouroboros 专用：每回合轮转标志 |
 | `boss.ouroborosOrbitStates` | Array | ouroboros 专用：六附体槽状态，记录封印回合与被打断次数 |
 | `boss.ouroborosOrbitDisruptions` | number | ouroboros 专用：累计打断附体次数，状态短标签显示为 `断N` |
@@ -485,6 +509,12 @@ finalHP = max(
 - Boss 狂暴触发阈值统一为 `CONFIG.balance.bossEnrageHpRatio = 0.2`，即 20% HP；`combat_checkBossPhaseChange()`、狂暴符文掉落和破绽延后狂暴均读取该配置。
 - `ignis`：`moveInterval` 从 2 调整为 3，`hpMult = 1.08`，通过 `spawn_spawnBoss()` 乘入生成血量。
 - `glacies`：`regenPercentOverride = 0.12`，Boss 专属 regen 覆盖普通 `CONFIG.balance.affixes.regenPercent = 0.2`；`frostSeam*` 参数控制战斗场霜缝目标数、持续、减伤、回血与 cryo / pierce 反制。
+
+## 2026-06-26 Boss 移动节奏
+
+- 所有 Boss 移动都走 `_moveInterval` / `_moveCooldown`，狂暴阶段不再绕过冷却强制每回合位移。
+- 当前 `moveInterval` 分布：`ignis/devourer/tesla = 3`，`glacies/mikro/viridis/chimera/ouroboros = 4`；运行时最低兜底为 2。
+- Boss 携带 `haste` 时只保留机制与行动频率语义，不追加同回合二段位移，避免慢速 Boss 被词缀打破节奏。
 ## 附：导演剧本调度提示
 
 V2 preset 不再只按 `roundRange` 和权重抽取；所有 preset 均需通过 `DIRECTOR_SCRIPTS` 的 `scriptId` / `beatId` 调度，并受剧本冷却与陌生演员预算限制。修改 preset、专属词条首演回合或导演权重时，需同步阅读 [`director_system.md`](director_system.md)。

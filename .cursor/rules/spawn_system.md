@@ -328,6 +328,14 @@ core.js: _setupEventListeners()
 | `berserk` | r >= 14 | `r * 3`（无上限，后期极危险） |
 | `radiantAegis` | r >= 20 | R20-R26: 12，R27-R33: 18，R34-R40: 22，R41-R47: 30，R48+: 35；随机精英获得半值版流彩护盾 |
 
+### 7.2.1 基座专属词条与相性过滤
+
+`spawn_generateAffixes()` 只负责普通 1×1 精英词条。生成权重必须先经过 `filterRandomEnemyAffixWeights(interpolateAffixWeights(...))`，从随机池中移除 `ENEMY_BASE_EXCLUSIVE_AFFIXES`，避免 `heavyArmor`、`devour`、`deflectionWard`、`echoRelay`、`prism`、`hive`、`siege`、`carrier`、`gravityWell` 作为普通词条落到非基座敌人身上。
+
+大型基座词条由 `spawn_trySpawnWavePreset()` / `spawn_trySpawnArchetypes()` 显式注入；所有非 `normal` slot 在实例化后必须调用 `normalizeEnemyAffixesForArchetype(slot.archetype, e.affixes)`。Boss 入场冲击波如果命中已有 `baseArchetype` 敌人，追加或覆盖词条前也必须走同一规范化入口。
+
+维护原则：基座词条定义身体和主机制，普通词条只能作为少量 Overlay。典型例子是 `bastion + heavyArmor` 可以保留 `shield`，但必须剔除 `haste`、`jump`、`clone`、`healer` 等破坏重型慢速身份的词条。新增基座时必须同步补齐 `ENEMY_BASE_AFFIX_COMPATIBILITY`、`tests/validate_wave_presets.mjs` 和 `tests/validate_enemy_spawn_runtime.mjs`。
+
 ### 7.3 符文奖励词条的投放边界
 
 `runeBearer` 与 `adaptiveRune` 是奖励 / 构筑词条，不是普通难度词条。首版机制、占位资产、试炼场验证已接入，但仍不得把它们加入 `spawn_generateAffixes()` 的随机权重池，也不得通过 `forceAffixes` 在导演模板中批量投放。后续开放应由导演系统用显式模板或奖励事件少量投放，并配套收益频率上限。
@@ -354,3 +362,4 @@ core.js: _setupEventListeners()
 
 - 普通 Peg 的额外二次反馈应传入 `{ secondary: true }`，避免多颗能量球抢占弹珠本体。
 - 新增高亮事件时，优先通过 options 调整现有 `EnergyOrb`，不要在 `spawn_createHitFeedback()` 内新增未受控粒子或冲击波。
+- 多弹珠同时研磨时，必须从 `options.session.marbleIndex` 定位对应 `.gathering-ammo-panel[data-marble-index]`，再通过 `ui_getCanvasPointForElement()` 转成 canvas 坐标作为 `EnergyOrb` 终点。禁止把 `getBoundingClientRect()` 的视口坐标直接传给 canvas 特效，否则 PC 侧栏 / 居中缩放 / 面板隐藏时会出现能量飞向左上角或错误面板。

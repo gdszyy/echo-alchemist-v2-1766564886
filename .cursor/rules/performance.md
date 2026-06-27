@@ -16,7 +16,7 @@ Echo Alchemist V2 以 Canvas 2D API 渲染，在中低端手机上粒子特效�
 | 排名 | 瓶颈来源 | 每帧开销原因 | 涉及文件 |
 |------|---------|------------|---------|
 | 1 | **粒子系统**（`mist`/`ember`/`shard`） | `createRadialGradient` + `shadowBlur` + `lighter`/`screen` 混合；全局上限 800 | `src/effects/particles.js`、`src/spawn_system.js` |
-| 2 | **特效对象**（`Shockwave`/`FireWave`/`LightningBolt`/`HealWave`） | 多层 `shadowBlur` + `lighter` 叠加，无原始数量上限 | `src/effects/particles.js`、`src/combat_system.js`、`src/combat/damage_calc.js`、`src/spawn_system.js` |
+| 2 | **特效对象**（`Shockwave`/`ImpactBlastWave`/`AssimilationPulseWave`/`FireWave`/`LightningBolt`/`HealWave`） | 多层 `shadowBlur` + `lighter` 叠加，无原始数量上限 | `src/effects/particles.js`、`src/combat_system.js`、`src/combat/damage_calc.js`、`src/spawn_system.js` |
 | 3 | **Peg 软阴影 + 底部光晕** | 每帧对约 50 个 Peg 各执行 `createRadialGradient`（光晕）+ `ellipse`（阴影） | `src/entities.js`（`Peg.draw`） |
 | 3a | **高密度模块化钉盘** | 细钉/小弹珠会提高可见 Peg 数量；必须继续依赖 `pegSoftShadow` / `pegGlowHalo` 在 medium/low 档关闭高开销层 | `src/pinboard_modules.js`、`src/game_phase.js`、`src/entities.js` |
 | 4 | **敌人材质光泽** | `OffscreenCanvas` 上 `LinearGradient` 叠加，敌人构造时执行 | `src/entities/enemy.js`（`Enemy._initTexture`） |
@@ -128,9 +128,15 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | `spawn_createParticle(x, y, color, type)` | `maxParticles` / `windLimit` / `emberLimit` / `mistLimit` / `shardLimit` / `sparkLimit` / `smokeLimit` / `venomLimit` | 按粒子类型查询对应上限，超限时跳过创建 |
 | `spawn_pushParticleWithLimit(particle)` | `maxParticles` / `sparkLimit` / `smokeLimit` / `venomLimit` | 通用粒子与短生命周期 Slash/PierceCutEffect 推入前检查全局上限及 spark/smoke/venom 独立限制 |
-| `spawn_createExplosion(x, y, color)` | `maxParticles` / `sparkLimit` / `smokeLimit` / `perfQualityLevel` | 泛用爆点改为定向 spark + 少量 smoke；low 档减少粒子且不加额外范围波 |
-| `spawn_createShockwave(x, y, color)` | `shockwaveLimit` | 超限时跳过创建 |
-| `spawn_createHealWave(x, y, range)` | `waveLimit` | 超限时跳过创建 |
+| `spawn_createProjectileExplosion(x, y, theme, opts)` | `shockwaveLimit` / `maxParticles` / `sparkLimit` / `shardLimit` / `smokeLimit` | 子弹/爆破钩钉专用：创建 `ImpactBlastWave` 全圆伤害半径动态扩散 + 减速外飞弹片 + 轻量方向余波 + 弹片/烟尘粒子；不再复用通用圆形扩散 |
+| `spawn_createExplosionHitGust(target, originX, originY, opts)` | `maxParticles` / `sparkLimit` / `emberLimit` | 爆炸伤害命中敌人时的红色吹拂反馈；按 `high/medium/low` 缩放每目标短命 spark/ember 数量 |
+| `spawn_createExplosion(x, y, color)` | 同 `spawn_createProjectileExplosion` | 旧兼容入口；新代码应选择具体语义入口 |
+| `spawn_createImpactWave(x, y, color, opts)` | `shockwaveLimit` | `ImpactBlastWave` 专用，超限时跳过创建 |
+| `spawn_createAssimilationPulse(x, y, color, opts)` / `spawn_createAssimilationWave(...)` | `shockwaveLimit` / `maxParticles` / `mistLimit` / `sparkLimit` / `emberLimit` | 弹珠同化/突变专用铭刻脉冲；表现为能量收束和属性烙印，不再叠加通用 Shockwave |
+| `spawn_createSkillIgnition(x, y, color, opts)` | `shockwaveLimit` / `maxParticles` / `mistLimit` / `sparkLimit` / `emberLimit` | 主动技能、解冻反馈和 ammo buff 的通用点火反馈；`opts.intensity/radius/withShockwave` 只缩放既有粒子和冲击波，不新增预算字段 |
+| `spawn_createShockwave(x, y, color)` | `shockwaveLimit` | 保留为泛用冲击波，超限时跳过创建 |
+| `phase_playThawFeedback()` → `spawn_createSkillIgnition(..., { skillType: 'thaw' })` | `shockwaveLimit` / `maxParticles` / `mistLimit` / `sparkLimit` / `emberLimit`（经既有入口间接读取） | 敌人回合扫描波检测到刚解冻时触发一次；复用 skill ignition 三档降级，low 档只保留少量 spark，不新增预算字段 |
+| `spawn_createHealWave(x, y, range)` | `waveLimit` | 范围治疗专用铰点外翻软花瓣治疗波，超限时跳过创建；不再额外叠粉色通用 Shockwave |
 | `spawn_createGreedyWheelEffect(x, y, mode)` | `greedyWheelEffectLimit` | 贪婪轮盘链式发射演出超限时跳过创建；low 档使用平面描边 |
 
 ### 5.2 战斗系统（`src/combat_system.js`）
@@ -143,6 +149,8 @@ if avgFps > fpsThresholdUp (55):
 | 静电场词条（约第 1802 行） | `lightningLimit` | 超限时跳过 LightningBolt 创建 |
 | 毒素命中粒子爆发（约第 1739 行） | `venomLimit`（经 spawn_createParticle 间接读取） | 叠加毒层时在命中点发射 1~4 颗毒液粒子 |
 | 穿透命中切割反馈 | `perfQualityLevel` / `maxParticles` / `sparkLimit`（经 spawn_pushParticleWithLimit / spawn_createParticle 间接读取） | 按弹丸速度方向绘制 PierceCutEffect 切割裂口；low 档减少碎屑并关闭高亮阴影 |
+| 主动技能释放/命中反馈 | `perfQualityLevel` / `shockwaveLimit` / `maxParticles` / `mistLimit` / `sparkLimit` / `emberLimit` | `combat_playSkillCastVFX()` 区分默认与高价值技能；`combat_playSkillImpactVFX()` 按画质截断目标数量。全部复用 `spawn_createSkillIgnition()` 与 `spawn_createAssimilationWave()`，不新增常驻对象 |
+| 法术形态表现入口 | `perfQualityLevel` / `maxParticles` / `sparkLimit` / `mistLimit` / `shardLimit` / `emberLimit` / `shockwaveLimit` / `lightningLimit` | `combat_playSpellFormVFX()` 仅负责视觉表现；`bottle` 复用药瓶 helper，`orb`/`mine`/`orbit`/`slash`/`beam`/`meteor`/`sweeping_laser`/`tower` 复用短生命周期 Slash/Pierce/Laser 与既有同化波、脉冲和粒子预算，不新增 `CONFIG.performance` 字段 |
 | 爆炸视觉击退 `combat_applyExplosionKnockback()` | 无新增预算字段 | 爆破弹药、过热爆炸、殒命爆裂触发时遍历存活敌人，写入 `Enemy` 绘制偏移并阻尼回弹；不改变碰撞/占位/粒子数量 |
 | 死亡特效 `_triggerDeathFX`（IceWave 创建） | `iceWaveLimit` | 冰冻死亡冰波环超限时跳过创建 |
 | 死亡特效 `_triggerDeathFX`（DeathExplosion 创建） | `deathExplosionLimit` | 精英/普通死亡特效超限时跳过；精英为紫晶裂解而非光圈扩散；Boss 死亡不受限（稀有且重要） |
@@ -201,6 +209,7 @@ if avgFps > fpsThresholdUp (55):
 |------|---------|------|
 | `radiantAegis` 内部护罩纹理（Layer 3.5） | `perfQualityLevel` | `high`：3 层流彩菱环 + 节点 + `screen` 混合；`medium`：2 层菱环、无节点；`low`：平面描边，关闭 `screen` 混合与 `_sb()` 阴影，仍保留词条身份 |
 | `radiantAegis` 命中/破盾反馈 | `perfQualityLevel` + 既有粒子/冲击波预算 | 破盾只通过 `spawn_createParticle(..., 'shard')` 和 `spawn_createShockwave()` 复用 `shardLimit` / `shockwaveLimit`；没有新增粒子类型或 `CONFIG.performance` 字段 |
+| `radiantAegis` 扩盾授予目标反馈 | `perfQualityLevel` | 满层扩盾时目标侧绘制来源方向的流彩细线与普通护盾成形描边，避免误读为目标自身流彩挡伤；`high/medium` 使用一次短线性渐变与 `_sb()` 门控发光，`low` 保留平面线条。不新增粒子、持久对象或 `CONFIG.performance` 字段 |
 | 防御层方向化挡伤反馈（`shield` / `phaseShield` / `deflectionWard` / `radiantAegis` / `energyArmor` / `livingArmor` / `lowDamageImmune`） | `perfQualityLevel` | 有弹道来源时绘制入射侧短生命周期能量弧幕、层叠波前和压缩纹，无来源属性结算走正面椭圆护面与内部折射波；`phaseShield` 使用错相断续波前，`livingArmor` 在弧幕内叠加黄绿脉络/甲结并在破裂时追加同方向分叉裂线，`lowDamageImmune` 使用硬壳压痕；`high/medium` 允许 `_sb()` 门控发光，并为每次方向化挡伤创建 1 次沿入射侧推进的 `createLinearGradient` 叠层；`low` 关闭发光、跳过该渐变并降低 `rayCount`、脉络线与甲结数量；不新增粒子、持久对象或 `CONFIG.performance` 字段 |
 
 ### 5.5.5 Boss 破绽身体 Overlay（`src/entities/enemy.js` → `Enemy._drawBossVulnerabilityOverlay`）
@@ -261,6 +270,8 @@ if avgFps > fpsThresholdUp (55):
 | 平面预告（`enemyTelegraphGlow === false`，即 low 档） | `enemyTelegraphGlow` | 保留面板、图标、短标签和倒计时环，关闭 `shadowBlur`；无粒子、无渐变、无混合模式 |
 
 > **注意**：`telegraphIntent` 在 `Enemy.startTurnAction()` 中一次性计算，渲染层只读取结果，不在 `draw()` 中扫描敌人列表或重新判定行为。
+
+> 2026-06-25 更新：行动预告面板现使用缓存的 `ENEMY_AFFIX_ICON_MAP` 位图，配合静态 Canvas 倒计时环、威胁刻度和指向箭头。`high/medium` 继续复用既有 `enemyTelegraphGlow` 阴影门控；`low` 保留位图、标签、进度环与刻度但关闭 `shadowBlur`。本轮不新增粒子、渐变、混合模式、持久渲染对象或 `CONFIG.performance` 字段。
 
 ### 5.11 PixiJS WebGL 渲染层（`src/render/pixi_bridge.js` + `src/render/pixi_effect_adapter.js`）
 
@@ -350,6 +361,7 @@ if avgFps > fpsThresholdUp (55):
 |------|------|
 | 2026-06-25 | **PixiJS 渲染管线迁移（阶段一+二+三+T2.7）**：粒子系统（8 种模式含 wind_slash/line）和 17 种特效对象迁移至 PixiJS WebGL。新增 `src/render/pixi_bridge.js`（PixiJS Application 生命周期、18 张预烘焙纹理、8 个 ParticleContainer、Sprite 对象池）和 `src/render/pixi_effect_adapter.js`（17 组适配器函数）。粒子通过 `ParticleContainer` GPU 批渲染，特效通过 `PIXI.Graphics` 3-pass 辉光 + 预烘焙纹理 Sprite。`CONFIG.performance` 三档预算继续生效。Canvas 2D fallback 完整保留。详见第 2 节迁移状态说明、第 5.11 节消费端索引和第 6.5 节修改指南。 |
 | 2026-06-25 | **开炮视觉特效增强（4 阶段）**：基于 PixiJS WebGL 管线全面升级开炮与弹道视觉。（A）枪口火光 V2：`MuzzleFlashV2` 类（核心光球 + 方向光锥 + 火星粒子 + 冷却热辉）+ 3 张预烘焙纹理（muzzleCore/muzzleFlare/muzzleSpark）。`pixi_effect_adapter.js` 新增适配器。三档：high 完整 13 火星/medium 简化 6 火星/low 关闭。（B）拖尾 V2：`projectile.js` 新增 `_drawTrailV2()` 用 Sprite GPU 批渲染替代 Canvas 2D 逐段 stroke，新增 `trail` 粒子纹理（64×16 高斯渐变）和 ParticleContainer。速度动态宽度 + 开幕齐射金色 tint。三档：high 22 段/medium 14 段 80%宽/low 关闭回退 Canvas 2D。（C）开炮冲击波 + 屏幕震动 + 边缘闪光：`FiringBurst` 类（径向冲击环 + 方向锥 + 碎片粒子），震动/闪光反馈独立于 PixiJS 始终生效。三档：high 10 碎片/medium 5/low 关闭视觉保留震动。（D）弹道光照：`projectile.js` 新增 `_syncBulletGlow()` 每子弹 1 个 ADD 混合 Sprite 低透明度环境光 + 元素 tint + 命中 6 帧脉冲。新增 `bulletGlow` 纹理（128×128 径向渐变）。三档：high 128px + 命中闪光/medium 96px 无闪光/low 关闭。新增 CONFIG.performance 字段：muzzleFlashV2/muzzleFlashV2Sparks/firingBurst/firingBurstDebris/firingScreenShake/firingScreenFlash/trailV2/trailV2MaxSegments/trailV2WidthMult/trailV2SpeedDynamic/trailV2OpeningSalvo/bulletGlow/bulletGlowScale/bulletGlowHitFlash。预烘焙纹理从 18 → 23 张，ParticleContainer 从 8 → 9 个。修改文件：`pixi_bridge.js`、`pixi_effect_adapter.js`、`particles.js`、`projectile.js`、`render_system.js`、`entities.js`、`config.js`。Canvas 2D fallback 完整保留。 |
+| 2026-06-25 | **爆炸/扩散语义拆分**：新增 `ImpactBlastWave` 与 `AssimilationPulseWave` 两个 `Shockwave` 语义子类，并新增 `spawn_createProjectileExplosion()`、`spawn_createImpactWave()`、`spawn_createAssimilationWave()`。子弹爆炸改为前向冲击 + 弹片；弹珠同化/突变改为收束铭刻脉冲；范围治疗移除额外粉色通用 Shockwave，仅保留重做后的 `HealWave` 铰点外翻软花瓣效果（根部固定、错峰绽放、治疗花粉）。PixiJS 分支禁用 HealWave 专属 `healGlow` 中心 Sprite，改用 Graphics 柔光圆，并移除花瓣脉络线，避免实机 ADD 叠加下出现绿色横向亮线；low 档仍均匀抽样但强制粉绿混色，避免半朵/单色花。未新增 `CONFIG.performance` 字段：两种语义波继续复用 `shockwaveLimit`，治疗复用 `waveLimit`，粒子复用既有分类上限；Canvas 2D fallback 与 PixiJS 分支均已同步。 |
 | 2026-06-23 | **爆炸视觉击退**：`Enemy` 新增 `_blastOffsetX/Y` 视觉偏移与阻尼回弹，`combat_applyExplosionKnockback()` 在爆破弹药、过热爆炸、殒命爆裂触发时按距离衰减写入偏移（普通/精英/Boss 分级压低幅度）。该效果只影响 `draw()` transform，不改变 `pos`、碰撞、格子占位或伤害半径；未新增 `CONFIG.performance` 字段，开销为爆炸瞬间一次存活敌人遍历。 |
 | 2026-06-23 | **爆炸类特效视觉重做**：穿透命中从旧 `spawn_createShockwave()` 光圈改为按弹丸速度方向绘制 `PierceCutEffect` 切割裂口，并只追加 1-3 个定向 `spark`；精英 DeathExplosion 去掉紫色光圈/虚空圆，改为紫晶裂隙与棱片碎落；`Shockwave` 与 `FireWave` 改为分段冲击边、热纹和短放射线。未新增 `CONFIG.performance` 字段：切割类走 `spawn_pushParticleWithLimit()` 的 `maxParticles`，碎屑走 `sparkLimit/shardLimit/smokeLimit`，范围波继续走 `shockwaveLimit/waveLimit`；`low` 档关闭高亮阴影并减少碎屑/放射线。 |
 | 2026-06-23 | **Boss 物理轮廓收口**：Mikro 与 Devourer 从环形/缺口 arc 语义改为实体 polygon，只有 Ouroboros 保留完整闭合环形 arc 以承载 6 个附体槽。Devourer Layer 6.5 继续复用既有 `arcBossVfx*` 三档门控和 sparkLimit，Ouroboros 轮转锚点只改变视觉指示，不新增粒子、渐变预算、混合模式或 `CONFIG.performance` 字段。 |
@@ -359,6 +371,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-19 | **默认钉盘回归纯交错钉板**：默认前两行由 10 个 `dense_stagger` 1x1 模块组成，120 个普通圆钉、0 个 barrier、0 个 SpecialSlot；未新增粒子、渐变或额外 `shadowBlur`，Peg 绘制继续受 `pegSoftShadow` / `pegGlowHalo` 三档预算控制。三档影响：`high`/`medium` 维持原 Peg 视觉门控，`low` 继续关闭高开销 Peg halo。 |
 | 2026-06-19 | **底部奖励分栏与初始 5 钉板**：默认开放槽位回调为首行 5 个 `dense_stagger` 模块；研磨底部小概率生成 1 个奖励分栏，宽度按 `1.5` 个倍化弹珠直径计算，两侧新增最多 2 条 `shape='barrier'` 竖直挡板。分栏绘制只使用 `fillRect` / `strokeRect` / 文本，挡板复用 `Peg.drawBarrierPeg()`，软阴影继续由 `pegSoftShadow` 门控；不新增粒子、渐变、混合模式、额外 `shadowBlur` 或 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **战斗发射器信号 V2.2**：`render_combat_launcherSignal()` 改为居中的下一发 HUD，集中展示弹体轮廓、弹药位图核心、`DMG` 伤害、`S` 散射弹数、`xN` 连射数、连射柱和装填格。2026-06-23 发射点/炮口叠层被移除，散射数并入左侧屏幕，避免占用上方发射槽。该层复用现有弹药位图，绘制数量固定；`shadowBlur` 继续由 `perfQualityLevel !== 'low'` 门控，不新增粒子、渐变循环或 `CONFIG.performance` 预算字段。 |
+| 2026-06-25 | **流彩扩盾授盾反馈拆分**：`radiantAegis` 满层给周围目标追加标准护盾时，目标侧新增来源方向的“流彩缝入普通护盾”短反馈，不再播放目标自己的 `radiantAegis` 挡伤反馈。high/medium 使用一次短线性渐变与 `_sb()` 门控发光，low 为平面线条；不新增粒子、持久对象或 `CONFIG.performance` 字段。 |
 | 2026-06-22 | **流彩护盾超级词条**：`enemy.js` 新增 `radiantAegis` 护罩纹理、命中反馈与破盾反馈；high 绘制 3 层流彩菱环和节点，medium 降为 2 层无节点，low 关闭 `screen` 混合与 `_sb()` 阴影并保留平面语义描边。扩盾冲击波和破盾碎片复用既有 `shockwaveLimit` / `shardLimit`，未新增 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **钉盘编辑器放置预览**：模块 picker 在 hover/focus 候选组件时写入 `_moduleEditorPlacementPreview`，`render_moduleEditorOverlay()` 用平面填充和描边标记当前槽、可放置覆盖槽、不可放置覆盖槽。该反馈不新增粒子、渐变、混合模式或 `shadowBlur`，无需新增 `CONFIG.performance` 预算字段。 |
 | 2026-06-19 | **钉盘编辑器异形轮廓**：`render_moduleEditorOverlay()` 根据组件 `shape.footprint` 绘制导流翼、杯形、沙漏、螺旋等平面轮廓，帮助玩家在编辑态识别组件身份。该层只使用 `stroke`、`lineTo`、`quadraticCurveTo`、`arc/ellipse` 等廉价路径绘制，不新增粒子、渐变、混合模式或额外 `shadowBlur`。 |
@@ -367,6 +380,7 @@ if avgFps > fpsThresholdUp (55):
 | 2026-06-19 | **初始钉盘 2x5 铺满与异形机关化**：默认开放前两行 10 个槽，首发组件提升到约 120 Peg / 5 SpecialSlot，并新增轻分裂门、连射门、轻回环、轻轮盘杯等真实机关模块。该修改复用现有 `Peg` / `SpecialSlot`、既有 `split` / `multicast` / `recall` / `wheel` 触发逻辑，不新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
 | 2026-06-19 | **钉盘钉子密度加密**：初始 6 个异形组件从约 35 颗 Peg 提升到约 58 颗 Peg，商店路线型组件同步补齐入口、转折和出口空洞。该修改只增加普通 Peg/少量既有类型 Peg，未新增粒子、`shadowBlur`、渐变、混合模式或新预算字段；高开销 Peg 阴影/光晕仍由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
 | 2026-06-19 | **商店异形钉盘组件池扩展**：新增 6 个路线型商店组件（Y 字分流、沙漏门、月牙坡、螺旋回廊、棱镜分光、双轮桥），全部复用现有 `Peg` 与 `SpecialSlot` 绘制和触发逻辑，不新增粒子、`shadowBlur`、渐变或混合模式。性能影响仍主要来自同屏 Peg/Slot 数量，继续归入高密度模块化钉盘预算。 |
+| 2026-06-26 | **解冻反馈接入扫描波**：`game_phase.js` 新增 `phase_playThawFeedback()`，敌人回合扫描波检测到上一回合冻结、本回合已解冻时触发一次冰青色反馈；复用 `spawn_createSkillIgnition()` 既有三档降级与粒子/冲击波预算，不新增粒子类型、常驻对象、混合模式或 `CONFIG.performance` 字段。 |
 | 2026-06-24 | **Boss 本体/底座分区呼吸**：`SpriteRenderer` 新增 `drawRegion()`，`enemy.js` 在 `high/medium` 档把 384×256 Boss 帧按 `CONFIG.enemyRender.bossSpriteMotion` 拆成本体和底座两段绘制，分别套用不同频率、相位和振幅；`low` 档仍为单次整图 `drawImage`。该改动最多把单个 Boss 本体 pass 从 1 次提升到 2 次缓存 `drawImage`，不新增粒子、渐变、`shadowBlur`、混合模式或 `CONFIG.performance` 字段。 |
 | 2026-06-22 | **钉盘机关槽扩展**：`SpecialSlot` 新增可重复触发的 `launcher` 与 `energy_wheel` 玩法分支，商店新增 `launcher_gate_module`、`pinwheel_capacitor_module`、`turbine_loop_module`、`swerve_cannon_module`。机关视觉复用 `SpecialSlot.draw()` 的固定数量路径、文字和 `_sb()` 门控阴影，不新增粒子、渐变循环、混合模式或 `CONFIG.performance` 预算字段；额外开销主要来自少量可见 `SpecialSlot` 与 Peg/barrier 数量，仍归入高密度模块化钉盘预算。 |
 | 2026-06-19 | **钉盘居中 3+3 初始布局与异形组件**：`moduleCols` 调整为 5，默认激活槽从 3 个提升到居中 `3+3` 两行共 6 个组件，并新增 6 个首发异形组件（导流翼、轻符文格、弹跳室、炼金核、接球杯）。该调整会提高初始 Peg 数量，但不新增粒子、`shadowBlur`、`createRadialGradient` 或混合模式；Peg 软阴影/光晕继续由 `pegSoftShadow` / `pegGlowHalo` 三档门控。 |
@@ -494,3 +508,19 @@ _activePhase = !isPaused && phase ∈ { combat, training, gathering }
 
 - **新增动画活跃阶段**时，须将其阶段名加入 `sys_loop` 的 `_activePhase` 判断，否则会被降帧到 15fps。
 - **依赖逐帧计时的菜单逻辑**（如按帧倒计时）在静态阶段会因降帧而变慢（墙钟时间拉长约 4 倍）。此类逻辑应改用 `performance.now()` 墙钟时间差，而非帧计数。
+
+---
+
+## 11. 药瓶法术碎裂表现（2026-06-27）
+
+`combat_playPotionBottleVFX()` / `combat_playPotionShatterVFX()` 将炼金药瓶释放拆成点火、抛射残影、碎裂图案、目标点短反馈四段。该表现层不新增常驻渲染对象或新的 `CONFIG.performance` 字段，全部复用现有预算入口：
+
+| 表现段 | 预算来源 | 降级行为 |
+|---|---|---|
+| 药瓶残影 | `spawn_createParticle()` 的 `mist` / `ember` / `spark` / `shard` / `venom` 分类上限 | `high` 4-7 粒，`medium` 3-5 粒，`low` 2-3 粒 |
+| 雾化/毒雾/碎片铺洒 | `maxParticles` 与对应粒子分类上限 | `low` 降低径向数量并保留中心反馈 |
+| 爆破/过载爆破 | `spawn_createProjectileExplosion()` -> `shockwaveLimit` + 粒子上限 | 继续沿用投射物爆破的三档粒子数量 |
+| 封装/标记/坍缩铭刻 | `spawn_createAssimilationPulse()` / `spawn_createAssimilationWave()` -> `shockwaveLimit` | 超出 `shockwaveLimit` 时跳过波形，只保留粒子/浮字 |
+| 标记与过载短电弧 | `lightningLimit` | `low` 默认不新增短电弧，`medium` 1 条，`high` 2-3 条 |
+
+性能自适应影响评估：`high` 档展示完整轨迹、碎裂图案、目标短反馈和少量短电弧；`medium` 档减少残影、径向粒子和电弧数量；`low` 档保留可读的落点、封装/爆破语义和语义浮字，关闭或压缩高开销附加线段。该层不直接修改伤害、状态、DOM 或装药量逻辑。

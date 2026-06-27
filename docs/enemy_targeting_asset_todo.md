@@ -24,6 +24,8 @@
 2026-06-24 更新：`shield` 与 `radiantAegis` 已补入 footprint-aware PNG overlay 资产族。生成器会导出 `overlay_affix_shield.png`、`overlay_affix_radiantAegis.png` 以及 `_2x1` / `_1x2` / `_2x2` / `_3x1` / `_1x3` / `_2x3` / `_3x2` / `_3x3` 变体；运行时 `radiantAegis` 从 SVG 常驻兜底切到 PNG overlay，Boss 通过 `gridCols=3`、`gridRows=2` 命中 3x2 版本。词条 UI icon 同步补齐：战斗状态条敌方护盾数值使用 `affix_shield.png`，`radiantAegis` 登记为正式 `affix_radiantAegis.png`。
 2026-06-24 追补：局内敌人本体的护盾数值展示已改为血量旁常驻 icon badge：`shield` 显示 `affix_shield.png + 层数`，`radiantAegis` 显示 `affix_radiantAegis.png + 百分比`。受击时的浮字/描边反馈只表达瞬时命中，不再承担常驻数值 UI。
 2026-06-24 追补：`carrier` 铸巢母架正式运行时美术已生成，不再使用 PH 占位图。源图由 imagegen 按几何磨石/炼金晶核风格生成并保存在 `docs/design/concepts/carrier_imagegen_pass1/`，`scripts/generate_carrier_enemy_assets.py` 只负责绿幕去底、运行时缩放、空舱透明校验与派生图标/碰撞框。已覆盖 `assets/sprites/enemies/v2/enemy_carrier_3x2.png`、`assets/sprites/enemies/archetypes/enemy_carrier_3x2.png`、`assets/sprites/enemies/composites/enemy_carrier_carrier_3x2_idle.png`、`assets/sprites/enemies/frames/frame_carrier_3x2.png`、图鉴头像、基底 UI 图标与 `affix_carrier.png`；manifest 与 `ENEMY_V2_METADATA` 均已改为 `placeholder:false`。验收预览见 `docs/design/enemy_carrier_asset_preview.png`。
+2026-06-25 追补：敌人行动/针对词条 UI icon 补齐并正式登记，覆盖 `berserk`、`haste`、`healer`、`clone`、`jump`、`lowDamageImmune`、`deflectShell`、`armorSpore`、`siegeBreaker`、`overloadReactor`。这些 PNG 已接入 `ENEMY_AFFIX_ICON_MAP`、manifest、图鉴、试炼场词缀 chip、敌人信息抽屉与行动预告面板；后续替换正式重绘图时保持同名路径或同步映射即可。
+2026-06-25 返工：上述 UI icon 已按当前敌人美术风格降饱和重导出。后续生成同类图标时，底盘优先使用黑曜石/暗金/磨损金属，机制色只作为小面积核心线、晶脉、刻度或边缘提示，避免整张高饱和发光。
 
 ## 1. 已定设计决策
 
@@ -69,8 +71,8 @@
 | 铸巢母架 archetype Sprite | `assets/sprites/enemies/archetypes/enemy_carrier_3x2.png` + `.json` | manifest 基底回退 | 已落地；与 V2 本体同 silhouette，不额外填满空舱。 |
 | 铸巢母架 collision frame | `assets/sprites/enemies/frames/frame_carrier_3x2.png` | 表达真实凹陷物理边界 | 已落地；只描 1/2/3/4/6 占格外壳，第 5 格透明，不画成完整 3×2 实心框。 |
 | 铸巢母架头像 | `assets/icons/enemies/enemy_carrier_3x2.png` | 图鉴/试炼场小图 | 已落地；64×64 仍能看出“冂”形空舱。 |
-| 低伤免疫图标 | `assets/ui/icons/enemy_affixes/affix_lowDamageImmune.png` | 图鉴与状态面板 | 金属硬壳符号，和普通 shield 图标明显不同。 |
-| 偏折壳图标 | `assets/ui/icons/enemy_affixes/affix_deflectShell.png` | 图鉴与状态面板 | 旋转硬壳/偏折边界，表现“反弹方向改变”。 |
+| ~~低伤免疫图标~~ | `assets/ui/icons/enemy_affixes/affix_lowDamageImmune.png` | ✅ 已生成并接入图鉴/状态面板/行动预告映射 | 金属硬壳符号，和普通 shield 图标明显不同。 |
+| ~~偏折壳图标~~ | `assets/ui/icons/enemy_affixes/affix_deflectShell.png` | ✅ 已生成并接入图鉴/状态面板/行动预告映射 | 旋转硬壳/偏折边界，表现“反弹方向改变”。 |
 | 活体护甲三档 Overlay | 见 §3 | 运行时护甲层状态 | 普通三档与叠加强化三档必须一眼可分。 |
 
 ### P1：补齐常驻词条与触发读法
@@ -79,10 +81,10 @@
 |---|---|---|---|
 | 蓄能甲图标 | `assets/ui/icons/enemy_affixes/affix_energyArmor.png` | 图鉴与状态面板 | 电容/蓄能槽，不做元素克制色。 |
 | 相位护盾图标 | `assets/ui/icons/enemy_affixes/affix_phaseShield.png` | 图鉴与状态面板 | 双层护盾 + 失效窗口语义。 |
-| 过量反应炉图标 | `assets/ui/icons/enemy_affixes/affix_overloadReactor.png` | 图鉴与状态面板 | 炉心刻度/计数，不像普通狂暴。 |
+| ~~过量反应炉图标~~ | `assets/ui/icons/enemy_affixes/affix_overloadReactor.png` | ✅ 已生成并接入图鉴/状态面板/行动预告映射 | 炉心刻度/计数，不像普通狂暴。 |
 | 活体护甲图标 | `assets/ui/icons/enemy_affixes/affix_livingArmor.png` | 图鉴与状态面板 | 护甲层/再生层，不做恶心有机物。 |
-| 护甲孢子图标 | `assets/ui/icons/enemy_affixes/affix_armorSpore.png` | 图鉴与状态面板 | 种荚/孢囊/炼金容器，避免虫卵感。 |
-| 撞城者图标 | `assets/ui/icons/enemy_affixes/affix_siegeBreaker.png` | 图鉴与状态面板 | 装饰撞角或加固件。 |
+| ~~护甲孢子图标~~ | `assets/ui/icons/enemy_affixes/affix_armorSpore.png` | ✅ 已生成并接入图鉴/状态面板/行动预告映射 | 种荚/孢囊/炼金容器，避免虫卵感。 |
+| ~~撞城者图标~~ | `assets/ui/icons/enemy_affixes/affix_siegeBreaker.png` | ✅ 已生成并接入图鉴/状态面板/行动预告映射 | 装饰撞角或加固件。 |
 | 铸巢母架词条图标 | `assets/ui/icons/enemy_affixes/affix_carrier.png` | 图鉴与状态面板 | 已落地；空舱/巢架符号，不画军舰。 |
 
 ### P2：高频组合 Sprite

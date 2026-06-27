@@ -163,6 +163,111 @@ export const ENEMY_WAVE_PRESET_ARCHETYPES = {
     gravityWell: { cols: 3, rows: 3, affix: 'gravityWell', color: '#7c3aed' },
 };
 
+const unique = (items = []) => [...new Set((items || []).filter(Boolean))];
+
+export const ENEMY_BASE_EXCLUSIVE_AFFIXES = Object.freeze(unique(
+    Object.values(ENEMY_WAVE_PRESET_ARCHETYPES).map(meta => meta.affix)
+));
+
+export const ENEMY_BASE_AFFIX_COMPATIBILITY = {
+    bastion: {
+        requiredAffixes: ['heavyArmor'],
+        allowedExtraAffixes: ['shield', 'regen', 'berserk', 'radiantAegis', 'livingArmor', 'energyArmor', 'phaseShield', 'lowDamageImmune', 'siegeBreaker'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'healer', 'deflectShell', 'armorSpore', 'overloadReactor', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    maw: {
+        requiredAffixes: ['devour'],
+        allowedExtraAffixes: ['shield', 'regen', 'clone', 'radiantAegis', 'livingArmor', 'phaseShield'],
+        blockedAffixes: ['haste', 'jump', 'healer', 'berserk', 'deflectShell', 'armorSpore', 'siegeBreaker', 'overloadReactor', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    deflector: {
+        requiredAffixes: ['deflectionWard'],
+        allowedExtraAffixes: ['shield', 'regen', 'energyArmor', 'phaseShield', 'lowDamageImmune', 'radiantAegis'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'berserk', 'healer', 'deflectShell', 'armorSpore', 'overloadReactor', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    echoSpire: {
+        requiredAffixes: ['echoRelay'],
+        allowedExtraAffixes: ['shield', 'regen', 'healer', 'phaseShield', 'radiantAegis'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'berserk', 'deflectShell', 'siegeBreaker', 'overloadReactor', 'lowDamageImmune', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    prism: {
+        requiredAffixes: ['prism'],
+        allowedExtraAffixes: ['shield', 'regen', 'energyArmor', 'phaseShield', 'radiantAegis'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'healer', 'berserk', 'deflectShell', 'armorSpore', 'overloadReactor', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    hive: {
+        requiredAffixes: ['hive'],
+        allowedExtraAffixes: ['shield', 'regen', 'healer', 'livingArmor', 'armorSpore', 'phaseShield'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'berserk', 'deflectShell', 'siegeBreaker', 'overloadReactor', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    siege: {
+        requiredAffixes: ['siege'],
+        allowedExtraAffixes: ['shield', 'berserk', 'livingArmor', 'energyArmor', 'phaseShield', 'overloadReactor', 'siegeBreaker', 'lowDamageImmune'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'healer', 'regen', 'deflectShell', 'armorSpore', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    carrier: {
+        requiredAffixes: ['carrier'],
+        allowedExtraAffixes: ['shield', 'regen', 'livingArmor', 'energyArmor', 'phaseShield', 'lowDamageImmune', 'siegeBreaker'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'healer', 'berserk', 'deflectShell', 'armorSpore', 'overloadReactor', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+    gravityWell: {
+        requiredAffixes: ['gravityWell'],
+        allowedExtraAffixes: ['shield', 'regen', 'radiantAegis', 'energyArmor', 'phaseShield'],
+        blockedAffixes: ['haste', 'jump', 'clone', 'healer', 'berserk', 'deflectShell', 'armorSpore', 'siegeBreaker', 'overloadReactor', 'lowDamageImmune', 'runeBearer', 'adaptiveRune'],
+        maxExtraAffixes: 1,
+    },
+};
+
+export function isBaseExclusiveEnemyAffix(affix) {
+    return ENEMY_BASE_EXCLUSIVE_AFFIXES.includes(affix);
+}
+
+export function normalizeEnemyAffixesForArchetype(archetype, affixes = []) {
+    if (!archetype || archetype === 'normal') return unique(affixes);
+    const meta = ENEMY_WAVE_PRESET_ARCHETYPES[archetype] || {};
+    const rule = ENEMY_BASE_AFFIX_COMPATIBILITY[archetype] || {};
+    const required = unique(rule.requiredAffixes || (meta.affix ? [meta.affix] : []));
+    const allowed = new Set(rule.allowedExtraAffixes || []);
+    const blocked = new Set(rule.blockedAffixes || []);
+    const baseExclusive = new Set(ENEMY_BASE_EXCLUSIVE_AFFIXES);
+    const out = [...required];
+    let extraCount = 0;
+    const maxExtra = Number.isFinite(rule.maxExtraAffixes) ? rule.maxExtraAffixes : Infinity;
+
+    for (const affix of affixes || []) {
+        if (!affix || out.includes(affix) || required.includes(affix)) continue;
+        if (baseExclusive.has(affix)) continue;
+        if (blocked.has(affix)) continue;
+        if (allowed.size > 0 && !allowed.has(affix)) continue;
+        if (extraCount >= maxExtra) continue;
+        out.push(affix);
+        extraCount++;
+    }
+    return out;
+}
+
+export function isEnemyAffixAllowedForArchetype(archetype, affix, existingAffixes = []) {
+    if (!archetype || archetype === 'normal') return !isBaseExclusiveEnemyAffix(affix);
+    return normalizeEnemyAffixesForArchetype(archetype, [...existingAffixes, affix]).includes(affix);
+}
+
+export function filterRandomEnemyAffixWeights(weights = {}) {
+    const filtered = {};
+    for (const [affix, weight] of Object.entries(weights || {})) {
+        if (isBaseExclusiveEnemyAffix(affix)) continue;
+        filtered[affix] = weight;
+    }
+    return filtered;
+}
+
 export const DIRECTOR_SCRIPT_CONFIG = {
     unfamiliarRoundWindow: 3,
     maxUnfamiliarActorsPerPreset: 1,

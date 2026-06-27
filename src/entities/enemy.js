@@ -17,13 +17,18 @@
  */
 import { CONFIG } from '../config.js';
 import { Vec2, lerp, lerpColor } from '../utils/math_utils.js';
-import { Particle, BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect } from '../effects/particles.js';
-import { getUiBitmap, DEFENSE_ICON_MAP } from '../bitmap_icons.js';
+import { Particle, BurnEffect, ElectrocuteEffect, VenomEffect, WindMarkEffect, BounceArcEffect, ScatterBurstEffect, EchoRippleEffect } from '../effects/particles.js';
+import { getUiBitmap, DEFENSE_ICON_MAP, ENEMY_AFFIX_ICON_MAP } from '../bitmap_icons.js';
 import { sb as _sb } from '../utils/perf.js';
 import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
 import { resolveDynamicEnemyOverlayPaths, resolveEnemyVisualAsset } from '../data/enemy_visual_assets.js';
 import { getBossVulnerabilityOverlayPath, resolveBossVulnerabilityStateId } from '../data/boss_vulnerability_assets.js';
+
+const TELEGRAPH_ICON_AFFIX_BY_KEY = {
+    devourer_maw: 'devour',
+    chimera_thermal_devour: 'overloadReactor',
+};
 
 // audio 代理由 entities.js 注入，通过模块级变量共享
 // 注意：Enemy 类使用的 audio 对象来自 entities.js 的依赖注入机制
@@ -55,6 +60,30 @@ const _DEFENSE_HUD_ICON_SRC = {
     phaseShield: 'assets/ui/icons/enemy_affixes/affix_phaseShield.png',
     livingArmor: 'assets/ui/icons/enemy_affixes/affix_livingArmor.png',
 };
+const _DEFENSE_SHIELD_MEMBRANE_VERSION = '?v=20260625-radiant-png';
+const _DEFENSE_FLOW_SHIELD_MEMBRANE_SRCS = [
+    `assets/sprites/enemies/overlays/overlay_defense_flow_shield_membrane_wide.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_flow_shield_membrane.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_flow_shield_membrane_caustic.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_flow_shield_membrane_slim.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+];
+const _DEFENSE_GLASS_SHIELD_MEMBRANE_SRCS = [
+    `assets/sprites/enemies/overlays/overlay_defense_glass_shield_membrane_wide.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_glass_shield_membrane.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_glass_shield_membrane_caustic.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_glass_shield_membrane_slim.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+];
+const _DEFENSE_TREE_SHIELD_MEMBRANE_SRCS = [
+    `assets/sprites/enemies/overlays/overlay_defense_tree_shield_membrane_wide.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_tree_shield_membrane.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_tree_shield_membrane_caustic.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+    `assets/sprites/enemies/overlays/overlay_defense_tree_shield_membrane_slim.png${_DEFENSE_SHIELD_MEMBRANE_VERSION}`,
+];
+const _DEFENSE_FLOW_SHIELD_LAYER_PROFILES = [
+    { scale: 0.96, alpha: 0.22, xBase: -0.12, yAmp: 0.010, slide: 0.035, pulse: 0.018, rotate: -0.010, blend: 'source-over' },
+    { scale: 0.86, alpha: 0.66, xBase: -0.04, yAmp: 0.016, slide: -0.014, pulse: 0.026, rotate: 0.008, blend: 'screen' },
+    { scale: 0.74, alpha: 0.26, xBase: 0.03, yAmp: 0.010, slide: 0.020, pulse: 0.020, rotate: 0.014, blend: 'source-over' },
+];
 
 function _getAffixOverlayImage(src) {
     if (!src || typeof Image === 'undefined') return null;
@@ -75,6 +104,12 @@ function _getAffixOverlayImage(src) {
 
 function _getEnemyFrameImage(src) {
     return _getAffixOverlayImage(src);
+}
+
+function _preloadDefenseShieldMembranes() {
+    if (typeof Image === 'undefined') return;
+    [..._DEFENSE_FLOW_SHIELD_MEMBRANE_SRCS, ..._DEFENSE_GLASS_SHIELD_MEMBRANE_SRCS, ..._DEFENSE_TREE_SHIELD_MEMBRANE_SRCS]
+        .forEach(src => _getAffixOverlayImage(src));
 }
 
 function _measureImageAlphaBounds(img) {
@@ -116,6 +151,44 @@ function _measureImageAlphaBounds(img) {
     } catch (err) {
         return null;
     }
+}
+
+_preloadDefenseShieldMembranes();
+
+function _createDefenseFlowShieldMembraneStack(kind = 'shield', randomize = true) {
+    const isFlow = kind === 'phaseShield' || kind === 'radiantAegis';
+    const isTree = kind === 'livingArmor';
+    const membraneSrcs = isTree
+        ? _DEFENSE_TREE_SHIELD_MEMBRANE_SRCS
+        : (isFlow ? _DEFENSE_FLOW_SHIELD_MEMBRANE_SRCS : _DEFENSE_GLASS_SHIELD_MEMBRANE_SRCS);
+    const count = Math.min(3, membraneSrcs.length, _DEFENSE_FLOW_SHIELD_LAYER_PROFILES.length);
+    const order = membraneSrcs.map((_, index) => index);
+    if (randomize) {
+        for (let i = order.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [order[i], order[j]] = [order[j], order[i]];
+        }
+    }
+    const phaseBase = randomize ? Math.random() * Math.PI * 2 : 0;
+    return Array.from({ length: count }, (_, index) => {
+        const profile = _DEFENSE_FLOW_SHIELD_LAYER_PROFILES[index] || _DEFENSE_FLOW_SHIELD_LAYER_PROFILES[0];
+        const phaseJitter = randomize ? (Math.random() - 0.5) * 0.38 : 0;
+        return {
+            src: membraneSrcs[order[index]],
+            scale: profile.scale,
+            alpha: profile.alpha * (isFlow ? 0.88 : isTree ? 0.92 : 0.96),
+            xBase: profile.xBase,
+            yAmp: profile.yAmp,
+            slide: profile.slide,
+            pulse: profile.pulse,
+            rotate: profile.rotate,
+            blend: isFlow ? profile.blend : 'source-over',
+            phase: phaseBase + index * 1.73 + phaseJitter,
+            wave: randomize ? 0.82 + Math.random() * 0.42 : 0.92 + index * 0.14,
+            flow: isFlow,
+            flipX: !isTree,
+        };
+    });
 }
 
 function _hexToRgba(hex, alpha) {
@@ -384,6 +457,10 @@ class Enemy {
         this.radiantAegisBroken = false;
         this._radiantAegisPulseTimer = 0;
         this._radiantAegisBreakTimer = 0;
+        this._shieldAssimilationTimer = 0; // 流彩扩盾转化为普通护盾的短反馈
+        this._shieldAssimilationDuration = 0;
+        this._shieldAssimilationFromX = 0;
+        this._shieldAssimilationFromY = -1;
         this.energyArmorShield = 0; // 蓄能甲转换出的临时数值护盾
         this._energyArmorBlockTimer = 0;
         this.livingArmorHp = 0; // 活体护甲当前生命
@@ -491,6 +568,7 @@ class Enemy {
         this._visualOverlayKey = '';
         this._visualFrameKey = '';
         this._visualFramePath = '';
+        this._usesEliteGolemAffixComboSprite = false;
         this._collisionFrameImage = null;
         this._affixOverlayImages = [];
         if ((this.affixes || []).includes('runeBearer')) {
@@ -517,6 +595,9 @@ class Enemy {
             bossMinionRole: this.bossMinionRole,
             bossMechanicTags: this.bossMechanicTags,
         });
+        this._usesEliteGolemAffixComboSprite = !!(
+            resolved?.assetKey && String(resolved.assetKey).startsWith('eliteGolemAffixCombo:')
+        );
         const spriteKey = `${this.type || 'normal'}|${this.bossType || ''}|${resolved?.assetKey || ''}`;
         if (this._spriteRenderer && this._spriteVisualKey === spriteKey) return;
 
@@ -967,6 +1048,33 @@ class Enemy {
                 this._windMarkEffect = null;
             }
         }
+
+        // [BounceArcEffect] 弹跳动能弧线瞬态特效生命周期（Phase 2.7）
+        if (this._bounceArcEffect) {
+            this._bounceArcEffect.update(this.pos, timeScale);
+            if (!this._bounceArcEffect.active) {
+                this._bounceArcEffect.destroy();
+                this._bounceArcEffect = null;
+            }
+        }
+
+        // [ScatterBurstEffect] 散射星爆瞬态特效生命周期（Phase 2.9）
+        if (this._scatterBurstEffect) {
+            this._scatterBurstEffect.update(this.pos, timeScale);
+            if (!this._scatterBurstEffect.active) {
+                this._scatterBurstEffect.destroy();
+                this._scatterBurstEffect = null;
+            }
+        }
+
+        // [EchoRippleEffect] 回响波纹瞬态特效生命周期（Phase 2.11）
+        if (this._echoRippleEffect) {
+            this._echoRippleEffect.update(this.pos, timeScale);
+            if (!this._echoRippleEffect.active) {
+                this._echoRippleEffect.destroy();
+                this._echoRippleEffect = null;
+            }
+        }
     }
 
     /**
@@ -981,6 +1089,9 @@ class Enemy {
         if (this._electrocuteEffect) { this._electrocuteEffect.destroy(); this._electrocuteEffect = null; }
         if (this._venomEffect) { this._venomEffect.destroy(); this._venomEffect = null; }
         if (this._windMarkEffect) { this._windMarkEffect.destroy(); this._windMarkEffect = null; }
+        if (this._bounceArcEffect) { this._bounceArcEffect.destroy(); this._bounceArcEffect = null; }
+        if (this._scatterBurstEffect) { this._scatterBurstEffect.destroy(); this._scatterBurstEffect = null; }
+        if (this._echoRippleEffect) { this._echoRippleEffect.destroy(); this._echoRippleEffect = null; }
     }
 
     addSwordCrack(relPos, angle) {
@@ -1515,15 +1626,19 @@ class Enemy {
         }
     }
 
-    _grantShieldLayer(amount = 1) {
+    _grantShieldLayer(amount = 1, options = {}) {
         if (!this.affixes.includes('shield')) this.affixes.push('shield');
-        this.shieldCharges = (this.shieldCharges || 0) + amount;
+        const gain = Math.max(1, Math.ceil(amount || 1));
+        this.shieldCharges = (this.shieldCharges || 0) + gain;
         if (this.affixes.includes('phaseShield')) {
             this._phaseShieldBlockTimer = Math.max(this._phaseShieldBlockTimer || 0, 12);
             this._triggerDefenseImpactFx('phaseShield', null, 12);
         } else {
             this.shieldHitTimer = Math.max(this.shieldHitTimer || 0, 12);
             this._triggerDefenseImpactFx('shield', null, 12);
+        }
+        if (options.cause === 'radiantAegis') {
+            this._triggerShieldAssimilationFx(options.source || null, options.duration || 22);
         }
         if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
     }
@@ -1545,9 +1660,7 @@ class Enemy {
             const targets = this._getRadiantAegisTargets(game);
             for (const target of targets) {
                 if (typeof target._grantShieldLayer === 'function') {
-                    target._grantShieldLayer(1);
-                    target._radiantAegisPulseTimer = Math.max(target._radiantAegisPulseTimer || 0, 18);
-                    target._triggerDefenseImpactFx('radiantAegis', null, 18);
+                    target._grantShieldLayer(1, { cause: 'radiantAegis', source: this, duration: 24 });
                 }
             }
             this._radiantAegisPulseTimer = 24;
@@ -1646,9 +1759,7 @@ class Enemy {
             const targets = this._getRadiantAegisTargets(game);
             for (const target of targets) {
                 if (typeof target._grantShieldLayer === 'function') {
-                    target._grantShieldLayer(1);
-                    target._radiantAegisPulseTimer = Math.max(target._radiantAegisPulseTimer || 0, 18);
-                    target._triggerDefenseImpactFx('radiantAegis', null, 18);
+                    target._grantShieldLayer(1, { cause: 'radiantAegis', source: this, duration: 24 });
                 }
             }
             this._radiantAegisPulseTimer = 24;
@@ -2501,12 +2612,24 @@ class Enemy {
                 }
                 const dx = col - bossCol;
                 const dy = row - bossRow;
-                candidates.push({ x, y, dist: dx * dx + dy * dy });
+                const side = col < bossCol ? 'left' : col > bossCol ? 'right' : (x < this.pos.x ? 'left' : 'right');
+                candidates.push({ x, y, dist: dx * dx + dy * dy, side });
             }
         }
 
         candidates.sort((a, b) => b.dist - a.dist);
-        return candidates.slice(0, count);
+        const left = candidates.filter(candidate => candidate.side === 'left');
+        const right = candidates.filter(candidate => candidate.side === 'right');
+        const selected = [];
+        while (selected.length < count && (left.length > 0 || right.length > 0)) {
+            if (left.length > 0 && selected.length < count) selected.push(left.shift());
+            if (right.length > 0 && selected.length < count) selected.push(right.shift());
+        }
+        for (const candidate of candidates) {
+            if (selected.length >= count) break;
+            if (!selected.includes(candidate)) selected.push(candidate);
+        }
+        return selected.slice(0, count);
     }
 
     // @perf-impact: Devourer maw-field spawns reuse existing enemy creation, floating text, shockwave and 1-2 particle calls; no persistent particle pool is added.
@@ -2634,6 +2757,50 @@ class Enemy {
         );
     }
 
+    _isChimeraThermalPrey(enemy) {
+        if (!enemy || !enemy.active || enemy.type === 'boss') return false;
+        const tags = Array.isArray(enemy.bossMechanicTags) ? enemy.bossMechanicTags : [];
+        if (enemy.bossOwnerId === 'chimera' || tags.includes('thermalFeed') || tags.includes('chaosFeed')) return true;
+        const cfg = this._getChimeraConfig();
+        const minTemp = Math.max(1, Math.floor(cfg.chimeraThermalAbsorbMinTemp || 24));
+        return Number.isFinite(enemy.temp) && Math.abs(enemy.temp) >= minTemp;
+    }
+
+    _getChimeraPreySide(enemy) {
+        if (!enemy || !enemy.pos) return 'center';
+        const dx = enemy.pos.x - this.pos.x;
+        if (dx < -1) return 'left';
+        if (dx > 1) return 'right';
+        return 'center';
+    }
+
+    _scoreChimeraSidePrey(enemy, side) {
+        const temp = Number.isFinite(enemy?.temp) ? enemy.temp : 0;
+        const tags = Array.isArray(enemy?.bossMechanicTags) ? enemy.bossMechanicTags : [];
+        let score = 0;
+        if (this._isChimeraThermalPrey(enemy)) score += 10;
+        if (enemy?.bossOwnerId === 'chimera' || tags.includes('thermalFeed') || tags.includes('chaosFeed')) score += 6;
+        if (side === 'left') {
+            if (temp < 0) score += 20 + Math.min(10, Math.abs(temp) / 20);
+            if (temp > 0) score -= 6;
+        } else if (side === 'right') {
+            if (temp > 0) score += 20 + Math.min(10, Math.abs(temp) / 20);
+            if (temp < 0) score -= 6;
+        }
+        score -= Math.abs((enemy?.pos?.x || this.pos.x) - this.pos.x) / 1000;
+        return score;
+    }
+
+    _chimeraPickSidePrey(game, side, excluded = []) {
+        const excludedSet = new Set(excluded);
+        const sideTargets = this._getChimeraPrey(game).filter(target =>
+            target && !excludedSet.has(target) && this._getChimeraPreySide(target) === side
+        );
+        if (sideTargets.length === 0) return null;
+        sideTargets.sort((a, b) => this._scoreChimeraSidePrey(b, side) - this._scoreChimeraSidePrey(a, side));
+        return sideTargets[0] || null;
+    }
+
     _findChimeraPullCell(game, target) {
         if (!game || !target) return null;
         const m = this._getChimeraGridMetrics(game);
@@ -2678,23 +2845,50 @@ class Enemy {
         return 0;
     }
 
-    _chimeraPickRandomPrey(game) {
-        const targets = this._getChimeraPrey(game);
+    _chimeraPickRandomPrey(game, excluded = []) {
+        const excludedSet = new Set(excluded);
+        const targets = this._getChimeraPrey(game).filter(target => !excludedSet.has(target));
         if (targets.length === 0) return null;
-        return targets[Math.floor(Math.random() * targets.length)];
+        const priorityTargets = targets.filter(target => this._isChimeraThermalPrey(target));
+        const pool = priorityTargets.length > 0 ? priorityTargets : targets;
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    _grantChimeraRadiantShield(game, amount = 0) {
+        const gain = Math.max(0, Math.ceil(amount || 0));
+        if (gain <= 0) return 0;
+        if (!this.affixes.includes('radiantAegis')) this.affixes.push('radiantAegis');
+        const cfg = typeof this._getRadiantAegisConfig === 'function'
+            ? this._getRadiantAegisConfig()
+            : { capPct: 0.10 };
+        const baseMax = Math.max(1, Math.ceil((this.maxHp || 1) * (cfg.capPct || 0.10)));
+        if (this.radiantAegisBroken) {
+            this.radiantAegisBroken = false;
+            this._radiantAegisBreakTimer = 0;
+            this.radiantAegis = 0;
+        }
+        const before = Math.max(0, this.radiantAegis || 0);
+        this.radiantAegisMax = Math.max(this.radiantAegisMax || 0, baseMax, before + gain);
+        this.radiantAegis = before + gain;
+        this._radiantAegisPulseTimer = Math.max(this._radiantAegisPulseTimer || 0, 22);
+        this._triggerDefenseImpactFx('radiantAegis', null, 22);
+        if (game && typeof game.spawn_createShockwave === 'function') {
+            game.spawn_createShockwave(this.pos.x, this.pos.y, '#f0abfc');
+        }
+        if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
+        return gain;
     }
 
     _chimeraNormalizeThermalStacks(game) {
         const paired = Math.min(this.chimeraHeatStacks || 0, this.chimeraFrostStacks || 0);
         if (paired <= 0) return { paired: 0, shieldAmount: 0 };
-        const cfg = this._getChimeraConfig();
         this.chimeraHeatStacks = Math.max(0, (this.chimeraHeatStacks || 0) - paired);
         this.chimeraFrostStacks = Math.max(0, (this.chimeraFrostStacks || 0) - paired);
-        this.chimeraRadiantConversions = Math.min(999, (this.chimeraRadiantConversions || 0) + paired);
-        const shieldAmount = Math.max(1, Math.ceil((this.maxHp || 1) * Math.max(0, cfg.chimeraThermalShieldPct ?? 0.06) * paired));
-        if (typeof this._grantRadiantAegisPulse === 'function') {
-            this._grantRadiantAegisPulse(game, shieldAmount, { rearmBroken: true, label: '流彩' });
-        }
+        const cfg = this._getChimeraConfig();
+        const shieldMult = this.berserked ? Math.max(1, cfg.chimeraBerserkShieldMult || 2) : 1;
+        const shieldAmount = paired * shieldMult;
+        this.chimeraRadiantConversions = Math.min(999999, (this.chimeraRadiantConversions || 0) + shieldAmount);
+        this._grantChimeraRadiantShield(game, shieldAmount);
         return { paired, shieldAmount };
     }
 
@@ -2704,31 +2898,31 @@ class Enemy {
         const minTemp = Math.max(1, Math.floor(cfg.chimeraThermalAbsorbMinTemp || 24));
         if (Math.abs(temp) < minTemp) return { statusCount: 0, tempGain: 0, heatGain: 0, frostGain: 0, paired: 0 };
 
-        const unit = Math.max(1, Math.floor(cfg.chimeraThermalStackUnit || 100));
+        const unit = Math.max(1, Math.floor(cfg.chimeraThermalStackUnit || 1));
         const rawStacks = Math.max(1, Math.floor(Math.abs(temp) / unit));
-        const mult = this.berserked ? 2 : 1;
-        const stacks = rawStacks * mult;
+        const cap = Math.max(1, Math.floor(cfg.chimeraThermalStackCap || 9999));
+        const stacks = rawStacks;
         let heatGain = 0;
         let frostGain = 0;
         if (temp > 0) {
-            this.chimeraHeatStacks = Math.min(99, (this.chimeraHeatStacks || 0) + stacks);
+            this.chimeraHeatStacks = Math.min(cap, (this.chimeraHeatStacks || 0) + stacks);
             heatGain = stacks;
         } else {
-            this.chimeraFrostStacks = Math.min(99, (this.chimeraFrostStacks || 0) + stacks);
+            this.chimeraFrostStacks = Math.min(cap, (this.chimeraFrostStacks || 0) + stacks);
             frostGain = stacks;
         }
 
         const normalized = this._chimeraNormalizeThermalStacks(game);
-        this.chimeraInheritedStatusCount = Math.min(99, (this.chimeraInheritedStatusCount || 0) + stacks);
+        this.chimeraInheritedStatusCount = Math.min(cap, (this.chimeraInheritedStatusCount || 0) + stacks);
         if (game && typeof game.spawn_createFloatingText === 'function') {
-            const label = temp > 0 ? `热核+${stacks}` : `寒核+${stacks}`;
+            const label = temp > 0 ? `HEAT+${stacks}` : `FROST+${stacks}`;
             const color = temp > 0 ? '#fdba74' : '#67e8f9';
             game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 54, label, color, 12);
             if (normalized.paired > 0) {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 70, `流彩x${normalized.paired}`, '#f0abfc', 12);
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 70, `RADIANT+${normalized.shieldAmount}`, '#f0abfc', 12);
             }
         }
-        return { statusCount: stacks, tempGain: temp, heatGain, frostGain, paired: normalized.paired };
+        return { statusCount: stacks, tempGain: temp, heatGain, frostGain, paired: normalized.paired, shieldAmount: normalized.shieldAmount };
     }
 
     _chimeraAbsorbNegativeStates(victim, game = null) {
@@ -2738,18 +2932,24 @@ class Enemy {
     _chimeraDevourTargets(game, options = {}) {
         if (!this._isChimeraBoss()) return 0;
         if (!options.force && (this._chimeraDigestCooldown || 0) > 0) return 0;
-        const maxCount = Math.max(1, Math.floor(options.count || 1));
+        const cfg = this._getChimeraConfig();
+        const maxCount = Math.max(1, Math.floor(options.count || cfg.chimeraDevourTargetsPerTurn || 2));
         const targets = [];
-        for (let i = 0; i < maxCount; i++) {
-            const target = this._chimeraPickRandomPrey(game);
+        if (maxCount >= 2) {
+            for (const side of ['left', 'right']) {
+                const sideTarget = this._chimeraPickSidePrey(game, side, targets);
+                if (sideTarget && !targets.includes(sideTarget)) targets.push(sideTarget);
+            }
+        }
+        for (let i = targets.length; i < maxCount; i++) {
+            const target = this._chimeraPickRandomPrey(game, targets);
             if (!target || targets.includes(target)) break;
             targets.push(target);
         }
         if (targets.length === 0) return 0;
 
-        const cfg = this._getChimeraConfig();
         const healPct = Math.max(0, cfg.chimeraDigestHealPct ?? 0.06);
-        const shieldGain = Math.max(0, Math.floor(cfg.chimeraDigestShieldPerFeed ?? 1));
+        const shieldGain = Math.max(0, Math.floor(cfg.chimeraDigestShieldPerFeed ?? 0));
         let devoured = 0;
         let heatGain = 0;
         let frostGain = 0;
@@ -2759,7 +2959,7 @@ class Enemy {
             const absorbed = this._chimeraAbsorbThermalStacks(victim, game);
             heatGain += absorbed.heatGain || 0;
             frostGain += absorbed.frostGain || 0;
-            pairedGain += absorbed.paired || 0;
+            pairedGain += absorbed.shieldAmount || 0;
             const heal = Math.max(1, Math.ceil((victim.maxHp || victim.hp || 1) * healPct));
             this.hp = Math.min(this.maxHp, (this.hp || 0) + heal);
             if (shieldGain > 0 && typeof this._grantShieldLayer === 'function') {
@@ -2777,20 +2977,17 @@ class Enemy {
         }
 
         if (devoured > 0) {
-            const interval = this.berserked
-                ? (cfg.chimeraBerserkDigestInterval || 1)
-                : (cfg.chimeraDigestInterval || 2);
+            const interval = cfg.chimeraDigestInterval || 1;
             this._chimeraDigestCooldown = Math.max(1, Math.floor(interval));
             this._chimeraMawPulseTimer = Math.max(this._chimeraMawPulseTimer || 0, 32);
             if (typeof game?.spawn_createFloatingText === 'function') {
-                const stackText = `热${heatGain}/寒${frostGain}`;
-                const shieldText = pairedGain > 0 ? ` 流${pairedGain}` : '';
+                const stackText = `HEAT ${heatGain}/FROST ${frostGain}`;
+                const shieldText = pairedGain > 0 ? ` RADIANT +${pairedGain}` : '';
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 38, `THERMAL x${devoured} ${stackText}${shieldText}`, '#f0abfc', 13);
             }
             if (typeof game?.spawn_createShockwave === 'function') {
                 game.spawn_createShockwave(this.pos.x, this.pos.y, '#f0abfc');
             }
-            this._chimeraSpawnFeeders(game, Math.max(1, Math.floor(cfg.chimeraSummonMaxPerTurn || 1)));
             audio.playEffect('split');
         }
         return devoured;
@@ -2826,15 +3023,27 @@ class Enemy {
                 }
                 const dx = col - bossCol;
                 const dy = row - bossRow;
-                candidates.push({ x, y, dist: dx * dx + dy * dy });
+                const side = col < bossCol ? 'left' : col > bossCol ? 'right' : (x < this.pos.x ? 'left' : 'right');
+                candidates.push({ x, y, dist: dx * dx + dy * dy, side });
             }
         }
 
         candidates.sort((a, b) => b.dist - a.dist);
-        return candidates.slice(0, count);
+        const left = candidates.filter(candidate => candidate.side === 'left');
+        const right = candidates.filter(candidate => candidate.side === 'right');
+        const selected = [];
+        while (selected.length < count && (left.length > 0 || right.length > 0)) {
+            if (left.length > 0 && selected.length < count) selected.push(left.shift());
+            if (right.length > 0 && selected.length < count) selected.push(right.shift());
+        }
+        for (const candidate of candidates) {
+            if (selected.length >= count) break;
+            if (!selected.includes(candidate)) selected.push(candidate);
+        }
+        return selected.slice(0, count);
     }
 
-    // @perf-impact: Chimera feeder summon reuses the existing enemy spawn, shockwave and 1-2 particle paths; no persistent particle allocation.
+    // @perf-impact: Chimera feeder summon can create up to 3 thermal feeds per Chimera turn, reusing existing enemy, shockwave and particle budget paths.
     _chimeraSpawnFeeders(game, count = 1) {
         if (!this._isChimeraBoss() || !game || !Array.isArray(game.enemies)) return 0;
         const cfg = this._getChimeraConfig();
@@ -2846,19 +3055,26 @@ class Enemy {
         const positions = this._findChimeraFeederSpawnPositions(game, spawnCount);
         const profile = (typeof game.spawn_getBossMinionProfile === 'function' && game.spawn_getBossMinionProfile('chimera'))
             || (CONFIG.balance.bossEntranceShockwave?.bossMinionProfiles?.chimera)
-            || { role: 'chaos_feed', affixes: cfg.chimeraFeedAffixes || ['berserk'], tags: ['chaosFeed'] };
+            || { role: 'chaos_feed', affixes: cfg.chimeraFeedAffixes || [], tags: ['chaosFeed'] };
         const w = game.enemyWidth || 60;
         const h = game.enemyHeight || 50;
         const hp = Math.max(1, Math.ceil(this.maxHp * (cfg.chimeraSummonHpPct || 0.12)));
         let spawned = 0;
 
         for (const pos of positions) {
-            const affixes = Array.isArray(profile.affixes) ? [...profile.affixes] : [...(cfg.chimeraFeedAffixes || ['berserk'])];
+            const affixes = Array.isArray(profile.affixes) ? [...profile.affixes] : [...(cfg.chimeraFeedAffixes || [])];
             const feeder = new Enemy(pos.x, pos.y, w, h, hp, hp, 'elite', affixes);
             const tempChoices = Array.isArray(cfg.chimeraThermalFeedTemps) && cfg.chimeraThermalFeedTemps.length > 0
                 ? cfg.chimeraThermalFeedTemps
                 : [100, -100];
-            const feedTemp = tempChoices[Math.floor(Math.random() * tempChoices.length)] || 100;
+            const sideTemp = pos.side === 'left'
+                ? (Number.isFinite(cfg.chimeraLeftFeedTemp) ? cfg.chimeraLeftFeedTemp : -100)
+                : pos.side === 'right'
+                    ? (Number.isFinite(cfg.chimeraRightFeedTemp) ? cfg.chimeraRightFeedTemp : 100)
+                    : null;
+            const feedTemp = Number.isFinite(sideTemp)
+                ? sideTemp
+                : (tempChoices[Math.floor(Math.random() * tempChoices.length)] || 100);
             feeder.temp = feedTemp;
             feeder.dropTargetY = pos.y;
             feeder.hasActedThisTurn = true;
@@ -2879,7 +3095,7 @@ class Enemy {
             const feedColor = feedTemp > 0 ? '#fdba74' : '#67e8f9';
             if (typeof game.spawn_createShockwave === 'function') game.spawn_createShockwave(pos.x, pos.y, feedColor);
             if (typeof game.spawn_createFloatingText === 'function') {
-                game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, feedTemp > 0 ? '+100°C' : '-100°C', feedColor, 12);
+                game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, `${feedTemp > 0 ? '+' : ''}${feedTemp}C`, feedColor, 12);
             }
             if (typeof game.spawn_createParticle === 'function') {
                 game.spawn_createParticle(pos.x, pos.y, feedColor, 'mist');
@@ -2890,16 +3106,37 @@ class Enemy {
         return spawned;
     }
 
-    _tickChimeraMawField(game) {
+    _chimeraSummonFeedersForTurn(game) {
+        if (!this._isChimeraBoss()) return { pulled: 0, spawned: 0 };
+        const cfg = this._getChimeraConfig();
+        const minSummons = Math.max(0, Math.floor(cfg.chimeraSummonMinPerTurn ?? 2));
+        const maxSummons = Math.max(minSummons, Math.floor(cfg.chimeraSummonMaxPerTurn ?? 3));
+        const summonRolls = maxSummons - minSummons + 1;
+        const targetSummons = summonRolls > 1
+            ? minSummons + Math.floor(Math.random() * summonRolls)
+            : minSummons;
+        const spawned = targetSummons > 0 ? this._chimeraSpawnFeeders(game, targetSummons) : 0;
+        if (spawned > 0 && typeof game?.spawn_createFloatingText === 'function') {
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 22, `热核养料x${spawned}`, '#f0abfc', 12);
+        }
+        return { pulled: 0, spawned };
+    }
+
+    _tickChimeraMawField(game, options = {}) {
         if (!this._isChimeraBoss()) return { pulled: 0, spawned: 0 };
         this._chimeraMawPulseTimer = Math.max(this._chimeraMawPulseTimer || 0, 12);
+        const cfg = this._getChimeraConfig();
         if ((this._chimeraDigestCooldown || 0) > 0) {
             this._chimeraDigestCooldown = Math.max(0, (this._chimeraDigestCooldown || 0) - 1);
+            if (Math.max(1, Math.floor(cfg.chimeraDigestInterval || 1)) <= 1) {
+                this._chimeraDigestCooldown = 0;
+            }
         }
         if ((this._chimeraSummonCooldown || 0) > 0) {
             this._chimeraSummonCooldown = Math.max(0, (this._chimeraSummonCooldown || 0) - 1);
         }
-        return { pulled: 0, spawned: 0 };
+        if (options.summon === false) return { pulled: 0, spawned: 0 };
+        return this._chimeraSummonFeedersForTurn(game);
     }
 
     _ensureDevourerBodyCollisionShape() {
@@ -2976,7 +3213,7 @@ class Enemy {
             this._tickDevourerMawField(game);
         }
         if (this._isChimeraBoss()) {
-            this._tickChimeraMawField(game);
+            this._tickChimeraMawField(game, { summon: false });
         }
         if (this._isOuroborosBoss()) {
             this._tickOuroborosOrbit(game);
@@ -3166,8 +3403,6 @@ class Enemy {
                     audio.playEffect('regen');
                     // 扩散治疗波：以治疗范围为参数，明确展示治疗覆盖范围
                     game.spawn_createHealWave(this.pos.x, this.pos.y, range);
-                    // 额外一圈粉色冲击波增强打击感
-                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
                     game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'regen', {
                         isBoss: this.type === 'boss', isElite: this.isElite
                     });
@@ -3249,6 +3484,10 @@ class Enemy {
             }
         }
 
+        if (!skipMove && this._isChimeraBoss?.()) {
+            this._chimeraSummonFeedersForTurn(game);
+        }
+
         // [skipMove] 仅结算词条行动、跳过所有移动/跳跃与移动冷却逻辑
         // 用于 Boss 进入狂暴时的「立刻行动但不移动」即时反击
         if (skipMove) {
@@ -3260,26 +3499,19 @@ class Enemy {
 
         // --- [改动] 移动与跳跃：移出循环，始终只执行一次 ---
         // [Boss 移动冷却逻辑]
-        // 狂暴模式下：每回合必定移动（_moveCooldown 始终为 0）
-        // 常规模式下：检查冷却计数器，未到间隔则跳过移动
+        // 所有 Boss（包含狂暴阶段）都遵循低频移动冷却；狂暴只改变专属机制，不强制每回合位移。
         let _shouldMove = true;
         if (this.type === 'boss' && this.bossType) {
-            if (this.berserked) {
-                // 狂暴模式：每回合移动，重置冷却为 0
-                this._moveCooldown = 0;
+            if (this._moveCooldown > 0) {
+                _shouldMove = false;
+                this._moveCooldown--;
             } else {
-                // 常规模式：检查冷却
-                if (this._moveCooldown > 0) {
-                    _shouldMove = false;
-                    this._moveCooldown--;
-                } else {
-                    // 冷却到期，本回合移动，重置冷却计数器
-                    const interval = this._moveInterval || 2;
-                    this._moveCooldown = interval - 1; // 下次移动需要等待的回合数
-                }
+                const interval = Math.max(2, this._moveInterval || 3);
+                this._moveInterval = interval;
+                this._moveCooldown = interval - 1; // 下次移动需要等待的回合数
             }
         }
-        // haste 词条：额外触发一次移动（速度加快，不重复结算其他词条）
+        // haste 词条：普通敌人额外触发一次移动；Boss 只保留机制强化，不追加位移。
         const _doMove = () => {
             const moveAmount = game.enemyHeight;
             const targetY = this.dropTargetY + moveAmount;
@@ -3328,7 +3560,7 @@ class Enemy {
                 _doMove();
             }
             // [改动] haste 词条：仅额外触发一次移动，不重复结算其他词条
-            if (this.affixes.includes('haste')) {
+            if (this.affixes.includes('haste') && this.type !== 'boss') {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
                 game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'haste', {
                     isBoss: this.type === 'boss', isElite: this.isElite
@@ -3444,8 +3676,6 @@ class Enemy {
                     audio.playEffect('regen');
                     // 扩散治疗波：以治疗范围为参数，明确展示治疗覆盖范围
                     game.spawn_createHealWave(this.pos.x, this.pos.y, range);
-                    // 额外一圈粉色冲击波增强打击感
-                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#f472b6');
                     game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'regen', {
                         isBoss: this.type === 'boss', isElite: this.isElite
                     });
@@ -3607,7 +3837,7 @@ class Enemy {
             for (let moveIndex = 0; moveIndex < 1 + overloadBonus; moveIndex++) {
                 _doMoveP();
             }
-            if (this.affixes.includes('haste')) {
+            if (this.affixes.includes('haste') && this.type !== 'boss') {
                 game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
                 _doMoveP();
             }
@@ -4121,8 +4351,27 @@ class Enemy {
             kind,
             duration,
             break: !!options.break,
-            absorbed: Math.max(0, options.absorbed || 0)
+            absorbed: Math.max(0, options.absorbed || 0),
+            membraneStack: (kind === 'shield' || kind === 'phaseShield' || kind === 'radiantAegis' || kind === 'livingArmor')
+                ? _createDefenseFlowShieldMembraneStack(kind)
+                : null
         };
+    }
+
+    _triggerShieldAssimilationFx(source = null, duration = 22) {
+        const sourceX = Number.isFinite(source?.pos?.x) ? source.pos.x : this.pos.x;
+        const sourceY = Number.isFinite(source?.pos?.y) ? source.pos.y : this.pos.y - Math.max(1, this.height);
+        const dx = sourceX - this.pos.x;
+        const dy = sourceY - this.pos.y;
+        const dist = Math.hypot(dx, dy);
+        this._shieldAssimilationFromX = dist > 0.001 ? dx / dist : 0;
+        this._shieldAssimilationFromY = dist > 0.001 ? dy / dist : -1;
+        const life = Math.max(1, Math.ceil(duration));
+        const currentTimer = this._shieldAssimilationTimer || 0;
+        this._shieldAssimilationTimer = Math.max(currentTimer, life);
+        this._shieldAssimilationDuration = life >= currentTimer
+            ? life
+            : Math.max(this._shieldAssimilationDuration || life, currentTimer);
     }
 
     _getDefenseImpactFx(kind, duration = 16) {
@@ -4137,7 +4386,7 @@ class Enemy {
             || this._radiantAegisPulseTimer > 0 || this._radiantAegisBreakTimer > 0
             || this._energyArmorBlockTimer > 0 || this._livingArmorHitTimer > 0 || this._livingArmorBreakTimer > 0
             || this._phaseShieldBlockTimer > 0 || this._phaseShieldBreakTimer > 0
-            || this._lowDamageImmuneBlockTimer > 0;
+            || this._lowDamageImmuneBlockTimer > 0 || this._shieldAssimilationTimer > 0;
         if (!hasDefenseFx) return;
 
         const perfLevel = (typeof game !== 'undefined' && game.perfQualityLevel) || 'high';
@@ -4150,10 +4399,35 @@ class Enemy {
         const drawDirectionalPlate = (fx, alpha, palette, options = {}) => {
             const sideAngle = Number.isFinite(fx.sideAngle) ? fx.sideAngle : -Math.PI / 2;
             const style = options.style || 'shield';
-            const outward = Math.max(w, h) * 0.06 + (options.extraOut || 0);
-            const depth = edgeDepth * (options.depthMult || 1);
-            const span = edgeSpan * (options.spanMult || 1);
-            const alphaBase = clamp01(alpha);
+            const usesMembraneAsset = style === 'shield' || style === 'phase' || style === 'radiant' || style === 'living';
+            const absorbed = Math.max(0, fx.absorbed || 0);
+            const absorbBoost = options.absorbBoost === false
+                ? 0
+                : Math.min(options.maxAbsorbBoost ?? 0.32, absorbed / (options.absorbDivisor || 180));
+            const impactPower = 1 + absorbBoost * 0.82;
+            const lineBoost = 1 + absorbBoost * 0.54;
+            const curtainBoost = 1 + absorbBoost * 0.48;
+            const outward = Math.max(w, h) * (usesMembraneAsset ? 0.028 : 0.06)
+                + (options.extraOut || 0)
+                + absorbBoost * edgeDepth * (usesMembraneAsset ? 0.08 : 0.18);
+            const depth = edgeDepth * (options.depthMult || 1) * impactPower;
+            const span = edgeSpan * (options.spanMult || 1) * (1 + absorbBoost * 0.34);
+            const alphaBase = clamp01(alpha * (1 + absorbBoost * 0.12));
+            const breakProgress = fx.break ? clamp01(options.progress || 0) : 0;
+            const shieldMembraneLayers = usesMembraneAsset
+                ? (Array.isArray(fx.membraneStack) && fx.membraneStack.length > 0
+                    ? fx.membraneStack
+                    : _createDefenseFlowShieldMembraneStack(
+                        style === 'shield' ? 'shield' : style === 'living' ? 'livingArmor' : 'radiantAegis',
+                        false
+                    ))
+                : [];
+            const maxMembraneLayers = perfLevel === 'low' ? 2 : 3;
+            const shieldMembraneRecords = shieldMembraneLayers
+                .slice(0, maxMembraneLayers)
+                .map(layer => ({ layer, record: _getAffixOverlayImage(layer.src) }))
+                .filter(item => item.record && !item.record.failed && item.record.ready && item.record.img);
+            const hasShieldMembraneAsset = shieldMembraneRecords.length > 0;
 
             ctx.save();
             ctx.rotate(sideAngle);
@@ -4175,7 +4449,7 @@ class Enemy {
             // @perf-impact: Directional gradient overlay is gated off on low quality; no particles or persistent objects.
             const drawEnergyCurtain = (fillAlpha = 0.42) => {
                 ctx.save();
-                ctx.globalAlpha = alphaBase * fillAlpha;
+                ctx.globalAlpha = clamp01(alphaBase * fillAlpha * curtainBoost);
                 ctx.fillStyle = palette.fill;
                 traceEnergyCurtain();
                 ctx.fill();
@@ -4187,7 +4461,7 @@ class Enemy {
                     impactGradient.addColorStop(0.58, palette.gradientCore || palette.stroke);
                     impactGradient.addColorStop(0.86, palette.gradientTail || palette.fill);
                     impactGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                    ctx.globalAlpha = alphaBase * (options.gradientAlpha || 0.44);
+                    ctx.globalAlpha = clamp01(alphaBase * (options.gradientAlpha || 0.44) * (1 + absorbBoost * 0.44));
                     ctx.fillStyle = impactGradient;
                     traceEnergyCurtain(depth * 0.10, 0.92, 1.16);
                     ctx.fill();
@@ -4199,7 +4473,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = clamp01(alphaBase * alphaMult);
                 ctx.strokeStyle = color;
-                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.4) * lineMult);
+                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.4) * lineMult * lineBoost);
                 ctx.beginPath();
                 ctx.moveTo(-depth * 0.34 + offset, -span * 0.49 * spanScale);
                 ctx.quadraticCurveTo(depth * (0.24 + offset / Math.max(1, depth)), -span * 0.34 * spanScale, depth * 0.58 + offset, 0);
@@ -4208,7 +4482,188 @@ class Enemy {
                 ctx.restore();
             };
 
+            const drawImpactRidge = () => {
+                ctx.save();
+                ctx.globalAlpha = clamp01(alphaBase * (0.46 + absorbBoost * 0.26));
+                ctx.strokeStyle = palette.gradientHit || palette.ray || palette.stroke;
+                ctx.lineWidth = Math.max(1.4, (options.lineWidth || 2.4) * 0.36 * lineBoost);
+                ctx.beginPath();
+                ctx.moveTo(-depth * 0.30, -span * 0.36);
+                ctx.bezierCurveTo(depth * 0.34, -span * 0.26, depth * 0.76, -span * 0.08, depth * 0.86, 0);
+                ctx.bezierCurveTo(depth * 0.76, span * 0.08, depth * 0.34, span * 0.26, -depth * 0.30, span * 0.36);
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            const drawImpactCore = () => {
+                if (style !== 'shield' && style !== 'phase') return;
+                ctx.save();
+                ctx.globalAlpha = clamp01(alphaBase * (perfLevel === 'low' ? 0.46 : 0.58));
+                ctx.strokeStyle = palette.gradientHit || palette.ray || palette.stroke;
+                ctx.lineWidth = Math.max(1.5, (options.lineWidth || 2.4) * 0.40 * lineBoost);
+                ctx.shadowBlur = shadow((options.shadow || 10) * 0.28);
+                ctx.shadowColor = palette.glow || palette.stroke;
+                ctx.beginPath();
+                ctx.moveTo(-depth * 0.20, -span * 0.26);
+                ctx.quadraticCurveTo(depth * 0.48, -span * 0.18, depth * 1.02, 0);
+                ctx.quadraticCurveTo(depth * 0.48, span * 0.18, -depth * 0.20, span * 0.26);
+                ctx.stroke();
+                if (perfLevel !== 'low') {
+                    ctx.globalAlpha = clamp01(alphaBase * 0.28);
+                    ctx.strokeStyle = palette.gradientCore || palette.stroke;
+                    ctx.lineWidth = Math.max(1.0, (options.lineWidth || 2.4) * 0.20 * lineBoost);
+                    ctx.beginPath();
+                    ctx.moveTo(-depth * 0.08, -span * 0.15);
+                    ctx.quadraticCurveTo(depth * 0.42, -span * 0.08, depth * 0.74, 0);
+                    ctx.quadraticCurveTo(depth * 0.42, span * 0.08, -depth * 0.08, span * 0.15);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            };
+
+            // @perf-impact: Defense shield membranes use 2 cached transparent PNG drawImage calls on low and 3 on medium/high; no particles or persistent objects.
+            const drawShieldMembraneAsset = () => {
+                if (!hasShieldMembraneAsset) return false;
+                const progress = clamp01(options.progress || 0);
+                const lifeEase = Math.sin(progress * Math.PI);
+                let drew = false;
+
+                for (let i = 0; i < shieldMembraneRecords.length; i++) {
+                    const { layer, record } = shieldMembraneRecords[i];
+                    const source = record.sourceRect || {
+                        x: 0,
+                        y: 0,
+                        w: record.img.naturalWidth || record.img.width || 1,
+                        h: record.img.naturalHeight || record.img.height || 1,
+                    };
+                    if (!source.w || !source.h) continue;
+
+                    const wave = Math.sin(progress * Math.PI * 2 * layer.wave + layer.phase);
+                    const slide = (progress - 0.5) * layer.slide + wave * 0.010;
+                    const membraneHeightMult = style === 'phase' ? 1.12 : style === 'radiant' ? 1.18 : 1.16;
+                    const membraneHeight = span
+                        * membraneHeightMult
+                        * (1 + absorbBoost * 0.04)
+                        * layer.scale
+                        * (1 + breakProgress * (0.055 + i * 0.018))
+                        * (1 + layer.pulse * lifeEase * wave);
+                    const membraneWidth = Math.max(
+                        depth * 1.06,
+                        Math.min(span * 0.86, membraneHeight * (source.w / source.h))
+                    );
+                    const drawX = -membraneWidth * 0.48 - depth * 0.08 + depth * (layer.xBase + slide + breakProgress * (0.035 + i * 0.014));
+                    const drawY = -membraneHeight * 0.50
+                        + span * layer.yAmp * Math.sin(progress * Math.PI * 2.4 + layer.phase)
+                        + span * breakProgress * (i - 1) * 0.014;
+                    const centerX = drawX + membraneWidth * 0.50;
+                    const centerY = drawY + membraneHeight * 0.50;
+
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(layer.rotate * 0.55 * lifeEase * Math.sin(progress * Math.PI * 2 + layer.phase));
+                    ctx.scale(layer.flipX === false ? 1 : -1, 1);
+                    ctx.globalAlpha = clamp01(alphaBase * layer.alpha * (perfLevel === 'low' ? 0.86 : 1) * (0.94 + lifeEase * 0.06) * (fx.break ? 0.92 : 1));
+                    ctx.globalCompositeOperation = perfLevel !== 'low' && layer.blend === 'screen' ? 'screen' : 'source-over';
+                    ctx.shadowBlur = shadow((options.shadow || 10) * (0.16 + i * 0.06));
+                    ctx.shadowColor = palette.glow || palette.stroke;
+                    try {
+                        ctx.drawImage(
+                            record.img,
+                            source.x,
+                            source.y,
+                            source.w,
+                            source.h,
+                            -membraneWidth / 2,
+                            -membraneHeight / 2,
+                            membraneWidth,
+                            membraneHeight
+                        );
+                        drew = true;
+                    } catch (err) {
+                        ctx.restore();
+                        return drew;
+                    }
+                    ctx.restore();
+                }
+                return drew;
+            };
+
+            const drawOvershieldEcho = () => {
+                if (style !== 'shield' && style !== 'phase') return;
+                const echoScale = style === 'phase' ? 1.17 : 1.22;
+                const echoAlpha = perfLevel === 'low'
+                    ? 0.52
+                    : (style === 'phase' ? 0.60 : 0.66) + absorbBoost * 0.10;
+                const diffractionColors = palette.diffraction || [
+                    'rgba(125, 211, 252, 0.56)',
+                    'rgba(216, 180, 254, 0.42)',
+                    'rgba(253, 224, 71, 0.34)'
+                ];
+                ctx.save();
+                ctx.globalAlpha = clamp01(alphaBase * echoAlpha);
+                ctx.strokeStyle = palette.bubbleRim || palette.ray || palette.stroke;
+                ctx.lineWidth = Math.max(1.8, (options.lineWidth || 2.4) * 0.34 * lineBoost);
+                ctx.shadowBlur = shadow((options.shadow || 10) * 0.30);
+                ctx.shadowColor = palette.glow || palette.stroke;
+                traceEnergyCurtain(-depth * 0.04, echoScale, echoScale);
+                ctx.stroke();
+
+                if (perfLevel !== 'low') {
+                    const filmGradient = ctx.createLinearGradient(-depth * 0.64, -span * 0.48, depth * 0.94, span * 0.40);
+                    filmGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+                    filmGradient.addColorStop(0.22, palette.bubbleFilmA || 'rgba(186, 230, 253, 0.16)');
+                    filmGradient.addColorStop(0.48, palette.bubbleFilmB || 'rgba(221, 214, 254, 0.12)');
+                    filmGradient.addColorStop(0.70, palette.bubbleFilmC || 'rgba(254, 240, 138, 0.10)');
+                    filmGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.globalAlpha = clamp01(alphaBase * (0.48 + absorbBoost * 0.12));
+                    ctx.fillStyle = filmGradient;
+                    traceEnergyCurtain(-depth * 0.08, echoScale * 1.08, echoScale * 1.10);
+                    ctx.fill();
+
+                    ctx.globalCompositeOperation = 'screen';
+                    for (let i = 0; i < diffractionColors.length; i++) {
+                        const t = diffractionColors.length === 1 ? 0.5 : i / (diffractionColors.length - 1);
+                        const yOffset = (t - 0.5) * span * 0.050;
+                        const xOffset = -depth * (0.10 + i * 0.010);
+                        ctx.globalAlpha = clamp01(alphaBase * (0.25 - i * 0.025 + absorbBoost * 0.06));
+                        ctx.strokeStyle = diffractionColors[i];
+                        ctx.lineWidth = Math.max(0.8, (options.lineWidth || 2.4) * (0.15 - i * 0.014) * lineBoost);
+                        ctx.shadowColor = diffractionColors[i];
+                        ctx.shadowBlur = shadow((options.shadow || 10) * (0.18 - i * 0.025));
+                        ctx.beginPath();
+                        ctx.moveTo(xOffset - depth * 0.34, yOffset - span * 0.48 * echoScale);
+                        ctx.quadraticCurveTo(depth * 0.40, yOffset - span * (0.35 + i * 0.012) * echoScale, depth * (0.78 + i * 0.025), yOffset);
+                        ctx.quadraticCurveTo(depth * 0.40, yOffset + span * (0.35 + i * 0.012) * echoScale, xOffset - depth * 0.34, yOffset + span * 0.48 * echoScale);
+                        ctx.stroke();
+                    }
+
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha = clamp01(alphaBase * (0.40 + absorbBoost * 0.10));
+                    ctx.strokeStyle = palette.bubbleHighlight || 'rgba(248, 250, 252, 0.72)';
+                    ctx.lineWidth = Math.max(1.0, (options.lineWidth || 2.4) * 0.16 * lineBoost);
+                    const causticCount = 2;
+                    for (let i = 0; i < causticCount; i++) {
+                        const y = (i === 0 ? -0.22 : 0.23) * span * echoScale;
+                        const lift = (i === 0 ? -1 : 1) * span * 0.08;
+                        ctx.beginPath();
+                        ctx.moveTo(-depth * 0.22, y);
+                        ctx.quadraticCurveTo(depth * 0.20, y + lift, depth * 0.56, y * 0.50);
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            };
+
+            drawShieldMembraneAsset();
+            if (usesMembraneAsset) {
+                ctx.restore();
+                return;
+            }
+
             drawEnergyCurtain(style === 'energy' ? 0.50 : style === 'shell' ? 0.32 : style === 'phase' ? 0.44 : style === 'living' ? 0.36 : 0.40);
+            drawImpactRidge();
+            drawImpactCore();
+            drawOvershieldEcho();
 
             if (style === 'radiant') {
                 const colors = palette.colors || [palette.stroke];
@@ -4248,7 +4703,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = alphaBase * 0.78;
                 ctx.strokeStyle = palette.ray || palette.stroke;
-                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.38);
+                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.38 * lineBoost);
                 for (let i = -1; i <= 1; i++) {
                     const y = i * span * 0.18;
                     ctx.beginPath();
@@ -4261,7 +4716,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = alphaBase * 0.72;
                 ctx.strokeStyle = palette.pressure || palette.stroke;
-                ctx.lineWidth = Math.max(1.3, (options.lineWidth || 2.4) * 0.46);
+                ctx.lineWidth = Math.max(1.3, (options.lineWidth || 2.4) * 0.46 * lineBoost);
                 for (let i = -1; i <= 1; i++) {
                     const y = i * span * 0.16;
                     ctx.beginPath();
@@ -4274,7 +4729,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = alphaBase * 0.76;
                 ctx.strokeStyle = palette.pressure || palette.stroke;
-                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.38);
+                ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.38 * lineBoost);
                 const veinCount = perfLevel === 'low' ? 4 : 7;
                 for (let i = 0; i < veinCount; i++) {
                     const t = veinCount === 1 ? 0.5 : i / (veinCount - 1);
@@ -4301,7 +4756,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = alphaBase * 0.62;
                 ctx.strokeStyle = palette.pressure || palette.stroke;
-                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.4) * 0.30);
+                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.4) * 0.30 * lineBoost);
                 ctx.setLineDash([Math.max(3, depth * 0.16), Math.max(4, depth * 0.18)]);
                 for (let i = -1; i <= 1; i++) {
                     const y = i * span * 0.19;
@@ -4315,7 +4770,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = alphaBase * 0.70;
                 ctx.strokeStyle = palette.pressure || palette.stroke;
-                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.4) * 0.36);
+                ctx.lineWidth = Math.max(1.2, (options.lineWidth || 2.4) * 0.36 * lineBoost);
                 for (let i = -1; i <= 1; i++) {
                     const y = i * span * 0.16;
                     ctx.beginPath();
@@ -4329,7 +4784,7 @@ class Enemy {
                 ctx.save();
                 ctx.globalAlpha = alphaBase * 0.68;
                 ctx.strokeStyle = palette.pressure || palette.stroke;
-                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.4) * 0.30);
+                ctx.lineWidth = Math.max(1, (options.lineWidth || 2.4) * 0.30 * lineBoost);
                 for (let i = -2; i <= 2; i++) {
                     const y = i * span * 0.12;
                     ctx.beginPath();
@@ -4345,7 +4800,7 @@ class Enemy {
             ctx.save();
             ctx.globalAlpha = alphaBase * (options.rayAlpha || 0.82);
             ctx.strokeStyle = palette.ray || palette.stroke;
-            ctx.lineWidth = Math.max(1.25, (options.lineWidth || 2.4) * 0.45);
+            ctx.lineWidth = Math.max(1.25, (options.lineWidth || 2.4) * 0.45 * lineBoost);
             ctx.shadowBlur = shadow((options.shadow || 10) * 0.65);
             for (let i = 0; i < rayCount; i++) {
                 const t = rayCount === 1 ? 0.5 : i / (rayCount - 1);
@@ -4361,7 +4816,7 @@ class Enemy {
             ctx.save();
             ctx.globalAlpha = alphaBase * 0.52;
             ctx.strokeStyle = palette.pressure || palette.stroke;
-            ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.34);
+            ctx.lineWidth = Math.max(1.1, (options.lineWidth || 2.4) * 0.34 * lineBoost);
             ctx.setLineDash([Math.max(4, depth * 0.20), Math.max(3, depth * 0.12)]);
             for (let i = -1; i <= 1; i++) {
                 const y = i * span * 0.19;
@@ -4514,14 +4969,16 @@ class Enemy {
 
         const drawDefensePlate = (kind, timer, duration, palette, options = {}) => {
             if (timer <= 0) return;
-            const alpha = clamp01(timer / duration) * (options.alpha || 1);
+            const timerRatio = clamp01(timer / duration);
+            const alpha = timerRatio * (options.alpha || 1);
             const fx = this._getDefenseImpactFx(kind, duration);
+            const plateOptions = { ...options, progress: 1 - timerRatio };
             ctx.save();
             ctx.globalAlpha = alpha;
             if (fx.mode === 'directional') {
-                drawDirectionalPlate(fx, alpha, palette, options);
+                drawDirectionalPlate(fx, alpha, palette, plateOptions);
             } else {
-                drawFrontPlate(alpha, palette, options);
+                drawFrontPlate(alpha, palette, plateOptions);
             }
             ctx.restore();
         };
@@ -4576,18 +5033,23 @@ class Enemy {
         };
 
         // @section:defense_fx_type_dispatch - 各防御层样式分发
-        // @perf-impact: 防御受击反馈只绘制短生命周期描边/切线，不新增粒子、渐变或持久对象；shadowBlur 受 low 档门控。
-        drawDefensePlate('shield', this.shieldHitTimer, 20, {
+        // @perf-impact: Shield/phase/radiant/living armor impacts use cached PNG membrane draws; other defense cuts remain short-lived Canvas strokes. No particles or persistent objects.
+        drawDefensePlate('shield', Math.max(this.shieldHitTimer, this._shieldBreakTimer), this._shieldBreakTimer > 0 ? 24 : 20, {
             stroke: 'rgba(147, 197, 253, 0.98)',
-            fill: 'rgba(147, 197, 253, 0.20)',
-            glow: '#60a5fa',
-            ray: 'rgba(219, 234, 254, 0.95)',
-            pressure: 'rgba(96, 165, 250, 0.92)',
-            gradientHit: 'rgba(248, 250, 252, 0.92)',
-            gradientCore: 'rgba(147, 197, 253, 0.82)',
-            gradientTail: 'rgba(59, 130, 246, 0.12)'
-        }, { style: 'shield', shadow: 18, lineWidth: 4.8, alpha: 1.0, rayAlpha: 1.0, gradientAlpha: 0.54, depthMult: 1.16, spanMult: 1.12 });
-        drawBreakCuts('shield', this._shieldBreakTimer, 24, 'rgba(191, 219, 254, 0.88)', 5);
+            fill: 'rgba(186, 230, 253, 0.18)',
+            glow: '#7dd3fc',
+            ray: 'rgba(226, 246, 255, 0.88)',
+            pressure: 'rgba(125, 211, 252, 0.70)',
+            gradientHit: 'rgba(255, 255, 255, 0.88)',
+            gradientCore: 'rgba(186, 230, 253, 0.62)',
+            gradientTail: 'rgba(96, 165, 250, 0.08)',
+            bubbleRim: 'rgba(226, 246, 255, 0.82)',
+            bubbleHighlight: 'rgba(255, 255, 255, 0.66)',
+            bubbleFilmA: 'rgba(125, 211, 252, 0.18)',
+            bubbleFilmB: 'rgba(216, 180, 254, 0.13)',
+            bubbleFilmC: 'rgba(254, 240, 138, 0.10)',
+            diffraction: ['rgba(125, 211, 252, 0.52)', 'rgba(216, 180, 254, 0.40)', 'rgba(253, 224, 71, 0.30)']
+        }, { style: 'shield', shadow: this._shieldBreakTimer > 0 ? 15 : 13, lineWidth: 4.4, alpha: 1.0, rayAlpha: 0.72, gradientAlpha: 0.42, depthMult: this._shieldBreakTimer > 0 ? 1.18 : 1.14, spanMult: this._shieldBreakTimer > 0 ? 1.12 : 1.10, rayCount: perfLevel === 'low' ? 3 : 5, maxAbsorbBoost: 0.34, absorbDivisor: 120 });
 
         drawDefensePlate('phaseShield', Math.max(this._phaseShieldBlockTimer, this._phaseShieldBreakTimer), this._phaseShieldBreakTimer > 0 ? 24 : 22, {
             stroke: 'rgba(165, 180, 252, 0.96)',
@@ -4599,8 +5061,7 @@ class Enemy {
             gradientHit: 'rgba(238, 242, 255, 0.86)',
             gradientCore: 'rgba(165, 180, 252, 0.76)',
             gradientTail: 'rgba(109, 40, 217, 0.12)'
-        }, { style: 'phase', shadow: this._phaseShieldBreakTimer > 0 ? 19 : 16, lineWidth: this._phaseShieldBreakTimer > 0 ? 4.1 : 3.5, alpha: 1.0, rayAlpha: 0.92, gradientAlpha: 0.48, depthMult: 1.20, spanMult: 1.14, rayCount: perfLevel === 'low' ? 3 : 5 });
-        drawBreakCuts('phaseShield', this._phaseShieldBreakTimer, 24, 'rgba(196, 181, 253, 0.88)', 5);
+        }, { style: 'phase', shadow: this._phaseShieldBreakTimer > 0 ? 15 : 13, lineWidth: this._phaseShieldBreakTimer > 0 ? 4.0 : 3.6, alpha: 1.0, rayAlpha: 0.74, gradientAlpha: 0.44, depthMult: this._phaseShieldBreakTimer > 0 ? 1.17 : 1.13, spanMult: this._phaseShieldBreakTimer > 0 ? 1.10 : 1.08, rayCount: perfLevel === 'low' ? 3 : 5, maxAbsorbBoost: 0.30, absorbDivisor: 125 });
 
         drawDefensePlate('ward', Math.max(this._wardBlockTimer, this._wardBreakTimer), this._wardBreakTimer > 0 ? 24 : 22, {
             stroke: 'rgba(103, 232, 249, 0.98)',
@@ -4624,8 +5085,7 @@ class Enemy {
             gradientHit: 'rgba(240, 249, 255, 0.88)',
             gradientCore: this._radiantAegisBreakTimer > 0 ? 'rgba(240, 171, 252, 0.78)' : 'rgba(103, 232, 249, 0.78)',
             gradientTail: 'rgba(167, 139, 250, 0.14)'
-        }, { style: 'radiant', shadow: this._radiantAegisBreakTimer > 0 ? 20 : 17, lineWidth: this._radiantAegisBreakTimer > 0 ? 4.2 : 3.5, alpha: 1.0, rayAlpha: 0.96, gradientAlpha: 0.52, depthMult: 1.30, spanMult: 1.22 });
-        drawBreakCuts('radiantAegis', this._radiantAegisBreakTimer, 28, 'rgba(240, 171, 252, 0.88)', 7);
+        }, { style: 'radiant', shadow: this._radiantAegisBreakTimer > 0 ? 17 : 15, lineWidth: this._radiantAegisBreakTimer > 0 ? 4.2 : 3.5, alpha: 1.0, rayAlpha: 0.96, gradientAlpha: 0.52, depthMult: this._radiantAegisBreakTimer > 0 ? 1.20 : 1.16, spanMult: this._radiantAegisBreakTimer > 0 ? 1.13 : 1.10 });
 
         drawDefensePlate('energyArmor', this._energyArmorBlockTimer, 20, {
             stroke: 'rgba(251, 191, 36, 0.94)',
@@ -4648,7 +5108,6 @@ class Enemy {
             gradientCore: 'rgba(190, 242, 100, 0.72)',
             gradientTail: 'rgba(101, 163, 13, 0.12)'
         }, { style: 'living', shadow: this._livingArmorBreakTimer > 0 ? 15 : 13, lineWidth: this._livingArmorBreakTimer > 0 ? 3.8 : 3.4, alpha: 0.98, rayAlpha: 0.88, gradientAlpha: 0.46, depthMult: this._livingArmorBreakTimer > 0 ? 1.12 : 1.04, spanMult: 1.08 });
-        drawBreakCuts('livingArmor', this._livingArmorBreakTimer, 26, 'rgba(217, 249, 157, 0.9)', 5);
 
         drawDefensePlate('lowDamageImmune', this._lowDamageImmuneBlockTimer, 18, {
             stroke: 'rgba(203, 213, 225, 0.94)',
@@ -4660,6 +5119,91 @@ class Enemy {
             gradientCore: 'rgba(203, 213, 225, 0.62)',
             gradientTail: 'rgba(71, 85, 105, 0.12)'
         }, { style: 'shell', shadow: 11, lineWidth: 3.9, alpha: 0.94, rayAlpha: 0.66, gradientAlpha: 0.36, depthMult: 0.94, spanMult: 0.94, rayCount: perfLevel === 'low' ? 2 : 4 });
+
+        this._drawShieldAssimilationFeedback(ctx, w, h, r, perfLevel);
+    }
+
+    // @perf-impact: 流彩扩盾目标侧短反馈；high/medium 使用一次线性渐变和 _sb 门控发光，low 降级为平面线条，不新增粒子或持久对象。
+    _drawShieldAssimilationFeedback(ctx, w, h, r, perfLevel = 'high') {
+        const timer = this._shieldAssimilationTimer || 0;
+        const duration = Math.max(1, this._shieldAssimilationDuration || 24);
+        if (timer <= 0) return;
+
+        const clamp01 = (value) => Math.max(0, Math.min(1, value));
+        const progress = clamp01(1 - timer / duration);
+        const life = Math.sin(progress * Math.PI);
+        const alpha = clamp01(0.18 + life * 0.76);
+        const dirX = Number.isFinite(this._shieldAssimilationFromX) ? this._shieldAssimilationFromX : 0;
+        const dirY = Number.isFinite(this._shieldAssimilationFromY) ? this._shieldAssimilationFromY : -1;
+        const angle = Math.atan2(dirY, dirX);
+        const edge = Math.max(w, h) * (0.62 + progress * 0.10);
+        const core = Math.max(8, Math.min(w, h) * 0.19);
+        const stitchSpan = Math.max(14, Math.min(w, h) * 0.34);
+        const shadow = perfLevel === 'low' ? 0 : 12;
+        const ribbonCount = perfLevel === 'low' ? 2 : 3;
+
+        ctx.save();
+        ctx.rotate(angle);
+        ctx.globalAlpha = alpha;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = _sb(shadow);
+        ctx.shadowColor = '#67e8f9';
+        if (perfLevel !== 'low') ctx.globalCompositeOperation = 'screen';
+
+        const ribbonStroke = perfLevel === 'low'
+            ? 'rgba(165, 243, 252, 0.82)'
+            : (() => {
+                const g = ctx.createLinearGradient(edge, 0, core * 0.28, 0);
+                g.addColorStop(0, 'rgba(240, 171, 252, 0)');
+                g.addColorStop(0.22, 'rgba(240, 171, 252, 0.74)');
+                g.addColorStop(0.52, 'rgba(103, 232, 249, 0.88)');
+                g.addColorStop(0.82, 'rgba(254, 240, 138, 0.62)');
+                g.addColorStop(1, 'rgba(147, 197, 253, 0.08)');
+                return g;
+            })();
+
+        for (let i = 0; i < ribbonCount; i++) {
+            const lane = i - (ribbonCount - 1) / 2;
+            const y = lane * stitchSpan * 0.24;
+            const weave = Math.sin(progress * Math.PI * 2 + i * 1.7 + this.visualSeed * 4) * stitchSpan * 0.08;
+            ctx.globalAlpha = alpha * (0.68 - i * 0.10);
+            ctx.strokeStyle = ribbonStroke;
+            ctx.lineWidth = Math.max(1.1, (perfLevel === 'low' ? 1.4 : 2.2) - i * 0.18);
+            ctx.beginPath();
+            ctx.moveTo(edge, y + weave);
+            ctx.quadraticCurveTo(edge * 0.58, y * 0.45 - weave * 0.55, core * 1.15, y * 0.18);
+            ctx.quadraticCurveTo(core * 0.62, y * 0.06, core * 0.16, 0);
+            ctx.stroke();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = _sb(perfLevel === 'low' ? 0 : 8);
+        ctx.shadowColor = '#93c5fd';
+        ctx.globalAlpha = alpha * 0.72;
+        ctx.strokeStyle = 'rgba(191, 219, 254, 0.90)';
+        ctx.lineWidth = Math.max(1.2, perfLevel === 'low' ? 1.4 : 2.0);
+        ctx.beginPath();
+        ctx.moveTo(0, -stitchSpan * 0.56);
+        ctx.lineTo(core * 0.88, 0);
+        ctx.lineTo(0, stitchSpan * 0.56);
+        ctx.lineTo(-core * 0.62, 0);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.globalAlpha = alpha * (perfLevel === 'low' ? 0.42 : 0.58);
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.78)';
+        ctx.lineWidth = Math.max(1.0, perfLevel === 'low' ? 1.0 : 1.35);
+        const ribCount = perfLevel === 'low' ? 3 : 5;
+        for (let i = 0; i < ribCount; i++) {
+            const t = ribCount === 1 ? 0.5 : i / (ribCount - 1);
+            const y = -stitchSpan * 0.36 + stitchSpan * 0.72 * t;
+            ctx.beginPath();
+            ctx.moveTo(-core * 0.42, y);
+            ctx.quadraticCurveTo(0, y * 0.72, core * 0.48, y * 0.38);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
 
     // @perf-impact: 仅递减若干特效计时器，不分配对象；为护盾/偏折/跳越反馈提供统一生命周期。
@@ -4670,6 +5214,7 @@ class Enemy {
         if (this._wardBreakTimer > 0) this._wardBreakTimer = Math.max(0, this._wardBreakTimer - timeScale);
         if (this._radiantAegisPulseTimer > 0) this._radiantAegisPulseTimer = Math.max(0, this._radiantAegisPulseTimer - timeScale);
         if (this._radiantAegisBreakTimer > 0) this._radiantAegisBreakTimer = Math.max(0, this._radiantAegisBreakTimer - timeScale);
+        if (this._shieldAssimilationTimer > 0) this._shieldAssimilationTimer = Math.max(0, this._shieldAssimilationTimer - timeScale);
         if (this._energyArmorBlockTimer > 0) this._energyArmorBlockTimer = Math.max(0, this._energyArmorBlockTimer - timeScale);
         if (this._phaseShieldBlockTimer > 0) this._phaseShieldBlockTimer = Math.max(0, this._phaseShieldBlockTimer - timeScale);
         if (this._phaseShieldBreakTimer > 0) this._phaseShieldBreakTimer = Math.max(0, this._phaseShieldBreakTimer - timeScale);
@@ -4982,21 +5527,23 @@ class Enemy {
         // 衰减；总体 alpha 降低，避免大面积纯色显得廉价，让 game-container 的
         // 径向背景充分透出，强化"半透明面板嵌在战场上"的高级质感。
         // @perf-impact: 容器背景渐变按实例缓存（色标静态，仅依赖 h）- 消除每帧每敌 1 个 LinearGradient 分配
-        if (!this._cachedBgGrad || this._cachedBgGradH !== h) {
-            const _bg = ctx.createLinearGradient(0, -h/2, 0, h/2);
-            _bg.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
-            _bg.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
-            this._cachedBgGrad = _bg;
-            this._cachedBgGradH = h;
+        if (!this._usesEliteGolemAffixComboSprite) {
+            if (!this._cachedBgGrad || this._cachedBgGradH !== h) {
+                const _bg = ctx.createLinearGradient(0, -h/2, 0, h/2);
+                _bg.addColorStop(0, 'rgba(30, 41, 59, 0.04)');
+                _bg.addColorStop(1, 'rgba(8, 14, 26, 0.12)');
+                this._cachedBgGrad = _bg;
+                this._cachedBgGradH = h;
+            }
+            ctx.fillStyle = this._cachedBgGrad;
+            ctx.fill();
         }
-        ctx.fillStyle = this._cachedBgGrad;
-        ctx.fill();
         // [增强对比 #4] 在裁剪之前先给容器外缘绘制一圈柔光描边，
         // 让敌人在与背景同色的「液态」战场上仍能识别轮廓（精英/Boss 尤其关键）。
         // 由于 ctx.clip() 之后描边会被裁剪一半，这里预先绘制可保留完整外缘。
         // [柔化] 外缘轮廓改为更柔的辉光：降低描边 alpha，让轮廓融入背景而不是
         // 像贴上去的环。shadowBlur 略增以补偿亮度损失，整体感觉更"渗出"而非"切边"。
-        if (!collisionFrameCandidate) {
+        if (!collisionFrameCandidate && !this._usesEliteGolemAffixComboSprite) {
             ctx.save();
             ctx.shadowColor = (this.type === 'boss') ? 'rgba(239, 68, 68, 0.55)'
                              : (this.type === 'elite') ? 'rgba(168, 85, 247, 0.50)'
@@ -5014,6 +5561,8 @@ class Enemy {
         // 绘制，从而"贴在敌人身上却不被身体轮廓裁掉"。
         ctx.save(); // [S_clip] 身体裁剪作用域开始
         ctx.clip();
+
+        if (!this._usesEliteGolemAffixComboSprite) {
 
          // === Layer 1.5: 底层纹理 (预计算 OffscreenCanvas) ===
         if (this._textureCanvas) {
@@ -6128,6 +6677,8 @@ class Enemy {
             }
         }
 
+        }
+
         // === Layer 3.55: V2 基底敌人轮廓美术（尺寸 × 基底 × 词条）===
         // 在通用词缀特效之后、词缀印章之前绘制，让大型敌人的基底身份先于小图标被识别。
         if (this.baseArchetype && this.type !== 'boss') {
@@ -6135,7 +6686,7 @@ class Enemy {
         }
         // === Layer 3.6: 词缀组合标识章（印章图标）===
         // 顶部绘制每个词缀对应的几何印章，让玩家能直观识别词缀组合
-        if (this.affixes && this.affixes.length > 0 && this.type !== 'boss') {
+        if (this.affixes && this.affixes.length > 0 && this.type !== 'boss' && !this._usesEliteGolemAffixComboSprite) {
             this._drawAffixSigil(ctx, w, h);
         }
 
@@ -6155,14 +6706,19 @@ class Enemy {
             if (isLargeV2) {
                 const padX = 6, padY = 6;
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
+            } else if (this._usesEliteGolemAffixComboSprite) {
+                const sprSize1 = Math.min(w, h) * 1.10;
+                this._spriteRenderer.draw(ctx, -sprSize1/2, h/2 - sprSize1 + h * 0.10, sprSize1, sprSize1, 1);
             } else {
                 const sprSize1 = Math.min(w, h);
                 this._spriteRenderer.draw(ctx, -sprSize1/2, h/2 - sprSize1, sprSize1, sprSize1, 0.85);
             }
             ctx.restore();
         }
-        this._drawAffixBitmapOverlays(ctx, w, h);
-        this._drawEnemyTargetingFallback(ctx, w, h);
+        if (!this._usesEliteGolemAffixComboSprite) {
+            this._drawAffixBitmapOverlays(ctx, w, h);
+            this._drawEnemyTargetingFallback(ctx, w, h);
+        }
         this._drawRuneRewardFallback(ctx, w, h);
         // === Layer 4: 裂纹绘制 (Fissures) - [保持不变] ===
 
@@ -6280,8 +6836,8 @@ class Enemy {
         // === 边框分级样式（Border Tier）：根据词条数量 + Boss 类型决定边框颜色/线宽 ===
         // @perf-impact: 仅替换 strokeStyle/lineWidth，无额外 Canvas 操作，性能影响极低
         if (!boundaryFrameDrawn && !collisionFrameCandidate) {
-        ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; // 默认：0 词条（无特殊边框）
-        if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 4; } // Boss 保持红色基础边框
+        ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; // 默认：0 词条（无特殊边框）
+        if (this.type === 'boss') { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; } // Boss 保持红色基础边框
         if (this.type === 'elite' || this.type === 'boss') {
             const affixCount = this.affixes ? this.affixes.length : 0;
             const tierCfg = CONFIG.enemyRender;
@@ -6307,7 +6863,7 @@ class Enemy {
                 ctx.lineWidth = tierCfg.borderTierIronWidth;
             } else {
                 // 0 词条精英：无特殊边框（保持默认灰色）
-                ctx.strokeStyle = '#334155'; ctx.lineWidth = 2;
+                ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
             }
         }
 
@@ -6514,8 +7070,6 @@ class Enemy {
             ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, this._hitFlashTimer / flashDuration) * flashMaxAlpha})`;
             ctx.fillRect(-w/2, -h/2, w, h);
         }
-        // --- 词条特效层：护盾/偏折屏障受击视觉反馈 ---
-        this._drawDefenseImpactFeedback(ctx, w, h, r);
 
         // === Layer 5.5: 插在身上的子剑 (Stuck Swords) ===
         if (this.stuckSwords && this.stuckSwords.length > 0) {
@@ -6592,6 +7146,10 @@ class Enemy {
             this._drawBossVulnerabilityOverlay(ctx, w, h);
             this._drawBossRainbowBorder(ctx, w, h);
         }
+
+        // --- 词条特效层：护盾/偏折屏障受击视觉反馈 ---
+        // 放在 [S_clip] 裁剪恢复之后，保证外扩帷幕和流光衍射不被物理边界裁掉。
+        this._drawDefenseImpactFeedback(ctx, w, h, r);
 
         // [HUD-fix] 裁剪结束、S1 变换仍生效时绘制 HUD：血量数字 + 护盾标记融合显示，
         // 以及状态标签。这样既贴在敌人身上、又不会被身体轮廓裁掉，也无黑色底板。
@@ -6871,6 +7429,21 @@ class Enemy {
         // [WindMarkEffect] 持续风场视觉特效（世界坐标空间）
         if (this._windMarkEffect) {
             this._windMarkEffect.draw(ctx);
+        }
+
+        // [BounceArcEffect] 弹跳动能弧线（世界坐标空间，Phase 2.7）
+        if (this._bounceArcEffect) {
+            this._bounceArcEffect.draw(ctx);
+        }
+
+        // [ScatterBurstEffect] 散射星爆（世界坐标空间，Phase 2.9）
+        if (this._scatterBurstEffect) {
+            this._scatterBurstEffect.draw(ctx);
+        }
+
+        // [EchoRippleEffect] 回响波纹（世界坐标空间，Phase 2.11）
+        if (this._echoRippleEffect) {
+            this._echoRippleEffect.draw(ctx);
         }
 
         // === Layer 6.8: 遗物标记敌人专属金边 (Relic Reward Border) ===
@@ -7190,8 +7763,8 @@ class Enemy {
             }
         }
 
-        // --- Enemy intent telegraph: icon + label + countdown ring ---
-        // @perf-impact: 敌人意图预告语义提示 - high/medium 使用 shadowBlur 轻光晕，low 降级为平面面板与描边
+        // --- Enemy intent telegraph: bitmap icon + countdown instrument ---
+        // @perf-impact: enemy intent telegraph adds one cached bitmap draw, ring strokes, and a static panel; high/medium use shadowBlur glow, low keeps the same semantic panel without glow or extra particles.
         if (this.actionPhase === 'telegraphing' && this.actionIcon) {
             ctx.save();
             const _intent = this.telegraphIntent || {
@@ -7204,47 +7777,119 @@ class Enemy {
             const _duration = Math.max(1, _teleCfg.telegraphDuration || 48);
             const _progress = Math.max(0, Math.min(1, this.telegraphTimer / _duration));
             const _pulse = 0.5 + Math.sin((1 - _progress) * Math.PI * 8) * 0.5;
+            const _severity = Math.max(1, Math.min(4, _intent.severity || 1));
+            const _label = String(_intent.label || this.actionName || '');
             const _perfBudget = (typeof game !== 'undefined' && game.perfQualityLevel)
                 ? CONFIG.performance[game.perfQualityLevel]
                 : CONFIG.performance.high;
             const _glowEnabled = _perfBudget.enemyTelegraphGlow !== false;
-            const _panelW = Math.max(66, Math.min(104, this.width + 24));
-            const _panelH = 44;
+            const _iconKey = TELEGRAPH_ICON_AFFIX_BY_KEY[_intent.key] || _intent.key;
+            const _intentIcon = getUiBitmap(_intent.iconSrc || ENEMY_AFFIX_ICON_MAP[_iconKey]);
+            let _labelSize = _teleCfg.telegraphLabelSize || 12;
+            ctx.font = `bold ${_labelSize}px sans-serif`;
+            const _targetPanelW = Math.max(this.width + 30, ctx.measureText(_label).width + 74);
+            const _panelW = Math.max(108, Math.min(156, _targetPanelW));
+            const _panelH = 48;
+            const _maxLabelW = Math.max(42, _panelW - 66);
+            while (_labelSize > 9 && ctx.measureText(_label).width > _maxLabelW) {
+                _labelSize -= 1;
+                ctx.font = `bold ${_labelSize}px sans-serif`;
+            }
             const _iconY = this.pos.y - this.height / 2 - (_teleCfg.telegraphYOffset || 42);
-            const _scale = 1 + _pulse * 0.06 + (_intent.severity || 1) * 0.015;
+            const _scale = 1 + _pulse * 0.045 + _severity * 0.012;
+            const _edgeColor = _intent.color || '#ffffff';
+            const _iconX = -_panelW / 2 + 25;
 
             ctx.translate(this.pos.x, _iconY);
             ctx.scale(_scale, _scale);
 
             ctx.fillStyle = _glowEnabled
-                ? `rgba(15, 23, 42, ${0.78 + _pulse * 0.08})`
-                : 'rgba(15, 23, 42, 0.9)';
-            ctx.strokeStyle = _intent.color;
-            ctx.lineWidth = 1.5 + (_intent.severity || 1) * 0.35;
-            ctx.shadowColor = _intent.color;
-            ctx.shadowBlur = _glowEnabled ? _sb(8 + (_intent.severity || 1) * 5 + _pulse * 6) : 0;
+                ? `rgba(8, 13, 24, ${0.86 + _pulse * 0.06})`
+                : 'rgba(8, 13, 24, 0.94)';
+            ctx.strokeStyle = _edgeColor;
+            ctx.lineWidth = 1.5 + _severity * 0.3;
+            ctx.shadowColor = _edgeColor;
+            ctx.shadowBlur = _glowEnabled ? _sb(7 + _severity * 4 + _pulse * 5) : 0;
             ctx.beginPath();
-            ctx.roundRect(-_panelW / 2, -_panelH / 2, _panelW, _panelH, _teleCfg.telegraphPanelRadius || 12);
+            ctx.roundRect(-_panelW / 2, -_panelH / 2, _panelW, _panelH, _teleCfg.telegraphPanelRadius || 11);
             ctx.fill();
             ctx.stroke();
 
             ctx.shadowBlur = 0;
+            ctx.globalAlpha = 0.7;
+            ctx.strokeStyle = 'rgba(248, 250, 252, 0.18)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(-_panelW / 2 + 19, 0, 13, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - _progress));
-            ctx.strokeStyle = _intent.color;
-            ctx.lineWidth = 3;
+            ctx.moveTo(-_panelW / 2 + 44, -_panelH / 2 + 9);
+            ctx.lineTo(_panelW / 2 - 10, -_panelH / 2 + 9);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.76)';
+            ctx.strokeStyle = 'rgba(226, 232, 240, 0.24)';
+            ctx.lineWidth = 1.25;
+            ctx.beginPath();
+            ctx.arc(_iconX, 0, 17, 0, Math.PI * 2);
+            ctx.fill();
             ctx.stroke();
 
-            ctx.font = `bold ${_teleCfg.telegraphIconSize || 24}px sans-serif`;
-            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.arc(_iconX, 0, 18.5, -Math.PI / 2, Math.PI * 1.5);
+            ctx.stroke();
+            ctx.strokeStyle = _edgeColor;
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.arc(_iconX, 0, 18.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - _progress));
+            ctx.stroke();
+
+            if (_intentIcon) {
+                const _drawSize = _teleCfg.telegraphIconSize || 28;
+                ctx.drawImage(_intentIcon, _iconX - _drawSize / 2, -_drawSize / 2, _drawSize, _drawSize);
+            } else {
+                ctx.font = `bold ${_teleCfg.telegraphIconSize || 23}px sans-serif`;
+                ctx.fillStyle = '#f8fafc';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(_intent.icon || this.actionIcon, _iconX, 0);
+            }
+
+            ctx.font = `bold ${_labelSize}px sans-serif`;
+            ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#f8fafc';
-            ctx.fillText(_intent.icon || this.actionIcon, -_panelW / 2 + 19, 0);
+            ctx.fillText(_label, -_panelW / 2 + 52, -5);
 
-            ctx.font = `bold ${_teleCfg.telegraphLabelSize || 12}px sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.fillStyle = _intent.color;
-            ctx.fillText(_intent.label || this.actionName || '', -_panelW / 2 + 39, -2);
+            const _tickCount = 4;
+            const _tickW = Math.max(8, (_maxLabelW - 8) / _tickCount);
+            const _tickStartX = -_panelW / 2 + 52;
+            for (let i = 0; i < _tickCount; i++) {
+                ctx.fillStyle = i < _severity ? _edgeColor : 'rgba(100, 116, 139, 0.45)';
+                ctx.globalAlpha = i < _severity ? 0.92 : 0.55;
+                ctx.beginPath();
+                ctx.roundRect(_tickStartX + i * _tickW, 8, Math.max(5, _tickW - 4), 4, 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            ctx.fillStyle = _glowEnabled ? `rgba(8, 13, 24, ${0.82 + _pulse * 0.06})` : 'rgba(8, 13, 24, 0.94)';
+            ctx.strokeStyle = _edgeColor;
+            ctx.lineWidth = 1.25;
+            ctx.beginPath();
+            ctx.moveTo(-7, _panelH / 2 - 1);
+            ctx.lineTo(0, _panelH / 2 + 8);
+            ctx.lineTo(7, _panelH / 2 - 1);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = _edgeColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.globalAlpha = 0.74;
+            ctx.fillText('!', _panelW / 2 - 12, -5);
+            ctx.globalAlpha = 1;
 
             ctx.restore();
         }
@@ -7846,8 +8491,8 @@ class Enemy {
 
             ctx.save();
 
-            if (this.berserked) {
-                // 狂暴模式：每回合移动，显示橙红警告
+            if (this.berserked && this._willMoveThisTurn === true) {
+                // 狂暴阶段仍遵循移动冷却；本回合移动时用橙红警告。
                 const alpha = 0.75 + pulse * 0.25;
                 const bgColor = `rgba(239, 68, 68, ${0.25 + pulse * 0.15})`;
                 const textColor = `rgba(255, 200, 100, ${alpha})`;
@@ -7870,7 +8515,7 @@ class Enemy {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = textColor;
-                ctx.fillText('⚡ 狂暴：每回合移动', labelX, labelY);
+                ctx.fillText('⚡ 狂暴移动', labelX, labelY);
 
             } else if (this._willMoveThisTurn === true) {
                 // 本回合移动（回合开始时预计算）：红色警告
@@ -8137,17 +8782,6 @@ class Enemy {
                         // 显示剩余层数（使用位图护盾图标代替 emoji）
                         const shieldIcon = getUiBitmap(DEFENSE_ICON_MAP[isPhaseShieldBlock ? 'phaseShield' : 'shield']);
                         game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, `${this.shieldCharges}`, isPhaseShieldBlock ? '#a5b4fc' : '#93c5fd', 14, shieldIcon);
-                        // [新引擎] 护盾格挡爆发：用 PixiJS 渲染醒目的冲击波 + 六角护盾闪光，
-                        // 叠加在原有「定向能量帷幕」之上，让护盾抵挡伤害在众多特效中更突出。
-                        // 强度随本次格挡吸收量提升，Boss / 精英进一步放大。
-                        if (typeof game.spawn_createAffixSkillVFX === 'function') {
-                            game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'shieldBlock', {
-                                perfTier: game.perfQualityLevel || 'high',
-                                intensity: 1.0 + Math.min(0.8, shieldBlocked / 60),
-                                isBoss: this.type === 'boss',
-                                isElite: !!this.isElite,
-                            });
-                        }
                     }
                 }
 
@@ -8309,35 +8943,6 @@ class Enemy {
                 }
             }
             
-            // --- [新增] Chimera 狂暴受击全场爆炸逻辑 ---
-            if (this.type === 'boss' && this.bossType === 'chimera' && this.berserked && this._berserkedBlastOnHitChance) {
-                if (Math.random() < this._berserkedBlastOnHitChance) {
-                    // 视觉反馈：冲击波和粒子
-                    game.spawn_createShockwave(this.pos.x, this.pos.y, '#f97316'); // 橙色冲击波
-                    for (let i = 0; i < 20; i++) {
-                        game.spawn_createParticle(this.pos.x, this.pos.y, Math.random() > 0.5 ? '#ef4444' : '#f97316', 'ember');
-                    }
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 60, '💥CHAOS BLAST!', '#f97316');
-                    
-                    // 逻辑反馈：随机禁用 3 个钉子持续 1 回合
-                    if (game.pegs && game.pegs.length > 0) {
-                        // 过滤出未被禁用的正常钉子
-                        const activePegs = game.pegs.filter(p => p.cooldownTimer <= 0);
-                        // 随机打乱并取前 3 个
-                        activePegs.sort(() => Math.random() - 0.5);
-                        const pegsToDisable = activePegs.slice(0, 3);
-                        
-                        pegsToDisable.forEach(peg => {
-                            // 设置高额冷却时间，使其在本回合内无法被触发
-                            peg.cooldownTimer = 1000; // 足够长的时间，或者可以考虑其他状态标志
-                            peg.scale = 0.5; // 视觉上变小
-                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y, '🚫', '#ef4444');
-                        });
-                    }
-                }
-            }
-            // ----------------------------------------
-
             // --- [B1] 词缀差异化受击粒子 ---
             // 根据主导词缀（affixes[0] 或优先级最高）选择不同粒子组合，增强打击感
             if (this.affixes && this.affixes.length > 0) {
@@ -9261,6 +9866,8 @@ class Enemy {
     }
 
     _drawStatusBadges(ctx, w, h) {
+        if (this._usesEliteGolemAffixComboSprite) return;
+
         const badges = [];
         const affixes = this.affixes || [];
         if (affixes.includes('runeBearer')) {
@@ -9299,7 +9906,7 @@ class Enemy {
             const radiant = Math.max(0, Math.floor(this.chimeraRadiantConversions || 0));
             if (heat > 0) badges.push({ text: `热核${heat}`, color: '#fdba74' });
             if (frost > 0) badges.push({ text: `寒核${frost}`, color: '#67e8f9' });
-            if (radiant > 0) badges.push({ text: `流${radiant}`, color: '#f0abfc' });
+            if (radiant > 0) badges.push({ text: `流彩${radiant}`, color: '#f0abfc' });
         }
         if ((this.frostSeamTurns || 0) > 0) {
             const reduction = Math.round(Math.max(0, this._glaciesFrostSeamReduction || 0) * 100);
@@ -9494,7 +10101,7 @@ class Enemy {
                             ctx.shadowBlur = _sb(cfg.borderTierGoldGlowBlur);
                         }
                         ctx.strokeStyle = flowGrad;
-                        ctx.lineWidth = e4IsRainbow ? cfg.borderTierRainbowWidth : 3;
+                        ctx.lineWidth = e4IsRainbow ? cfg.borderTierRainbowWidth : 1.5;
                         ctx.beginPath();
                         ctx.moveTo(px0, py0);
                         ctx.lineTo(px1, py1);
@@ -9654,7 +10261,7 @@ class Enemy {
                 _bGrad.addColorStop(0.5, `hsla(${(_bHue0 + _bHue1) / 2}, 100%, 85%, 0.95)`);
                 _bGrad.addColorStop(1, `hsla(${_bHue1}, 100%, 70%, 0)`);
                 ctx.strokeStyle = _bGrad;
-                ctx.lineWidth = _bossE4Cfg.borderTierRainbowWidth + 1;
+                ctx.lineWidth = _bossE4Cfg.borderTierRainbowWidth + 0.5;
                 ctx.shadowColor = `hsl(${_bHue0}, 100%, 65%)`;
                 ctx.shadowBlur = _sb(_bossE4Cfg.borderTierRainbowGlowBlur + 4);
                 ctx.beginPath();

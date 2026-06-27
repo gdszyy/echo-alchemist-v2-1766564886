@@ -4,7 +4,7 @@ import {
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, Peg, DropBall, Enemy, SwordQi, 
     SlashAnim, SonSword, Projectile, CloneSpore, Particle, SlashEffect, CollectionBeam, 
-    Shockwave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, DoomsdayClockEffect, AffixSkillVFX, showToast,
+    Shockwave, ImpactBlastWave, AssimilationPulseWave, LaserBeam, FloatingText, EnergyOrb, LightningBolt, FireWave, HealWave, GreedyWheelEffect, DoomsdayClockEffect, AffixSkillVFX, showToast,
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { getThemeSegment } from './utils/math_utils.js';
@@ -21,7 +21,43 @@ import {
     DIRECTOR_SCRIPTS,
     DIRECTOR_SCRIPT_CONFIG,
     DIRECTOR_ACTOR_INTRO_ROUNDS,
+    filterRandomEnemyAffixWeights,
+    isBaseExclusiveEnemyAffix,
+    isEnemyAffixAllowedForArchetype,
+    normalizeEnemyAffixesForArchetype,
 } from './wave_presets.js';
+
+const DAMAGE_FLOATING_TEXT_RE = /(^|[\s(])[-−]\s*\d|^[^\d\n]{0,8}[-−]\s*\d|^(BOOM!|Burn|电弧|照射)\s*\+?\d/i;
+
+function isDamageFloatingText(text) {
+    return DAMAGE_FLOATING_TEXT_RE.test(String(text || '').trim());
+}
+
+function looksLikeFloatingTextOptions(value) {
+    return value &&
+        typeof value === 'object' &&
+        !('complete' in value) &&
+        !('naturalWidth' in value) &&
+        !('nodeType' in value);
+}
+
+function findFloatingTextOwner(enemies, x, y) {
+    if (!Array.isArray(enemies) || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    let best = null;
+    let bestDistSq = Infinity;
+    for (const enemy of enemies) {
+        if (!enemy || !enemy.active || !enemy.pos) continue;
+        const dx = x - enemy.pos.x;
+        const dy = y - enemy.pos.y;
+        const radius = Math.max(52, Math.min(180, Math.max(enemy.width || 0, enemy.height || 0) * 0.75 + 56));
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= radius * radius && distSq < bestDistSq) {
+            best = enemy;
+            bestDistSq = distSq;
+        }
+    }
+    return best;
+}
 
 /**
  * [导演系统] 方阵突击（Phalanx）阵型模板
@@ -150,8 +186,33 @@ export const spawn_system = {
      * @param {number} [fontSize] - 字號 (可選)
      * @param {HTMLImageElement|null} [iconImg] - 可選圖標圖片
      */
-    spawn_createFloatingText(x, y, text, color, fontSize, iconImg) { 
-        this.floatingTexts.push(new FloatingText(x, y, text, color, fontSize, iconImg)); 
+    spawn_createFloatingText(x, y, text, color, fontSize, iconImg, options = {}) {
+        if (looksLikeFloatingTextOptions(iconImg) && arguments.length < 7) {
+            options = iconImg;
+            iconImg = null;
+        }
+        const opts = options || {};
+        const isDamageNumber = opts.kind === 'damage' || opts.isDamageNumber || isDamageFloatingText(text);
+        const resolvedFontSize = Number.isFinite(fontSize) ? fontSize : (isDamageNumber ? 13 : undefined);
+        const owner = opts.floatingDamageOwner || opts.owner || opts.enemy ||
+            (isDamageNumber ? findFloatingTextOwner(this.enemies, x, y) : null);
+        const floatingText = new FloatingText(x, y, text, color, resolvedFontSize, iconImg, {
+            ...opts,
+            isDamageNumber,
+            floatingDamageOwner: owner,
+        });
+
+        if (isDamageNumber && owner) {
+            if (!this._floatingDamageTextsByEnemy) this._floatingDamageTextsByEnemy = new Map();
+            const previous = this._floatingDamageTextsByEnemy.get(owner);
+            if (previous && previous !== floatingText && previous.life > 0 && typeof previous.accelerateExit === 'function') {
+                previous.accelerateExit();
+            }
+            this._floatingDamageTextsByEnemy.set(owner, floatingText);
+        }
+
+        this.floatingTexts.push(floatingText);
+        return floatingText;
     },
 
 // --- 敌人生成与词缀系统 ---
@@ -176,15 +237,16 @@ export const spawn_system = {
 
         // 2. [曲线接入][Task C.1] 使用 interpolateAffixWeights 计算当前回合各词缀权重
         // 替代原有硬编码的 poolDefinitions，权重由 ENEMY_CURVE_CONFIG.AFFIX_WEIGHT_CURVES 统一管理
-        const affixWeights = interpolateAffixWeights(r, ENEMY_CURVE_CONFIG);
+        const affixWeights = filterRandomEnemyAffixWeights(interpolateAffixWeights(r, ENEMY_CURVE_CONFIG));
 
         if (Object.keys(affixWeights).length === 0) return [];
 
         // 2.5 [教学闸门·boss 预教学] 临近 boss 时，用本行"新词条"预算优先教一个该 boss 的随从词条
         const preTeach = this.spawn_getNextBossPreTeach(r);
-        if (preTeach && preTeach.length && (this._rowBrandNewBudget || 0) > 0) {
-            affixes.push(preTeach[0]);
-            this.spawn_markAffixSeenIfNew(preTeach[0]);
+        const preTeachAffix = (preTeach || []).find(affix => !isBaseExclusiveEnemyAffix(affix));
+        if (preTeachAffix && (this._rowBrandNewBudget || 0) > 0) {
+            affixes.push(preTeachAffix);
+            this.spawn_markAffixSeenIfNew(preTeachAffix);
         }
 
         // 3. 抽取词条（使用 weightedRandom 加权随机，避免重复）
@@ -301,6 +363,7 @@ export const spawn_system = {
         if (!profile || !Array.isArray(profile.affixes)) return [];
         if (!this.directorSeenAffixes) this.directorSeenAffixes = new Set();
         return profile.affixes.filter(a => {
+            if (isBaseExclusiveEnemyAffix(a)) return false;
             const intro = DIRECTOR_ACTOR_INTRO_ROUNDS[a];
             if (Number.isFinite(intro) && round < intro) return false;
             return !this.directorSeenAffixes.has(a);
@@ -1770,44 +1833,91 @@ export const spawn_system = {
         this.projectiles.push(new Projectile(x, y, vel, mainRecipe, false, shotId, isLast)); 
     },
 
-/**
+    /**
+     * @method spawn_createProjectileExplosion
+     * @description 子弹/爆破钩钉专用爆炸：全圆伤害范围溅射 + 轻量方向余波，区别于死亡、治疗、同化。
+     * @param {number} x - 位置 X。
+     * @param {number} y - 位置 Y。
+     * @param {object|string} theme - { waveColor, particleColor, particleMode } 或颜色字符串。
+     * @param {object} opts - { impactDirection, radius, intensity, isOvercharge }。
+     */
+    spawn_createProjectileExplosion(x, y, theme = {}, opts = {}) {
+        const themeBag = typeof theme === 'string' ? { waveColor: theme, particleColor: theme } : (theme || {});
+        const waveColor = themeBag.waveColor || themeBag.color || '#ef4444';
+        const particleColor = themeBag.particleColor || waveColor;
+        const radius = Number.isFinite(opts.radius) ? opts.radius : 100;
+        // @perf-impact: projectile explosion coverage - reuses shockwaveLimit plus particle budgets; full-circle splash reaches the true damage radius.
+        this.spawn_createImpactWave(x, y, waveColor, {
+            impactDirection: opts.impactDirection,
+            radius,
+            maxRadius: Math.max(72, Math.min(220, radius)),
+            damageRadius: radius,
+            coverageRing: true,
+            intensity: opts.intensity || (opts.isOvercharge ? 1.25 : 1),
+        });
+        this.spawn_createImpactBlast(x, y, particleColor, {
+            ...opts,
+            particleMode: themeBag.particleMode || opts.particleMode || 'spark',
+            withShockwave: false,
+        });
+    },
+
+    /**
+     * @method spawn_createExplosionHitGust
+     * @description 爆炸伤害命中敌人时的红色吹拂粒子，沿爆心到目标方向掠过目标身体。
+     */
+    spawn_createExplosionHitGust(target, originX, originY, opts = {}) {
+        if (!target || !target.pos || typeof this.spawn_createParticle !== 'function') return;
+        const quality = this.perfQualityLevel || 'high';
+        const isLow = quality === 'low';
+        const isMid = quality === 'medium';
+        const tx = target.pos.x;
+        const ty = target.pos.y;
+        const dx = tx - originX;
+        const dy = ty - originY;
+        const len = Math.hypot(dx, dy);
+        const fallbackAngle = Math.random() * Math.PI * 2;
+        const nx = len > 0.001 ? dx / len : Math.cos(fallbackAngle);
+        const ny = len > 0.001 ? dy / len : Math.sin(fallbackAngle);
+        const px = -ny;
+        const py = nx;
+        const size = Math.max(target.width || target.radius || 18, target.height || target.radius || 18);
+        const intensity = Math.max(0.65, Math.min(1.8, opts.intensity || 1));
+        const sparkCount = Math.round((isLow ? 2 : (isMid ? 3 : 5)) * intensity);
+        const emberCount = isLow ? 0 : Math.round((isMid ? 1 : 2) * intensity);
+        const color = opts.color || '#ef4444';
+
+        // @perf-impact: explosion hit gust - short spark/ember burst per damaged enemy; gated by quality and existing particle limits.
+        for (let i = 0; i < sparkCount; i++) {
+            const side = (Math.random() - 0.5) * size * 0.46;
+            const along = (Math.random() - 0.4) * size * 0.18;
+            const p = this.spawn_createParticle(tx + px * side - nx * size * 0.18 + nx * along, ty + py * side - ny * size * 0.18, color, 'spark');
+            if (!p || !p.vel) continue;
+            const speed = (2.8 + Math.random() * 3.2) * intensity;
+            const scatter = (Math.random() - 0.5) * 1.5;
+            p.vel.x = nx * speed + px * scatter;
+            p.vel.y = ny * speed + py * scatter - 0.25;
+            p.gravity = 0.02;
+            p.drag = 0.9;
+            p.size *= 0.85 + Math.random() * 0.75;
+        }
+        for (let i = 0; i < emberCount; i++) {
+            const side = (Math.random() - 0.5) * size * 0.35;
+            const e = this.spawn_createParticle(tx + px * side, ty + py * side, opts.emberColor || '#fb7185', 'ember');
+            if (!e || !e.vel) continue;
+            const speed = (1.2 + Math.random() * 1.5) * intensity;
+            e.vel.x = nx * speed + (Math.random() - 0.5) * 0.45;
+            e.vel.y = ny * speed - 0.8 - Math.random() * 0.45;
+            e.size *= 1.0 + Math.random() * 0.7;
+        }
+    },
+
+    /**
      * @method createExplosion
-     * @description 创建爆炸特效 (粒子群)。
-     * @param {number} x - **重要参数** 位置 X。
-     * @param {number} y - **重要参数** 位置 Y。
-     * @param {string} color - 颜色。
+     * @description 旧兼容入口。新代码应使用 spawn_createProjectileExplosion / spawn_createAssimilationPulse / spawn_createHealWave。
      */
     spawn_createExplosion(x, y, color) {
-        const quality = this.perfQualityLevel || 'high';
-        const burstCount = quality === 'low' ? 5 : (quality === 'medium' ? 7 : 10);
-        const sparkColor = color || '#f87171';
-        // @perf-impact: 泛用爆点细化 - 仍仅使用 spark/smoke 粒子并受既有粒子预算限制。
-        for (let i = 0; i < burstCount; i++) {
-            const p = this.spawn_createParticle(x, y, sparkColor, 'spark');
-            if (p && p.vel) {
-                const angle = (i / burstCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
-                const speed = 2.1 + Math.random() * 3.4;
-                p.vel.x = Math.cos(angle) * speed;
-                p.vel.y = Math.sin(angle) * speed - Math.random() * 0.5;
-                p.size *= 0.8 + Math.random() * 0.75;
-            }
-        }
-        if (quality !== 'low') {
-            const smokeCount = quality === 'medium' ? 1 : 2;
-            for (let i = 0; i < smokeCount; i++) {
-                const s = this.spawn_createParticle(
-                    x + (Math.random() - 0.5) * 8,
-                    y + (Math.random() - 0.5) * 8,
-                    'rgba(30, 20, 16, 0.45)',
-                    'smoke'
-                );
-                if (s) {
-                    s.vel.x *= 0.35;
-                    s.vel.y = -0.4 - Math.random() * 0.5;
-                    s.size *= 0.9;
-                }
-            }
-        }
+        this.spawn_createProjectileExplosion(x, y, color || '#f87171');
     },
 
     /**
@@ -1866,10 +1976,12 @@ export const spawn_system = {
             }
         }
 
-        // 变异事件附加冲击波
-        if (opts.isMutation) {
-            this.spawn_createShockwave(x, y, color);
-        }
+        // 同化/突变附加铭刻脉冲：收束/烙印，而不是爆炸冲击波
+        this.spawn_createAssimilationWave(x, y, color, {
+            isMutation: !!opts.isMutation,
+            isMirror: !!opts.isMirror,
+            intensity: opts.isMutation ? 1.25 : (opts.isMirror ? 0.55 : 0.9),
+        });
     },
 
     /**
@@ -1931,6 +2043,7 @@ export const spawn_system = {
         const isLow = quality === 'low';
         const isMid = quality === 'medium';
         const overchargeBonus = opts.isOvercharge ? 4 : 0;
+        const primaryMode = opts.particleMode || 'spark';
         // @perf-impact: impact blast - spark+shard+smoke 高速爆破，受既有预算限制
         const sparkCount = (isLow ? 5 : (isMid ? 8 : 12)) + overchargeBonus;
 
@@ -1948,7 +2061,7 @@ export const spawn_system = {
                 ? biasAngle + (baseAngle - Math.PI) * 0.6
                 : baseAngle;
             const speed = 4.0 + Math.random() * 4.5;
-            const p = this.spawn_createParticle(x, y, color, 'spark');
+            const p = this.spawn_createParticle(x, y, color, primaryMode);
             if (p && p.vel) {
                 p.vel.x = Math.cos(angle) * speed;
                 p.vel.y = Math.sin(angle) * speed;
@@ -1991,7 +2104,7 @@ export const spawn_system = {
         }
 
         if (opts.withShockwave) {
-            this.spawn_createShockwave(x, y, color);
+            this.spawn_createImpactWave(x, y, color, opts);
         }
     },
 
@@ -2007,12 +2120,14 @@ export const spawn_system = {
         const quality = this.perfQualityLevel || 'high';
         const isLow = quality === 'low';
         const isMid = quality === 'medium';
+        const intensity = Math.max(0.2, Math.min(1.8, Number(opts.intensity) || 1));
+        const gatherRadius = Math.max(12, Number(opts.radius) || 35);
+        const withShockwave = opts.withShockwave !== false;
         // @perf-impact: skill ignition - mist+spark+ember+shockwave 组合，受既有预算限制
 
         // Phase 1: 聚集 — mist 从较大半径向中心汇入
         if (!isLow) {
-            const mistCount = isMid ? 3 : 6;
-            const gatherRadius = 35;
+            const mistCount = Math.max(1, Math.round((isMid ? 3 : 6) * intensity));
             for (let i = 0; i < mistCount; i++) {
                 const angle = (i / mistCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
                 const spawnX = x + Math.cos(angle) * gatherRadius;
@@ -2027,10 +2142,10 @@ export const spawn_system = {
         }
 
         // Phase 2: 点燃 — spark 中速径向扩散
-        const sparkCount = isLow ? 4 : (isMid ? 6 : 8);
+        const sparkCount = Math.max(1, Math.round((isLow ? 4 : (isMid ? 6 : 8)) * intensity));
         for (let i = 0; i < sparkCount; i++) {
             const angle = (i / sparkCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
-            const speed = 2.5 + Math.random() * 2.5;
+            const speed = (2.5 + Math.random() * 2.5) * (0.8 + intensity * 0.2);
             const p = this.spawn_createParticle(x, y, color, 'spark');
             if (p && p.vel) {
                 p.vel.x = Math.cos(angle) * speed;
@@ -2040,8 +2155,8 @@ export const spawn_system = {
         }
 
         // ember 上飘点燃感（中高质量）
-        if (!isLow) {
-            const emberCount = isMid ? 1 : 2;
+        if (!isLow && intensity >= 0.45) {
+            const emberCount = Math.max(1, Math.round((isMid ? 1 : 2) * intensity));
             for (let i = 0; i < emberCount; i++) {
                 const e = this.spawn_createParticle(x, y, color, 'ember');
                 if (e && e.vel) {
@@ -2052,9 +2167,44 @@ export const spawn_system = {
         }
 
         // 固定附加冲击波（高质量/中质量）
-        if (!isLow) {
+        if (!isLow && withShockwave) {
             this.spawn_createShockwave(x, y, color);
         }
+    },
+
+    /**
+     * @method spawn_createImpactWave
+     * @description 子弹爆炸/撞击专用范围波，覆盖真实伤害圆并保留轻量方向余波。
+     */
+    spawn_createImpactWave(x, y, color = null, opts = {}) {
+        if (!this.shockwaves) this.shockwaves = [];
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        if (this.shockwaves.length >= _budget.shockwaveLimit) return;
+        this.shockwaves.push(new ImpactBlastWave(x, y, color || '#f87171', {
+            impactDirection: opts.impactDirection || opts.direction,
+            directionAngle: opts.directionAngle,
+            maxRadius: opts.maxRadius,
+            damageRadius: opts.damageRadius,
+            coverageRing: opts.coverageRing,
+            intensity: opts.intensity,
+        }));
+    },
+
+    /**
+     * @method spawn_createAssimilationWave
+     * @description 弹珠同化/突变专用铭刻脉冲，表现为能量收束和属性烙印。
+     */
+    spawn_createAssimilationWave(x, y, color = null, opts = {}) {
+        if (!this.shockwaves) this.shockwaves = [];
+        const _budget = CONFIG.performance[this.perfQualityLevel || 'high'];
+        if (this.shockwaves.length >= _budget.shockwaveLimit) return;
+        const isMutation = !!opts.isMutation;
+        this.shockwaves.push(new AssimilationPulseWave(x, y, color || '#ffffff', {
+            maxRadius: opts.maxRadius || (isMutation ? 72 : 54),
+            intensity: opts.intensity || (isMutation ? 1.2 : 0.85),
+            growthSpeed: opts.isMirror ? 2.4 : (isMutation ? 3.6 : 3.0),
+            fadeSpeed: opts.isMirror ? 0.06 : 0.045,
+        }));
     },
 
 /**
@@ -2139,16 +2289,28 @@ export const spawn_system = {
         delete visualOptions.session;
         // 1. 获取目标坐标
         if (!this.uiCache) this.ui_updateUICache();
+
+        let targetPanel = null;
+        if (chargeSession && Number.isInteger(chargeSession.marbleIndex)) {
+            targetPanel = document.querySelector(`.gathering-ammo-panel[data-marble-index="${chargeSession.marbleIndex}"]`);
+            if (!targetPanel && typeof this._hud_renderSessionChargeStack === 'function') {
+                this._hud_renderSessionChargeStack();
+                targetPanel = document.querySelector(`.gathering-ammo-panel[data-marble-index="${chargeSession.marbleIndex}"]`);
+            }
+        }
         
-        let targetX = this.uiCache.x;
-        let targetY = this.uiCache.y;
+        const panelTarget = targetPanel && typeof this.ui_getCanvasPointForElement === 'function'
+            ? this.ui_getCanvasPointForElement(targetPanel)
+            : null;
+        let targetX = panelTarget ? panelTarget.x : this.uiCache.x;
+        let targetY = panelTarget ? panelTarget.y : this.uiCache.y;
 
         // [核心修复]：兜底检测
         // 如果缓存坐标是 0 (说明上次获取时 UI 可能被隐藏了)，强制重算
         if (targetX === 0 && targetY === 0) {
             this.ui_updateUICache();
-            targetX = this.uiCache.x;
-            targetY = this.uiCache.y;
+            targetX = panelTarget ? panelTarget.x : this.uiCache.x;
+            targetY = panelTarget ? panelTarget.y : this.uiCache.y;
             
             // 如果还是 0 (极罕见)，就手动指定一个大概位置 (屏幕中下方)
             if (targetX === 0) {
@@ -2677,13 +2839,13 @@ export const spawn_system = {
 
         // Boss 移动冷却计数器初始化
         // _moveCooldown: 当前剩余冷却回合数（0 = 本回合可以移动）
-        // _moveInterval: 当前生效的移动间隔（从 bossCfg.moveInterval 读取，默认 2）
-        const defaultMoveInterval = bossCfg.moveInterval || 2;
+        // _moveInterval: 当前生效的移动间隔（从 bossCfg.moveInterval 读取，最低 2，默认 3）
+        const defaultMoveInterval = Math.max(2, bossCfg.moveInterval || 3);
         boss._moveInterval = defaultMoveInterval;
         boss._moveCooldown = 0; // 首回合直接可以移动
 
         // [重装词条 Boss 支持] 若 bossCfg.heavyArmor === true，则为 Boss 添加重装词条
-        // 效果：血量翻倍 + 强制移动间隔 = 2（所有 Boss 可选接入此机制）
+        // 效果：血量翻倍 + 移动间隔不低于 2（所有 Boss 可选接入此机制）
         if (bossCfg.heavyArmor === true) {
             if (!boss.affixes.includes('heavyArmor')) boss.affixes.push('heavyArmor');
             const _haMult = (CONFIG.balance.affixes && CONFIG.balance.affixes.heavyArmorHpMult) || 2.0;
@@ -2692,7 +2854,7 @@ export const spawn_system = {
             boss.displayHp = boss.hp;
             boss.delayedHp = boss.hp;
             boss.greenHp = boss.hp;
-            boss._moveInterval = (CONFIG.balance.affixes && CONFIG.balance.affixes.heavyArmorMoveInterval) || 2;
+            boss._moveInterval = Math.max(2, boss._moveInterval, (CONFIG.balance.affixes && CONFIG.balance.affixes.heavyArmorMoveInterval) || 2);
         }
 
         // 设置入场动画状态
@@ -3238,6 +3400,7 @@ export const spawn_system = {
             e.gridCols = cols;
             e.gridRows = rows;
             if (cols >= 2) e.isWideEnemy = true;
+            e.affixes = normalizeEnemyAffixesForArchetype(slot.archetype, e.affixes);
             this.spawn_applyArchetypeShape(e, slot.archetype);
         } else if (e.affixes.length > 0) {
             e.type = 'elite';
@@ -3399,7 +3562,7 @@ export const spawn_system = {
             const hp = Math.floor(baseHP * hpMultByCells * (0.9 + Math.random() * 0.2));
 
             const e = new Enemy(centerX, centerY, wPx, hPx, hp);
-            e.affixes = [chosen.affix];
+            e.affixes = normalizeEnemyAffixesForArchetype(chosen.id, [chosen.affix]);
             e.type = 'elite';
             e.baseArchetype = chosen.id;
             e.gridCols = chosen.cols;
@@ -3603,12 +3766,12 @@ export const spawn_system = {
             devourer: ['devour', 'shield'],
             viridis:  ['regen', 'healer'],
             tesla:    ['haste', 'clone'],
-            chimera:  ['berserk', 'devour'],
+            chimera:  ['devour'],
             ouroboros:['shield', 'haste', 'regen'],
         };
         const minionProfile = this.spawn_getBossMinionProfile ? this.spawn_getBossMinionProfile(bossId) : null;
         const profileAffixes = minionProfile && Array.isArray(minionProfile.affixes) ? minionProfile.affixes : null;
-        const affixPool = profileAffixes && profileAffixes.length > 0 ? profileAffixes : (BOSS_AFFIX_POOLS[bossId] || ['shield']);
+        const affixPool = profileAffixes !== null ? profileAffixes : (BOSS_AFFIX_POOLS[bossId] || ['shield']);
 
         // === 概率加成 ===
         const bonus = isBigBoss ? cfg.bigBossBonus : 0;
@@ -3661,7 +3824,9 @@ export const spawn_system = {
                 if (roll < minionChance) {
                     // === 转化为 Boss 随从 ===
                     // 保留位置和尺寸，重置词条为 Boss 属性词条
-                    e.affixes = [...affixPool];
+                    e.affixes = e.baseArchetype
+                        ? normalizeEnemyAffixesForArchetype(e.baseArchetype, affixPool)
+                        : [...affixPool];
                     e.type = 'elite';
                     if (typeof this.spawn_applyBossMinionMetadata === 'function') {
                         this.spawn_applyBossMinionMetadata(e, bossId, minionProfile);
@@ -3686,11 +3851,18 @@ export const spawn_system = {
                         e.pos.x, e.pos.y - e.height / 2 - 10,
                         '随从!', bossColor
                     );
-                } else if (roll < minionChance + affixChance) {
+                } else if (affixPool.length > 0 && roll < minionChance + affixChance) {
                     // === 赋予 Boss 特殊词条 ===
-                    const newAffix = affixPool[Math.floor(Math.random() * affixPool.length)];
+                    const legalAffixPool = e.baseArchetype
+                        ? affixPool.filter(affix => isEnemyAffixAllowedForArchetype(e.baseArchetype, affix, e.affixes))
+                        : affixPool;
+                    if (legalAffixPool.length === 0) return;
+                    const newAffix = legalAffixPool[Math.floor(Math.random() * legalAffixPool.length)];
                     if (!e.affixes.includes(newAffix)) {
                         e.affixes.push(newAffix);
+                        if (e.baseArchetype) {
+                            e.affixes = normalizeEnemyAffixesForArchetype(e.baseArchetype, e.affixes);
+                        }
                         if (e.affixes.length > 0) e.type = 'elite';
                         if (typeof this.spawn_applyBossMinionMetadata === 'function') {
                             this.spawn_applyBossMinionMetadata(e, bossId, minionProfile, 'boss_empowered');

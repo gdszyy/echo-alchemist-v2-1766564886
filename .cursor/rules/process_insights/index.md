@@ -10,8 +10,9 @@
 
 ## 活跃洞察 (Active Insights)
 
-当前共有 **10** 条活跃洞察。
+当前共有 **11** 条活跃洞察。
 
+> **[2026-06-26 新增]** PI-011：敌人基座词条与常规词条相性流程（基座专属词条不进普通随机池，预设 / 随机大型基座 / Boss 入场强化统一走 `normalizeEnemyAffixesForArchetype()`）。
 > **[2026-06-25 新增]** PI-010：PixiJS WebGL 渲染管线迁移流程与防坑指南（7 个坑位：compaction instanceof 遗漏、粒子模式特殊同步、blendMode 不一致、_pixi/_pixiSprite 区分、BladeStormRing 未实例化、SwordQi 无需迁移、预烘焙纹理形状准确性）。
 > **[2026-06-23 更新]** PI-006 升版至 v1.8：纠正 v1.7 错误方向；精华奖励退出主循环，`marble_pack` 是开局与局内商店购买后的直接研磨入口。
 > **[2026-06-23 更新]** PI-006 升版至 v1.7：坑 9 废弃；主动 `marble_pack` 已移除，旧奖励必须转译为 `run_resource_pack` 并直接发放局内资源。（已由 v1.8 纠正）
@@ -36,6 +37,7 @@
 | PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
 | PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.1 | entities, render_system, core | 2026-06-21 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
 | PI-010 | PixiJS WebGL 渲染管线迁移流程与防坑指南 | v1.0 | render_system, particles, combat_system, spawn_system, game_phase, pixi_bridge, pixi_effect_adapter | 2026-06-25 | [PI-010_pixijs_webgl_rendering_migration.md](PI-010_pixijs_webgl_rendering_migration.md) |
+| PI-011 | 敌人基座词条与常规词条相性流程 | v1.0 | wave_presets, spawn_system, config, enemy_index | 2026-06-26 | [PI-011_enemy_base_affix_compatibility.md](PI-011_enemy_base_affix_compatibility.md) |
 
 ### 按模块快速检索
 
@@ -52,6 +54,7 @@
 | `core.js` | PI-003（_subsystems 数组、组合模式）、PI-006（enemy:killed 只登记延迟奖励）、PI-007（选择态与双倍同化率运行态初始化） |
 | `config.js` | PI-004（CONFIG.performance 三档配置）、PI-007（混沌精华 / 纯净精华 / 同化倍率显式配置） |
 | `spawn_system.js` | PI-004（EnergyOrb 聚合优化）、PI-007（预览状态与纯净精华注入面板联动）、PI-010（粒子模式 Sprite 获取条件扩展） |
+| `wave_presets.js` / `spawn_system.js` | PI-011（基座专属词条随机池过滤、基座相性表、Boss 入场强化过滤） |
 | `effects/particles.js` | PI-004（未接入预算的高风险特效清单）、PI-005（性能自适应影响评估）、PI-010（特效类 _pixi 钩子、draw() PixiJS 早返回、预烘焙纹理形状准确性） |
 | `render_system.js` | PI-005（性能自适应影响评估）、PI-009（SpriteRenderer 异步加载与绘制）、PI-010（floatingTexts splice _pixiDestroy 清理） |
 | `render/pixi_bridge.js` | PI-010（PixiJS 初始化、预烘焙纹理、粒子 Sprite 对象池、blendMode 设置） |

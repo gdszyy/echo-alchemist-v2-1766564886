@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 3717 | 函数数: 59 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 3905 | 函数数: 67 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,8 +11,11 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| isDamageFloatingText | function | `isDamageFloatingText(text)` |  |
+| looksLikeFloatingTextOptions | function | `looksLikeFloatingTextOptions(value)` |  |
+| findFloatingTextOwner | function | `findFloatingTextOwner(enemies, x, y)` |  |
 | spawn_windSkillParticles | method | `spawn_windSkillParticles(type, rect, progress)` |  |
-| spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize, iconImg)` |  |
+| spawn_createFloatingText | method | `spawn_createFloatingText(x, y, text, color, fontSize, iconImg, options = {})` |  |
 | spawn_generateAffixes | method | `spawn_generateAffixes()` |  |
 | spawn_getBossMinionProfile | method | `spawn_getBossMinionProfile(bossId)` |  |
 | spawn_applyBossMinionMetadata | method | `spawn_applyBossMinionMetadata(e, bossId, profile = null, roleOverride = null)` |  |
@@ -36,14 +39,19 @@
 | spawn_createParticle | method | `spawn_createParticle(x, y, color, mode = 'normal')` |  |
 | spawn_pushParticleWithLimit | method | `spawn_pushParticleWithLimit(p)` |  |
 | spawn_spawnBullet | method | `spawn_spawnBullet(x, y, vel, recipe, shotId = null, isLast = false)` | ⚠️ 巨型函数，见 @section 导航 |
+| spawn_createProjectileExplosion | method | `spawn_createProjectileExplosion(x, y, theme = {}, opts = {})` |  |
+| spawn_createExplosionHitGust | method | `spawn_createExplosionHitGust(target, originX, originY, opts = {})` |  |
 | spawn_createExplosion | method | `spawn_createExplosion(x, y, color)` |  |
 | spawn_createAssimilationPulse | method | `spawn_createAssimilationPulse(x, y, color, opts = {})` |  |
 | spawn_createSlotBurst | method | `spawn_createSlotBurst(x, y, color, opts = {})` |  |
 | spawn_createImpactBlast | method | `spawn_createImpactBlast(x, y, color, opts = {})` |  |
 | spawn_createSkillIgnition | method | `spawn_createSkillIgnition(x, y, color, opts = {})` |  |
+| spawn_createImpactWave | method | `spawn_createImpactWave(x, y, color = null, opts = {})` |  |
+| spawn_createAssimilationWave | method | `spawn_createAssimilationWave(x, y, color = null, opts = {})` |  |
 | spawn_createShockwave | method | `spawn_createShockwave(x, y, color = null)` |  |
 | spawn_createHealWave | method | `spawn_createHealWave(x, y, range = 120)` |  |
 | spawn_createGreedyWheelEffect | method | `spawn_createGreedyWheelEffect(x, y, mode = 'prelude')` |  |
+| spawn_createDoomsdayClock | method | `spawn_createDoomsdayClock(x, y, chainIndex = 0)` |  |
 | spawn_createAffixSkillVFX | method | `spawn_createAffixSkillVFX(x, y, skillType, opts = {})` |  |
 | spawn_createHitFeedback | method | `spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {})` |  |
 | spawn_triggerLevelUpEvent | method | `spawn_triggerLevelUpEvent(uiX, uiY, session = this.currentSession)` |  |

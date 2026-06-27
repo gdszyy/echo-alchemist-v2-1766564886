@@ -173,8 +173,12 @@ function makeGame(spawnSystem, config) {
         particleCounts: { wind_slash: 0, line: 0, ember: 0, mist: 0, shard: 0, spark: 0, smoke: 0, venom: 0 },
         _particlePool: [],
         shockwaves: [],
+        fireWaves: [],
+        deathExplosions: [],
+        impactBlasts: [],
         lightningBolts: [],
         floatingTexts: [],
+        screenShakes: [],
         damageReported: 0,
         roundDamage: 0,
         currentShotDamage: 0,
@@ -194,11 +198,16 @@ function makeGame(spawnSystem, config) {
         _directorScriptUsage: {},
         _directorLastScriptId: null,
         calc_getRecentAverageDamage() { return 0; },
+        combat_calculatePlayerExpectedDamage() { return 10; },
         sys_determineEnemyReward(enemy) { enemy.rewardType = 'gold'; },
         spawn_createShockwave() { this.shockwaves.push({}); },
+        spawn_createImpactBlast(x, y, color) { this.impactBlasts.push({ x, y, color }); },
         spawn_createParticle(x, y, color, mode = 'normal') { this.particles.push({ x, y, color, mode }); },
         spawn_pushParticleWithLimit(particle) { this.particles.push(particle); },
         spawn_createFloatingText(x, y, text) { this.floatingTexts.push({ x, y, text }); },
+        spawn_createSkillIgnition(x, y, color) { this.particles.push({ x, y, color, mode: 'skill_ignition' }); },
+        triggerScreenShake(amount) { this.screenShakes.push(amount); },
+        triggerScreenShakeAdvanced(amount, duration) { this.screenShakes.push({ amount, duration }); },
         combat_recordDamage(amount) { this.damageReported += amount || 0; },
         combat_reportDamage(amount) { this.damageReported += amount || 0; },
         ui_updateRoundDamage() {},
@@ -226,6 +235,25 @@ function makeGame(spawnSystem, config) {
 
     game._spawnRuntimeConfig = config;
     return game;
+}
+
+function bindSystem(game, system) {
+    for (const [key, value] of Object.entries(system)) {
+        if (typeof value === 'function') game[key] = value.bind(game);
+    }
+}
+
+function calcExpectedVenomEffectiveStacks(rawStacks) {
+    const stacks = Math.max(0, Math.floor(rawStacks || 0));
+    const venomCfg = CONFIG.mechanics.venom;
+    const linearStacks = Math.max(0, Math.floor(venomCfg.linearStacks ?? 30));
+    const overflowSqrtScale = Math.max(0, venomCfg.overflowSqrtScale ?? 6);
+    if (stacks <= linearStacks) return stacks;
+    return linearStacks + Math.sqrt(stacks - linearStacks) * overflowSqrtScale;
+}
+
+function calcExpectedVenomTick(rawStacks, dotMultiplier = 1) {
+    return calcExpectedVenomEffectiveStacks(rawStacks) * (CONFIG.mechanics.venom.dotPerStack || 0.8) * dotMultiplier;
 }
 
 function countArchetypes(enemies) {
@@ -336,7 +364,7 @@ function check(condition, message) {
 
 installBrowserStubs();
 
-const [{ spawn_system }, { combat_system }, { game_phase }, { CONFIG }, { ENEMY_WAVE_PRESETS, ENEMY_WAVE_PRESET_ARCHETYPES }, { Enemy }, { loot_calcRuneDrop }, { RUNE_DB }, { resolveEnemyVisualAsset }] = await Promise.all([
+const [{ spawn_system }, { combat_system }, { game_phase }, { CONFIG }, wavePresetModule, { Enemy }, { loot_calcRuneDrop }, { RUNE_DB }, visualAssetModule] = await Promise.all([
     import('../src/spawn_system.js'),
     import('../src/combat_system.js'),
     import('../src/game_phase.js'),
@@ -347,6 +375,17 @@ const [{ spawn_system }, { combat_system }, { game_phase }, { CONFIG }, { ENEMY_
     import('../src/rune_config.js'),
     import('../src/data/enemy_visual_assets.js'),
 ]);
+const {
+    STATIC_FOOTPRINT_OVERLAY_AFFIXES,
+    isStaticFootprintOverlayAffix,
+    resolveEnemyVisualAsset,
+} = visualAssetModule;
+const {
+    ENEMY_WAVE_PRESETS,
+    ENEMY_WAVE_PRESET_ARCHETYPES,
+    ENEMY_BASE_EXCLUSIVE_AFFIXES,
+    normalizeEnemyAffixesForArchetype,
+} = wavePresetModule;
 
 console.log('===================================================');
 console.log('  V2 large enemy runtime spawn validation');
@@ -354,6 +393,167 @@ console.log('===================================================\n');
 
 const baseHP = CONFIG.balance.enemyBaseHp || 10;
 const colWidth = 60;
+
+{
+    const expectedBossMoveIntervals = {
+        ignis: 3,
+        glacies: 4,
+        mikro: 4,
+        devourer: 3,
+        viridis: 4,
+        tesla: 3,
+        chimera: 4,
+        ouroboros: 4,
+    };
+    for (const [bossId, expectedInterval] of Object.entries(expectedBossMoveIntervals)) {
+        const interval = CONFIG.balance.bossConfigs?.[bossId]?.moveInterval;
+        check(interval === expectedInterval, `${bossId} boss moveInterval is ${expectedInterval}`);
+        check(interval >= 2, `${bossId} boss moveInterval is never faster than every 2 turns`);
+    }
+    check(CONFIG.balance.bossConfigs.chimera.chimeraDigestInterval === 1, 'Chimera thermal devour is available every boss turn');
+    check(CONFIG.balance.bossConfigs.chimera.chimeraDevourTargetsPerTurn === 2, 'Chimera thermal devour consumes two side-selected targets per boss turn');
+    check(CONFIG.balance.bossConfigs.chimera.chimeraDigestShieldPerFeed === 0, 'Chimera devour does not grant flat shield outside thermal cancellation');
+    check(CONFIG.balance.bossConfigs.chimera.chimeraThermalStackUnit === 1, 'Chimera thermal stacks map one-to-one from temperature');
+    check(CONFIG.balance.bossConfigs.chimera.chimeraBerserkShieldMult === 2, 'Berserk Chimera doubles thermal cancellation shield output');
+    check(
+        CONFIG.balance.bossConfigs.chimera.chimeraLeftFeedTemp === -100
+        && CONFIG.balance.bossConfigs.chimera.chimeraRightFeedTemp === 100,
+        'Chimera thermal feed sides are configured as left cold and right hot'
+    );
+
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    game.round = 40;
+    game.spawn_spawnBoss('tesla', true);
+    const spawnedBoss = game.enemies.find(enemy => enemy.bossType === 'tesla');
+    check(!!spawnedBoss && spawnedBoss._moveInterval === expectedBossMoveIntervals.tesla, 'spawn_spawnBoss initializes configured slow boss movement interval');
+    game.enemies = [];
+
+    const cooldownBoss = new Enemy(180, 220, 180, 100, 300, 300, 'boss', []);
+    cooldownBoss.type = 'boss';
+    cooldownBoss.bossType = 'ignis';
+    cooldownBoss.berserked = true;
+    cooldownBoss._moveInterval = 3;
+    cooldownBoss._moveCooldown = 2;
+    cooldownBoss.executeTurnAction(game);
+    check(cooldownBoss._moveCooldown === 1, 'berserk boss decrements movement cooldown instead of forcing immediate movement');
+
+    const hasteBoss = new Enemy(180, 220, 180, 100, 300, 300, 'boss', ['haste']);
+    hasteBoss.type = 'boss';
+    hasteBoss.bossType = 'ignis';
+    hasteBoss._moveInterval = 3;
+    hasteBoss._moveCooldown = 0;
+    const startY = hasteBoss.dropTargetY;
+    hasteBoss.executeTurnAction(game);
+    check(hasteBoss.dropTargetY === startY + game.enemyHeight, 'boss haste does not add a second movement step');
+}
+
+{
+    const normalized = normalizeEnemyAffixesForArchetype('bastion', ['heavyArmor', 'haste', 'shield']);
+    check(normalized.includes('heavyArmor'), 'bastion compatibility keeps heavyArmor identity');
+    check(normalized.includes('shield'), 'bastion compatibility keeps compatible shield overlay');
+    check(!normalized.includes('haste'), 'bastion compatibility removes haste conflict');
+
+    const game = makeGame(spawn_system, CONFIG);
+    game.round = 54;
+    withRandom(() => 0, () => {
+        const affixes = game.spawn_generateAffixes();
+        check(
+            !affixes.some(affix => ENEMY_BASE_EXCLUSIVE_AFFIXES.includes(affix)),
+            'random affix generation excludes base-exclusive affixes'
+        );
+    });
+
+    const noAffixElite = new Enemy(120, 120, 60, 50, 120, 120, 'elite', []);
+    const noAffixAsset = resolveEnemyVisualAsset(noAffixElite);
+    check(
+        noAffixAsset.assetKey === 'eliteGolemAffixCombo:1x1:' && noAffixAsset.fallbackLevel === 'composite',
+        '1x1 elite without affixes resolves to the elite golem no-affix body'
+    );
+    check(
+        noAffixAsset.spritePath && noAffixAsset.spritePath.includes('enemy_elite_golem_noaffix_1x1_pass13_idle.png'),
+        '1x1 elite no-affix body uses the pass13 sprite'
+    );
+
+    const shieldOnlyElite = new Enemy(120, 120, 60, 50, 120, 120, 'elite', ['shield']);
+    const shieldOnlyAsset = resolveEnemyVisualAsset(shieldOnlyElite);
+    check(
+        shieldOnlyAsset.assetKey === 'eliteGolemAffixCombo:1x1:' && shieldOnlyAsset.fallbackLevel === 'composite',
+        'overlay-only elite affixes keep the no-affix elite golem body'
+    );
+    check(
+        shieldOnlyAsset.overlayPaths.some(item => item.affix === 'shield'),
+        'shield remains a separate overlay on the no-affix elite golem body'
+    );
+
+    for (const affix of STATIC_FOOTPRINT_OVERLAY_AFFIXES) {
+        check(isStaticFootprintOverlayAffix(affix), `${affix} is registered as a static footprint overlay affix`);
+
+        const overlayOnlyElite = { type: 'elite', gridCols: 1, gridRows: 1, affixes: [affix] };
+        const overlayOnlyAsset = resolveEnemyVisualAsset(overlayOnlyElite);
+        check(
+            overlayOnlyAsset.assetKey === 'eliteGolemAffixCombo:1x1:',
+            `${affix} does not change the no-affix elite golem body key`
+        );
+        check(
+            overlayOnlyAsset.overlayPaths.some(item => item.affix === affix),
+            `${affix} remains in overlayPaths on the no-affix elite golem body`
+        );
+
+        const overlayOnHaste = { type: 'elite', gridCols: 1, gridRows: 1, affixes: ['haste', affix] };
+        const overlayOnHasteAsset = resolveEnemyVisualAsset(overlayOnHaste);
+        check(
+            overlayOnHasteAsset.assetKey === 'eliteGolemAffixCombo:1x1:haste',
+            `${affix} does not change the haste elite golem body key`
+        );
+        check(
+            overlayOnHasteAsset.overlayPaths.some(item => item.affix === affix),
+            `${affix} remains in overlayPaths on the haste elite golem body`
+        );
+
+        const overlayOnBastion = {
+            type: 'elite',
+            baseArchetype: 'bastion',
+            gridCols: 3,
+            gridRows: 1,
+            affixes: ['heavyArmor', affix],
+        };
+        const overlayOnBastionAsset = resolveEnemyVisualAsset(overlayOnBastion);
+        check(
+            overlayOnBastionAsset.assetKey === 'bastion:3x1:heavyArmor',
+            `${affix} does not change the bastion body key`
+        );
+        check(
+            overlayOnBastionAsset.overlayPaths.some(item => item.affix === affix),
+            `${affix} remains in overlayPaths on the bastion body`
+        );
+    }
+
+    const hasted = new Enemy(120, 120, 60, 50, 120, 120, 'elite', ['haste', 'shield']);
+    const hastedAsset = resolveEnemyVisualAsset(hasted);
+    check(
+        hastedAsset.assetKey === 'eliteGolemAffixCombo:1x1:haste' && hastedAsset.fallbackLevel === 'composite',
+        'overlay affixes do not change the haste elite composite asset'
+    );
+    check(
+        hastedAsset.overlayPaths.some(item => item.affix === 'shield'),
+        'shield remains a separate overlay on haste elite composite asset'
+    );
+
+    const bastion = new Enemy(120, 120, 180, 50, 120, 120, 'elite', ['heavyArmor', 'shield']);
+    bastion.baseArchetype = 'bastion';
+    bastion.gridCols = 3;
+    bastion.gridRows = 1;
+    const bastionAsset = resolveEnemyVisualAsset(bastion);
+    check(
+        bastionAsset.assetKey === 'bastion:3x1:heavyArmor' && bastionAsset.fallbackLevel === 'composite',
+        'overlay affixes do not change the bastion base composite asset'
+    );
+    check(
+        bastionAsset.overlayPaths.some(item => item.affix === 'shield'),
+        'shield remains a separate overlay on bastion base composite asset'
+    );
+}
 
 {
     const game = makeGame(spawn_system, CONFIG);
@@ -376,6 +576,174 @@ const colWidth = 60;
     const drop = withRandom(() => 0, () => loot_calcRuneDrop(game, { forcedElement: 'venom' }));
     const rune = RUNE_DB.find(item => item.id === drop.runeId);
     check(!!rune && rune.element === 'venom', 'loot_calcRuneDrop forcedElement restricts rune family');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    bindSystem(game, game_phase);
+    let recordedVenomDamage = 0;
+    game.combat_reportDamage = () => {};
+    game.combat_recordDamage = (amount, attrType) => {
+        if (attrType === 'venom') recordedVenomDamage += amount || 0;
+    };
+
+    const target = new Enemy(160, 160, 60, 50, 10000, 10000, 'normal', []);
+    target.venomStacks = 10000;
+    game.enemies = [target];
+
+    game.phase_enemy_processTurn(target);
+
+    const expectedVenomDamage = Math.ceil(calcExpectedVenomTick(10000));
+    const linearVenomDamage = Math.ceil(10000 * CONFIG.mechanics.venom.dotPerStack);
+    const legacyTriangularTier = Math.floor((-1 + Math.sqrt(1 + 8 * 10000)) / 2);
+    const legacyTriangularDamage = Math.ceil(legacyTriangularTier * CONFIG.mechanics.venom.dotPerStack);
+    check(expectedVenomDamage < linearVenomDamage, 'venom DoT keeps high stack damage below pure linear scaling');
+    check(expectedVenomDamage > legacyTriangularDamage, 'venom DoT keeps massive stack investment above the legacy triangular tier value');
+    check(target.hp === 10000 - expectedVenomDamage, 'venom DoT uses diminishing effective stacks');
+    check(recordedVenomDamage === expectedVenomDamage, 'venom DoT records actual venom damage amount');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    bindSystem(game, game_phase);
+    game.activeElementResonances = {
+        cryo: { params: { frozenPhysDmgBonus: 0.3 } },
+    };
+    let recordedVenomDamage = 0;
+    game.combat_reportDamage = () => {};
+    game.combat_recordDamage = (amount, attrType) => {
+        if (attrType === 'venom') recordedVenomDamage += amount || 0;
+    };
+
+    const target = new Enemy(160, 160, 60, 50, 1000, 1000, 'normal', []);
+    target.venomStacks = 100;
+    target._wasFrozenLastTurn = true;
+    target.isFrozenCurrentTurn = true;
+    game.enemies = [target];
+
+    game.phase_enemy_processTurn(target);
+
+    const baseTick = calcExpectedVenomTick(100);
+    const expectedVenomDamage = Math.ceil(baseTick + baseTick * (1 + 0.3) * (CONFIG.mechanics.venom.thawExtraTickMultiplier ?? 1));
+    check(target.hp === 1000 - expectedVenomDamage, 'venom thaw burst adds one extra poison tick with cryo damage amp');
+    check(recordedVenomDamage === expectedVenomDamage, 'venom thaw burst records as venom damage');
+    check(target.isFrozenCurrentTurn === false && target._wasFrozenLastTurn === false, 'thaw start clears frozen turn markers before enemy action gate');
+    check(game.particles.some(p => p.mode === 'spark' && p.color === '#67e8f9') && game.floatingTexts.some(t => String(t.text).includes('解冻')), 'thaw start plays visible thaw feedback before venom burst');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    bindSystem(game, combat_system);
+    let recordedVenomDamage = 0;
+    game.combat_recordDamage = (amount, attrType) => {
+        if (attrType === 'venom') recordedVenomDamage += amount || 0;
+    };
+
+    const target = new Enemy(160, 160, 60, 50, 1000, 1000, 'normal', []);
+    target.venomStacks = 10;
+    game.enemies = [target];
+
+    const lightningShot = {
+        pos: { x: target.pos.x, y: target.pos.y },
+        config: { damage: 10, lightning: 1, cryo: 0, pyro: 0, bounce: 0, pierce: 0, scatter: 0, multicast: 0, wind: 0, venom: 0, type: 'test' },
+        chainHistory: [],
+        isCopy: false,
+        bouncesLeft: 0,
+        piercesLeft: 0,
+        shotId: 'lightning_venom_direct',
+    };
+    withRandom(() => 0.99, () => game.combat_damageEnemy(target, lightningShot));
+
+    const expectedProc = Math.ceil(calcExpectedVenomTick(10) * (CONFIG.mechanics.venom.lightningProcRatio ?? 0.35));
+    check(recordedVenomDamage === expectedProc, 'lightning hit immediately triggers configured partial venom tick');
+    check(target.hp === 1000 - 10 - expectedProc, 'lightning venom proc stacks on top of direct lightning hit damage');
+
+    const hpAfterProc = target.hp;
+    const repeat = game.combat_lightningVenom_trigger(target, 'lightning_venom_direct', 0);
+    check(repeat && repeat.triggered === false && target.hp === hpAfterProc, 'same shot cannot trigger lightning venom twice on one target');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    bindSystem(game, combat_system);
+    let recordedVenomDamage = 0;
+    game.combat_recordDamage = (amount, attrType) => {
+        if (attrType === 'venom') recordedVenomDamage += amount || 0;
+    };
+
+    const source = new Enemy(80, 160, 60, 50, 1000, 1000, 'normal', []);
+    source.active = false;
+    const target = new Enemy(150, 160, 60, 50, 1000, 1000, 'normal', []);
+    target.venomStacks = 30;
+    game.enemies = [source, target];
+
+    const triggered = withImmediateTimers(() => withRandom(() => 0, () =>
+        game.combat_lightning_triggerChain(source, 20, [], 1, 'lightning_venom_chain', 1.0)
+    ));
+
+    const expectedRatio = Math.max(
+        CONFIG.mechanics.venom.lightningProcMinRatio ?? 0.20,
+        (CONFIG.mechanics.venom.lightningProcRatio ?? 0.35) * (CONFIG.mechanics.venom.lightningProcChainFalloff ?? 0.85)
+    );
+    const expectedProc = Math.ceil(calcExpectedVenomTick(30) * expectedRatio);
+    check(triggered === true, 'forced lightning chain can trigger from test source');
+    check(recordedVenomDamage === expectedProc, 'lightning chain venom proc uses depth falloff ratio');
+    check(target.hp === 1000 - 20 - expectedProc, 'lightning chain damage and venom proc both apply to chained target');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    bindSystem(game, combat_system);
+
+    const source = new Enemy(120, 160, 60, 50, 100, 100, 'normal', []);
+    source.temp = 120;
+    source.venomStacks = 11;
+    source.active = false;
+    const nearA = new Enemy(150, 160, 60, 50, 1000, 1000, 'normal', []);
+    const nearB = new Enemy(190, 160, 60, 50, 1000, 1000, 'normal', []);
+    const far = new Enemy(320, 160, 60, 50, 1000, 1000, 'normal', []);
+    game.enemies = [source, nearA, nearB, far];
+
+    game._triggerDeathFX(source, null);
+
+    check((nearA.venomStacks || 0) === 6 && (nearB.venomStacks || 0) === 5, 'burning death explosion evenly distributes dead enemy venom stacks');
+    check((far.venomStacks || 0) === 0, 'burning death venom spread respects fire spread radius');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    bindSystem(game, combat_system);
+    game.ownedRelics = ['ember_fuse'];
+
+    const source = new Enemy(120, 160, 60, 50, 10000, 10000, 'normal', []);
+    source.temp = 320;
+    source.venomStacks = 100;
+    const nearA = new Enemy(150, 160, 60, 50, 10000, 10000, 'normal', []);
+    const nearB = new Enemy(190, 160, 60, 50, 10000, 10000, 'normal', []);
+    const far = new Enemy(320, 160, 60, 50, 10000, 10000, 'normal', []);
+    game.enemies = [source, nearA, nearB, far];
+
+    const pyroShot = {
+        pos: { x: source.pos.x, y: source.pos.y },
+        config: { damage: 1, lightning: 0, cryo: 0, pyro: 8, bounce: 0, pierce: 0, scatter: 0, multicast: 0, wind: 0, venom: 0, type: 'test' },
+        chainHistory: [],
+        isCopy: false,
+        bouncesLeft: 0,
+        piercesLeft: 0,
+    };
+    withRandom(() => 0, () => game.combat_damageEnemy(source, pyroShot));
+
+    const expectedSpread = Math.floor(100 * (CONFIG.mechanics.venom.pyroExplosionSpreadRatio ?? CONFIG.mechanics.pyro.heatConsumptionRate));
+    const spreadTotal = (nearA.venomStacks || 0) + (nearB.venomStacks || 0);
+    check(spreadTotal === expectedSpread, 'ember_fuse explosion spreads the configured ratio of source venom stacks');
+    check(Math.abs((nearA.venomStacks || 0) - (nearB.venomStacks || 0)) <= 1, 'ember_fuse venom spread is evenly distributed across explosion targets');
+    check((far.venomStacks || 0) === 0, 'ember_fuse venom spread respects explosion radius');
 }
 
 withRandom(() => 0, () => {
@@ -442,6 +810,8 @@ withRandom(() => 0, () => {
     game.enemies = [boss, neighbor, far];
     boss._tickRadiantAegis(game);
     check(neighbor.shieldCharges === 1 && neighbor.affixes.includes('shield'), 'radiantAegis full boss grants one shield layer to adjacent enemy');
+    check((neighbor._shieldAssimilationTimer || 0) > 0 && neighbor._shieldAssimilationFromX < 0, 'radiantAegis shield grant plays a source-facing shield assimilation effect on target');
+    check(!neighbor._defenseImpactFx?.radiantAegis, 'radiantAegis shield grant does not masquerade as target-side radiant block feedback');
     check((far.shieldCharges || 0) === 0, 'radiantAegis does not shield enemies beyond one grid');
 
     boss.takeDamage(boss.radiantAegis);
@@ -840,7 +1210,7 @@ withRandom(() => 0, () => {
     check(target.type === 'elite', 'Chimera entrance converts ordinary enemy into elite chaos feed');
     check(target.bossOwnerId === 'chimera' && target.bossMinionRole === 'chaos_feed', 'Chimera entrance feed stores boss metadata');
     check(target.bossMechanicTags.includes('chaosFeed'), 'Chimera entrance feed stores chaosFeed tag');
-    check(target.affixes.includes('berserk') && !target.affixes.includes('devour'), 'Chimera feed is volatile but does not self-devour');
+    check(!target.affixes.includes('berserk') && !target.affixes.includes('devour'), 'Chimera entrance feed no longer receives berserk or self-devour affixes');
 }
 
 {
@@ -862,29 +1232,33 @@ withRandom(() => 0, () => {
     globalThis.game = game;
     const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['berserk', 'devour']);
     boss.bossType = 'chimera';
-    boss.chimeraFrostStacks = 1;
-    const preyA = new Enemy(30, 200, 60, 50, 100, 100, 'normal', []);
-    preyA.temp = 100;
-    preyA.venomStacks = 2;
-    preyA.swordMarks = 1;
-    preyA.markTimer = 7;
-    preyA.frozenCount = 2;
-    const preyB = new Enemy(330, 200, 60, 50, 100, 100, 'elite', ['shield']);
-    preyB.temp = -100;
-    preyB.isFrozenCurrentTurn = true;
-    preyB._irradiationStacks = 3;
-    preyB.phaseShieldDisabledThisTurn = true;
-    preyB.shieldCharges = 1;
-    game.enemies = [boss, preyA, preyB];
+    const leftCold = new Enemy(90, 200, 60, 50, 100, 100, 'normal', []);
+    leftCold.temp = -100;
+    leftCold.venomStacks = 2;
+    leftCold.swordMarks = 1;
+    leftCold.markTimer = 7;
+    leftCold.frozenCount = 2;
+    const leftHot = new Enemy(150, 200, 60, 50, 100, 100, 'normal', []);
+    leftHot.temp = 100;
+    const rightHot = new Enemy(330, 200, 60, 50, 100, 100, 'elite', ['shield']);
+    rightHot.temp = 100;
+    rightHot.isFrozenCurrentTurn = true;
+    rightHot._irradiationStacks = 3;
+    rightHot.phaseShieldDisabledThisTurn = true;
+    rightHot.shieldCharges = 1;
+    const rightCold = new Enemy(390, 200, 60, 50, 100, 100, 'elite', []);
+    rightCold.temp = -100;
+    game.enemies = [boss, leftCold, leftHot, rightHot, rightCold];
 
     const devoured = withRandom(() => 0, () => boss._chimeraDevourTargets(game, { force: true }));
-    const feeder = game.enemies.find(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera' && enemy.bossMechanicTags.includes('thermalFeed'));
-    check(devoured === 1, 'Chimera thermal devour consumes exactly one random enemy');
-    check(!preyA.active && preyB.active, 'Chimera thermal devour leaves the other prey on the board');
+    check(devoured === 2, 'Chimera thermal devour consumes two side-selected enemies');
+    check(!leftCold.active && leftHot.active, 'Chimera left-side devour prefers a low-temperature target');
+    check(!rightHot.active && rightCold.active, 'Chimera right-side devour prefers a high-temperature target');
     check((boss.chimeraHeatStacks || 0) === 0 && (boss.chimeraFrostStacks || 0) === 0, 'Chimera heat and frost stacks cancel each other');
-    check((boss.chimeraRadiantConversions || 0) === 1 && (boss.radiantAegis || 0) > 0, 'Chimera canceled thermal stacks convert into radiant aegis shield');
+    check((boss.chimeraRadiantConversions || 0) === 100 && (boss.radiantAegis || 0) === 100, 'Chimera 100 heat plus 100 frost converts into 100 radiant shield');
+    check(boss.affixes.includes('radiantAegis') && (boss.shieldCharges || 0) === 0, 'Chimera thermal cancellation uses radiant aegis instead of ordinary shield layers');
     check((boss.venomStacks || 0) === 0 && (boss.frozenCount || 0) === 0, 'Chimera no longer inherits non-temperature negative states');
-    check((boss.chimeraFeedStacks || 0) === 1 && !!feeder && Math.abs(feeder.temp) === 100, 'Chimera records feed stacks and summons a +/-100C thermal feed');
+    check((boss.chimeraFeedStacks || 0) === 2, 'Chimera records both side devours without devour-time feeder summons');
 }
 
 {
@@ -893,13 +1267,32 @@ withRandom(() => 0, () => {
     const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['berserk', 'devour']);
     boss.bossType = 'chimera';
     boss.berserked = true;
-    boss.chimeraHeatStacks = 2;
+    boss.chimeraHeatStacks = 100;
     const prey = new Enemy(30, 200, 60, 50, 100, 100, 'normal', []);
     prey.temp = -100;
     game.enemies = [boss, prey];
 
-    withRandom(() => 0, () => boss._chimeraDevourTargets(game, { force: true }));
-    check((boss.chimeraRadiantConversions || 0) === 2, 'Berserk Chimera gains double thermal stacks before radiant conversion');
+    withRandom(() => 0, () => boss._chimeraDevourTargets(game, { force: true, count: 1 }));
+    check((boss.chimeraRadiantConversions || 0) === 200 && (boss.radiantAegis || 0) === 200, 'Berserk Chimera doubles matched thermal cancellation into radiant shield');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const boss = new Enemy(210, 200, 180, 100, 900, 1000, 'boss', ['devour']);
+    boss.bossType = 'chimera';
+    boss.chimeraFrostStacks = 100;
+    const ordinary = new Enemy(30, 200, 60, 50, 100, 100, 'normal', []);
+    const feeder = new Enemy(330, 200, 60, 50, 100, 100, 'elite', []);
+    feeder.temp = 100;
+    feeder.bossOwnerId = 'chimera';
+    feeder.bossMinionRole = 'chaos_feed';
+    feeder.bossMechanicTags = ['chaosFeed', 'thermalFeed'];
+    game.enemies = [boss, ordinary, feeder];
+
+    const devoured = withRandom(() => 0, () => boss._chimeraDevourTargets(game, { force: true, count: 1 }));
+    check(devoured === 1 && ordinary.active && !feeder.active, 'Chimera prioritizes thermal feed prey over ordinary enemies');
+    check((boss.radiantAegis || 0) === 100, 'Priority thermal feed devour converts matched cores into radiant shield');
 }
 
 {
@@ -909,12 +1302,84 @@ withRandom(() => 0, () => {
     boss.bossType = 'chimera';
     game.enemies = [boss];
 
-    const spawned = boss._chimeraSpawnFeeders(game, 1);
-    const feeder = game.enemies.find(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera');
-    check(spawned === 1 && !!feeder, 'Chimera summons a chaos feed enemy');
-    check(feeder.bossMechanicTags.includes('chaosFeed') && feeder.bossMechanicTags.includes('thermalFeed') && feeder.affixes.includes('berserk'), 'Chimera summoned feed keeps chaosFeed and thermalFeed identity');
-    check(Math.abs(feeder.temp) === 100, 'Chimera summoned feed carries +100C or -100C temperature');
+    const spawned = boss._chimeraSpawnFeeders(game, 2);
+    const feeders = game.enemies.filter(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera');
+    const leftFeeders = feeders.filter(enemy => enemy.pos.x < boss.pos.x);
+    const rightFeeders = feeders.filter(enemy => enemy.pos.x > boss.pos.x);
+    check(spawned === 2 && feeders.length === 2, 'Chimera summons two chaos feed enemies when asked');
+    check(feeders.every(feeder => feeder.bossMechanicTags.includes('chaosFeed') && feeder.bossMechanicTags.includes('thermalFeed') && !feeder.affixes.includes('berserk')), 'Chimera summoned feeds keep thermal identity without berserk');
+    check(leftFeeders.length >= 1 && leftFeeders.every(feeder => feeder.temp === -100), 'Chimera summoned left-side feeds are cold');
+    check(rightFeeders.length >= 1 && rightFeeders.every(feeder => feeder.temp === 100), 'Chimera summoned right-side feeds are hot');
     assertNoOverlap(game);
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const boss = new Enemy(210, 200, 180, 100, 1000, 1000, 'boss', ['devour']);
+    boss.bossType = 'chimera';
+    boss.chimeraFrostStacks = 100;
+    boss._chimeraDigestCooldown = 2;
+    const prey = new Enemy(30, 200, 60, 50, 100, 100, 'normal', []);
+    prey.temp = 100;
+    game.enemies = [boss, prey];
+
+    withRandom(() => 0, () => boss.startTurnAction(game));
+    check(boss.telegraphIntent?.key === 'chimera_thermal_devour' && boss._chimeraDigestCooldown === 0, 'Chimera old digest cooldown is clamped so next turn can telegraph devour');
+    const feedersBeforeExecute = game.enemies.filter(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera' && enemy.bossMechanicTags?.includes('thermalFeed'));
+    check(feedersBeforeExecute.length === 0, 'Chimera does not summon thermal feeds before resolving devour');
+    withRandom(() => 0, () => boss.executeTurnAction(game));
+    const feedersAfterExecute = game.enemies.filter(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera' && enemy.bossMechanicTags?.includes('thermalFeed'));
+    const leftFeeders = feedersAfterExecute.filter(enemy => enemy.pos.x < boss.pos.x);
+    const rightFeeders = feedersAfterExecute.filter(enemy => enemy.pos.x > boss.pos.x);
+    check(!prey.active && (boss.chimeraFeedStacks || 0) > 0 && (boss.radiantAegis || 0) >= 100, 'Chimera resolves thermal devour before summoning and gains matched radiant shield');
+    check(
+        feedersAfterExecute.length === 2
+        && leftFeeders.length >= 1 && leftFeeders.every(enemy => enemy.temp === -100)
+        && rightFeeders.length >= 1 && rightFeeders.every(enemy => enemy.temp === 100),
+        'Chimera summons thermal feeds after devour resolves'
+    );
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const boss = new Enemy(210, 200, 180, 100, 1000, 1000, 'boss', ['devour']);
+    boss.bossType = 'chimera';
+    game.enemies = [boss];
+
+    let idx = 0;
+    const rolls = [0.99, 0, 0.99, 0];
+    const cooldownOnly = boss._tickChimeraMawField(game, { summon: false });
+    check(cooldownOnly.spawned === 0 && game.enemies.length === 1, 'Chimera turn-start maw tick does not summon before devour');
+    const result = withRandom(() => rolls[idx++] ?? 0, () => boss._tickChimeraMawField(game));
+    const feeders = game.enemies.filter(enemy => enemy !== boss && enemy.bossOwnerId === 'chimera' && enemy.bossMechanicTags.includes('thermalFeed'));
+    const leftFeeders = feeders.filter(enemy => enemy.pos.x < boss.pos.x);
+    const rightFeeders = feeders.filter(enemy => enemy.pos.x > boss.pos.x);
+    check(result.spawned === 3 && feeders.length === 3, 'Chimera turn tick summons 2-3 thermal feeds');
+    check(feeders.every(enemy => !enemy.affixes.includes('berserk')), 'Chimera thermal feeds do not carry berserk');
+    check(
+        leftFeeders.length >= 1 && leftFeeders.every(enemy => enemy.temp === -100)
+        && rightFeeders.length >= 1 && rightFeeders.every(enemy => enemy.temp === 100),
+        'Chimera thermal feeds spawn as cold on the left and hot on the right'
+    );
+    assertNoOverlap(game);
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const boss = new Enemy(210, 200, 180, 100, 1000, 1000, 'boss', []);
+    boss.bossType = 'ignis';
+    boss.berserked = true;
+    boss._moveInterval = 2;
+    boss._moveCooldown = 1;
+    game.enemies = [boss];
+
+    boss.executeTurnAction(game);
+    check(boss.dropTargetY === 200 && boss._moveCooldown === 0, 'Berserk boss waits when movement cooldown is active');
+    boss.executeTurnAction(game);
+    check(boss.dropTargetY === 250 && boss._moveCooldown === 1, 'Berserk boss moves only when its movement cooldown reaches zero');
 }
 
 {
@@ -1055,11 +1520,17 @@ withRandom(() => 0, () => {
     const normalSource = { config: { damage: 8, bounce: 0, pierce: 0, cryo: 0, pyro: 0, lightning: 0, venom: 0, wind: 0 }, pos: { x: 100, y: 100 } };
     const normalBlock = armored.takeDamage(8, normalSource);
     check(armored.hp === 100 && armored.livingArmorHp === 2 && normalBlock.hpDamage === 0 && normalBlock.blockedBy === 'livingArmor', 'livingArmor fully absorbs normal physical projectile hits');
+    check(armored._defenseImpactFx?.livingArmor?.membraneStack?.every(layer => layer.flipX === false), 'livingArmor tree shield membranes keep their source-art orientation');
     const pierceSource = { config: { bounce: 0, pierce: 1 }, bouncesLeft: 0, pos: { x: 100, y: 100 } };
     armored.takeDamage(2, pierceSource);
     check(armored.hp === 98 && armored.livingArmorBroken === true, 'pierce damages livingArmor and body together');
     armored._grantLivingArmor(200);
     check(armored.livingArmorHp === 20 && armored.livingArmorBroken === false, 'armorSpore can restore broken livingArmor');
+
+    const shielded = new Enemy(130, 100, 60, 50, 100, 100, 'normal', ['shield']);
+    shielded.shieldCharges = 1;
+    shielded.takeDamage(8, { config: { damage: 8 }, pos: { x: 130, y: 140 } });
+    check(shielded._defenseImpactFx?.shield?.membraneStack?.every(layer => layer.flipX === true), 'standard shield membranes keep the legacy mirrored orientation');
 
     const spore = new Enemy(160, 100, 60, 50, 200, 200, 'normal', ['armorSpore']);
     const target = new Enemy(220, 100, 60, 50, 100, 100, 'normal', []);
@@ -1251,6 +1722,48 @@ withRandom(() => 0.25, () => {
         assertArchetypeContract(enemy, archetypeId, meta, game, CONFIG);
     }
 });
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    game.round = 30;
+    game.spawn_spawnWavePresetSlot({
+        slot: {
+            archetype: 'bastion',
+            cols: 3,
+            rows: 1,
+            affixes: ['heavyArmor', 'haste', 'shield'],
+        },
+        startCol: 0,
+        cols: 3,
+        rows: 1,
+        centerX: 90,
+        centerY: 240,
+        widthPx: 180,
+        heightPx: 50,
+    }, baseHP, colWidth, {});
+    const enemy = game.enemies.at(-1);
+    check(enemy.affixes.includes('heavyArmor'), 'runtime bastion slot keeps heavyArmor');
+    check(enemy.affixes.includes('shield'), 'runtime bastion slot keeps compatible shield');
+    check(!enemy.affixes.includes('haste'), 'runtime bastion slot strips incompatible haste');
+}
+
+{
+    const game = makeGame(spawn_system, CONFIG);
+    globalThis.game = game;
+    const bastion = new Enemy(160, 160, 180, 50, 200, 200, 'elite', ['heavyArmor']);
+    bastion.baseArchetype = 'bastion';
+    bastion.gridCols = 3;
+    bastion.gridRows = 1;
+    const boss = new Enemy(160, 160, 180, 100, 1000, 1000, 'boss', ['haste', 'clone']);
+    boss.bossType = 'tesla';
+    game.enemies = [bastion];
+    withImmediateTimers(() => withRandom(() => 0, () => game.spawn_triggerBossEntranceShockwave(boss)));
+    check(bastion.affixes.includes('heavyArmor'), 'boss shockwave keeps base required affix on bastion');
+    check(
+        !bastion.affixes.includes('haste') && !bastion.affixes.includes('clone'),
+        'boss shockwave cannot add blocked speed/clone affixes to bastion'
+    );
+}
 
 withRandom(makeRng(0xEC0A1), () => {
     const game = makeGame(spawn_system, CONFIG);

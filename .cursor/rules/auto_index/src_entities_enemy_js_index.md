@@ -1,9 +1,9 @@
 # src\entities\enemy.js 函数索引
 
-> 自动生成于 2026-06-25 | 总行数: 11525 | 函数数: 181 | 语言: javascript
+> 自动生成于 2026-06-27 | 总行数: 12216 | 函数数: 195 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 11 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 10 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -14,7 +14,9 @@
 | setEnemyAudioProvider | function | `setEnemyAudioProvider(provider)` |  |
 | _getAffixOverlayImage | function | `_getAffixOverlayImage(src)` |  |
 | _getEnemyFrameImage | function | `_getEnemyFrameImage(src)` |  |
+| _preloadDefenseShieldMembranes | function | `_preloadDefenseShieldMembranes()` |  |
 | _measureImageAlphaBounds | function | `_measureImageAlphaBounds(img)` |  |
+| _createDefenseFlowShieldMembraneStack | function | `_createDefenseFlowShieldMembraneStack(kind = 'shield', randomize = true)` |  |
 | _hexToRgba | function | `_hexToRgba(hex, alpha)` |  |
 | _getBossHpThemePalette | function | `_getBossHpThemePalette(bossType)` |  |
 | constructor | method | `constructor(x, y, width, height, hp, maxHp = hp, type = 'normal', affixes = [])` | ⚠️ 巨型函数，见 @section 导航 |
@@ -23,6 +25,7 @@
 | applyExplosionKnockback | method | `applyExplosionKnockback(cx, cy, radius = 100, maxOffset = 12)` |  |
 | _tickExplosionKnockback | method | `_tickExplosionKnockback(timeScale)` |  |
 | update | method | `update(timeScale, game)` | ⚠️ 巨型函数，见 @section 导航 |
+| releasePersistentEffects | method | `releasePersistentEffects()` |  |
 | addSwordCrack | method | `addSwordCrack(relPos, angle)` |  |
 | updateTempParticles | method | `updateTempParticles(timeScale)` |  |
 | advance | method | `advance(amount)` |  |
@@ -51,9 +54,10 @@
 | _selectTurnIntent | method | `_selectTurnIntent(game, afx)` |  |
 | _getRadiantAegisConfig | method | `_getRadiantAegisConfig()` |  |
 | _initRadiantAegis | method | `_initRadiantAegis()` |  |
-| _grantShieldLayer | method | `_grantShieldLayer(amount = 1)` |  |
+| _grantShieldLayer | method | `_grantShieldLayer(amount = 1, options = {})` |  |
 | _grantRadiantAegisPulse | method | `_grantRadiantAegisPulse(game, amount = null, options = {})` |  |
 | _consumeBossVulnerabilityExposedTurn | method | `_consumeBossVulnerabilityExposedTurn(game)` |  |
+| _growBossVulnerabilityThreshold | method | `_growBossVulnerabilityThreshold(game = null)` |  |
 | _getRadiantAegisTargets | method | `_getRadiantAegisTargets(game)` |  |
 | _tickRadiantAegis | method | `_tickRadiantAegis(game)` |  |
 | _getTeslaConfig | method | `_getTeslaConfig()` |  |
@@ -111,9 +115,14 @@
 | _getChimeraGridCol | method | `_getChimeraGridCol(game, x, metrics = null)` |  |
 | _getChimeraGridRow | method | `_getChimeraGridRow(y, metrics)` |  |
 | _getChimeraPrey | method | `_getChimeraPrey(game)` |  |
+| _isChimeraThermalPrey | method | `_isChimeraThermalPrey(enemy)` |  |
+| _getChimeraPreySide | method | `_getChimeraPreySide(enemy)` |  |
+| _scoreChimeraSidePrey | method | `_scoreChimeraSidePrey(enemy, side)` |  |
+| _chimeraPickSidePrey | method | `_chimeraPickSidePrey(game, side, excluded = [])` |  |
 | _findChimeraPullCell | method | `_findChimeraPullCell(game, target)` |  |
 | _chimeraAttractPrey | method | `_chimeraAttractPrey(game)` |  |
-| _chimeraPickRandomPrey | method | `_chimeraPickRandomPrey(game)` |  |
+| _chimeraPickRandomPrey | method | `_chimeraPickRandomPrey(game, excluded = [])` |  |
+| _grantChimeraRadiantShield | method | `_grantChimeraRadiantShield(game, amount = 0)` |  |
 | _chimeraNormalizeThermalStacks | method | `_chimeraNormalizeThermalStacks(game)` |  |
 | _chimeraAbsorbThermalStacks | method | `_chimeraAbsorbThermalStacks(victim, game = null)` |  |
 | _chimeraAbsorbNegativeStates | method | `_chimeraAbsorbNegativeStates(victim, game = null)` |  |
@@ -121,12 +130,15 @@
 | _getChimeraFeeders | method | `_getChimeraFeeders(game)` |  |
 | _findChimeraFeederSpawnPositions | method | `_findChimeraFeederSpawnPositions(game, count)` |  |
 | _chimeraSpawnFeeders | method | `_chimeraSpawnFeeders(game, count = 1)` |  |
-| _tickChimeraMawField | method | `_tickChimeraMawField(game)` |  |
+| _chimeraSummonFeedersForTurn | method | `_chimeraSummonFeedersForTurn(game)` |  |
+| _tickChimeraMawField | method | `_tickChimeraMawField(game, options = {})` |  |
 | _ensureDevourerBodyCollisionShape | method | `_ensureDevourerBodyCollisionShape()` |  |
 | _tickBossPhysicsForTurn | method | `_tickBossPhysicsForTurn()` |  |
 | _tickBossMechanicsForTurn | method | `_tickBossMechanicsForTurn(game)` |  |
 | startTurnAction | method | `startTurnAction(game)` |  |
-| executeTurnAction | method | `executeTurnAction(game)` | ⚠️ 巨型函数，见 @section 导航 |
+| executeTurnAction | method | `executeTurnAction(game, options = {})` |  |
+| _doMove | function | `_doMove()` |  |
+| triggerImmediateAction | method | `triggerImmediateAction(game)` |  |
 | performTurnActionAndMove | method | `performTurnActionAndMove(game)` | ⚠️ 巨型函数，见 @section 导航 |
 | _getBossActionCount | method | `_getBossActionCount(baseCount)` |  |
 | _getOuroborosConfig | method | `_getOuroborosConfig()` |  |
@@ -150,8 +162,10 @@
 | triggerLaserHitShake | method | `triggerLaserHitShake()` |  |
 | _resolveDefenseImpactVector | method | `_resolveDefenseImpactVector(source = null)` |  |
 | _triggerDefenseImpactFx | method | `_triggerDefenseImpactFx(kind, source = null, duration = 16, options = {})` |  |
+| _triggerShieldAssimilationFx | method | `_triggerShieldAssimilationFx(source = null, duration = 22)` |  |
 | _getDefenseImpactFx | method | `_getDefenseImpactFx(kind, duration = 16)` |  |
 | _drawDefenseImpactFeedback | method | `_drawDefenseImpactFeedback(ctx, w, h, r)` | ⚠️ 巨型函数，见 @section 导航 |
+| _drawShieldAssimilationFeedback | method | `_drawShieldAssimilationFeedback(ctx, w, h, r, perfLevel = 'high')` |  |
 | _tickVisualFxTimers | method | `_tickVisualFxTimers(timeScale)` |  |
 | _startJumpFx | method | `_startJumpFx(rows = 1, startY = this.dropTargetY, targetY = this.dropTargetY)` |  |
 | _drawRelicMaterialFrame | method | `_drawRelicMaterialFrame(ctx, w, h, r, options = {})` |  |
@@ -202,14 +216,6 @@
 ### update
 
 > **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
-
-### executeTurnAction
-
-> 定位：`grep -n '@section:节点名'` 跳转到对应节点
-
-| 节点标记 | 说明 |
-|----------|------|
-| `@section:enemy_action_audio` | 敌人行动音效分发：regen/split/freeze 按词缀类型路由 |
 
 ### performTurnActionAndMove
 
@@ -293,6 +299,7 @@
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:enemy_telegraph_audio` | 敌人特殊动作预警蓄力音（低频 200Hz，区别于玩家蓄力 800Hz） |
+| `@section:enemy_action_audio` | 敌人行动音效分发：regen/split/freeze 按词缀类型路由 |
 | `@section:draw_entry_and_perf_check` | 绘制入口与性能等级检查 |
 | `@section:damage_shield_check` | 护盾吸收与穿透判断 |
 | `@section:targeting_fallback_setup` | 计算绘制参数 |

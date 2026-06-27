@@ -8,9 +8,13 @@
 import {
     ENEMY_WAVE_PRESETS,
     ENEMY_WAVE_PRESET_ARCHETYPES,
+    ENEMY_BASE_AFFIX_COMPATIBILITY,
+    ENEMY_BASE_EXCLUSIVE_AFFIXES,
     DIRECTOR_SCRIPTS,
     DIRECTOR_SCRIPT_CONFIG,
     DIRECTOR_ACTOR_INTRO_ROUNDS,
+    filterRandomEnemyAffixWeights,
+    normalizeEnemyAffixesForArchetype,
 } from '../src/wave_presets.js';
 
 const ENEMY_COLS = 6;
@@ -18,6 +22,7 @@ const LARGE_LIMITS = {
     maw: 2,
     hive: 1,
     siege: 1,
+    carrier: 1,
     gravityWell: 1,
 };
 
@@ -102,6 +107,27 @@ console.log('══════════════════════�
 const ids = new Set();
 const scriptIds = new Set();
 const scriptMap = new Map();
+const randomFilterProbe = filterRandomEnemyAffixWeights({
+    shield: 10,
+    haste: 10,
+    ...Object.fromEntries(ENEMY_BASE_EXCLUSIVE_AFFIXES.map(affix => [affix, 10])),
+});
+check(randomFilterProbe.shield === 10 && randomFilterProbe.haste === 10, 'random affix filter keeps regular affixes');
+for (const affix of ENEMY_BASE_EXCLUSIVE_AFFIXES) {
+    check(!(affix in randomFilterProbe), `random affix filter excludes base-only affix ${affix}`);
+}
+
+for (const [archetype, meta] of Object.entries(ENEMY_WAVE_PRESET_ARCHETYPES)) {
+    const rule = ENEMY_BASE_AFFIX_COMPATIBILITY[archetype];
+    check(!!rule, `${archetype}.compatibility rule registered`);
+    const normalizedRequired = normalizeEnemyAffixesForArchetype(archetype, [meta.affix]);
+    check(normalizedRequired.includes(meta.affix), `${archetype}.compatibility keeps required affix ${meta.affix}`);
+    for (const blocked of rule?.blockedAffixes || []) {
+        const normalized = normalizeEnemyAffixesForArchetype(archetype, [meta.affix, blocked]);
+        check(!normalized.includes(blocked), `${archetype}.compatibility blocks ${blocked}`);
+    }
+}
+
 for (const script of DIRECTOR_SCRIPTS) {
     check(typeof script.id === 'string' && script.id.length > 0, `${script.id || '<missing>'}.script id non-empty`);
     check(!scriptIds.has(script.id), `${script.id}.script id unique`);
@@ -153,6 +179,12 @@ for (const preset of ENEMY_WAVE_PRESETS) {
                 check((slot.cols || meta.cols) === meta.cols, `${preset.id}.${archetype}.cols 匹配`);
                 check((slot.rows || meta.rows) === meta.rows, `${preset.id}.${archetype}.rows 匹配`);
                 check((slot.affixes || []).includes(meta.affix), `${preset.id}.${archetype}.affixes 包含专属词条 ${meta.affix}`);
+                const originalAffixes = [...new Set(slot.affixes || [])];
+                const normalizedAffixes = normalizeEnemyAffixesForArchetype(archetype, slot.affixes || []);
+                check(
+                    originalAffixes.every(affix => normalizedAffixes.includes(affix)) && normalizedAffixes.length === originalAffixes.length,
+                    `${preset.id}.${archetype}.affixes satisfy base compatibility`
+                );
             }
             largeCounts[archetype] = (largeCounts[archetype] || 0) + 1;
         }
