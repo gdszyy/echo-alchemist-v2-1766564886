@@ -14,7 +14,7 @@
  * 或在 DevTools → Application → Service Workers 里 Unregister。
  */
 
-const CACHE_VERSION = 'v20260624-round-boss-preview-clean1';
+const CACHE_VERSION = 'v20260626-pass12-elite-golem-combos';
 const ASSET_CACHE = `echo-alchemist-assets-${CACHE_VERSION}`;
 const CORE_CACHE = `echo-alchemist-core-${CACHE_VERSION}`;
 
