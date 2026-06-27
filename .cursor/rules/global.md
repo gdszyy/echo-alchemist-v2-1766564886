@@ -207,6 +207,8 @@ game.perfQualityLevel // 当前性能等级：'high' | 'medium' | 'low'
 
 ### AI 定制测试工作流
 
+根项目本地 npm 测试/预览服务默认端口为 `3002`：执行 `npm start` 后，T2 试炼场实机验证与 T3 Puppeteer 自动化默认访问 `http://localhost:3002`。启动前必须先检查 `:3002` 是否已有可复用服务；临时换端口时必须说明原因并记录端口。
+
 ```
 AI 修改代码
     ↓

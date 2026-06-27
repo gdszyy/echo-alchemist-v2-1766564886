@@ -1,5 +1,11 @@
-# Echo Alchemist V2 AI Agent 协作规范 (AGENTS.md)
+﻿# Echo Alchemist V2 AI Agent 协作规范 (AGENTS.md)
 本文档是 Echo Alchemist V2 项目中所有 AI Agent（包括临时 Agent 和常驻 Agent）必须遵守的协作规范和工作指南。它定义了全局的编辑策略、代码风格约定以及各模块的规范文档索引。
+## 0. Codex 开发归属约定
+
+本项目的代码开发、资源接入、测试验证、文档同步、任务拆分与后续交接默认均由 **Codex / Codex Agent** 执行。文档中出现的“Agent”“后续 Agent”“临时 Agent”均按 Codex 执行主体理解；除非用户明确指定，不应假设存在其他外部开发执行者。
+
+在编写计划、分阶段提示词、交接文档或 TODO 时，应使用“交给后续 Codex 执行 / 由 Codex 验证 / Codex 同步文档”等表述，确保所有开发闭环都落回 Codex。
+
 ## 1. 快速导航与核心入口规范 (Quick Navigation)
 
 为了确保各技能 (Skills) 与本项目之间的索引契约一致，所有 Agent 在介入本项目时，**必须**优先阅读以下入口文档：
@@ -15,6 +21,7 @@
 *   **流程洞察索引**：[`.cursor/rules/process_insights/index.md`](.cursor/rules/process_insights/index.md)（在涉及复杂跨模块流程、修复历史 Bug 区域或新增特效时必读；包含历次任务沉淀的防坑经验与版本化洞察文档）。
 *   **自动函数索引**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)（在涉及大文件修改时必读；包含所有大文件的函数名、行号范围和 @section 内部节点映射，由 `code-indexer` 脚本自动维护，**严禁手动编辑**）。
 *   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md)（凡涉及位图生成、Sprite 接入、图标替换的任务必读；包含 UI 切图清单、敌人 Sprite 规格、Boss 形象清单）。
+*   **美术资产生成规范**：[`docs/art_asset_generation_guidelines.md`](docs/art_asset_generation_guidelines.md)（凡生成或替换 UI、ICON、Toast、敌人/Boss 位图时必读；包含场景化要求、Prompt 模板、透明管线、禁忌与验收清单）。
 *   **测试基础设施规范**：[`.cursor/rules/testing.md`](.cursor/rules/testing.md)（凡修改涉及遗物、精华、符文词条、敌人词条等核心机制时必读；包含试炼场场景规范、Puppeteer 测试套件运行方式、测试覆盖范围与已知盲区）。
 
 所有专门针对本项目的技能 (如 `echo-developer`) 仅需指引 Agent 阅读上述入口，无需在技能文件内硬编码具体的架构细节或行数统计。
@@ -61,6 +68,8 @@
 
 ## 2.5 Dev Server / 本地服务进程管理规范
 
+> **本地 npm 测试/预览默认端口**：根项目执行 `npm start` 时必须默认使用 `http://localhost:3002`。启动前优先检查 `:3002` 是否已有可复用服务；T2/T3 测试、Puppeteer 和浏览器实机验证默认 URL 均为 `http://localhost:3002`。只有当 3002 被占用且不可复用时，才允许临时换端口，并必须在任务总结中说明原因、端口与关闭方式。
+
 为避免 AI Agent 在开发过程中反复启动 `node dev` / `vite` / `serve` / `http-server` 等本地服务并遗留后台进程，所有 Agent 必须遵守以下规则：
 
 1. **启动前必须检查已有服务**
@@ -68,7 +77,7 @@
    - 如果已有可用服务，优先复用，不得重复启动新的服务。
    - 常用检查命令：
      ```powershell
-     netstat -ano | findstr :3000
+     netstat -ano | findstr :3002
      Get-Process node
      ```
 
@@ -156,11 +165,13 @@
 *   **敌人词缀与 Boss 索引**：[`.cursor/rules/enemy_index.md`](.cursor/rules/enemy_index.md) - 8 种敌人词缀和 8 个 Boss 的行为机制、出现回合、克制属性、狂暴行为及关键代码位置速查表。
 
 *   **位图化视觉重构规格**：[`design_spec_bitmap.md`](design_spec_bitmap.md) - 阶段五规划文档。包含 UI 切图清单（9-Slice 规格 + 图标尺寸）、敌人 Sprite 规格（128×128 基准、帧数要求、Overlay 分层设计）、8 种 Boss 专属形象清单。**凡涉及位图生成、Sprite 接入、图标替换的任务，必先读此文档。**
+*   **美术资产生成规范**：[`docs/art_asset_generation_guidelines.md`](docs/art_asset_generation_guidelines.md) - 将整体暗黑赛博炼金风格拆成可执行的场景化生成要求、Prompt 模板、透明 PNG/chroma key 流程、动态文字禁忌与验收清单。**凡生成 UI、ICON、Toast、遗物图标、敌人或 Boss 资源，必须与资产 TODO 一起引用本规范。**
 *   **UI 页面与美术素材需求清单**：[`docs/ui_asset_requirements.md`](docs/ui_asset_requirements.md) - 所有 UI 页面（`#phase-*` + 组件）的美术状态、缺失素材清单与优先级（P0/P1/P2）、命名/尺寸/接入路径规范。**新增 UI 页面或替换素材时必先读此文档，并同步更新该表。**
 
 ### 核心机制文档（深度阅读，含数值与流程说明）
 
 *   **核心机制文档**：[`docs/core_mechanics.md`](docs/core_mechanics.md) - 四大核心机制的完整数值与流程说明：“符文充能”、“子弹替换（混沌/纯净精华两条路径）”、“遗物/精华保底概率（DropPity V3）”、“符文智能掉落算法（三层加权）”。**凡修改上述任一机制时，必须先读此文档。**
+*   **符文法术与药剂炼成收口规范**：[`docs/rune_potion_spell_contract.md`](docs/rune_potion_spell_contract.md) - 当前符文组合=法术、法阵=形态+嵌套合约、药剂炼成顺序、嵌套合法性矩阵、防御塔/坠击/扫射激光收口规则。**凡修改药剂炼成、`POTION_SPELL_DB`、法阵形态或符文组合法术化时必读。**
 *   **敌人视觉设计 V2**：[`docs/enemy_visual_design_v2.md`](docs/enemy_visual_design_v2.md) - 敌人尺寸足迹、基底类型、专属词条与 3×3 范围内大型敌人的视觉/机制规范。**凡修改敌人尺寸、基底形体、敌人词条归属或大型敌人生成逻辑时，必须先读此文档。**
 *   **敌人美术与词条特效影响范围评估**：[`docs/enemy_art_implementation_impact.md`](docs/enemy_art_implementation_impact.md) - 记录敌人组合资产、非 1×1 词条特效、新词条特效和预设波次系统的影响范围、优先级与推荐落地路径。
 *   **敌人组合预设波次设计**：[`docs/enemy_wave_preset_design.md`](docs/enemy_wave_preset_design.md) - 定义大型敌人首批预设波次、出场节奏、放置规则、资产键联动和后续代码修改方案。
