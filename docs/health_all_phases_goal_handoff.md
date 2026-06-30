@@ -108,7 +108,7 @@
 
 1. C1：中断与覆盖边界。
 2. C2-C3：法阵选择 MVP 与合法性表。
-3. C4：从 `RUNEWORD_DB` 解析 `spellContent`。
+3. C4：从 `RUNEWORD_DB` 解析 `spellContent`（2026-06-30 已完成）。
 4. C5-C6：`spellTree` 存档与嵌套 MVP。
 5. C7：战斗层按 `spellTree` 释放。
 6. C8：资产与体验 polish。

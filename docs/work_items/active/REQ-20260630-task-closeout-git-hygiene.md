@@ -88,7 +88,7 @@
 
 - `git diff --check`：通过；仅输出 Windows `LF will be replaced by CRLF` 提示。
 - `git status --short --branch`：当前 `main...origin/main [ahead 15]`，工作区包含本需求的 5 个修改文件与 2 个新增文档。
-- `rg -n "C1|interruption|deferred|debt" docs/work_items/active TODO.md docs/p0_interaction_optimization_todo.md docs/potion_alchemy_development_plan.md docs/rune_potion_spell_contract.md .cursor/rules/ui_system.md AGENTS.md`：通过；C1 状态已一致，剩余 debt/deferred 为 C4/C6/Tower/C8 或其他模块已知债务。
+- `rg -n "C1|interruption|deferred|debt" docs/work_items/active TODO.md docs/p0_interaction_optimization_todo.md docs/potion_alchemy_development_plan.md docs/rune_potion_spell_contract.md .cursor/rules/ui_system.md AGENTS.md`：通过；C1 状态已一致。历史遗留状态已复核；2026-06-30 嵌套 UI 已在 `REQ-20260630-potion-c6-nesting-ui.md` 收口，当前药剂线剩余项只保留 Tower 专用资产/长期平衡与正式 PNG/chroma 美术替换。
 - `node --check src/potion_nesting.js`：通过。
 - Dev server：未启动。
 - auto_index：不涉及，未运行索引生成。
