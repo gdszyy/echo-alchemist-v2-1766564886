@@ -45,6 +45,7 @@
 | **战场奖励掉落外壳** | `FieldLootItem` / `.loot-fly-card-icon` | 256x256 源图，运行时 50x58 / 54x62 | `relic`、`chaos_essence`、`pure_essence` 三种透明 PNG 外壳，中心镂空并复用 `RELIC_ICON_MAP` 图标；只增加 `drawImage`/DOM `img`，不新增粒子预算。 |
 | **技能充能仪表** | `#combat-rune-charge-ui` | 面板 288×84，运行时约 226×64；条纹 192×12；晶体 64×64 | 2026-06-23 起替代旧符文充能视觉。视觉上必须是一根连续充能槽：`skill_charge_actual_fill.png` 表示当前总充能底纹，`skill_charge_temp_fill.png` 仅作为条内“会回落”段的半透明 overlay；另含 SP 晶体空/满状态和满充光爆 overlay。样式只写入 `src/styles/bitmap_ui.css`。 |
 | **研磨三弹珠子弹面板** | `#session-charge-stack .gathering-ammo-panel` | 面板 180×140，运行时三列自适应；充能槽约 128×12 | 2026-06-24 起将研磨阶段固定 3 颗弹珠与各自充能槽合并展示。正式资产已落地为 `gathering_ammo_panel_9s.png`、`gathering_charge_track.png`、`gathering_charge_fill.png`，并通过 `src/styles/bitmap_ui.css` 接入；文字、弹珠名、属性 chip 与进度数值继续由 DOM 渲染，不烘焙进图片。 |
+| **药剂炼成 C8 runtime fallback** | `#rune-potion-panel` / `.potion-workbench` | 炉底 512×512；状态环 512×512；药瓶槽 128×128；未知节点 128×128 | 2026-06-30 起接入 `assets/ui/panels/potion/potion_alchemy_furnace_runtime.svg` 与 `assets/ui/sprites/potion/potion_*_runtime.svg`，覆盖炼金炉、稳定/排斥、坍塌、药瓶槽和未知稳定节点。该批为低成本运行时 fallback，不等同正式 PNG/chroma 终稿；封装前仍不得显示药剂名、词条名、品质、装药或数值。 |
 
 ---
 

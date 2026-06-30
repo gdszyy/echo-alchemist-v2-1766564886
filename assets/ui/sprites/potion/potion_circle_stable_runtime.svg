@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Stable alchemy circle runtime fallback">
+  <defs>
+    <linearGradient id="stableStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fef3c7"/>
+      <stop offset="0.45" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#facc15"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="206" fill="none" stroke="url(#stableStroke)" stroke-width="8" stroke-dasharray="48 24" opacity="0.78"/>
+  <circle cx="256" cy="256" r="152" fill="none" stroke="#2dd4bf" stroke-width="5" opacity="0.72"/>
+  <circle cx="256" cy="256" r="92" fill="none" stroke="#facc15" stroke-width="4" stroke-dasharray="16 14" opacity="0.7"/>
+  <path d="M256 70 305 204 446 204 332 286 376 420 256 338 136 420 180 286 66 204 207 204Z" fill="none" stroke="#fef3c7" stroke-width="3" opacity="0.32"/>
+  <g fill="#2dd4bf" opacity="0.88">
+    <circle cx="256" cy="50" r="7"/>
+    <circle cx="462" cy="256" r="7"/>
+    <circle cx="256" cy="462" r="7"/>
+    <circle cx="50" cy="256" r="7"/>
+  </g>
+</svg>

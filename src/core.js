@@ -34,6 +34,9 @@ import { SoundManager, audio, _setAudioInstance } from './audio.js';
 // 导入暗黑炼金 Psytrance 实时音乐引擎（纯合成，复用 SoundManager 的 ctx）
 import { MusicEngine } from './music_engine.js';
 
+// 导入 clip_pack 运行时加载器（填充 window.CLIP_PACKS 复数注册表，供引擎 mined brain 按 boss 启用）
+import { loadClipPacks } from './music_clip_packs.js';
+
 // 导入拆分后的子系统
 import { game_system } from './game_system.js';
 import { game_phase } from './game_phase.js';
@@ -133,6 +136,9 @@ function initAudio() {
     } catch (e) {
         console.warn('[Core] MusicEngine 启动失败：', e);
     }
+
+    // 启动时异步拉取 clip_pack（fire-and-forget 单例）；boss 出现前完成即可，未完成则该 boss 回退 legacy。
+    loadClipPacks();
 
     console.log('[Core] SoundManager initialized on user interaction');
     return instance;

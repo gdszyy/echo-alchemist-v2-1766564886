@@ -18,9 +18,9 @@ Current checkpoint focus:
 Deferred checkpoints remain tracked in the handoff document:
 
 - Potion alchemy closure.
-  - [x] done: C1 interruption boundaries, Root Orb carrier without child spells, shared nesting legality, and Tower active/death basic runtime.
+  - [x] done: C1 interruption boundaries, C4 spellContent parsing, C6 multi-node nesting UI, Root Orb carrier without child spells, shared nesting legality, Tower foundation runtime, and C8 runtime fallback polish.
   - [x] contract-only: static potion metadata and VFX dispatcher coverage.
-  - [ ] debt: RUNEWORD spellContent parsing, multi-node nesting UI, full Tower assets/balance.
+  - [ ] debt: Tower dedicated assets, long-term balance, deep child-spell scheduling, and formal PNG/chroma potion art replacement.
 - Bitmap UI and asset coverage.
 - Enemy/Boss visual follow-up.
 - PixiJS performance validation and remaining migration.
@@ -60,7 +60,7 @@ Deferred checkpoints remain tracked in the handoff document:
 - 2026-06-30 Potion alchemy status-word sync:
   - Root Orb now creates `potion_orb_carrier` even when `spellTree.root.children` is empty, then ruptures at arrival.
   - Nesting legality is centralized in `src/potion_nesting.js` for UI selection, save validation, combat release, and tests.
-  - Tower active/death basic runtime creates `potion_tower` entities with active periodic pulse and death-triggered release.
+  - Tower foundation runtime creates `potion_tower` entities with AABB blocking/contact damage, deterministic targeting, active periodic pulse, death-triggered release, lifecycle cleanup, and invalid-tree runtime rejection.
   - Static potion metadata and VFX dispatcher are contract-only, not gameplay completion.
   - `node --check src/potion_nesting.js`: passed.
   - `node --check src/ui/rune_launcher.js`: passed.
@@ -75,6 +75,13 @@ Deferred checkpoints remain tracked in the handoff document:
   - `node tests/validate_rune_spell_forms.mjs`: 8/8 passed.
   - `node -e "require.resolve('puppeteer')"`: failed; repository does not have `puppeteer` installed.
   - Local HTTP smoke: started `node node_modules/serve/build/main.js . -l 3002`, loaded `http://localhost:3002` with status 200 and confirmed `potion-form-controls`; stopped PID 6940. No service left running.
+- 2026-06-30 Potion C4 spellContent parsing:
+  - `src/potion_spell_content.js` parses one 3-rune `RUNEWORD_DB` formula into hidden `spellContentId` / `spellType` and maps to a static compatibility `potionId`.
+  - `src/ui/rune_launcher.js` no longer uses element-loose recipe mapping for new alchemy results; pre-seal UI remains black-box.
+  - `preparedPotionSpell.potionId` remains the combat/HUD compatibility key while `spellTree.root.spellContentId` stores the hidden runeword content.
+  - `node --check src/potion_spell_content.js`: passed.
+  - `node --check src/ui/rune_launcher.js`: passed.
+  - `node tests/validate_potion_spell_content.mjs`: 22/22 passed.
 
 ## Sync Gates
 
@@ -84,6 +91,7 @@ Deferred checkpoints remain tracked in the handoff document:
 - Potion P0 slice module docs: `docs/rune_potion_spell_contract.md`, `docs/potion_alchemy_development_plan.md`, `src/combat/combat.md`, `.cursor/rules/ui_system.md`, `.cursor/rules/performance.md`, and `tests/README.md` updated.
 - Progress docs: `docs/p0_interaction_optimization_todo.md` updated for the completed feedback-chain item.
 - Potion progress docs: `TODO.md`, `docs/p0_interaction_optimization_todo.md`, `docs/rune_potion_spell_contract.md`, and `docs/potion_alchemy_development_plan.md` use `done / placeholder / contract-only / debt` for potion status.
+- Potion C4 docs: `TODO.md`, `docs/p0_interaction_optimization_todo.md`, `docs/rune_potion_spell_contract.md`, `docs/potion_alchemy_development_plan.md`, `.cursor/rules/ui_system.md`, `.cursor/rules/runeword_index.md`, and `docs/work_items/active/REQ-20260630-potion-c4-spell-content.md` updated.
 - Process insights: pending; add only if a non-obvious coupling or recurring trap is discovered.
 - Temporary files: no scratch files added. Dev server was started for browser check and closed by PID.
 - Verification: Checkpoint 0 baseline passed; Checkpoint 1 partial batch passed available static checks and in-app browser DOM check.

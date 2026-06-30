@@ -39,6 +39,7 @@ Echo Alchemist V2 的视觉基调是 **暗黑赛博炼金**：
 | Animation frames | 同一状态帧之间只改变光流、边缘能量或机械微动；不要改变轮廓和文本安全区。 |
 | Runtime text | 所有名称、数值、价格、回合数、倒计时、稀有度文案继续由 DOM / Canvas 文本渲染。 |
 | Performance | 静态贴图替换优先；不要用新增粒子表达本可由贴图完成的装饰。如果需要粒子、混合模式、`shadowBlur` 或动态渐变，先读 `.cursor/rules/performance.md`。 |
+| Runtime fallback | 缺少正式 PNG 时，可先使用同语义 SVG/CSS fallback 防止界面空白或 404，但必须在资产清单中标明 `runtime fallback`，不得写成正式美术完成；后续 PNG/chroma 替换仍遵守本表全部约束。 |
 
 ## 4. 场景化要求
 

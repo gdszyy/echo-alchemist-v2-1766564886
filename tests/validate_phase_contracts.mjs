@@ -57,6 +57,7 @@ const gameOver = read('src/ui/game_over.js');
 const runShop = read('src/ui/run_shop.js');
 const shop = read('src/ui/shop.js');
 const runeLauncher = read('src/ui/rune_launcher.js');
+const potionSpellContent = read('src/potion_spell_content.js');
 const indexHtml = read('index.html');
 const spawnSystem = read('src/spawn_system.js');
 const combatSystem = read('src/combat_system.js');
@@ -93,10 +94,12 @@ check(
 check(
     has(shop, /relic\.effect\s*===\s*['"]unlock_potion_alchemy['"][\s\S]{0,260}potionAlchemyUnlocked\s*=\s*true/) &&
     has(runeLauncher, /ui_confirmPotionAlchemy\s*\(\)/) &&
-    has(runeLauncher, /_ui_resolvePotionRecipe\s*\(selectedRunes\)[\s\S]{0,1800}potion_prism_focus/) &&
+    has(runeLauncher, /resolvePotionSpellContent\s*\(runes,\s*RUNEWORD_DB\)/) &&
+    has(potionSpellContent, /resolvePotionSpellContent\s*\(selectedRunes\s*=\s*\[\],\s*runewordDb\s*=\s*\[\]\)/) &&
+    has(potionSpellContent, /runeword_meltdown[\s\S]{0,120}potion_molten_flask/) &&
     has(indexHtml, /id=["']rune-tab-potion["'][\s\S]{0,120}ui_switchRuneTab\(['"]potion['"]\)/) &&
     has(indexHtml, /id=["']rune-potion-panel["'][\s\S]*id=["']potion-confirm-btn["']/),
-    'sage apothecary unlocks the alchemy table potion tab and crafting flow'
+    'sage apothecary unlocks the C4 spellContent alchemy table flow'
 );
 check(
     has(core, /potionAlchemyUnlocked\s*=\s*false/) &&

@@ -13,7 +13,9 @@
 | `validate_rune_spell_forms.mjs` | 静态校验 | Node.js（无需浏览器） | 验证符文词条 Spell Form V1 的中心法阵匹配契约 |
 | `validate_potion_vfx_contract.mjs` | 静态校验 | Node.js（无需浏览器） | 验证药剂法术的药瓶形态字段与战斗 VFX helper 契约 |
 | `validate_spell_vfx_design.mjs` | 静态校验 | Node.js（无需浏览器） | 验证法术形态特效设计文档覆盖所有形态与实现契约 |
+| `validate_potion_spell_content.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证 C4 从 `RUNEWORD_DB` 解析隐藏 spellContent 与黑箱 UI 不泄露 |
 | `validate_potion_nesting.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证药剂嵌套合法性共享函数的正向与反向规则 |
+| `validate_potion_c6_nesting_ui.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证 C6 多节点炼成 UI 的合法接入、非法坍塌、不返符文与黑箱预览 |
 | `validate_potion_spell_tree_combat.mjs` | 运行时契约校验 | Node.js（无需浏览器） | 验证 Root Orb carrier、Tower active/death 与非法 spellTree 战斗行为 |
 | `ai_test_runner.js` | 运行时测试 | Puppeteer + 本地游戏服务 | 驱动浏览器进行实机行为验证 |
 
@@ -85,7 +87,20 @@ node tests/validate_spell_vfx_design.mjs
 - 文档包含表现矩阵、单形态规格、实现顺序和验收清单
 - 文档声明后续运行时入口、配置表、性能预算和 `@perf-impact` 约束
 
-### 1.5 药剂嵌套合法性校验（无需启动游戏）
+### 1.5 药剂 C4 spellContent 解析校验（无需启动游戏）
+
+```bash
+node tests/validate_potion_spell_content.mjs
+```
+
+验证内容：
+- 合法 `RUNEWORD_DB` 公式可生成隐藏 `spellContentId` / `spellType`
+- 同符文集合但核心位不同的公式能稳定区分
+- 非法组合进入未成法路径，链式/禁用类词条进入明确排斥路径
+- `preparedPotionSpell` 仍可保留旧静态 `potionId`，同时保存 root `spellTree`
+- 封装前预览不拼出 `spellContentId`、`runewordId`、`spellType`、药剂名、品质或装药量
+
+### 1.6 药剂嵌套合法性校验（无需启动游戏）
 
 ```bash
 node tests/validate_potion_nesting.mjs
@@ -96,7 +111,7 @@ node tests/validate_potion_nesting.mjs
 - Orb -> Orb、Beam 命中生成 Orb、纯扣血、链式反应、active/death 双槽混用均被共享规则拒绝
 - Tower active/death 与 construct 子节点禁用项走同一个 `src/potion_nesting.js` 入口
 
-### 1.6 药剂 spellTree 战斗运行时校验（无需启动游戏）
+### 1.7 药剂 spellTree 战斗运行时校验（无需启动游戏）
 
 ```bash
 node tests/validate_potion_spell_tree_combat.mjs

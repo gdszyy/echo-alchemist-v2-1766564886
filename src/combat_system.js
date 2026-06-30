@@ -990,35 +990,133 @@ export const combat_system = {
         }
     },
 
+    combat_getPotionTowerStats(prepared = {}, root = {}) {
+        const quality = Math.max(1, Math.min(3, Number(prepared.quality) || 1));
+        const round = Math.max(1, Number(this.round) || 1);
+        const slotType = root.slotType === 'death' ? 'death' : 'active';
+        const maxHp = Math.max(24, Math.round(22 + quality * 14 + round * 3));
+        return {
+            slotType,
+            quality,
+            maxHp,
+            width: 34 + quality * 2,
+            height: 78,
+            blockWidth: 44 + quality * 4,
+            blockHeight: 84,
+            contactDamageCooldown: 24,
+            contactPushback: 10 + quality * 2,
+            lifeFrames: (slotType === 'death' ? 300 : 240) + quality * 30,
+            pulseInterval: slotType === 'death' ? 9999 : Math.max(54, 94 - quality * 10),
+            pulseTimer: slotType === 'death' ? 9999 : 18,
+            radius: 118 + quality * 14,
+            activeTargetLimit: 1,
+            deathTargetLimit: Math.min(6, 3 + quality),
+        };
+    },
+
+    combat_getPotionTowerHitbox(tower) {
+        const width = Math.max(1, tower.blockWidth || tower.width || 36);
+        const height = Math.max(1, tower.blockHeight || tower.height || 78);
+        const bottom = tower.pos.y + 6;
+        const top = bottom - height;
+        return {
+            left: tower.pos.x - width / 2,
+            right: tower.pos.x + width / 2,
+            top,
+            bottom,
+        };
+    },
+
+    combat_isEnemyTouchingPotionTower(enemy, tower) {
+        if (!enemy || !enemy.active || !enemy.pos || !tower || !tower.active || !tower.pos) return false;
+        const box = this.combat_getPotionTowerHitbox(tower);
+        const halfW = Math.max(1, (enemy.width || 36) / 2);
+        const halfH = Math.max(1, (enemy.height || 42) / 2);
+        return enemy.pos.x + halfW >= box.left
+            && enemy.pos.x - halfW <= box.right
+            && enemy.pos.y + halfH >= box.top
+            && enemy.pos.y - halfH <= box.bottom;
+    },
+
+    combat_getPotionTowerContactDamage(tower, enemy) {
+        if (enemy && typeof enemy._getDefenseBarrierDamage === 'function') {
+            return Math.max(1, Math.ceil(enemy._getDefenseBarrierDamage(this)));
+        }
+        const cellW = Math.max(1, this.enemyWidth || enemy?.width || 36);
+        const cellH = Math.max(1, this.enemyHeight || enemy?.height || 42);
+        const footprint = Math.max(1, Math.round(((enemy?.width || cellW) / cellW) * ((enemy?.height || cellH) / cellH)));
+        const siegeMult = (enemy?.affixes || []).includes('siegeBreaker')
+            ? ((CONFIG.balance.affixes && CONFIG.balance.affixes.siegeBreakerDamageMult) || 2)
+            : 1;
+        return Math.max(1, Math.ceil(footprint * siegeMult));
+    },
+
+    combat_applyPotionTowerBlocker(tower, enemy, timeScale = 1) {
+        if (!tower || !enemy || !enemy.pos) return 0;
+        const dt = Math.max(0.25, timeScale || 1);
+        const box = this.combat_getPotionTowerHitbox(tower);
+        const enemyHalfH = Math.max(1, (enemy.height || 42) / 2);
+        const blockLineY = box.top - enemyHalfH - 1;
+        const currentDropY = Number.isFinite(enemy.dropTargetY) ? enemy.dropTargetY : enemy.pos.y;
+        enemy.dropTargetY = Math.min(currentDropY, blockLineY);
+        if (enemy.pos.y > blockLineY) enemy.pos.y = blockLineY;
+        enemy.bumpOffsetY = Math.min(enemy.bumpOffsetY || 0, -Math.min(14, tower.contactPushback || 10));
+
+        if (!tower._contactCooldowns) tower._contactCooldowns = new WeakMap();
+        const cooldown = Math.max(0, (tower._contactCooldowns.get(enemy) || 0) - dt);
+        if (cooldown > 0) {
+            tower._contactCooldowns.set(enemy, cooldown);
+            return 0;
+        }
+
+        const damage = this.combat_getPotionTowerContactDamage(tower, enemy);
+        tower.hp = Math.max(0, tower.hp - damage);
+        tower._contactCooldowns.set(enemy, tower.contactDamageCooldown || 24);
+        this.spawn_createFloatingText?.(tower.pos.x, box.top - 8, `塔-${damage}`, tower.color, 11);
+        return damage;
+    },
+
     // @perf-impact: Potion tower runtime - capped by prepared potion charges, flat canvas body and low-frequency pulses; no new CONFIG.performance fields.
     combat_spawnPotionTower(potionDef, prepared, root) {
+        const normalizedRoot = normalizePotionNode(root);
+        const validation = validatePotionSpellTree({ root: normalizedRoot });
+        if (!validation.ok) {
+            showToast(`法阵结构非法：${validation.reason || validation.code}`);
+            return false;
+        }
         const activeTargets = (this.enemies || []).filter(e => e && e.active);
         if (activeTargets.length <= 0) {
             showToast('没有敌人可作用，药剂未消耗。');
             return false;
         }
         if (!Array.isArray(this._potionTowers)) this._potionTowers = [];
-        const spellDef = this.combat_buildPotionSpellDef(potionDef, root);
+        const spellDef = this.combat_buildPotionSpellDef(potionDef, normalizedRoot);
         const point = this.combat_resolvePotionVfxPoint(activeTargets, { targetMode: 'cluster_center' });
-        const quality = Math.max(1, Math.min(3, Number(prepared.quality) || 1));
+        const stats = this.combat_getPotionTowerStats(prepared, normalizedRoot);
         const tower = {
             kind: 'potion_tower',
             active: true,
-            slotType: root.slotType || 'active',
+            slotType: stats.slotType,
             potionId: potionDef.id,
             potionDef,
             prepared,
-            root: normalizePotionNode(root),
+            root: normalizedRoot,
             pos: { x: point.x, y: point.y + 18 },
-            width: 34,
-            height: 78,
-            hp: 24 + quality * 12 + Math.max(0, Number(this.round) || 1) * 2,
-            maxHp: 24 + quality * 12 + Math.max(0, Number(this.round) || 1) * 2,
-            lifeFrames: (root.slotType === 'death' ? 300 : 240) + quality * 30,
+            width: stats.width,
+            height: stats.height,
+            blockWidth: stats.blockWidth,
+            blockHeight: stats.blockHeight,
+            hp: stats.maxHp,
+            maxHp: stats.maxHp,
+            lifeFrames: stats.lifeFrames,
             age: 0,
-            pulseInterval: root.slotType === 'death' ? 9999 : Math.max(54, 94 - quality * 10),
-            pulseTimer: root.slotType === 'death' ? 9999 : 18,
-            radius: 118 + quality * 14,
+            pulseInterval: stats.pulseInterval,
+            pulseTimer: stats.pulseTimer,
+            radius: stats.radius,
+            activeTargetLimit: stats.activeTargetLimit,
+            deathTargetLimit: stats.deathTargetLimit,
+            contactDamageCooldown: stats.contactDamageCooldown,
+            contactPushback: stats.contactPushback,
             color: potionDef.color || '#f8fafc',
             triggeredDeath: false,
         };
@@ -1034,14 +1132,22 @@ export const combat_system = {
     },
 
     combat_selectPotionTowerTargets(tower, limit = 1) {
+        const count = Math.max(0, Math.floor(Number(limit) || 0));
+        if (!tower || !tower.pos || count <= 0) return [];
         return (this.enemies || [])
-            .filter(e => e && e.active && e.pos && Math.hypot(e.pos.x - tower.pos.x, e.pos.y - tower.pos.y) <= tower.radius)
-            .sort((a, b) => Math.hypot(a.pos.x - tower.pos.x, a.pos.y - tower.pos.y) - Math.hypot(b.pos.x - tower.pos.x, b.pos.y - tower.pos.y))
-            .slice(0, limit);
+            .filter(e => e && e.active && e.pos)
+            .map(enemy => ({
+                enemy,
+                dist: Math.hypot(enemy.pos.x - tower.pos.x, enemy.pos.y - tower.pos.y),
+            }))
+            .filter(item => item.dist <= tower.radius)
+            .sort((a, b) => a.dist - b.dist || a.enemy.pos.y - b.enemy.pos.y || a.enemy.pos.x - b.enemy.pos.x)
+            .slice(0, count)
+            .map(item => item.enemy);
     },
 
     combat_potionTowerPulse(tower, reason = 'active') {
-        const targets = this.combat_selectPotionTowerTargets(tower, reason === 'death' ? 4 : 1);
+        const targets = this.combat_selectPotionTowerTargets(tower, reason === 'death' ? (tower.deathTargetLimit || 4) : (tower.activeTargetLimit || 1));
         if (targets.length <= 0) return false;
         const round = Math.max(1, Number(this.round) || 1);
         const quality = Math.max(1, Math.min(3, Number(tower.prepared?.quality) || 1));
@@ -1076,19 +1182,25 @@ export const combat_system = {
     },
 
     combat_updatePotionTower(tower, timeScale = 1, ctx = null) {
-        tower.age += Math.max(0.25, timeScale || 1);
-        tower.pulseTimer -= timeScale;
-        const blockers = (this.enemies || []).filter(e => e && e.active && e.pos && Math.abs(e.pos.x - tower.pos.x) < tower.width * 0.85 && Math.abs(e.pos.y - tower.pos.y) < tower.height * 0.65);
+        const dt = Math.max(0.25, timeScale || 1);
+        tower.age += dt;
+        tower.pulseTimer -= dt;
+        const blockers = (this.enemies || []).filter(e => this.combat_isEnemyTouchingPotionTower(e, tower));
         for (const enemy of blockers) {
-            tower.hp -= Math.max(0.35, timeScale * 0.9);
-            enemy.dropTargetY = Math.min(enemy.dropTargetY || enemy.pos.y, enemy.pos.y + 0.12 * timeScale);
+            this.combat_applyPotionTowerBlocker(tower, enemy, dt);
+        }
+        if (tower.hp <= 0) {
+            this.combat_destroyPotionTower(tower, 'death');
+            return;
+        }
+        if (tower.age >= tower.lifeFrames) {
+            this.combat_destroyPotionTower(tower, 'expired');
+            return;
         }
         if (tower.slotType === 'active' && tower.pulseTimer <= 0) {
             this.combat_potionTowerPulse(tower, 'active');
             tower.pulseTimer = tower.pulseInterval;
         }
-        if (tower.hp <= 0) this.combat_destroyPotionTower(tower, 'death');
-        if (tower.age >= tower.lifeFrames) this.combat_destroyPotionTower(tower, 'expired');
 
         if (ctx && tower.active && typeof ctx.save === 'function') {
             const x = tower.pos.x;

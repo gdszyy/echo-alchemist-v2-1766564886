@@ -35,7 +35,7 @@
 |----|---------|----------|----------|---------|---------|
 | 1.1 | `#phase-title-container` | 启动标题 / 点击开始 | 🟡 | 文字 + Cinzel 字体（背景由 `#phase-meta` 承载） | 标题徽章 PNG、点击「开始按钮」金属底板 |
 | 1.2 | `#phase-meta` | 局外元商店 / 升级树 | 🟡 | 顶部栏 9-Slice、卡片 9-Slice 边框、`relic_overlay_bg.png` 复用底纹 | **元商店分类标签 Tab Sprite**、**SP 货币图标**、升级卡片占位插画 |
-| 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | ✅ | `rune_launcher_9s.png`（已收缩到内层卡片宽度 384px）、`rune_grid_bg_9s.png`、`rune_slot_idle/hover/filled/highlight.png` | — |
+| 1.3 | `#phase-rune-launcher` | 符文发射器主面板 | ✅ | `rune_launcher_9s.png`（已收缩到内层卡片宽度 384px）、`rune_grid_bg_9s.png`、`rune_slot_idle/hover/filled/highlight.png`；药剂炼成 C8 runtime fallback：`potion_alchemy_furnace_runtime.svg`、`potion_circle_stable/rejected_runtime.svg`、`potion_collapse_smoke_runtime.svg`、`potion_bottle_slot_runtime.svg`、`potion_unknown_core/link_runtime.svg` | 正式 PNG/chroma 药剂美术仍可后续替换 |
 | 1.4 | `#phase-shop` | 局外商店（货架） | 🟡 | 卡片 9-Slice、`replace_ammo_bg.png` 复用炼金工坊底图 | 商店物品分类图标、价格标签 |
 | 1.5 | `#phase-selection` | 弹珠选择 / 子弹替换 / 命运时刻 | ✅ | `replace_ammo_bg.png`、`replace_card_frame_<C/B/A/S>_9s.png`、`replace_card_attr_slot.png`、`skip_btn_metal.png` | — |
 | 1.6 | `#phase-gathering` | 研磨阶段（弹珠台） | 🟡 | `bg_main_canvas.png`、`bg_emitter_zone.png`、`emitter_base.png`；三弹珠子弹面板 `gathering_ammo_panel_9s.png` + `gathering_charge_track/fill.png` 已通过 `src/styles/bitmap_ui.css` 接入 | 底部「钉盘外框」装饰 |
@@ -78,6 +78,11 @@
 | ~~`assets/ui/sprites/orbital_socket_<elem>.png`~~ | ✅ **已生成**（7 属性，透明 PNG） | 64×64，圆形对称 | 详见 §6.1 |
 | ~~`assets/ui/sprites/orbital_link_strip.png`~~ | ✅ **已生成**（程序生成） | 24×6，水平可平铺 | UV 沿连线方向拉伸，结合 `screen` 合成 |
 | ~~`assets/ui/sprites/orbital_link_cap.png`~~ | ✅ **已生成**（透明 PNG） | 16×16，中心对齐 | 覆盖连线两端硬边切口 |
+| ~~`assets/ui/panels/potion/potion_alchemy_furnace_runtime.svg`~~ | ✅ 已接入：药剂炼金炉/法阵底座 runtime fallback | 512×512 SVG | 用于 `#rune-potion-panel` 炉心主视觉；正式 PNG/chroma 可后续同语义替换 |
+| ~~`assets/ui/sprites/potion/potion_circle_stable_runtime.svg`~~ | ✅ 已接入：法阵稳定线 runtime fallback | 512×512 SVG | 仅表达“结构稳定”，不烘焙药剂结果 |
+| ~~`assets/ui/sprites/potion/potion_circle_rejected_runtime.svg`~~ / ~~`potion_collapse_smoke_runtime.svg`~~ | ✅ 已接入：法阵排斥与坍塌 runtime fallback | 512×512 SVG | 由 `data-draft-state="failed"` 切换；不改变失败返还规则 |
+| ~~`assets/ui/sprites/potion/potion_bottle_slot_runtime.svg`~~ | ✅ 已接入：当前药剂/空药匣槽 runtime fallback | 128×128 SVG | CSS 通过 `--potion-fill` 裁切液面，数值仍由 DOM/JS 渲染 |
+| ~~`assets/ui/sprites/potion/potion_unknown_core_runtime.svg`~~ / ~~`potion_unknown_link_runtime.svg`~~ | ✅ 已接入：未知稳定节点与连接线 runtime fallback | 128×128 / 192×24 SVG | 用于黑箱节点表现，不显示 `spellContentId`、词条名或药剂名 |
 
 ### 2.2 P1 — 完整覆盖核心 UI 模块
 

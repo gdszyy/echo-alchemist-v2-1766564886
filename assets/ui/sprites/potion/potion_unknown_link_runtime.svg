@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 24" role="img" aria-label="Unknown stable node link runtime fallback">
+  <defs>
+    <linearGradient id="tube" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c2d12" stop-opacity="0.2"/>
+      <stop offset="0.5" stop-color="#2dd4bf" stop-opacity="0.74"/>
+      <stop offset="1" stop-color="#7c2d12" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <path d="M8 12h176" stroke="#facc15" stroke-width="12" stroke-linecap="round" opacity="0.18"/>
+  <path d="M8 12h176" stroke="url(#tube)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M28 8h18M74 8h18M120 8h18M166 8h10" stroke="#fef3c7" stroke-width="2" stroke-linecap="round" opacity="0.46"/>
+</svg>

@@ -3,6 +3,7 @@
 > **数据来源**：`src/rune_config.js` → `RUNEWORD_DB`
 > **用途**：Agent 快速查询所有词条的 ID、名称、符文组合、效果描述及实现位置，无需全量读取 `rune_config.js`。
 > **Spell Form V1**：表中的“符文组合”按法术公式解释；默认 `pattern[1]` 为中心核心符文，必须位于 3×3 中心格，`pattern[0]` / `pattern[2]` 为外环试剂，必须位于同一条穿心轴线两端（可反向）。
+> **Potion C4**：药剂炼成的单节点 `spellContent` 分类不写回 `RUNEWORD_DB`，由 `src/potion_spell_content.js` 维护最小映射。该映射只生成隐藏 `spellContentId` / `spellType` 与旧静态 `potionId` 兼容字段，封装前 UI 不得展示这些内部字段。
 
 ## 1. 词条总览（23 个）
 

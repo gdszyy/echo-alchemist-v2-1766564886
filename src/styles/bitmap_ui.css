@@ -3477,6 +3477,13 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 /* ==================== Potion Alchemy Workbench ==================== */
 
 .potion-workbench {
+    --potion-furnace-asset: url('../../assets/ui/panels/potion/potion_alchemy_furnace_runtime.svg');
+    --potion-stable-asset: url('../../assets/ui/sprites/potion/potion_circle_stable_runtime.svg');
+    --potion-rejected-asset: url('../../assets/ui/sprites/potion/potion_circle_rejected_runtime.svg');
+    --potion-collapse-asset: url('../../assets/ui/sprites/potion/potion_collapse_smoke_runtime.svg');
+    --potion-bottle-slot-asset: url('../../assets/ui/sprites/potion/potion_bottle_slot_runtime.svg');
+    --potion-unknown-core-asset: url('../../assets/ui/sprites/potion/potion_unknown_core_runtime.svg');
+    --potion-unknown-link-asset: url('../../assets/ui/sprites/potion/potion_unknown_link_runtime.svg');
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -3525,12 +3532,13 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     position: absolute;
     inset: 12px;
     border-radius: 16px;
-    background-image:
+    background:
+        var(--potion-furnace-asset) center/252px 252px no-repeat,
         linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px),
         linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
-    background-size: 22px 22px;
+    background-size: 252px 252px, 22px 22px, 22px 22px;
     mask-image: radial-gradient(circle, #000 45%, transparent 78%);
-    opacity: 0.7;
+    opacity: 0.82;
     z-index: -2;
 }
 
@@ -3541,6 +3549,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     height: 168px;
     border-radius: 50%;
     background:
+        var(--potion-stable-asset) center/168px 168px no-repeat,
         radial-gradient(circle at center, rgba(45, 212, 191, 0.18), transparent 42%),
         conic-gradient(from 25deg, rgba(251, 191, 36, 0.0), rgba(251, 191, 36, 0.32), rgba(20, 184, 166, 0.16), rgba(251, 191, 36, 0.0));
     filter: blur(0.2px);
@@ -3555,11 +3564,17 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 
 .potion-workbench[data-draft-state="form_ready"] .potion-furnace-card::after {
     opacity: 1;
+    background:
+        var(--potion-stable-asset) center/184px 184px no-repeat,
+        radial-gradient(circle at center, rgba(45, 212, 191, 0.24), transparent 42%),
+        conic-gradient(from 25deg, rgba(251, 191, 36, 0.0), rgba(251, 191, 36, 0.4), rgba(20, 184, 166, 0.2), rgba(251, 191, 36, 0.0));
     filter: saturate(1.25) drop-shadow(0 0 12px rgba(45, 212, 191, 0.24));
 }
 
 .potion-workbench[data-draft-state="failed"] .potion-furnace-card::after {
     background:
+        var(--potion-collapse-asset) center/206px 206px no-repeat,
+        var(--potion-rejected-asset) center/178px 178px no-repeat,
         radial-gradient(circle at center, rgba(244, 63, 94, 0.16), transparent 44%),
         conic-gradient(from 25deg, rgba(127, 29, 29, 0.0), rgba(244, 63, 94, 0.3), rgba(30, 41, 59, 0.2), rgba(127, 29, 29, 0.0));
 }
@@ -3570,7 +3585,9 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     height: 190px;
     border: 1px dashed rgba(251, 191, 36, 0.24);
     border-radius: 50%;
+    background: var(--potion-stable-asset) center/176px 176px no-repeat;
     box-shadow: inset 0 0 24px rgba(20, 184, 166, 0.08);
+    opacity: 0.92;
 }
 
 .potion-furnace-orbit::before,
@@ -3617,6 +3634,27 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     box-shadow:
         0 0 30px rgba(20, 184, 166, 0.2),
         inset 0 0 22px rgba(251, 191, 36, 0.08);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.potion-furnace-core::before {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: var(--potion-unknown-core-asset) center/100% 100% no-repeat;
+    opacity: 0.34;
+    z-index: -1;
+}
+
+.potion-workbench[data-draft-state="form_ready"] .potion-furnace-core::before {
+    opacity: 0.62;
+}
+
+.potion-workbench[data-draft-state="failed"] .potion-furnace-core::before {
+    background: var(--potion-rejected-asset) center/100% 100% no-repeat;
+    opacity: 0.48;
 }
 
 .potion-workbench[data-draft-state="form_ready"] .potion-furnace-core {
@@ -3678,6 +3716,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     border-radius: 15px;
     border: 1px solid rgba(251, 191, 36, 0.34);
     background:
+        url('../../assets/ui/sprites/rune_slot_filled.png') center/100% 100% no-repeat,
         radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.22), transparent 55%),
         rgba(2, 6, 23, 0.74);
     box-shadow:
@@ -3708,7 +3747,9 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 .potion-draft-rune.is-empty {
     border-style: dashed;
     border-color: rgba(148, 163, 184, 0.18);
-    background: rgba(15, 23, 42, 0.34);
+    background:
+        url('../../assets/ui/sprites/rune_slot_idle.png') center/100% 100% no-repeat,
+        rgba(15, 23, 42, 0.34);
     box-shadow: none;
 }
 
@@ -3768,6 +3809,47 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     padding: 14px;
 }
 
+.potion-form-option {
+    position: relative;
+    min-height: 42px;
+    padding: 8px 10px 8px 34px !important;
+    border-radius: 10px !important;
+    text-align: left;
+    letter-spacing: 0.02em;
+    background:
+        linear-gradient(145deg, rgba(15, 23, 42, 0.86), rgba(2, 6, 23, 0.72)) !important;
+}
+
+.potion-form-option::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--potion-unknown-core-asset) center/100% 100% no-repeat;
+    transform: translateY(-50%);
+    opacity: 0.72;
+}
+
+.potion-form-option.is-active {
+    color: #d1fae5 !important;
+    border-color: rgba(45, 212, 191, 0.72) !important;
+    box-shadow:
+        inset 0 0 18px rgba(20, 184, 166, 0.16),
+        0 0 12px rgba(45, 212, 191, 0.12);
+}
+
+.potion-form-option.is-rejected {
+    color: rgba(254, 202, 202, 0.82) !important;
+}
+
+.potion-form-option.is-rejected::before {
+    background: var(--potion-rejected-asset) center/100% 100% no-repeat;
+    opacity: 0.68;
+}
+
 .potion-unknown-seal {
     display: grid;
     place-items: center;
@@ -3780,6 +3862,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     font-weight: 900;
     border: 1px solid rgba(251, 191, 36, 0.32);
     background:
+        var(--potion-unknown-core-asset) center/110% 110% no-repeat,
         radial-gradient(circle at center, rgba(251, 191, 36, 0.2), transparent 62%),
         rgba(15, 23, 42, 0.72);
 }
@@ -3793,6 +3876,109 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     background: rgba(2, 6, 23, 0.48);
     color: rgba(203, 213, 225, 0.68);
     font-size: 12px;
+}
+
+.potion-state-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.potion-preview-sigil {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    border-radius: 14px;
+    background: var(--potion-unknown-core-asset) center/100% 100% no-repeat;
+}
+
+.potion-preview-sigil.is-feeding {
+    filter: saturate(0.78);
+    opacity: 0.74;
+}
+
+.potion-preview-sigil.is-stable {
+    background-image: var(--potion-stable-asset), var(--potion-unknown-core-asset);
+    background-position: center, center;
+    background-size: 132% 132%, 100% 100%;
+}
+
+.potion-preview-sigil.is-rejected,
+.potion-preview-sigil.is-collapse {
+    background-image: var(--potion-rejected-asset);
+    background-position: center;
+    background-size: 128% 128%;
+}
+
+.potion-preview-sigil.is-collapse::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    background: var(--potion-collapse-asset) center/100% 100% no-repeat;
+    opacity: 0.72;
+}
+
+.potion-node-chain {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.potion-node-chain::before {
+    content: "";
+    width: 44px;
+    height: 8px;
+    background: var(--potion-unknown-link-asset) center/100% 100% no-repeat;
+    opacity: 0.74;
+}
+
+.potion-unknown-node {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    background: var(--potion-unknown-core-asset) center/100% 100% no-repeat;
+    border: 1px solid rgba(45, 212, 191, 0.24);
+}
+
+.potion-unknown-node.is-locked {
+    filter: saturate(0.72) brightness(0.82);
+    opacity: 0.76;
+}
+
+.potion-bottle-slot {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    color: #fef3c7;
+    background: var(--potion-bottle-slot-asset) center/100% 100% no-repeat;
+}
+
+.potion-bottle-slot__liquid {
+    position: absolute;
+    left: 13px;
+    right: 13px;
+    bottom: 7px;
+    height: var(--potion-fill, 0%);
+    max-height: 32px;
+    border-radius: 0 0 14px 14px;
+    background: var(--potion-liquid, #2dd4bf);
+    opacity: 0.45;
+}
+
+.potion-bottle-slot__icon {
+    position: relative;
+    z-index: 1;
+    font-size: 20px;
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(2, 6, 23, 0.8));
 }
 
 .potion-rune-inventory {

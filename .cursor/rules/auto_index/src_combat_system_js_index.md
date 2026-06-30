@@ -1,6 +1,6 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-30 | 总行数: 6269 | 函数数: 110 | 语言: javascript
+> 自动生成于 2026-06-30 | 总行数: 6381 | 函数数: 115 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 6 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -43,6 +43,11 @@
 | combat_spawnPotionOrbCarrier | method | `combat_spawnPotionOrbCarrier(spellDef, targets = [], opts = {})` |  |
 | combat_updatePotionOrbCarrier | method | `combat_updatePotionOrbCarrier(carrier, timeScale = 1, ctx = null)` |  |
 | combat_releasePotionOrbCarrier | method | `combat_releasePotionOrbCarrier(carrier)` |  |
+| combat_getPotionTowerStats | method | `combat_getPotionTowerStats(prepared = {}, root = {})` |  |
+| combat_getPotionTowerHitbox | method | `combat_getPotionTowerHitbox(tower)` |  |
+| combat_isEnemyTouchingPotionTower | method | `combat_isEnemyTouchingPotionTower(enemy, tower)` |  |
+| combat_getPotionTowerContactDamage | method | `combat_getPotionTowerContactDamage(tower, enemy)` |  |
+| combat_applyPotionTowerBlocker | method | `combat_applyPotionTowerBlocker(tower, enemy, timeScale = 1)` |  |
 | combat_spawnPotionTower | method | `combat_spawnPotionTower(potionDef, prepared, root)` |  |
 | combat_selectPotionTowerTargets | method | `combat_selectPotionTowerTargets(tower, limit = 1)` |  |
 | combat_potionTowerPulse | method | `combat_potionTowerPulse(tower, reason = 'active')` |  |

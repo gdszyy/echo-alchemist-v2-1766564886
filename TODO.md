@@ -1,6 +1,11 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年6月30日 | **状态词口径：done / placeholder / contract-only / debt。当前药剂线：done = C1 中断与覆盖边界、Root Orb carrier、Tower active/death 基础运行时、共享嵌套校验；contract-only = 静态药剂 metadata 与 VFX dispatcher；debt = C4 spellContent、C6 多节点嵌套 UI、完整 Tower 系统与正式资产。**
+**最后更新：** 2026年6月30日
+
+**状态词口径：** `done` / `placeholder` / `contract-only` / `debt`。
+**当前药剂线 done：** C1 中断与覆盖边界、C4 spellContent 解析、C6 多节点嵌套 UI、Root Orb carrier、Tower 基础系统（阻挡/承伤/范围/冷却/生命周期/互斥/非法树拒绝）、共享嵌套校验、C8 炼金台 runtime fallback 资产 polish。
+**当前药剂线 contract-only：** 静态药剂 metadata 与 VFX dispatcher。
+**当前药剂线 debt：** Tower 专用资产与长期平衡、正式 PNG/chroma 美术替换。
 
 > 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
 
@@ -31,9 +36,11 @@
 | C1 | 中断与覆盖边界：关闭炼金台、切 Tab、进入战斗、刷新恢复时，已投入符文不返还且草稿状态可解释 | done：统一中断入口与静态契约已覆盖 |
 | C2 | 法阵选择第一版：用按钮/分段控件选择 `bottle`、`orb`、`beam`、`meteor`、`tower`，不先做手绘识别 | done：`#potion-form-controls` 写入草稿形态 |
 | C3 | 法阵合法性表：扩展 `_potionAlchemyDraft` 记录 `formId`、`nestingMode`、`slotType`，并校验 parent/slot/child/form/type/mode | done：`src/potion_nesting.js` 统一供 UI、封装、战斗、测试使用 |
-| C4 | `spellContent` 解析：从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容 | debt：尚未接入炼金台解析 |
-| C5 | `spellTree` 存档：将 `preparedPotionSpell` 从静态 `potionId` 兼容字段升级为可持久化树结构 | done：封装结果保留 `potionId` 兼容字段并保存 root `spellTree`；debt：多节点 UI 未接入 |
-| C7 | 战斗 `spellTree` 释放：Root Orb carrier、Tower active/death 基础运行时、旧药剂内容结算兼容 | done：`combat_updatePotionRuntime()` 驱动 carrier/tower；debt：完整多子节点 UI 与完整 Tower 系统 |
+| C4 | `spellContent` 解析：从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容 | done：`src/potion_spell_content.js` 解析 3 符文隐藏节点，炼金台封装前仍只显示黑箱稳定性 |
+| C5 | `spellTree` 存档：将 `preparedPotionSpell` 从静态 `potionId` 兼容字段升级为可持久化树结构 | done：封装结果保留 `potionId` 兼容字段并保存 root `spellTree` |
+| C6 | 多节点嵌套 UI：继续投料生成新隐藏节点，合法父子查表接入 root.children，非法嵌套整炉坍塌且不返符文 | done：`src/ui/rune_launcher.js` 维护 `consumedRunes` 总账、`pendingRunes` 当前节点与 `root.children`；`tests/validate_potion_c6_nesting_ui.mjs` 覆盖合法接入、非法坍塌、失败返还和黑箱预览 |
+| C7 | 战斗 `spellTree` 释放：Root Orb carrier、Tower 基础系统、旧药剂内容结算兼容 | done：`combat_updatePotionRuntime()` 驱动 carrier/tower，Tower 已覆盖阻挡/承伤、范围/冷却、生命周期、互斥和非法树拒绝；debt：Tower 专用资产与长期平衡 |
+| C8 | 资产与体验 polish：炼金炉、法阵稳定/排斥、坍塌、药瓶槽、未知稳定节点 | done：runtime SVG fallback 与 CSS 状态层已接入，封装前仍只显示黑箱稳定性；debt：后续正式 PNG/chroma 美术替换 |
 
 ---
 

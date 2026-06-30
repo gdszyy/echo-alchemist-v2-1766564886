@@ -20,7 +20,8 @@ import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
 import { SKILL_DB, CONFIG, POTION_SPELL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生 + 技能装配上限
 import { getRuneIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A6] 位图符文图标
-import { POTION_FORM_OPTIONS, buildPotionSpellTree, getPotionFormOption, validatePotionSpellTree } from '../potion_nesting.js';
+import { POTION_FORM_OPTIONS, getPotionFormOption, validatePotionNesting, validatePotionSpellTree } from '../potion_nesting.js';
+import { POTION_SPELL_CONTENT_RUNE_COUNT, resolvePotionSpellContent } from '../potion_spell_content.js';
 
 /**
  * 构建符文图标 HTML（统一的符文展示辅助函数）
@@ -1299,87 +1300,248 @@ export const rune_launcher_system = {
         return rarityBonus * Math.max(1, runeInfo.level || 1);
     },
 
-    _ui_resolvePotionRecipe(selectedRunes) {
-        const runes = selectedRunes || [];
+    _ui_hydratePotionRuneRecord(runeInfo) {
+        if (!runeInfo) return null;
+        const id = runeInfo.id || getRuneId(runeInfo);
+        const def = runeInfo.def || RUNE_DB.find(r => r.id === id);
+        if (!id || !def) return null;
+        return {
+            id,
+            def,
+            level: Math.max(1, Number(runeInfo.level) || 1),
+            element: runeInfo.element || def.element || def.baseStat,
+        };
+    },
+
+    _ui_clonePotionNode(node) {
+        return node ? JSON.parse(JSON.stringify(node)) : null;
+    },
+
+    _ui_countPotionSpellNodes(node) {
+        if (!node) return 0;
+        const children = Array.isArray(node.children) ? node.children : [];
+        return 1 + children.reduce((sum, child) => sum + this._ui_countPotionSpellNodes(child), 0);
+    },
+
+    _ui_resetPotionNodeForm(draft = null) {
+        const target = draft || this._ui_getPotionAlchemyDraft();
+        const form = getPotionFormOption('bottle', null);
+        target.formId = form.formId;
+        target.nestingMode = form.nestingMode;
+        target.slotType = form.slotType;
+    },
+
+    _ui_buildPotionResultFromSpellTree(spellTree, extras = {}) {
+        const draft = this._ui_getPotionAlchemyDraft();
+        const root = this._ui_clonePotionNode(spellTree?.root || draft.root);
+        const { resultRunes: explicitResultRunes, ...resultExtras } = extras;
+        const refundRunes = Array.isArray(explicitResultRunes) && explicitResultRunes.length > 0
+            ? explicitResultRunes
+            : this._ui_getPotionAlchemyLedgerRunes();
+        const elements = refundRunes.map(r => r.element);
+        const levelSum = refundRunes.reduce((sum, r) => sum + (r.level || 1), 0);
         const refund = Math.floor(
-            runes.reduce((sum, r) => sum + this._ui_estimatePotionRuneValue(r), 0)
+            refundRunes.reduce((sum, r) => sum + this._ui_estimatePotionRuneValue(r), 0)
             * (CONFIG.gameplay.potionAlchemyFailRefundRatio || 0.35)
         );
-        if (runes.length < 2 || runes.length > 4) {
-            return { success: false, reason: '选择 2-4 个符文开始调制。', refund };
-        }
-
-        const elements = runes.map(r => r.element);
-        const levelSum = runes.reduce((sum, r) => sum + (r.level || 1), 0);
-        const counts = elements.reduce((acc, e) => {
-            acc[e] = (acc[e] || 0) + 1;
-            return acc;
-        }, {});
-        const has = (e) => elements.includes(e);
-        const count = (e) => counts[e] || 0;
-        const choose = (id) => (POTION_SPELL_DB || []).find(p => p.id === id);
-
-        let potion = null;
-        if (has('laser') && levelSum >= 4) potion = choose('potion_prism_focus');
-        else if (has('overcharge') && (has('pyro') || has('lightning'))) potion = choose('potion_overload_vial');
-        else if (count('cryo') >= 2) potion = choose('potion_frost_seal');
-        else if (count('pyro') >= 2) potion = choose('potion_molten_flask');
-        else if (has('lightning') && (count('lightning') >= 2 || has('bounce') || has('overcharge'))) potion = choose('potion_storm_lure');
-        else if (has('pierce') && (count('pierce') >= 2 || has('scatter'))) potion = choose('potion_blade_shadow');
-        else if (has('bounce') && (has('pyro') || has('overcharge'))) potion = choose('potion_collapse_vial');
-        else if (has('echo')) potion = choose('potion_echo_phial');
-        else if (has('venom') && (count('venom') >= 2 || has('scatter'))) potion = choose('potion_venom_mist');
-
-        if (!potion) {
+        if (!root) {
             return {
                 success: false,
-                reason: `未形成稳定配方。确认后会消耗符文并返还 ${refund} 局内碎片。`,
+                status: 'pending',
+                reason: 'No stable potion structure exists.',
                 refund,
                 elements,
                 levelSum,
             };
         }
-
-        const quality = Math.max(1, Math.min(3, Math.floor(levelSum / runes.length)));
-        const purityBonus = elements.every(e => e === elements[0]) ? 1 : 0;
-        const qualityBonus = quality >= 3 ? 1 : 0;
-        const charges = Math.max(1, Math.min(potion.maxCharges || 3, (potion.baseCharges || 1) + purityBonus + qualityBonus));
-        const draft = this._ui_getPotionAlchemyDraft();
-        const form = getPotionFormOption(draft.formId || potion.formId || 'bottle', draft.slotType || null);
-        const sourceRunes = runes.map(r => ({ id: r.id, level: r.level, element: r.element }));
-        const spellTree = buildPotionSpellTree({
-            potion,
-            formId: form.formId,
-            nestingMode: draft.nestingMode || form.nestingMode,
-            slotType: form.slotType,
-            sourceRunes,
-        });
-        const validation = validatePotionSpellTree(spellTree);
+        const validation = validatePotionSpellTree({ root });
         if (!validation.ok) {
             return {
                 success: false,
-                reason: validation.reason || 'Potion form rejected this spell content.',
+                status: extras.status || 'collapse',
                 rejectedBy: 'potion_nesting',
+                reason: validation.reason || 'Potion spell tree collapsed.',
                 validation,
-                form,
-                spellTree,
+                spellTree: { root },
+                refund,
                 elements,
                 levelSum,
-                refund,
             };
         }
+        const potion = (POTION_SPELL_DB || []).find(p => p.id === root.potionId);
+        if (!potion) {
+            return {
+                success: false,
+                status: 'collapse',
+                rejectedBy: 'potion_compatibility',
+                ruleId: 'missing_compatibility_potion',
+                reason: 'Stable potion structure has no compatible release entry.',
+                spellTree: { root },
+                refund,
+                elements,
+                levelSum,
+            };
+        }
+        const runeCount = Math.max(1, refundRunes.length);
+        const quality = Math.max(1, Math.min(3, Math.floor((levelSum || runeCount) / runeCount)));
+        const purityBonus = elements.length > 0 && elements.every(e => e === elements[0]) ? 1 : 0;
+        const qualityBonus = quality >= 3 ? 1 : 0;
+        const charges = Math.max(1, Math.min(potion.maxCharges || 3, (potion.baseCharges || 1) + purityBonus + qualityBonus));
         return {
             success: true,
             potion,
             quality,
             charges,
             maxCharges: potion.maxCharges || charges,
-            sourceRunes,
-            form,
-            spellTree,
+            sourceRunes: refundRunes,
+            form: getPotionFormOption(root.formId || 'bottle', root.slotType || null),
+            spellTree: { root },
             validation,
+            nodeCount: this._ui_countPotionSpellNodes(root),
             elements,
             levelSum,
+            refund,
+            ...resultExtras,
+        };
+    },
+
+    _ui_buildPotionTreeCandidate(node) {
+        const draft = this._ui_getPotionAlchemyDraft();
+        const incoming = this._ui_clonePotionNode(node);
+        incoming.children = Array.isArray(incoming.children) ? incoming.children : [];
+        if (!draft.root) {
+            const spellTree = { root: incoming };
+            return {
+                node: incoming,
+                spellTree,
+                validation: validatePotionSpellTree(spellTree),
+                attachRuleId: null,
+            };
+        }
+        const root = this._ui_clonePotionNode(draft.root);
+        root.children = Array.isArray(root.children) ? root.children : [];
+        const edge = validatePotionNesting(root, incoming, root.children);
+        if (!edge.ok) {
+            return {
+                node: incoming,
+                spellTree: { root: { ...root, children: root.children.concat([incoming]) } },
+                validation: edge,
+                attachRuleId: edge.ruleId || edge.code || null,
+            };
+        }
+        incoming.attachRuleId = edge.ruleId || edge.code || null;
+        root.children = root.children.concat([incoming]);
+        const spellTree = { root };
+        return {
+            node: incoming,
+            spellTree,
+            validation: validatePotionSpellTree(spellTree),
+            attachRuleId: incoming.attachRuleId,
+        };
+    },
+
+    _ui_commitPotionAlchemyNode(result) {
+        if (!result || !result.success || !result.spellTree?.root) return false;
+        const draft = this._ui_getPotionAlchemyDraft();
+        draft.root = this._ui_clonePotionNode(result.spellTree.root);
+        draft.pendingRunes = [];
+        draft.nodeSeq = this._ui_countPotionSpellNodes(draft.root);
+        draft.state = 'form_ready';
+        draft.collapseLocked = false;
+        this._ui_resetPotionNodeForm(draft);
+        return true;
+    },
+
+    _ui_resolvePotionRecipe(selectedRunes) {
+        const runes = selectedRunes || [];
+        const draft = this._ui_getPotionAlchemyDraft();
+        const ledgerRunes = this._ui_getPotionAlchemyLedgerRunes();
+        const refundRunes = ledgerRunes.length > 0 ? ledgerRunes : runes;
+        const refund = Math.floor(
+            refundRunes.reduce((sum, r) => sum + this._ui_estimatePotionRuneValue(r), 0)
+            * (CONFIG.gameplay.potionAlchemyFailRefundRatio || 0.35)
+        );
+        const elements = refundRunes.map(r => r.element);
+        const levelSum = refundRunes.reduce((sum, r) => sum + (r.level || 1), 0);
+        const contentResult = resolvePotionSpellContent(runes, RUNEWORD_DB);
+
+        if (!contentResult.success) {
+            const collapse = !!draft.root && contentResult.status !== 'pending';
+            return {
+                success: false,
+                reason: contentResult.reason || `未形成稳定结构。确认后会消耗符文并返还 ${refund} 局内碎片。`,
+                refund,
+                elements,
+                levelSum,
+                sourceRunes: contentResult.sourceRunes || [],
+                status: collapse ? 'collapse' : (contentResult.status || 'rejected'),
+                rejectedBy: collapse ? 'potion_nesting' : (contentResult.rejectedBy || (contentResult.status === 'rejected' ? 'spell_content' : null)),
+                ruleId: contentResult.ruleId || contentResult.code || null,
+                collapse,
+            };
+        }
+
+        const choose = (id) => (POTION_SPELL_DB || []).find(p => p.id === id);
+        const potion = choose(contentResult.compatibilityPotionId || contentResult.potionId);
+        if (!potion) {
+            return {
+                success: false,
+                reason: '隐藏法术缺少静态药剂兼容释放入口。',
+                refund,
+                elements,
+                levelSum,
+                sourceRunes: contentResult.sourceRunes || [],
+                status: 'rejected',
+                rejectedBy: 'potion_compatibility',
+                ruleId: 'missing_compatibility_potion',
+            };
+        }
+
+        const form = getPotionFormOption(draft.formId || potion.formId || 'bottle', draft.slotType || null);
+        const sourceRunes = contentResult.sourceRunes || runes.map(r => ({ id: r.id, level: r.level, element: r.element }));
+        const node = {
+            nodeId: draft.root ? `node_${(Number(draft.nodeSeq) || this._ui_countPotionSpellNodes(draft.root) || 1) + 1}` : 'node_root',
+            potionId: potion.id,
+            spellContentId: contentResult.spellContentId,
+            spellType: contentResult.spellType,
+            formId: form.formId,
+            nestingMode: draft.nestingMode || form.nestingMode,
+            slotType: form.slotType,
+            sourceRunes,
+            children: [],
+        };
+        const candidate = this._ui_buildPotionTreeCandidate(node);
+        if (!candidate.validation.ok) {
+            return {
+                success: false,
+                reason: candidate.validation.reason || 'Potion form rejected this spell content.',
+                rejectedBy: 'potion_nesting',
+                validation: candidate.validation,
+                form,
+                spellTree: candidate.spellTree,
+                elements,
+                levelSum,
+                refund,
+                status: draft.root ? 'collapse' : 'rejected',
+                collapse: !!draft.root,
+                attachRuleId: candidate.attachRuleId,
+            };
+        }
+        const treeResult = this._ui_buildPotionResultFromSpellTree(candidate.spellTree, {
+            resultRunes: refundRunes,
+            spellContent: contentResult.spellContent,
+            spellContentId: contentResult.spellContentId,
+            runewordId: contentResult.runewordId,
+            spellType: contentResult.spellType,
+            compatibilityPotionId: contentResult.compatibilityPotionId,
+            ruleId: contentResult.ruleId,
+            form,
+            node: candidate.node,
+            isNested: !!draft.root,
+            attachRuleId: candidate.attachRuleId,
+        });
+        return {
+            ...treeResult,
             refund,
         };
     },
@@ -1389,6 +1551,9 @@ export const rune_launcher_system = {
             this._potionAlchemyDraft = {
                 state: 'empty',
                 consumedRunes: [],
+                pendingRunes: [],
+                root: null,
+                nodeSeq: 0,
                 formId: 'bottle',
                 nestingMode: 'shatter',
                 slotType: null,
@@ -1396,6 +1561,23 @@ export const rune_launcher_system = {
         }
         if (!Array.isArray(this._potionAlchemyDraft.consumedRunes)) {
             this._potionAlchemyDraft.consumedRunes = [];
+        }
+        this._potionAlchemyDraft.consumedRunes = this._potionAlchemyDraft.consumedRunes
+            .map(rune => this._ui_hydratePotionRuneRecord(rune))
+            .filter(Boolean);
+        if (!Array.isArray(this._potionAlchemyDraft.pendingRunes)) {
+            this._potionAlchemyDraft.pendingRunes = this._potionAlchemyDraft.root
+                ? []
+                : this._potionAlchemyDraft.consumedRunes.slice(-POTION_SPELL_CONTENT_RUNE_COUNT);
+        }
+        this._potionAlchemyDraft.pendingRunes = this._potionAlchemyDraft.pendingRunes
+            .map(rune => this._ui_hydratePotionRuneRecord(rune))
+            .filter(Boolean);
+        if (this._potionAlchemyDraft.root && !Array.isArray(this._potionAlchemyDraft.root.children)) {
+            this._potionAlchemyDraft.root.children = [];
+        }
+        if (!Number.isFinite(Number(this._potionAlchemyDraft.nodeSeq))) {
+            this._potionAlchemyDraft.nodeSeq = this._ui_countPotionSpellNodes(this._potionAlchemyDraft.root);
         }
         const form = getPotionFormOption(this._potionAlchemyDraft.formId || 'bottle', this._potionAlchemyDraft.slotType || null);
         this._potionAlchemyDraft.formId = form.formId;
@@ -1408,6 +1590,9 @@ export const rune_launcher_system = {
         this._potionAlchemyDraft = {
             state: 'empty',
             consumedRunes: [],
+            pendingRunes: [],
+            root: null,
+            nodeSeq: 0,
             formId: 'bottle',
             nestingMode: 'shatter',
             slotType: null,
@@ -1418,6 +1603,11 @@ export const rune_launcher_system = {
 
     _ui_getPotionDraftRunes() {
         const draft = this._ui_getPotionAlchemyDraft();
+        return (draft.pendingRunes || []).filter(Boolean);
+    },
+
+    _ui_getPotionAlchemyLedgerRunes() {
+        const draft = this._ui_getPotionAlchemyDraft();
         return (draft.consumedRunes || []).filter(Boolean);
     },
 
@@ -1426,10 +1616,11 @@ export const rune_launcher_system = {
         const workbench = document.getElementById('potion-alchemy-workbench');
         const draft = this._ui_getPotionAlchemyDraft();
         const runes = this._ui_getPotionDraftRunes();
+        const nodeCount = this._ui_countPotionSpellNodes(draft.root);
         if (workbench) workbench.dataset.draftState = draft.state || 'empty';
         if (!container) return;
         container.innerHTML = '';
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < POTION_SPELL_CONTENT_RUNE_COUNT; i++) {
             const rune = runes[i];
             const slot = document.createElement('div');
             slot.className = `potion-draft-rune${rune ? '' : ' is-empty'}`;
@@ -1445,6 +1636,13 @@ export const rune_launcher_system = {
             }
             container.appendChild(slot);
         }
+        if (nodeCount > 0) {
+            const stableNode = document.createElement('div');
+            stableNode.className = 'potion-draft-rune potion-draft-rune--stable-node';
+            stableNode.innerHTML = '<span class="potion-unknown-node" aria-hidden="true"></span>';
+            stableNode.title = `未知稳定节点 x${nodeCount}`;
+            container.appendChild(stableNode);
+        }
     },
 
     _ui_renderPotionFormControls(result = null) {
@@ -1454,11 +1652,19 @@ export const rune_launcher_system = {
         const selected = getPotionFormOption(draft.formId || 'bottle', draft.slotType || null);
         container.innerHTML = POTION_FORM_OPTIONS.map(option => {
             const active = selected.formId === option.formId && (selected.slotType || null) === (option.slotType || null);
-            const disabledBySpell = result?.potion && !option.spellTypes.includes(result.potion.spellType);
-            const title = disabledBySpell ? 'This form rejects the current hidden spell type.' : option.label;
+            const hiddenSpellType = result?.spellType || result?.spellContent?.spellType || result?.potion?.spellType || null;
+            const disabledBySpell = !!(hiddenSpellType && !option.spellTypes.includes(hiddenSpellType));
+            const title = disabledBySpell ? '当前隐藏结构被此法阵排斥。' : option.label;
+            const className = [
+                'potion-form-option rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-colors',
+                active ? 'is-active border-emerald-400/70 bg-emerald-900/30 text-emerald-100' : 'border-slate-700/60 bg-slate-900/50 text-slate-400 hover:border-slate-500/70',
+                disabledBySpell ? 'is-rejected opacity-45' : '',
+            ].filter(Boolean).join(' ');
             return `
                 <button type="button"
-                    class="${active ? 'border-emerald-400/70 bg-emerald-900/30 text-emerald-100' : 'border-slate-700/60 bg-slate-900/50 text-slate-400 hover:border-slate-500/70'} ${disabledBySpell ? 'opacity-45' : ''} rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-colors"
+                    class="${className}"
+                    data-form-id="${_ui_escapeHtml(option.formId)}"
+                    data-slot-type="${_ui_escapeHtml(option.slotType || '')}"
                     title="${_ui_escapeHtml(title)}"
                     onclick="game.ui_selectPotionForm('${option.formId}', ${option.slotType ? `'${option.slotType}'` : 'null'})">
                     ${_ui_escapeHtml(option.label)}
@@ -1471,6 +1677,10 @@ export const rune_launcher_system = {
         if (!this._ui_isPotionAlchemyUnlocked()) return;
         const form = getPotionFormOption(formId || 'bottle', slotType || null);
         const draft = this._ui_getPotionAlchemyDraft();
+        if (draft.collapseLocked) {
+            showToast('结构已坍塌，先领取失败返还。');
+            return;
+        }
         draft.formId = form.formId;
         draft.nestingMode = form.nestingMode;
         draft.slotType = form.slotType;
@@ -1491,13 +1701,12 @@ export const rune_launcher_system = {
     },
 
     _ui_abortPotionAlchemyDraft(context = 'manual') {
-        const draftRunes = this._ui_getPotionDraftRunes();
-        if (draftRunes.length <= 0) {
+        const ledgerRunes = this._ui_getPotionAlchemyLedgerRunes();
+        if (ledgerRunes.length <= 0) {
             this._ui_resetPotionAlchemyDraft();
             return { aborted: false, refund: 0 };
         }
-        const result = this._ui_resolvePotionRecipe(draftRunes);
-        const refund = this._ui_calcPotionDraftRefund(draftRunes, result);
+        const refund = this._ui_calcPotionDraftRefund(ledgerRunes, null);
         this.runFragments = (this.runFragments || 0) + refund;
         if (!Array.isArray(this.potionRecipeHistory)) this.potionRecipeHistory = [];
         this.potionRecipeHistory.push({
@@ -1505,7 +1714,7 @@ export const rune_launcher_system = {
             context,
             refund,
             round: this.round || 1,
-            consumedRunes: draftRunes.length,
+            consumedRunes: ledgerRunes.length,
         });
         this.potionRecipeHistory = this.potionRecipeHistory.slice(-10);
         this._ui_showPotionActionResult(`炼成中断，返还 ${refund} 局内碎片；已投入符文不返还`, 'error');
@@ -1518,8 +1727,8 @@ export const rune_launcher_system = {
     },
 
     ui_handlePotionAlchemyInterrupt(context = 'manual', options = {}) {
-        const draftRunes = this._ui_getPotionDraftRunes();
-        if (draftRunes.length <= 0) return true;
+        const ledgerRunes = this._ui_getPotionAlchemyLedgerRunes();
+        if (ledgerRunes.length <= 0) return true;
         const shouldConfirm = options.confirm !== false;
         const ok = !shouldConfirm || typeof window === 'undefined' || typeof window.confirm !== 'function'
             ? true
@@ -1546,18 +1755,38 @@ export const rune_launcher_system = {
         const info = this._ui_getPotionRuneEntry(idx);
         if (!info) return;
         const draft = this._ui_getPotionAlchemyDraft();
-        if ((draft.consumedRunes || []).length >= 4) {
-            showToast('本次炼成最多投入 4 个符文。');
+        if (draft.collapseLocked || draft.state === 'failed') {
+            showToast('结构坍塌，先领取失败返还。');
             return;
         }
+        if ((draft.pendingRunes || []).length >= POTION_SPELL_CONTENT_RUNE_COUNT) {
+            const currentResult = this._ui_resolvePotionRecipe(this._ui_getPotionDraftRunes());
+            if (!currentResult.success) {
+                if (currentResult.rejectedBy === 'potion_nesting' && currentResult.status !== 'collapse') {
+                    draft.state = 'form_rejected';
+                    draft.collapseLocked = false;
+                    this._ui_updatePotionAlchemyPreview();
+                    showToast('先调整法阵，再继续投料。');
+                    return;
+                }
+                draft.state = 'failed';
+                draft.collapseLocked = true;
+                this._ui_updatePotionAlchemyPreview();
+                showToast('结构坍塌，已投入符文不返还。');
+                return;
+            }
+            this._ui_commitPotionAlchemyNode(currentResult);
+        }
         this.runeInventory.splice(idx, 1);
-        draft.consumedRunes.push({
+        const consumed = {
             id: info.id,
             def: info.def,
             level: info.level,
             element: info.element,
-        });
-        draft.state = draft.consumedRunes.length >= 2 ? 'spell_ready' : 'feeding';
+        };
+        draft.consumedRunes.push(consumed);
+        draft.pendingRunes.push(consumed);
+        draft.state = draft.pendingRunes.length >= POTION_SPELL_CONTENT_RUNE_COUNT ? 'spell_ready' : 'feeding';
         showToast(`投入符文：${info.def.name} Lv.${info.level}`);
         this._ui_renderPotionAlchemyInventory();
         this._ui_updatePotionAlchemyPreview();
@@ -1598,7 +1827,7 @@ export const rune_launcher_system = {
         if (!def) {
             el.innerHTML = `
                 <div class="flex items-center gap-3">
-                    <span class="text-2xl">🧪</span>
+                    <span class="potion-bottle-slot is-empty" aria-hidden="true"></span>
                     <div>
                         <div class="text-sm font-bold text-slate-300">空药剂槽</div>
                         <div class="text-xs text-slate-500">炼成后会显示在战斗技能栏。</div>
@@ -1607,15 +1836,21 @@ export const rune_launcher_system = {
             `;
             return;
         }
+        const maxCharges = Math.max(1, prepared.maxCharges || def.maxCharges || 1);
+        const charges = Math.max(0, prepared.charges || 0);
+        const fillPct = Math.max(0, Math.min(100, Math.round((charges / maxCharges) * 100)));
         el.innerHTML = `
             <div class="flex items-center gap-3">
-                <span class="text-2xl">${def.icon}</span>
+                <span class="potion-bottle-slot is-filled" style="--potion-liquid:${def.color || '#2dd4bf'}; --potion-fill:${fillPct}%;" aria-hidden="true">
+                    <span class="potion-bottle-slot__liquid"></span>
+                    <span class="potion-bottle-slot__icon">${def.icon || '🧪'}</span>
+                </span>
                 <div class="min-w-0 flex-1">
                     <div class="text-sm font-bold" style="color:${def.color}">${def.name}</div>
                     <div class="text-xs text-slate-400">${def.desc}</div>
                     <div class="text-[10px] text-amber-300 mt-1">封装新药剂会弃置当前剩余装药，不返还。</div>
                 </div>
-                <div class="text-xs font-bold text-amber-200">${prepared.charges || 0}/${prepared.maxCharges || def.maxCharges}</div>
+                <div class="text-xs font-bold text-amber-200">${charges}/${maxCharges}</div>
             </div>
         `;
     },
@@ -1654,7 +1889,7 @@ export const rune_launcher_system = {
         Array.from(container.children).forEach(child => {
             if (child.id !== 'potion-rune-empty') child.remove();
         });
-        if (countEl) countEl.textContent = `${draft.consumedRunes.length} / 4 已投入`;
+        if (countEl) countEl.textContent = `${(draft.pendingRunes || []).length} / ${POTION_SPELL_CONTENT_RUNE_COUNT} current node · ${(draft.consumedRunes || []).length} in furnace`;
         if (!this.runeInventory || this.runeInventory.length === 0) {
             if (emptyEl) emptyEl.classList.remove('hidden');
             return;
@@ -1749,33 +1984,70 @@ export const rune_launcher_system = {
         const confirmBtn = document.getElementById('potion-confirm-btn');
         if (!preview || !confirmBtn) return;
         const draftRunes = this._ui_getPotionDraftRunes();
-        const result = this._ui_resolvePotionRecipe(draftRunes);
         const draft = this._ui_getPotionAlchemyDraft();
+        const result = draftRunes.length > 0
+            ? this._ui_resolvePotionRecipe(draftRunes)
+            : (draft.root ? this._ui_buildPotionResultFromSpellTree({ root: draft.root }) : this._ui_resolvePotionRecipe(draftRunes));
+        const nodeCount = result.nodeCount || this._ui_countPotionSpellNodes(result.spellTree?.root || draft.root);
+        const stableNodesHtml = Array.from({ length: Math.max(1, nodeCount || 1) }, () => '<span class="potion-unknown-node"></span>').join('<span class="potion-node-link"></span>');
         const restoredCopy = draft.restoredFromSave
             ? '<div class="text-xs text-amber-300 mt-1">已恢复上次未封装草稿；这些符文已被消耗，关闭或进入战斗会按中断处理。</div>'
             : '';
         this._ui_renderPotionFormControls(result);
-        if (draftRunes.length < 2) {
+        if (draft.root && draftRunes.length <= 0 && result.success) {
+            draft.state = 'form_ready';
+            draft.collapseLocked = false;
+            this._ui_renderPotionDraftRunes();
+            preview.innerHTML = `
+                <div class="potion-state-row">
+                    <span class="potion-preview-sigil is-stable" aria-hidden="true"></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-emerald-300">结构稳定，可以封装或继续投入</div>
+                        <div class="text-xs text-slate-400">已形成未知稳定节点；继续投料会尝试接入新的隐藏节点。</div>
+                        <div class="text-xs text-slate-500 mt-1">已入炉 ${(draft.consumedRunes || []).length} 枚符文，成本已支付。</div>
+                        ${this.preparedPotionSpell ? '<div class="text-xs text-amber-300 mt-1">封装会覆盖旧药剂；剩余装药不返还。</div>' : ''}
+                        ${restoredCopy}
+                        <div class="potion-node-chain" aria-hidden="true">${stableNodesHtml}</div>
+                    </div>
+                </div>
+            `;
+            confirmBtn.disabled = false;
+            confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-emerald-700/70 text-emerald-100 border border-emerald-400/60 hover:bg-emerald-600/80 cursor-pointer transition-all duration-200 shadow-[0_0_8px_rgba(16,185,129,0.25)]';
+            confirmBtn.textContent = this.preparedPotionSpell ? '手动接触并覆盖旧药剂' : '手动接触封装';
+            return;
+        }
+        if (draftRunes.length < POTION_SPELL_CONTENT_RUNE_COUNT) {
             draft.state = draftRunes.length > 0 ? 'feeding' : 'empty';
             this._ui_renderPotionDraftRunes();
             preview.innerHTML = `
-                <div class="text-sm font-bold text-slate-300 mb-1">炉内尚未成法</div>
-                <div class="text-xs text-slate-500">已投入 ${draftRunes.length} 个符文。继续投料；投入符文不会返还。</div>
-                ${restoredCopy}
+                <div class="potion-state-row">
+                    <span class="potion-preview-sigil is-feeding" aria-hidden="true"></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-slate-300 mb-1">炉内尚未成法</div>
+                        <div class="text-xs text-slate-500">已投入 ${draftRunes.length} 个符文。继续投料；投入符文不会返还。</div>
+                        ${restoredCopy}
+                    </div>
+                </div>
             `;
             confirmBtn.disabled = true;
             confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200';
             confirmBtn.textContent = '继续投料';
             return;
         }
-        if (result.rejectedBy === 'potion_nesting') {
-            this._ui_getPotionAlchemyDraft().state = 'failed';
+        if (result.rejectedBy === 'potion_nesting' && result.status !== 'collapse') {
+            this._ui_getPotionAlchemyDraft().state = 'form_rejected';
+            this._ui_getPotionAlchemyDraft().collapseLocked = false;
             this._ui_renderPotionDraftRunes();
             preview.innerHTML = `
-                <div class="text-sm font-bold text-rose-300 mb-1">法阵排斥，无法封装</div>
-                <div class="text-xs text-slate-400">${_ui_escapeHtml(result.reason || '当前形态不能承载这组隐藏法术。')}</div>
-                <div class="text-xs text-slate-500 mt-1">切换法阵形态后会重新校验；若中断，已投入符文不返还。</div>
-                ${restoredCopy}
+                <div class="potion-state-row">
+                    <span class="potion-preview-sigil is-rejected" aria-hidden="true"></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-rose-300 mb-1">法阵排斥，无法封装</div>
+                        <div class="text-xs text-slate-400">${_ui_escapeHtml(result.reason || '当前形态不能承载这组隐藏法术。')}</div>
+                        <div class="text-xs text-slate-500 mt-1">切换法阵形态后会重新校验；若中断，已投入符文不返还。</div>
+                        ${restoredCopy}
+                    </div>
+                </div>
             `;
             confirmBtn.disabled = true;
             confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200';
@@ -1788,27 +2060,35 @@ export const rune_launcher_system = {
             this._ui_getPotionAlchemyDraft().state = 'form_ready';
             this._ui_renderPotionDraftRunes();
             preview.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl">◎</span>
+                <div class="potion-state-row">
+                    <span class="potion-preview-sigil is-stable" aria-hidden="true"></span>
                     <div class="min-w-0 flex-1">
                         <div class="text-sm font-bold text-emerald-300">结构稳定，可以封装</div>
                         <div class="text-xs text-slate-400">最终药剂会在手动接触后揭示。</div>
                         <div class="text-xs text-slate-500 mt-1">已投入 ${draftRunes.length} 个符文，成本已支付。</div>
                         ${this.preparedPotionSpell ? '<div class="text-xs text-amber-300 mt-1">封装会覆盖旧药剂；剩余装药不返还。</div>' : ''}
                         ${restoredCopy}
+                        <div class="potion-node-chain" aria-hidden="true">
+                            ${stableNodesHtml}
+                        </div>
                     </div>
                 </div>
             `;
             confirmBtn.textContent = this.preparedPotionSpell ? '手动接触并覆盖旧药剂' : '手动接触封装';
         } else {
-            if (draftRunes.length < 4) {
+            if (result.status === 'pending') {
                 this._ui_getPotionAlchemyDraft().state = 'feeding';
                 this._ui_renderPotionDraftRunes();
                 preview.innerHTML = `
-                    <div class="text-sm font-bold text-amber-300 mb-1">结构未稳，可继续投料</div>
-                    <div class="text-xs text-slate-400">炉内已有 ${draftRunes.length} 个符文，但尚未形成可封装结构。</div>
-                    <div class="text-xs text-slate-500 mt-1">继续投入符文可能稳定，也可能坍塌。</div>
-                    ${restoredCopy}
+                    <div class="potion-state-row">
+                        <span class="potion-preview-sigil is-feeding" aria-hidden="true"></span>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-bold text-amber-300 mb-1">结构未稳，可继续投料</div>
+                            <div class="text-xs text-slate-400">炉内已有 ${draftRunes.length} 个符文，但尚未形成可封装结构。</div>
+                            <div class="text-xs text-slate-500 mt-1">继续投入符文可能稳定，也可能坍塌。</div>
+                            ${restoredCopy}
+                        </div>
+                    </div>
                 `;
                 confirmBtn.disabled = true;
                 confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200';
@@ -1816,12 +2096,20 @@ export const rune_launcher_system = {
                 return;
             }
             this._ui_getPotionAlchemyDraft().state = 'failed';
+            this._ui_getPotionAlchemyDraft().collapseLocked = true;
             this._ui_renderPotionDraftRunes();
             preview.innerHTML = `
-                <div class="text-sm font-bold text-rose-300 mb-1">结构坍塌，炼成失败</div>
-                <div class="text-xs text-slate-400">已投入符文不会返还，可领取失败返还。</div>
-                ${restoredCopy}
+                <div class="potion-state-row">
+                    <span class="potion-preview-sigil is-collapse" aria-hidden="true"></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-rose-300 mb-1">结构坍塌，炼成失败</div>
+                        <div class="text-xs text-slate-400">已投入符文不会返还，可领取失败返还。</div>
+                        ${restoredCopy}
+                    </div>
+                </div>
             `;
+            confirmBtn.disabled = false;
+            confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-rose-800/70 text-rose-100 border border-rose-400/50 hover:bg-rose-700/80 cursor-pointer transition-all duration-200';
             confirmBtn.textContent = '领取失败返还';
         }
     },
@@ -1838,11 +2126,18 @@ export const rune_launcher_system = {
     ui_confirmPotionAlchemy() {
         if (!this._ui_isPotionAlchemyUnlocked()) return;
         const draftRunes = this._ui_getPotionDraftRunes();
-        if (draftRunes.length < 2 || draftRunes.length > 4) {
+        const draft = this._ui_getPotionAlchemyDraft();
+        if (draftRunes.length > 0 && draftRunes.length !== POTION_SPELL_CONTENT_RUNE_COUNT) {
             showToast('继续投料后才能封装。');
             return;
         }
-        const result = this._ui_resolvePotionRecipe(draftRunes);
+        if (draftRunes.length <= 0 && !draft.root) {
+            showToast('继续投料后才能封装。');
+            return;
+        }
+        const result = draftRunes.length === POTION_SPELL_CONTENT_RUNE_COUNT
+            ? this._ui_resolvePotionRecipe(draftRunes)
+            : this._ui_buildPotionResultFromSpellTree({ root: draft.root });
 
         if (!Array.isArray(this.potionRecipeHistory)) this.potionRecipeHistory = [];
         if (result.success) {
@@ -1880,7 +2175,7 @@ export const rune_launcher_system = {
             showToast(`炼成药剂：${result.potion.name}`);
             try { audio.playTone(880, 'sine', 0.12, 0.18); } catch (e) {}
         } else {
-            const refund = this._ui_calcPotionDraftRefund(draftRunes, result);
+            const refund = this._ui_calcPotionDraftRefund(this._ui_getPotionAlchemyLedgerRunes(), result);
             this.runFragments = (this.runFragments || 0) + refund;
             this.potionRecipeHistory.push({ outcome: 'failure', refund, round: this.round || 1, elements: result.elements || [] });
             this._ui_showPotionActionResult(`配方失稳，返还 ${refund} 局内碎片`, 'error');

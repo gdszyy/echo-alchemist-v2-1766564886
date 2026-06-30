@@ -82,6 +82,15 @@ function enemy(x = 240, y = 180) {
     };
 }
 
+function siegeEnemy(x = 240, y = 180) {
+    return {
+        ...enemy(x, y),
+        width: 72,
+        height: 84,
+        affixes: ['siegeBreaker'],
+    };
+}
+
 function potion(id) {
     const def = (POTION_SPELL_DB || []).find(item => item.id === id);
     if (!def) throw new Error(`Missing potion ${id}`);
@@ -187,6 +196,57 @@ check(activeTowerGame._potionTowers?.[0]?.pulseInterval < 9999, 'active tower ha
 for (let i = 0; i < 80; i++) activeTowerGame.combat_updatePotionRuntime(1, fakeCtx());
 check(activeTowerTarget.damageTaken > 0 || activeTowerTarget.venom > 0, 'active tower periodically targets enemies');
 
+const targetA = enemy(220, 210);
+const targetB = enemy(270, 212);
+const targetFar = enemy(430, 212);
+const targetSelectGame = gameWith([targetFar, targetB, targetA]);
+const selectedTargets = targetSelectGame.combat_selectPotionTowerTargets({
+    active: true,
+    pos: { x: 230, y: 210 },
+    radius: 80,
+}, 2);
+check(selectedTargets.length === 2, 'tower target selection respects range and limit');
+check(selectedTargets[0] === targetA && selectedTargets[1] === targetB, 'tower target selection is nearest-first and deterministic');
+
+const blockingTarget = siegeEnemy(240, 198);
+const blockingGame = gameWith([blockingTarget]);
+blockingGame.preparedPotionSpell = preparedFor('potion_frost_seal', {
+    nodeId: 'blocking_tower',
+    potionId: 'potion_frost_seal',
+    spellType: 'status',
+    formId: 'tower',
+    nestingMode: 'tower_active',
+    slotType: 'active',
+    children: [],
+});
+blockingGame.combat_activatePotionSpell();
+const blockingTower = blockingGame._potionTowers?.[0];
+const towerHpBeforeBlock = blockingTower?.hp || 0;
+const enemyYBeforeBlock = blockingTarget.pos.y;
+blockingGame.combat_updatePotionRuntime(1, fakeCtx());
+check(blockingTower.hp < towerHpBeforeBlock, 'tower takes contact damage when blocking an enemy');
+check(blockingTarget.pos.y < enemyYBeforeBlock && blockingTarget.dropTargetY <= blockingTarget.pos.y, 'tower clamps blocked enemies above its hitbox');
+const towerHpAfterFirstBlock = blockingTower.hp;
+blockingGame.combat_updatePotionRuntime(1, fakeCtx());
+check(blockingTower.hp === towerHpAfterFirstBlock, 'tower contact damage uses a cooldown instead of draining every frame');
+
+const lifecycleTarget = enemy(240, 190);
+const lifecycleGame = gameWith([lifecycleTarget]);
+lifecycleGame.preparedPotionSpell = preparedFor('potion_venom_mist', {
+    nodeId: 'lifecycle_tower',
+    potionId: 'potion_venom_mist',
+    spellType: 'status',
+    formId: 'tower',
+    nestingMode: 'tower_active',
+    slotType: 'active',
+    children: [],
+});
+lifecycleGame.combat_activatePotionSpell();
+const lifecycleTower = lifecycleGame._potionTowers?.[0];
+lifecycleTower.lifeFrames = 1;
+lifecycleGame.combat_updatePotionRuntime(1, fakeCtx());
+check((lifecycleGame._potionTowers || []).length === 0, 'tower lifecycle expiry removes the runtime object');
+
 const deathTowerTarget = enemy(242, 190);
 const deathTowerGame = gameWith([deathTowerTarget]);
 deathTowerGame.preparedPotionSpell = preparedFor('potion_molten_flask', {
@@ -227,6 +287,61 @@ invalidGame.preparedPotionSpell = preparedFor('potion_molten_flask', {
 const invalidApplied = invalidGame.combat_applyPotionSpell(potion('potion_molten_flask'), invalidGame.preparedPotionSpell);
 check(invalidApplied === false, 'combat rejects illegal Orb -> Orb tree');
 check(!invalidGame._potionOrbCarriers, 'illegal tree does not spawn carrier runtime');
+
+const invalidTowerGame = gameWith([enemy()]);
+invalidTowerGame.preparedPotionSpell = preparedFor('potion_venom_mist', {
+    nodeId: 'invalid_tower_root',
+    potionId: 'potion_venom_mist',
+    spellType: 'status',
+    formId: 'tower',
+    nestingMode: 'tower_active',
+    slotType: 'active',
+    children: [{
+        nodeId: 'tower_child',
+        potionId: 'potion_molten_flask',
+        spellType: 'burst',
+        formId: 'tower',
+        nestingMode: 'tower_active',
+        slotType: 'active',
+        children: [],
+    }],
+});
+invalidTowerGame.combat_activatePotionSpell();
+check(invalidTowerGame.preparedPotionSpell.charges === 1, 'illegal tower-spawns-tower tree does not consume a charge');
+check(!invalidTowerGame._potionTowers, 'illegal tower-spawns-tower tree does not spawn tower runtime');
+check(!invalidTowerGame._potionOrbCarriers, 'illegal tower-spawns-tower tree does not spawn carrier runtime');
+
+const towerSlotMixGame = gameWith([enemy()]);
+towerSlotMixGame.preparedPotionSpell = preparedFor('potion_molten_flask', {
+    nodeId: 'slot_mix_root',
+    potionId: 'potion_molten_flask',
+    spellType: 'burst',
+    formId: 'bottle',
+    nestingMode: 'shatter',
+    children: [
+        {
+            nodeId: 'active_slot_child',
+            potionId: 'potion_venom_mist',
+            spellType: 'status',
+            formId: 'tower',
+            nestingMode: 'tower_active',
+            slotType: 'active',
+            children: [],
+        },
+        {
+            nodeId: 'death_slot_child',
+            potionId: 'potion_molten_flask',
+            spellType: 'burst',
+            formId: 'tower',
+            nestingMode: 'tower_death',
+            slotType: 'death',
+            children: [],
+        },
+    ],
+});
+towerSlotMixGame.combat_activatePotionSpell();
+check(towerSlotMixGame.preparedPotionSpell.charges === 1, 'active/death mixed tower tree does not consume a charge');
+check(!towerSlotMixGame._potionTowers, 'active/death mixed tower tree does not spawn tower runtime');
 
 const total = passed + failed;
 console.log(`Result: ${passed}/${total} passed`);

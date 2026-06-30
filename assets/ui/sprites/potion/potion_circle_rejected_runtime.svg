@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rejected alchemy circle runtime fallback">
+  <circle cx="256" cy="256" r="202" fill="none" stroke="#7f1d1d" stroke-width="10" stroke-dasharray="34 26" opacity="0.74"/>
+  <circle cx="256" cy="256" r="148" fill="none" stroke="#fb7185" stroke-width="5" stroke-dasharray="18 18" opacity="0.58"/>
+  <path d="M118 142 196 211 171 275 242 322 220 404" fill="none" stroke="#fb7185" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.74"/>
+  <path d="M384 115 320 191 343 250 270 303 300 396" fill="none" stroke="#991b1b" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity="0.68"/>
+  <path d="M76 282 164 262 232 284 306 244 438 270" fill="none" stroke="#f43f5e" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+  <g fill="#fb7185" opacity="0.62">
+    <path d="M236 58h40l-20 62Z"/>
+    <path d="M236 454h40l-20-62Z"/>
+    <path d="M58 236v40l62-20Z"/>
+    <path d="M454 236v40l-62-20Z"/>
+  </g>
+</svg>

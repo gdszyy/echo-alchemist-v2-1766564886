@@ -20,7 +20,11 @@ UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合
 
 - 可见标题使用“炼金台”，但历史文件名和 DOM 主容器 `phase-rune-launcher` 保持不变。
 - 药剂面板入口：`ui_updatePotionAlchemyPanel()`、`_ui_resolvePotionRecipe()`、`ui_confirmPotionAlchemy()`。
+- C4 起，`_ui_resolvePotionRecipe()` 必须调用 `src/potion_spell_content.js -> resolvePotionSpellContent()`，从 3 枚已消耗符文解析隐藏 `spellContentId` / `spellType`；禁止恢复旧元素宽松匹配。静态 `potionId` 只作为 9 个旧药剂释放兼容字段保留。
+- C6 起，药剂草稿必须区分 `consumedRunes` 整炉成本总账、`pendingRunes` 当前 3 枚候选节点与 `root.children` 稳定树结构。稳定 root 后继续投料会生成新隐藏节点；合法嵌套通过 `validatePotionNesting()` / `validatePotionSpellTree()` 接入 `root.children`，非法嵌套整炉坍塌并只按失败规则补偿，不返还旧草稿或新投入符文。
 - 法阵形态控件入口为 `#potion-form-controls` / `ui_selectPotionForm(formId, slotType)`。它只写入 `_potionAlchemyDraft.formId/nestingMode/slotType`，不展示最终药剂名、品质、装药量或具体效果。
+- 封装前 UI 只能显示“结构稳定 / 可继续 / 排斥 / 坍塌”这类黑箱状态，不得输出 `spellContentId`、`runewordId`、`spellType`、词条名、药剂名、伤害、品质或装药量。
+- C8 runtime fallback 资产仅属于表现层：`src/styles/bitmap_ui.css` 通过 `assets/ui/panels/potion/*.svg` 与 `assets/ui/sprites/potion/*.svg` 渲染炼金炉、稳定/排斥法阵、坍塌、药瓶槽和未知稳定节点。后续可替换正式 PNG/chroma 美术，但不得借资产接入修改投料、解析、嵌套、封装、失败返还或战斗释放规则。
 - UI、封装保存与战斗夹具必须调用 `src/potion_nesting.js` 的 `validatePotionSpellTree()` / `validatePotionNesting()`，禁止在 `rune_launcher.js` 里复制一套嵌套合法性矩阵。
 - `ui_confirmPotionAlchemy()` 写入 `preparedPotionSpell` 时必须保留旧 `potionId` 兼容字段，并同步保存 `formId/nestingMode/slotType/spellTree`；Root Orb / Tower 等非 bottle 形态依赖这些字段进入战斗。
 - 失败配方消耗选中符文并返还 `runFragments`，比例读取 `CONFIG.gameplay.potionAlchemyFailRefundRatio`。

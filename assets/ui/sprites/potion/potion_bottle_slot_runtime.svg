@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Potion bottle slot runtime fallback">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecfeff" stop-opacity="0.72"/>
+      <stop offset="0.44" stop-color="#2dd4bf" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#0f172a" stop-opacity="0.64"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#facc15"/>
+      <stop offset="1" stop-color="#7c2d12"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="12" width="108" height="104" rx="24" fill="#020617" fill-opacity="0.82" stroke="url(#frame)" stroke-width="4"/>
+  <path d="M53 18h22v25c0 6 4 11 9 16 12 11 20 24 20 38 0 21-17 31-40 31S24 118 24 97c0-14 8-27 20-38 5-5 9-10 9-16Z" fill="url(#glass)" stroke="#67e8f9" stroke-width="3" opacity="0.92"/>
+  <path d="M34 88c10 8 49 8 60 0v11c0 12-12 19-30 19s-30-7-30-19Z" fill="#2dd4bf" fill-opacity="0.26"/>
+  <path d="M56 28h16" stroke="#fef3c7" stroke-width="4" stroke-linecap="round" opacity="0.72"/>
+  <path d="M42 70c7-12 15-18 25-21" stroke="#ecfeff" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+</svg>

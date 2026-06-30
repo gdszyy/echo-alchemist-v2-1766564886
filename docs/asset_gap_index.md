@@ -1,6 +1,6 @@
 # Echo Alchemist V2 美术资产缺口索引与生成 TODO
 
-> 更新日期：2026-06-27
+> 更新日期：2026-06-30
 > 维护目的：把“当前有哪些素材已落地、哪些仍缺、下一批按什么优先级生成”固定成可持续维护的索引，避免资产状态只停留在聊天记录或分散文档里。
 
 ## 1. 当前扫描结论
@@ -18,7 +18,7 @@
 | 项目 | 当前状态 |
 |---|---|
 | 静态运行时资源引用 | 224 个引用，0 个缺文件 |
-| `assets/ui` | 281 个资源文件（278 PNG / 3 SVG） |
+| `assets/ui` | 300 个资源文件（290 PNG / 10 SVG） |
 | `assets/icons` | 163 个 PNG |
 | `assets/sprites/enemies` | 456 个资源文件（402 PNG / 14 SVG / 40 JSON） |
 | `assets/sprites/bosses` | 236 个资源文件（198 PNG / 38 JSON） |
@@ -48,6 +48,7 @@
 - 2026-06-25：暂停页“当前遗物”列表已改为优先读取 `getRelicIconSrc()`，与遗物选择、商店和掉落飞卡共用同一套位图入口。
 - 2026-06-25：敌人行动/针对词条 UI 图标补齐 10 个透明 PNG，并接入 `ENEMY_AFFIX_ICON_MAP`、敌人 manifest、图鉴、试炼场词缀 chip、敌人信息抽屉和行动预告面板。
 - 2026-06-27：敌人 V2 第一批精确 composite 补齐 `prism:1x3:prism`、`hive:2x3:hive`、`gravityWell:3x3:gravityWell`，源图保存在 `docs/design/concepts/enemy_exact_composites_pass1/`，运行时 PNG/JSON 接入 `assets/sprites/enemies/composites/` 与 `enemy_sprite_manifest.json`。
+- 2026-06-30：药剂炼成 C8 runtime fallback 补齐 7 个运行时 SVG，覆盖炼金炉、稳定/排斥法阵、坍塌、药瓶槽、未知稳定节点与连接线；样式接入 `src/styles/bitmap_ui.css`，正式 PNG/chroma 美术仍作为后续 art pass。
 
 建议验证：
 
@@ -74,6 +75,7 @@ P0 定义：高频可见、当前仍明显回退到 CSS/emoji、或影响第一�
 | P0-7 | 设置关闭按钮 | `assets/ui/sprites/modal_close_btn.png` | 40x40，透明 PNG | 关闭按钮缺专属 Sprite | 设置弹窗关闭控件与面板风格一致 |
 | P0-8 | 遗物图标缺口第一批 | `assets/icons/relic/<id>.png` | 64x64 PNG | 14 个 `RELIC_DB` ID 无映射；已补 6 个高频/推荐遗物 | 继续补第一批剩余关键项并写入 `RELIC_ICON_MAP` |
 | P0-9 | 遗物图标缺口第二批 | `assets/icons/relic/<id>.png` | 64x64 PNG | 同上 | 后续批次补齐，`RELIC_DB` 44/44 覆盖 |
+| P0-10 | 药剂炼成 C8 runtime fallback | `assets/ui/panels/potion/*.svg`、`assets/ui/sprites/potion/*.svg` | 512×512 / 128×128 / 192×24 SVG | ✅ 已接入运行时 fallback；正式 PNG/chroma 美术未生成 | 炼金台有可复用状态资产，缺文件时 CSS 渐变仍可兜底；后续正式美术可同语义替换 |
 
 P0 遗物图标缺口清单：
 

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Alchemy collapse smoke runtime fallback">
+  <defs>
+    <radialGradient id="smoke" cx="50%" cy="50%" r="58%">
+      <stop offset="0" stop-color="#111827" stop-opacity="0.9"/>
+      <stop offset="0.48" stop-color="#020617" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="224" fill="url(#smoke)"/>
+  <g fill="#111827" opacity="0.64">
+    <path d="M128 348c-30-20-46-53-35-84 13-38 58-36 75-68 24-47 95-43 114 5 20 52 98 36 121 83 21 43-19 91-72 88-63-4-80 50-137 28-22-9-44-37-66-52Z"/>
+    <path d="M211 119c34-25 74-19 91 11 18 32-5 63-43 65-44 2-83-44-48-76Z"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M142 153 220 231 198 283 267 338 246 433" stroke="#7f1d1d" stroke-width="10" opacity="0.72"/>
+    <path d="M372 155 313 225 346 286 282 352 318 429" stroke="#f43f5e" stroke-width="6" opacity="0.58"/>
+  </g>
+</svg>

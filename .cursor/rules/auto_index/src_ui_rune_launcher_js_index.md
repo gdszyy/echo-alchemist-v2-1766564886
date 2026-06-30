@@ -1,6 +1,6 @@
 # src\ui\rune_launcher.js 函数索引
 
-> 自动生成于 2026-06-30 | 总行数: 2861 | 函数数: 60 | 语言: javascript
+> 自动生成于 2026-06-30 | 总行数: 3156 | 函数数: 68 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -34,10 +34,18 @@
 | _ui_getPotionRuneEntry | method | `_ui_getPotionRuneEntry(idx)` |  |
 | _ui_getSelectedPotionRunes | method | `_ui_getSelectedPotionRunes()` |  |
 | _ui_estimatePotionRuneValue | method | `_ui_estimatePotionRuneValue(runeInfo)` |  |
+| _ui_hydratePotionRuneRecord | method | `_ui_hydratePotionRuneRecord(runeInfo)` |  |
+| _ui_clonePotionNode | method | `_ui_clonePotionNode(node)` |  |
+| _ui_countPotionSpellNodes | method | `_ui_countPotionSpellNodes(node)` |  |
+| _ui_resetPotionNodeForm | method | `_ui_resetPotionNodeForm(draft = null)` |  |
+| _ui_buildPotionResultFromSpellTree | method | `_ui_buildPotionResultFromSpellTree(spellTree, extras = {})` |  |
+| _ui_buildPotionTreeCandidate | method | `_ui_buildPotionTreeCandidate(node)` |  |
+| _ui_commitPotionAlchemyNode | method | `_ui_commitPotionAlchemyNode(result)` |  |
 | _ui_resolvePotionRecipe | method | `_ui_resolvePotionRecipe(selectedRunes)` |  |
 | _ui_getPotionAlchemyDraft | method | `_ui_getPotionAlchemyDraft()` |  |
 | _ui_resetPotionAlchemyDraft | method | `_ui_resetPotionAlchemyDraft()` |  |
 | _ui_getPotionDraftRunes | method | `_ui_getPotionDraftRunes()` |  |
+| _ui_getPotionAlchemyLedgerRunes | method | `_ui_getPotionAlchemyLedgerRunes()` |  |
 | _ui_renderPotionDraftRunes | method | `_ui_renderPotionDraftRunes()` |  |
 | _ui_renderPotionFormControls | method | `_ui_renderPotionFormControls(result = null)` |  |
 | ui_selectPotionForm | method | `ui_selectPotionForm(formId, slotType = null)` |  |

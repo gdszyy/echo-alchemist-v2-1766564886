@@ -141,10 +141,10 @@
 - [x] C1 done：中断与覆盖边界。关闭炼金台、切 Tab、进入战斗、刷新恢复时，已投入符文不返还且草稿状态可解释；`tests/validate_phase_contracts.mjs` 已覆盖统一中断入口与旧药剂覆盖提示。
 - [x] C2 done：法阵选择第一版。按钮/分段控件选择 `bottle`、`orb`、`beam`、`meteor`、`tower`，不做手绘识别。
 - [x] C3 done：共享法阵合法性表。`src/potion_nesting.js` 校验 parent form、parent slot、child form、child spellType、child nesting mode。
-- [ ] C4 debt：`spellContent` 解析。从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容，并保留旧 `potionId` 存档兼容。
-- [x] C5 done：`spellTree` root 存档。封装结果保存 root 草稿树；debt：多节点嵌套 UI 尚未接入。
-- [ ] C6 debt：继续投料、多节点嵌套 UI、非法整炉坍塌与不返符文闭环。
-- [x] C7 done：Root Orb carrier 与 Tower active/death 基础运行时；debt：完整 Tower 系统、资产、平衡和深层子法术调度。
+- [x] C4 done：`spellContent` 解析。炼金台从 `RUNEWORD_DB` 公式生成隐藏 `spellContentId` / `spellType`，封装前 UI 仍只显示结构稳定/可继续/排斥/坍塌，并保留旧 `potionId` 与 9 个静态药剂释放兼容。
+- [x] C5 done：`spellTree` root 存档。封装结果保存 root 草稿树。
+- [x] C6 done：继续投料生成新隐藏节点，合法父子查表接入 `root.children`；非法嵌套整炉坍塌，已投入符文不返还，只按失败规则补偿；封装前 UI 仍只显示未知稳定节点、结构稳定/排斥/坍塌。
+- [x] C7 done：Root Orb carrier 与 Tower 基础运行时，已覆盖阻挡/承伤、范围/冷却、生命周期、active/death 互斥与非法树拒绝；debt：Tower 专用资产、长期平衡和深层子法术调度。
 
 ### 4.3 P1 遗物 / 商店 / 真理之书
 
