@@ -106,6 +106,16 @@ check(
     'potion alchemy run state is initialized, saved, and restored'
 );
 check(
+    has(runeLauncher, /ui_handlePotionAlchemyInterrupt\s*\(context\s*=\s*['"]manual['"][\s\S]*_ui_abortPotionAlchemyDraft\(context\)/) &&
+    has(runeLauncher, /ui_closeRuneLauncher\s*\(\)[\s\S]{0,260}ui_handlePotionAlchemyInterrupt\(['"]close_launcher['"]\)/) &&
+    has(runeLauncher, /const\s+leavingPotion\s*=\s*tab\s*!==\s*['"]potion['"][\s\S]{0,260}ui_handlePotionAlchemyInterrupt\(['"]switch_tab['"]\)/) &&
+    has(gamePhase, /phase_startCombatPhase\s*\(\)\s*\{[\s\S]{0,260}ui_handlePotionAlchemyInterrupt\(['"]enter_combat['"]\)/) &&
+    has(gameSystem, /sys_showRoundStartBanner\s*\(\)[\s\S]*ui_handlePotionAlchemyInterrupt\(['"]enter_combat['"]\)[\s\S]*return\s+false/) &&
+    has(gameSystem, /this\._potionAlchemyDraft\.restoredFromSave\s*=\s*true/) &&
+    has(runeLauncher, /const\s+currentCharges[\s\S]{0,260}window\.confirm/),
+    'potion alchemy C1 interruption and overwrite boundaries are guarded'
+);
+check(
     has(combatSystem, /combat_activatePotionSpell\s*\(\)/) &&
     has(combatSystem, /combat_applyPotionSpell\s*\(potionDef,\s*prepared\)/) &&
     has(combatSystem, /prepared\.charges\s*=\s*Math\.max\(0,\s*\(Number\(prepared\.charges\)\s*\|\|\s*0\)\s*-\s*1\)/) &&

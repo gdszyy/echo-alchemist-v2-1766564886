@@ -1,6 +1,7 @@
 ﻿# 符文法术与药剂炼成收口规范
 
-> 状态：2026-06-26 收口版，作为符文组合、药剂炼成、法阵形态与嵌套合法性的当前权威文档。
+> 状态词口径：`done` = 已有 gameplay 或持久化行为并有测试；`contract-only` = 字段、metadata、VFX dispatcher 或文档合同；`placeholder` = 占位表现或临时资产；`debt` = 仍需后续 Codex 开发。
+> 当前状态：done = C1 中断与覆盖边界、Root Orb carrier、Tower active/death 基础运行时、共享嵌套校验；contract-only = 静态药剂 metadata 与 VFX dispatcher；debt = `spellContent` 解析、多节点嵌套 UI、完整 Tower 系统与正式资产。
 > 适用范围：`RUNE_DB`、`RUNEWORD_DB`、`POTION_SPELL_DB`、药剂炼成 UI、药剂战斗槽、法阵/形态/嵌套设计。
 > 取代文档：旧 `rune_design_v5`、`rune_system_redesign`、`skill_system_alchemy_redesign`、风剑词条任务稿与根目录散落机制稿均已归档，不再作为实现依据。
 > 落地计划：见 [`docs/potion_alchemy_development_plan.md`](potion_alchemy_development_plan.md)。
@@ -356,6 +357,13 @@ alchemyDraft = {
 
 “限制”只允许在有明确视觉演出、独立结算与 UI 文案说明时使用；否则按“折叠”或“禁止”处理。
 
+2026-06-30 起，代码侧不再只使用 `parent form x child spellType` 粗粒度表。统一入口为 `src/potion_nesting.js`：
+
+- `validatePotionNode()` 校验根节点的 `formId`、`spellType`、`nestingMode`、`slotType`。
+- `validatePotionNesting()` 校验父节点形态、父槽位、子节点形态、子法术类型、子嵌套模式与同层 sibling 的 tower 槽位。
+- `validatePotionSpellTree()` 递归校验整棵树，炼金台选择、封装保存、战斗释放和测试夹具都必须调用这一套函数。
+- 已显式返回 ruleId：`orb_cannot_release_orb`、`beam_cannot_generate_orb`、`pure_damage_chain_forbidden`、`chain_reaction_forbidden`、`tower_dual_slot_mix`、`tower_cannot_spawn_construct`。
+
 ## 6. 明确禁用清单
 
 | 组合 | 处理 | 原因 |
@@ -383,12 +391,26 @@ alchemyDraft = {
 | 血量 | `当前回合数 * 基础血量系数 * 符文血量倍率`。 |
 | 承伤 | 敌人撞击时复用敌人撞击护盾的伤害计算逻辑。 |
 | 嵌套槽 | `active` 或 `death` 二选一。 |
-| active | 回合开始时，从防御塔位置释放一次嵌套法术。 |
-| death | 防御塔死亡时，从防御塔位置释放一次嵌套法术。 |
-| 释放方式 | 由嵌套法术自己决定，防御塔不提供额外索敌/冷却/发射 AI。 |
+| active | 基础运行时为生成后周期 pulse，从防御塔位置选择范围内最近敌人释放轻量效果；完整“回合开始一次释放”仍可在后续平衡中替换。 |
+| death | 防御塔死亡/销毁时，从防御塔位置释放一次较强效果。 |
+| 释放方式 | 基础运行时提供最低限度目标选择与 pulse 频率；复杂射程、冷却、发射 AI 与多子法术调度仍是 debt。 |
 | 回响 | 只提供防御塔血量加成，不允许提供第二槽或复制施法。 |
 
-防御塔不负责射程、冷却、自动索敌、双槽触发、塔生塔。它只提供“站位 + 承伤 + 互斥触发时机”。
+防御塔 done 范围只包括“站位 + 承伤/阻挡 + active/death 互斥触发 + 最低限度目标选择”。复杂射程、完整冷却 AI、双槽触发、塔生塔和长期平衡均为 debt。
+
+2026-06-30 done 证据：
+
+- 正式实体：`src/combat_system.js -> combat_spawnPotionTower()` 创建 `kind: 'potion_tower'` 运行时对象，包含 `hp/maxHp/lifeFrames/pulseInterval/pulseTimer/radius/slotType`。
+- 生命周期：`combat_updatePotionRuntime()` 每帧驱动 `_potionTowers`，`combat_updatePotionTower()` 处理寿命、承伤/阻挡、active 周期 pulse 与 death 销毁触发。
+- active tower：生成后有较短 `pulseTimer` 与周期 `pulseInterval`，按范围选最近敌人结算轻量效果。
+- death tower：不会周期 pulse，只有 `hp <= 0` 或被销毁时通过 `combat_destroyPotionTower(..., 'death')` 触发一次较强释放。
+- debt：塔的完整碰撞伤害公式、专用塔资产、复杂嵌套 UI、多塔平衡和长期塔系统。
+
+Root Orb done 证据：
+
+- 正式 carrier：`combat_spawnPotionOrbCarrier()` 创建 `kind: 'potion_orb_carrier'`，无论 `children.length` 是否为 0 都生成。
+- 飞行与破裂：`combat_updatePotionOrbCarrier()` 从释放源移动到目标点，抵达后 `combat_releasePotionOrbCarrier()` 播放破裂并调用内容结算。
+- 子节点原则：子法术只在破裂点内部继续释放；`children` 不是 carrier 生成前置条件。
 
 ## 8. 坠击/迫击收口规则
 
@@ -525,9 +547,9 @@ Beam 与回旋不互相嵌套，而是合成一个复合形态：扫射激光。
 | 优先级 | 内容 | 原因 |
 |---:|---|---|
 | P0 | 药剂合成解析顺序改为“投入符文即消耗 -> 内部判定是否成法术 -> 玩家绘制法阵 -> 手动接触封装或继续投入符文嵌套” | 避免把炼成误写成免费预览或一次性线性流程。 |
-| P0 | 在 `POTION_SPELL_DB` 中拆分 `spellType`、`formId`、`nestingMode`、`vfxProfile` | 已在静态药剂库和战斗释放表现层落地；后续炼金台草稿树也要复用同一字段。 |
-| P0 | 禁用 Orb 生 Orb、Beam 生 Orb、纯扣血嵌套 | 先封住最容易变隐藏伤害的入口。 |
-| P1 | 防御塔 active/death 互斥槽 | 构筑类玩法的稳定基础。 |
+| P0 | 在 `POTION_SPELL_DB` 中拆分 `spellType`、`formId`、`nestingMode`、`vfxProfile` | contract-only：静态药剂库和战斗释放表现层已读取字段；这不代表 `spellContent` 解析完成。 |
+| P0 | 禁用 Orb 生 Orb、Beam 生 Orb、纯扣血嵌套 | done：由 `src/potion_nesting.js` 的共享 ruleId 与 `tests/validate_potion_nesting.mjs` 覆盖。 |
+| P1 | 防御塔 active/death 互斥槽 | done：基础运行时与互斥槽；debt：完整塔系统、资产、平衡与多节点 UI。 |
 | P1 | 坠击/迫击法阵 | 替代产出类 Orb 嵌套。 |
 | P1 | 扫射激光复合形态 | 承接 Beam + 回旋幻想。 |
 | P2 | 旧 `RUNEWORD_DB` 分类迁移 | 保留旧词条表现，同时逐步对齐新法术类型。 |

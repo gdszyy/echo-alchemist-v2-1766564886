@@ -12,3 +12,5 @@ scripts/__pycache__/
 docs/architecture/music_processing/_mine/
 docs/archive/**/*.png
 docs/archive/**/*.json
+tmp_training_*.png
+godot_project/.godot/

@@ -2197,6 +2197,11 @@ export const game_system = {
         const threatIconEl = document.getElementById('round-start-threat-icon');
         const bossThreat = _getRoundStartBossThreat(this);
 
+        if (enterCombat && typeof this.ui_handlePotionAlchemyInterrupt === 'function'
+            && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+            return false;
+        }
+
         // [BUGFIX] 切换到 combat 阶段前，显式重置敌人回合状态。
         // 根因：phase_switchPhase('combat') 会让主循环 sys_loop 立即开始执行
         // phase_combat_update()；若 isEnemyTurn/enemyWaveActive 未清零，
@@ -2295,6 +2300,7 @@ export const game_system = {
                 this.phase_startCombatPhase();
             }
         }, durationMs);
+        return true;
     },
 
     /**
@@ -3140,6 +3146,10 @@ export const game_system = {
             this.knownPotionSpellIds = (state.knownPotionSpellIds || []).slice();
             this.potionRecipeHistory = (state.potionRecipeHistory || []).slice();
             this._potionAlchemyDraft = state.potionAlchemyDraft ? JSON.parse(JSON.stringify(state.potionAlchemyDraft)) : null;
+            if (this._potionAlchemyDraft && Array.isArray(this._potionAlchemyDraft.consumedRunes)
+                && this._potionAlchemyDraft.consumedRunes.length > 0) {
+                this._potionAlchemyDraft.restoredFromSave = true;
+            }
             this._selectedPotionRuneIndices = new Set();
 
             // --- 恢复符文 ---

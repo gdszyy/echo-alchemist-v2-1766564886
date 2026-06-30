@@ -1,6 +1,6 @@
 # src\combat_system.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 5917 | 函数数: 91 | 语言: javascript
+> 自动生成于 2026-06-30 | 总行数: 6269 | 函数数: 110 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 6 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -37,7 +37,26 @@
 | combat_playSpellSweepingLaserVFX | method | `combat_playSpellSweepingLaserVFX(profile, targets = [], ctx)` |  |
 | combat_playSpellTowerVFX | method | `combat_playSpellTowerVFX(profile, targets = [], ctx)` |  |
 | combat_playSpellFormVFX | method | `combat_playSpellFormVFX(spellDef, targets = [], opts = {})` |  |
+| combat_getPotionSpellTreeRoot | method | `combat_getPotionSpellTreeRoot(potionDef, prepared = {})` |  |
+| combat_buildPotionSpellDef | method | `combat_buildPotionSpellDef(potionDef, node = null)` |  |
+| combat_applyPotionSpellTree | method | `combat_applyPotionSpellTree(potionDef, prepared)` |  |
+| combat_spawnPotionOrbCarrier | method | `combat_spawnPotionOrbCarrier(spellDef, targets = [], opts = {})` |  |
+| combat_updatePotionOrbCarrier | method | `combat_updatePotionOrbCarrier(carrier, timeScale = 1, ctx = null)` |  |
+| combat_releasePotionOrbCarrier | method | `combat_releasePotionOrbCarrier(carrier)` |  |
+| combat_spawnPotionTower | method | `combat_spawnPotionTower(potionDef, prepared, root)` |  |
+| combat_selectPotionTowerTargets | method | `combat_selectPotionTowerTargets(tower, limit = 1)` |  |
+| combat_potionTowerPulse | method | `combat_potionTowerPulse(tower, reason = 'active')` |  |
+| combat_destroyPotionTower | method | `combat_destroyPotionTower(tower, reason = 'expired')` |  |
+| combat_updatePotionTower | method | `combat_updatePotionTower(tower, timeScale = 1, ctx = null)` |  |
+| combat_updatePotionRuntime | method | `combat_updatePotionRuntime(timeScale = 1, ctx = null)` |  |
 | combat_applyPotionSpell | method | `combat_applyPotionSpell(potionDef, prepared)` |  |
+| combat_applyPotionSpellContent | method | `combat_applyPotionSpellContent(potionDef, prepared, opts = {})` |  |
+| playReleaseVfx | function | `playReleaseVfx(targets, releaseOpts = {})` |  |
+| damage | function | `damage(mult = 1)` |  |
+| flash | function | `flash(duration = 180)` |  |
+| impact | function | `impact(targets, opts = {})` |  |
+| requireEnemies | function | `requireEnemies()` |  |
+| requireAmmo | function | `requireAmmo()` |  |
 | combat_updateMulticastDisplay | method | `combat_updateMulticastDisplay(bonusAmount = 0)` |  |
 | combat_playMulticastTransferEffect | method | `combat_playMulticastTransferEffect(multicastValue)` |  |
 | combat_getSkillVisualTier | method | `combat_getSkillVisualTier(skill)` |  |

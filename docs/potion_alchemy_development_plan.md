@@ -1,6 +1,7 @@
 # 药剂炼成开发计划
 
-> 状态：2026-06-27 文档整理与规划版。
+> 状态词口径：`done` = 已有 gameplay 或持久化行为并有测试；`contract-only` = 字段、metadata、VFX dispatcher 或文档合同，不代表玩法完成；`placeholder` = 占位表现或临时资产；`debt` = 仍需后续 Codex 开发。
+> 当前药剂线：done = C1 中断与覆盖边界、Root Orb carrier、Tower active/death 基础运行时、共享嵌套校验、root `spellTree` 保存；contract-only = 静态药剂 `vfxProfile` 与通用法阵 VFX dispatcher；debt = C4 `spellContent`、C6 多节点嵌套 UI、完整 Tower 系统与正式资产。
 > 权威规则来源：[`docs/rune_potion_spell_contract.md`](rune_potion_spell_contract.md)。
 > 特效规格来源：[`docs/spell_vfx_design.md`](spell_vfx_design.md)。
 > 目标：把当前“静态药瓶药剂 + 黑箱炼成面板”整理成可持续推进的工程路线，最终落到“符文组合 = 法术内容，法阵 = 形态 + 嵌套合约，药剂 = spellTree 封装结果”。
@@ -27,40 +28,42 @@
 |---|---|---|
 | 解锁与配置 | `src/config.js` | `relic_sage_apothecary` 解锁药剂炼成；`CONFIG.gameplay.potionAlchemyFailRefundRatio = 0.35`；`POTION_SPELL_DB` 有 9 个静态药剂 |
 | 运行态字段 | `src/core.js`、`src/game_system.js` | 已初始化并存档 `potionAlchemyUnlocked`、`preparedPotionSpell`、`knownPotionSpellIds`、`potionRecipeHistory`、`_potionAlchemyDraft` |
-| 炼成 UI | `src/ui/rune_launcher.js` | 已有药剂 Tab、投料即消耗、黑箱状态反馈、手动接触封装、失败返还、炼金笔记 |
+| 炼成 UI | `src/ui/rune_launcher.js`、`index.html` | 已有药剂 Tab、投料即消耗、黑箱状态反馈、法阵形态按钮、手动接触封装、失败返还、炼金笔记 |
 | 当前配方解析 | `src/ui/rune_launcher.js -> _ui_resolvePotionRecipe()` | 仍是元素宽松匹配，2-4 个符文直接映射到 9 个静态 `potionId`，尚未解析 `RUNEWORD_DB` 的 `spellContent` |
 | 战斗槽 UI | `src/systems.js -> UIManager.updateSkillBar()` | 贤者药匣解锁后显示药剂槽；药剂不消耗 SP，只显示 `charges/maxCharges` |
-| 战斗释放 | `src/combat_system.js` | `combat_activatePotionSpell()` 校验阶段与装药量；`combat_applyPotionSpell()` 按静态药剂 ID 结算，成功后扣 1 装药 |
-| 药瓶 VFX | `src/combat_system.js` | `combat_playPotionBottleVFX()`、`combat_playPotionShatterVFX()` 已接入 `vfxProfile.shatterStyle` |
-| 法阵 VFX | `src/combat_system.js` | `combat_playSpellFormVFX()` 已有 `orb`、`mine`、`beam`、`orbit`、`slash`、`meteor`、`sweeping_laser`、`tower` 首版表现分支，但炼金台尚未产出这些形态 |
-| 静态测试 | `tests/validate_potion_vfx_contract.mjs`、`tests/validate_spell_vfx_design.mjs`、`tests/validate_rune_spell_forms.mjs` | 已覆盖静态药剂 VFX 字段、通用法阵 VFX 分支和符文 3x3 中心轴公式 |
+| 战斗释放 | `src/combat_system.js` | `combat_activatePotionSpell()` 校验阶段与装药量；`combat_applyPotionSpell()` 兼容旧静态药剂并读取 `spellTree` 分流 Root Orb / Tower / 内容结算，成功后扣 1 装药 |
+| 药瓶 VFX | `src/combat_system.js` | contract-only：`combat_playPotionBottleVFX()`、`combat_playPotionShatterVFX()` 已读取 `vfxProfile.shatterStyle`，只证明表现层合同，不证明玩法完成 |
+| 法阵/嵌套合法性 | `src/potion_nesting.js` | `validatePotionNode()` / `validatePotionNesting()` / `validatePotionSpellTree()` 统一覆盖 parent form、parent slot、child form、child spellType、child nesting mode |
+| 法阵 VFX 与运行时 | `src/combat_system.js` | contract-only：`combat_playSpellFormVFX()` 保留形态表现分支；done：`combat_spawnPotionOrbCarrier()` 与 `combat_spawnPotionTower()` 提供 Root Orb carrier 和 Tower active/death 基础运行时 |
+| 静态/运行时测试 | `tests/validate_potion_vfx_contract.mjs`、`tests/validate_spell_vfx_design.mjs`、`tests/validate_potion_nesting.mjs`、`tests/validate_potion_spell_tree_combat.mjs`、`tests/validate_rune_spell_forms.mjs` | contract-only：静态药剂 VFX 字段、通用法阵 VFX 分支；done：共享嵌套合法性、Root Orb 无子节点飞行与 Tower active/death 生命周期 |
 
-## 3. 当前已完成
+## 3. done / contract-only 边界
 
-| 模块 | 完成口径 |
-|---|---|
-| 药剂解锁 | 贤者药匣获得后显示药剂炼成入口和战斗药剂槽 |
-| 投料即消耗 | 点击符文后立即从 `runeInventory` 移除，并写入 `_potionAlchemyDraft.consumedRunes` |
-| 黑箱反馈 | 封装前 UI 只显示“结构稳定/未稳/坍塌”，不显示药剂名、效果、品质或装药量 |
-| 手动接触封装 | 结构稳定时写入 `preparedPotionSpell`，此时才揭示药剂 |
-| 失败返还 | 失败或中断时按 `potionAlchemyFailRefundRatio` 返还局内碎片，不返还符文 |
-| 炼金笔记 | 只记录已成功揭示的药剂 |
-| 战斗使用 | 药剂不走 SP 成本和技能冷却，释放成功后只扣 `charges` |
-| 药瓶表现层 | 9 个静态药剂都有 `spellType`、`formId: 'bottle'`、`nestingMode: 'shatter'`、`vfxProfile` |
-| 通用形态表现层 | 非药瓶形态已有短生命周期 VFX helper，且带 `@perf-impact` 标记 |
+| 状态 | 模块 | 口径 |
+|---|---|---|
+| done | 药剂解锁 | 贤者药匣获得后显示药剂炼成入口和战斗药剂槽 |
+| done | 投料即消耗 | 点击符文后立即从 `runeInventory` 移除，并写入 `_potionAlchemyDraft.consumedRunes` |
+| done | 黑箱反馈 | 封装前 UI 只显示“结构稳定/未稳/坍塌”，不显示药剂名、效果、品质或装药量 |
+| done | 手动接触封装 | 结构稳定时写入 `preparedPotionSpell`，此时才揭示药剂 |
+| done | 失败返还 | 失败或中断时按 `potionAlchemyFailRefundRatio` 返还局内碎片，不返还符文 |
+| done | 炼金笔记 | 只记录已成功揭示的药剂 |
+| done | 战斗使用 | 药剂不走 SP 成本和技能冷却，释放成功后只扣 `charges` |
+| done | Root Orb carrier | 无子节点 root Orb 也生成 `potion_orb_carrier`，到点破裂后释放 root 内容 |
+| done | Tower active/death 基础运行时 | `potion_tower` 有 active 周期 pulse、death 销毁释放、互斥槽校验 |
+| done | 共享嵌套校验 | `src/potion_nesting.js` 被 UI、封装、战斗和测试共用 |
+| contract-only | 静态药剂 metadata | 9 个静态药剂声明 `spellType`、`formId`、`nestingMode`、`vfxProfile`；这只保证字段合同 |
+| contract-only | 药瓶与法阵表现层 | VFX helper 和 dispatcher 只负责短生命周期表现，不应用伤害、状态、DOM、存档或装药消耗 |
 
 ## 4. 当前差距
 
 | 差距 | 影响 |
 |---|---|
 | 炼成尚未解析 `RUNEWORD_DB` 为 `spellContent` | 目前“符文组合 = 法术内容”仍停留在规范和符文网格测试，药剂炼成还不能复用词条法术 |
-| 没有法阵选择/绘制 UI | `POTION_SPELL_DB` 虽有 `formId` 字段，但玩家不能选择形态，所有实战药剂仍是药瓶 |
-| 没有 `spellType x formId` 合法性表 | 不合法法阵、Tower active/death、Beam 禁用项等规则还没有代码闸门 |
-| `preparedPotionSpell` 只保存 `potionId` | 还不是 `spellTree`，无法表达父子嵌套、隐藏节点或法阵形态 |
-| `combat_applyPotionSpell()` 仍按静态药剂 ID 分支 | 不能按 `spellTree` 分发，也不能让不同 `formId` 改变结算 |
-| 复合法术嵌套未实现 | “继续投料 -> 新节点 -> 父子查表 -> 合法接入/非法坍塌”尚未落地 |
-| 中断保护需要全入口复核 | `ui_clearPotionSelection()` 已有确认逻辑，但仍需确认关闭面板、切 Tab、进入战斗、刷新恢复等入口全部接入 |
-| 正式资产未接入 | 炼金炉、法阵画布、稳定/排斥、坍塌、药瓶液面等仍以 CSS/占位表现为主 |
+| 多节点嵌套 UI 尚未实现 | 当前工作台只封装 root `spellTree`；共享合法性函数已支持递归校验，但“继续投料 -> 新节点 -> 父子接入”还没有交互层 |
+| 完整防御塔系统尚未实现 | done 仅覆盖 active/death 基础运行时；专用资产、复杂阻挡公式、多塔平衡、子法术深度释放仍是 debt |
+| 子法术内容解析仍是兼容路径 | 允许 `spellTree.children` 进入战斗内部释放，但炼金台还不会从 `RUNEWORD_DB` 生成真实子节点 |
+| `spellContent` 解析仍未接入炼金台 | C1 已加固关闭面板、切 Tab、进入战斗、刷新恢复与旧药剂覆盖边界；下一步应迁移到 `RUNEWORD_DB` 的隐藏法术内容 |
+| 正式资产未接入 | 炼金炉、法阵画布、稳定/排斥、坍塌、药瓶液面等仍为 placeholder |
 
 ## 5. 规划原则
 
@@ -105,17 +108,17 @@
 
 ### 5.1.3 Codex 批次拆分
 
-| Codex 批次 | 目标 | 主要文件 | 验收 |
-|---|---|---|---|
-| C0 文档/测试基线 | 保持计划、规则、测试入口一致 | `docs/*`、`tests/README.md` | 相关静态测试全绿 |
-| C1 中断与覆盖边界 | 加固投料即消耗、关闭/切 Tab/进入战斗的确认与恢复 | `src/ui/rune_launcher.js`、必要时 `src/ui_system.js` | 投料后不能免费撤回；中断有确认/返还；旧药剂覆盖清楚 |
-| C2 法阵选择 MVP | 加入 `formId`、`nestingMode`、`slotType` 草稿字段与 5 个形态按钮 | `src/ui/rune_launcher.js`、`index.html`、样式文件 | 未选法阵不能封装；Tower active/death 二选一 |
-| C3 法阵合法性表 | 建立 `spellType x formId` 校验，并让 UI 只显示稳定/排斥 | 小型 helper、`src/ui/rune_launcher.js`、测试 | 禁用组合不能封装；不泄露最终药剂 |
-| C4 `spellContent` 解析 | 从 `RUNEWORD_DB` 解析隐藏法术内容，保留静态药剂兼容 | `src/rune_system.js` 或 helper、`src/rune_config.js`、测试 | 至少一批词条能成为隐藏法术节点 |
-| C5 `spellTree` 存档 | 让封装结果保存草稿树，同时兼容旧 `potionId` | `src/game_system.js`、`src/ui/rune_launcher.js`、测试 | 新旧存档均可恢复和释放 |
-| C6 嵌套 MVP | 支持继续投料、父子查表、非法整炉坍塌 | `src/ui/rune_launcher.js`、合法性 helper、测试 | 合法嵌套接入；非法嵌套不返符文 |
-| C7 战斗 `spellTree` 释放 | `combat_applyPotionSpellTree()` 读取形态与内容结算 | `src/combat_system.js`、`src/combat/combat.md`、测试 | 不同 `formId` 有不同结算时机；无目标/无弹药不扣装药 |
-| C8 资产与体验 polish | 接入炼金炉、法阵、药瓶槽等复用资产 | 资产、CSS、必要 UI helper | 视觉读感提升且不改机制 |
+| Codex 批次 | 状态 | 目标 | 主要文件 | 验收/边界 |
+|---|---|---|---|---|
+| C0 文档/测试基线 | done | 保持计划、规则、测试入口一致 | `docs/*`、`tests/README.md` | 相关静态测试全绿 |
+| C1 中断与覆盖边界 | done | 加固投料即消耗、关闭/切 Tab/进入战斗的确认与恢复 | `src/ui/rune_launcher.js`、`src/game_system.js`、`src/game_phase.js` | 关闭炼金台、切 Tab、进入战斗、刷新恢复与旧药剂覆盖均明确不返符文/不返旧装药 |
+| C2 法阵选择第一版 | done | 加入 `formId`、`nestingMode`、`slotType` 草稿字段与形态按钮 | `src/ui/rune_launcher.js`、`index.html` | 工作台按钮选择 bottle/orb/beam/meteor/tower active/tower death |
+| C3 法阵合法性表 | done | 建立 parent/slot/child/form/type/mode 共享校验，并让 UI 只显示稳定/排斥 | `src/potion_nesting.js`、`src/ui/rune_launcher.js`、测试 | UI、封装、战斗、夹具走同一套函数 |
+| C4 `spellContent` 解析 | debt | 从 `RUNEWORD_DB` 解析隐藏法术内容，保留静态药剂兼容 | `src/rune_system.js` 或 helper、`src/rune_config.js`、测试 | 至少一批词条能成为隐藏法术节点 |
+| C5 `spellTree` root 存档 | done | 让封装结果保存 root 草稿树，同时兼容旧 `potionId` | `src/ui/rune_launcher.js`、现有 `game_system.js` 保存字段 | `preparedPotionSpell` 保留 `potionId` 并新增 root `spellTree`；多节点 UI 仍是 debt |
+| C6 多节点嵌套 UI | debt | 支持继续投料、父子查表、非法整炉坍塌 | `src/ui/rune_launcher.js`、合法性 helper、测试 | 合法嵌套接入；非法嵌套不返符文 |
+| C7 战斗 `spellTree` 基础释放 | done | `combat_applyPotionSpellTree()` 读取形态与内容结算 | `src/combat_system.js`、`src/game_phase.js`、`src/combat/combat.md`、测试 | Root Orb carrier 到点破裂；Tower active/death 有基础运行时；完整 Tower 系统仍是 debt |
+| C8 资产与体验 polish | placeholder / debt | 接入炼金炉、法阵、药瓶槽等复用资产 | 资产、CSS、必要 UI helper | 视觉读感提升且不改机制 |
 
 ### 5.1.4 批次边界
 
@@ -154,9 +157,11 @@
 ```bash
 node tests/validate_phase_contracts.mjs
 node tests/validate_potion_vfx_contract.mjs
+node tests/validate_potion_nesting.mjs
+node tests/validate_potion_spell_tree_combat.mjs
 ```
 
-## 7. P1：法阵选择 MVP
+## 7. P1：法阵选择第一版
 
 目标：
 
@@ -270,13 +275,10 @@ node tests/validate_potion_vfx_contract.mjs
 
 | 顺序 | Codex 批次 | 任务 | 理由 |
 |---:|---|---|---|
-| 1 | C1 | 中断与覆盖边界 | 投料即消耗是高风险规则，先封边界 |
-| 2 | C2 | 法阵选择 MVP | 让炼成进入“符文法术 + 法阵形态”的真实结构 |
-| 3 | C3 | 法阵合法性表 | 后续 `spellTree` 和战斗释放都依赖这些字段 |
-| 4 | C4 | `spellContent` 解析 | 从静态药剂迁移到符文组合法术 |
-| 5 | C5 | `spellTree` 存档 | 先让新结果可持久化，再引入嵌套风险 |
-| 6 | C6 | 嵌套 MVP | 单节点稳定后再引入高风险复合结构 |
-| 7 | C7 | 战斗 `spellTree` 释放 | 让法阵真正改变实战形态 |
+| 1 | C4 | `spellContent` 解析 | 从静态药剂迁移到符文组合法术 |
+| 2 | C6 | 多节点嵌套 UI | 单节点与共享校验已稳定，下一步接复合结构 |
+| 3 | Tower debt | 完整 Tower 系统 | 在基础 active/death 运行时上补资产、阻挡公式、平衡和深层调度 |
+| 4 | C8 | 资产与体验 polish | 规则稳定后再替换 placeholder 表现 |
 
 ## 13. 验收闸门
 
@@ -285,11 +287,71 @@ node tests/validate_potion_vfx_contract.mjs
 | 阶段 | 静态验证 | 交互验证 |
 |---|---|---|
 | P0 | `node tests/validate_phase_contracts.mjs`、`node tests/validate_potion_vfx_contract.mjs` | 投料、刷新、关闭、覆盖旧药剂、失败返还 |
-| P1 | 新增法阵字段/合法性测试 | 选择法阵、排斥反馈、Tower 二选一 |
+| P1 | `node tests/validate_potion_nesting.mjs` | 选择法阵、排斥反馈、Tower 二选一、Orb/Beam/纯扣血禁用项 |
 | P2 | `node tests/validate_rune_spell_forms.mjs` + 新增 spellContent 测试 | 词条组合法术不提前泄露 |
 | P3 | 新增嵌套表测试 | 合法接入、非法坍塌、整炉不返符文 |
-| P4 | `node tests/validate_spell_vfx_design.mjs` + 战斗释放测试 | 各形态释放读感、无目标/无弹药不扣装药 |
+| P4 | `node tests/validate_spell_vfx_design.mjs` + `node tests/validate_potion_spell_tree_combat.mjs` | Root Orb 无子节点也会飞、Tower active/death 生命周期、非法树不生成运行时 |
 
 ## 14. 当前一句话结论
 
-当前系统已经不是纸面设定：解锁、投料、黑箱封装、静态药剂释放、药瓶 VFX、通用法阵 VFX 都有了首版代码。下一步的关键不是继续加药剂数量，而是把“静态 `potionId`”升级成“隐藏 `spellContent` + 法阵 `formId` + 可持久化 `spellTree`”，并用查表规则守住嵌套边界。
+当前系统不是纸面设定，但也不能把 contract-only 当 done：解锁、投料、C1 中断与覆盖边界、黑箱封装、root `spellTree` 保存、Root Orb carrier、Tower active/death 基础运行时和共享嵌套校验属于 done；静态药剂 metadata、药瓶 VFX 和通用法阵 VFX dispatcher 只属于 contract-only；下一步的关键是补 C4、C6、完整 Tower 系统和正式资产这些 debt。
+
+## 15. 剩余 debt 提示词
+
+以下提示词用于交给后续 Codex 执行。每条默认只做对应 debt，不顺手扩玩法、不改无关资产、不把 placeholder / contract-only 写成 done。
+
+### C4 spellContent 解析
+
+```text
+请在 D:\claude\echo-alchemist-v2-1766564886 执行“药剂炼成 C4 spellContent 解析”。
+
+必读：AGENTS.md、.cursor/rules/global.md、docs/rune_potion_spell_contract.md 第 10-12 节、docs/potion_alchemy_development_plan.md、.cursor/rules/rune_system.md、.cursor/rules/runeword_index.md、src/rune_config.js、src/rune_system.js、src/ui/rune_launcher.js 目标函数索引。
+
+目标：把炼金台当前元素宽松匹配迁移为从 RUNEWORD_DB 解析隐藏 spellContentId / spellType 的流程；封装前 UI 仍只显示稳定/排斥，不泄露具体法术；保留旧 potionId 存档兼容。
+
+边界：只做数据解析与炼金台接入；不做多节点嵌套 UI、不改 Tower 行为、不新增法术数量、不做资产。纯扣血、普通弹体、链式反应、吸取/链接不得进入子节点。
+
+验收：新增 spellContent 静态测试；运行 node tests/validate_rune_spell_forms.mjs、node tests/validate_potion_nesting.mjs、node tests/validate_potion_spell_tree_combat.mjs、node tests/validate_scenarios.js；文档状态只能使用 done / contract-only / debt / placeholder。
+```
+
+### C6 多节点嵌套 UI
+
+```text
+请在 D:\claude\echo-alchemist-v2-1766564886 执行“药剂炼成 C6 多节点嵌套 UI”。
+
+必读：AGENTS.md、.cursor/rules/global.md、docs/rune_potion_spell_contract.md、docs/potion_alchemy_development_plan.md、.cursor/rules/ui_system.md、.cursor/rules/testing.md、src/potion_nesting.js、tests/validate_potion_nesting.mjs。
+
+目标：在单节点草稿基础上支持继续投料 -> 新隐藏法术节点 -> 绘制/选择法阵 -> validatePotionSpellTree 父子查表 -> 合法接入 children；非法时整炉坍塌，本轮符文不返还，只按失败规则补偿。
+
+边界：不新增新的合法性口径；必须复用 src/potion_nesting.js。不要把抽象节点树做成具体法术泄露；不要接正式资产；不要改战斗伤害平衡。
+
+验收：新增正反向嵌套 UI/结构测试，覆盖合法接入、Orb -> Orb、Beam -> Orb、纯伤害、链式反应、active/death 混用；运行 node tests/validate_potion_nesting.mjs、node tests/validate_potion_spell_tree_combat.mjs、node tests/validate_phase_contracts.mjs、node tests/validate_scenarios.js；同步 TODO/REQ/计划状态。
+```
+
+### 完整 Tower 系统与资产
+
+```text
+请在 D:\claude\echo-alchemist-v2-1766564886 执行“药剂 Tower debt 收口”。
+
+必读：AGENTS.md、.cursor/rules/global.md、.cursor/rules/performance.md、docs/rune_potion_spell_contract.md 第 7 节、docs/potion_alchemy_development_plan.md、src/combat/combat.md、.cursor/rules/auto_index/src_combat_system_js_index.md、docs/art_asset_generation_guidelines.md、docs/ui_asset_requirements.md（若生成/接入资产）。
+
+目标：在已存在的 potion_tower active/death 基础运行时上，补完整阻挡/承伤公式、范围/冷却/目标选择参数、专用视觉资产或明确 fallback、平衡口径和训练/静态验证入口。active 与 death 仍必须互斥，Tower 不得生成 Tower。
+
+边界：不改 spellContent 解析、不做多节点 UI，除非该批次已标记 done 并且显式要求联调。新增高开销视觉必须加 // @perf-impact 并接入 CONFIG.performance 预算。
+
+验收：扩展 tests/validate_potion_spell_tree_combat.mjs 或新增 Tower 专项测试，覆盖 active pulse、death release、阻挡/承伤、互斥槽、非法树不生成运行时；运行 node tests/validate_potion_spell_tree_combat.mjs、node tests/validate_potion_nesting.mjs、node tests/validate_scenarios.js；更新 combat.md、合同、计划与 TODO 状态。
+```
+
+### C8 炼金资产与体验 polish
+
+```text
+请在 D:\claude\echo-alchemist-v2-1766564886 执行“药剂炼成 C8 资产与体验 polish”。
+
+必读：AGENTS.md、.cursor/rules/global.md、design_spec_bitmap.md、docs/art_asset_generation_guidelines.md、docs/ui_asset_requirements.md、docs/rune_potion_spell_contract.md、docs/potion_alchemy_development_plan.md、.cursor/rules/performance.md。
+
+目标：替换炼金炉、法阵画布、稳定/排斥、坍塌、药瓶液面、空药匣等 placeholder 表现，提升读感但不改变机制。资产必须归类为运行时资产、审稿资料或临时来源文件，并同步 manifest/资产清单。
+
+边界：不改炼成规则、spellContent、嵌套合法性或战斗结算。不能因为接入图像而把 placeholder 标成 done；只有运行时路径、清单和验证都完成才可标 done。
+
+验收：静态检查资产路径、尺寸、透明度/9-slice 要求；运行相关 UI/合同测试与 git diff --check；如启动本地服务，默认 3002，验证后关闭或明确保留方式；更新 TODO、资产需求清单和计划状态。
+```

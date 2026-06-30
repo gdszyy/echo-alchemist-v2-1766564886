@@ -524,3 +524,13 @@ _activePhase = !isPaused && phase ∈ { combat, training, gathering }
 | 标记与过载短电弧 | `lightningLimit` | `low` 默认不新增短电弧，`medium` 1 条，`high` 2-3 条 |
 
 性能自适应影响评估：`high` 档展示完整轨迹、碎裂图案、目标短反馈和少量短电弧；`medium` 档减少残影、径向粒子和电弧数量；`low` 档保留可读的落点、封装/爆破语义和语义浮字，关闭或压缩高开销附加线段。该层不直接修改伤害、状态、DOM 或装药量逻辑。
+### 11.1 Root Orb Carrier / Potion Tower MVP（2026-06-30）
+
+`combat_spawnPotionOrbCarrier()` 与 `combat_spawnPotionTower()` 新增短生命周期运行时对象，但不新增 `CONFIG.performance` 字段：
+
+| 运行时对象 | 渲染/更新成本 | 三档表现 |
+|---|---|---|
+| Root Orb carrier | 单次释放 1 个 carrier，Canvas flat `arc` + 短 trail；抵达后复用 `combat_playPotionShatterVFX()` 预算 | `high/medium/low` 均生成 carrier；差异只来自既有 shatter 粒子预算 |
+| Potion tower | 每瓶药剂最多消耗一次生成 1 个 `potion_tower`，每帧只做范围筛选、低频 pulse、简单 flat triangle/hp bar 绘制 | `high/medium/low` 均保留实体与生命周期；pulse VFX 复用 `spawn_createAssimilationWave()` 并受现有 `shockwaveLimit` 截断 |
+
+性能自适应影响评估：`high` 档表现完整 carrier/trail、tower body 与 pulse wave；`medium` 档由既有粒子/波形预算减少附加粒子；`low` 档仍保留 carrier 飞行、tower 阻挡和触发语义，仅压缩破裂/脉冲附加表现。Root Orb 和 Tower 的伤害、状态、装药消耗不随画质档变化。

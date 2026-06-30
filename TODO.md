@@ -1,8 +1,18 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年6月27日 | **状态：⏳ P0 交互优化大盘已整理 · 药剂炼成机制文档整理与规划已启动 · PixiJS 渲染管线迁移规划中 · 位图化视觉资产缺口索引已建立**
+**最后更新：** 2026年6月30日 | **状态词口径：done / placeholder / contract-only / debt。当前药剂线：done = C1 中断与覆盖边界、Root Orb carrier、Tower active/death 基础运行时、共享嵌套校验；contract-only = 静态药剂 metadata 与 VFX dispatcher；debt = C4 spellContent、C6 多节点嵌套 UI、完整 Tower 系统与正式资产。**
 
 > 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
+
+---
+
+## 2026-06-30 任务收尾与 Git 清洁规范入口
+
+为避免后续 Codex 任务遗留大量未归属 modified / untracked 文件，项目规范已新增任务收尾硬闸门：
+
+- [`AGENTS.md`](AGENTS.md) 第 2.6 节：每个任务结束前必须检查 `git status --short --branch`，文本修改后执行 `git diff --check`，并在总结中说明工作区状态。
+- [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 8 节：所有变脏路径必须归属为交付物、生成索引、运行时资产、归档资料或临时产物，不得静默遗留。
+- [`.cursor/rules/process_insights/PI-012_task_closeout_git_hygiene.md`](.cursor/rules/process_insights/PI-012_task_closeout_git_hygiene.md)：记录仓库变脏的常见原因、命名 stash 保护方式、LF/CRLF 噪音处理和禁止误删用户成果的 SOP。
 
 ---
 
@@ -18,11 +28,12 @@
 
 | 批次 | 任务 | 状态 |
 | :--- | :--- | :--- |
-| C1 | 中断与覆盖边界：关闭炼金台、切 Tab、进入战斗、刷新恢复时，已投入符文不返还且草稿状态可解释 | 待实施 |
-| C2 | 法阵选择 MVP：用按钮/分段控件选择 `bottle`、`orb`、`beam`、`meteor`、`tower`，不先做手绘识别 | 待实施 |
-| C3 | 法阵合法性表：扩展 `_potionAlchemyDraft` 记录 `formId`、`nestingMode`、`slotType`，并校验 `spellType x formId` | 待实施 |
-| C4 | `spellContent` 解析：从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容 | 待实施 |
-| C5 | `spellTree` 存档：将 `preparedPotionSpell` 从静态 `potionId` 兼容字段升级为可持久化树结构 | 待实施 |
+| C1 | 中断与覆盖边界：关闭炼金台、切 Tab、进入战斗、刷新恢复时，已投入符文不返还且草稿状态可解释 | done：统一中断入口与静态契约已覆盖 |
+| C2 | 法阵选择第一版：用按钮/分段控件选择 `bottle`、`orb`、`beam`、`meteor`、`tower`，不先做手绘识别 | done：`#potion-form-controls` 写入草稿形态 |
+| C3 | 法阵合法性表：扩展 `_potionAlchemyDraft` 记录 `formId`、`nestingMode`、`slotType`，并校验 parent/slot/child/form/type/mode | done：`src/potion_nesting.js` 统一供 UI、封装、战斗、测试使用 |
+| C4 | `spellContent` 解析：从元素宽松匹配迁移到 `RUNEWORD_DB` 的隐藏法术内容 | debt：尚未接入炼金台解析 |
+| C5 | `spellTree` 存档：将 `preparedPotionSpell` 从静态 `potionId` 兼容字段升级为可持久化树结构 | done：封装结果保留 `potionId` 兼容字段并保存 root `spellTree`；debt：多节点 UI 未接入 |
+| C7 | 战斗 `spellTree` 释放：Root Orb carrier、Tower active/death 基础运行时、旧药剂内容结算兼容 | done：`combat_updatePotionRuntime()` 驱动 carrier/tower；debt：完整多子节点 UI 与完整 Tower 系统 |
 
 ---
 

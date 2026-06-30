@@ -66,6 +66,8 @@ check(/combat_emitPotionArcingTrail\s*\(profile,\s*origin,\s*point,\s*color,\s*t
 check(/combat_playPotionShatterVFX\s*\(profile,\s*targets,\s*ctx\)/.test(combat), 'potion shatter style dispatcher exists');
 check(/combat_playPotionBottleVFX\s*\(potionDef,\s*targets\s*=\s*\[\],\s*opts\s*=\s*\{\}\)/.test(combat), 'combat_playPotionBottleVFX exists');
 check(/@perf-impact:[^\n]*药瓶碎裂法术表现/.test(combat), 'potion bottle VFX helper is marked as perf-impact');
+check(/combat_applyPotionSpellContent\s*\(potionDef,\s*prepared,\s*opts\s*=\s*\{\}\)/.test(combat), 'potion content dispatcher exists');
+check(/const\s+playReleaseVfx\s*=\s*\(targets,\s*releaseOpts\s*=\s*\{\}\)/.test(combat), 'potion branches use the spellTree-aware release VFX helper');
 check(/spawn_createProjectileExplosion\(point\.x,\s*point\.y/.test(combat), 'enemy-target potion shatter reuses projectile explosion helper');
 check(/spawn_createAssimilationPulse\?\.\(point\.x,\s*point\.y/.test(combat), 'ammo-socket potion shatter reuses assimilation pulse helper');
 check(/spawn_createAssimilationWave\?\.\(point\.x,\s*point\.y/.test(combat), 'non-explosive potion styles reuse assimilation wave helper');
@@ -76,8 +78,8 @@ for (const style of shatterStyles) {
     check(combat.includes(`profile.shatterStyle === '${style}'`), `shatter dispatcher handles ${style}`);
 }
 
-const helperCalls = combat.match(/combat_playPotionBottleVFX\(potionDef/g) || [];
-check(helperCalls.length >= potionIds.length, `all potion branches call bottle VFX helper (${helperCalls.length}/${potionIds.length})`);
+const releaseCalls = combat.match(/playReleaseVfx\(/g) || [];
+check(releaseCalls.length >= potionIds.length, `all potion branches call spellTree-aware release VFX helper (${releaseCalls.length}/${potionIds.length})`);
 
 const total = passed + failed;
 console.log(`Result: ${passed}/${total} passed`);

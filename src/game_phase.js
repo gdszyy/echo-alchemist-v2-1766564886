@@ -1527,6 +1527,10 @@ phase_gathering_getRandomPegType() {
      * @description 开始战斗阶段，初始化敌人和UI。
      */
     phase_startCombatPhase() {
+        if (typeof this.ui_handlePotionAlchemyInterrupt === 'function'
+            && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+            return false;
+        }
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
         pixiCleanupAllEffects(this);
 
@@ -1632,6 +1636,8 @@ phase_gathering_getRandomPegType() {
         // 防止上一回合的 setTimeout/帧计数残留导致本回合 isVisualEffectActive 永远为 true
         this.isVisualEffectActive = false;
         this._laserFadeOutFrames = 0;
+        this._potionOrbCarriers = [];
+        this._potionTowers = [];
         // [修复-照射残留] 兜底清理：将所有处于 isContinuous 模式（decay=0）的残留激光强制淡出，
         // 防止任何路径下未追踪到 activeBeams 的连续激光在新回合永久滞留屏幕。
         if (this.particles && this.particles.length > 0) {
@@ -1695,6 +1701,7 @@ phase_gathering_getRandomPegType() {
                 showToast(`☠️ ${pendingBoss.bossName} 出现！`);
             }, 100);
         }
+        return true;
     },
 
     phase_gathering_createSession(marbleDef, marbleIndex) {
@@ -3285,6 +3292,9 @@ phase_gathering_getRandomPegType() {
             // [剑刃风暴词条] 绑定首个子弹的周期性风斩更新
             if (this.combat_bladeStorm_update) {
                 this.combat_bladeStorm_update(timeScale);
+            }
+            if (this.combat_updatePotionRuntime) {
+                this.combat_updatePotionRuntime(timeScale, this.ctx);
             }
             // 拖拽瞄准线
             if (this.isDragging && this.projectiles.length === 0 && this.ammoQueue.length > 0 && this.burstQueue.length === 0) {

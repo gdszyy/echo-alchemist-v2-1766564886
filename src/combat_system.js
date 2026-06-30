@@ -20,6 +20,7 @@ import { sb as _sb } from './utils/perf.js';
 import { DamageCalc } from './combat/damage_calc.js';
 import { CollisionSystem } from './combat/collision.js';
 import { getUiBitmap, DEFENSE_ICON_MAP } from './bitmap_icons.js';
+import { normalizePotionNode, validatePotionSpellTree } from './potion_nesting.js';
 
 export const combat_system = {
 // [已迁移至 src/combat/damage_calc.js] combat_calculatePlayerExpectedDamage
@@ -802,12 +803,363 @@ export const combat_system = {
         return this.combat_playPotionBottleVFX(spellDef, targets, opts);
     },
 
+    combat_getPotionSpellTreeRoot(potionDef, prepared = {}) {
+        if (prepared.spellTree?.root) return normalizePotionNode(prepared.spellTree.root);
+        return normalizePotionNode({
+            nodeId: 'node_root',
+            potionId: potionDef?.id,
+            spellContentId: potionDef?.id,
+            spellType: potionDef?.spellType || 'burst',
+            formId: prepared.formId || potionDef?.formId || 'bottle',
+            nestingMode: prepared.nestingMode || potionDef?.nestingMode || 'shatter',
+            slotType: prepared.slotType || potionDef?.slotType || null,
+            sourceRunes: prepared.sourceRunes || [],
+            children: [],
+        });
+    },
+
+    combat_buildPotionSpellDef(potionDef, node = null) {
+        const normalized = node ? normalizePotionNode(node) : normalizePotionNode({
+            potionId: potionDef?.id,
+            spellType: potionDef?.spellType || 'burst',
+            formId: potionDef?.formId || 'bottle',
+            nestingMode: potionDef?.nestingMode || 'shatter',
+            slotType: potionDef?.slotType || null,
+        });
+        return {
+            ...potionDef,
+            id: potionDef?.id || normalized.potionId,
+            spellType: normalized.spellType || potionDef?.spellType || 'burst',
+            formId: normalized.formId || potionDef?.formId || 'bottle',
+            nestingMode: normalized.nestingMode || potionDef?.nestingMode || 'shatter',
+            slotType: normalized.slotType || potionDef?.slotType || null,
+            vfxProfile: {
+                ...(potionDef?.vfxProfile || {}),
+                slotType: normalized.slotType || potionDef?.slotType || null,
+            },
+        };
+    },
+
+    combat_applyPotionSpellTree(potionDef, prepared) {
+        const validation = validatePotionSpellTree(prepared.spellTree);
+        if (!validation.ok) {
+            showToast(`法阵结构非法：${validation.reason || validation.code}`);
+            return false;
+        }
+
+        const root = this.combat_getPotionSpellTreeRoot(potionDef, prepared);
+        if (root.formId === 'orb') {
+            const spellDef = this.combat_buildPotionSpellDef(potionDef, root);
+            const activeTargets = (this.enemies || []).filter(e => e && e.active);
+            const targetMode = spellDef.vfxProfile?.targetMode || 'cluster_center';
+            const needsEnemies = targetMode !== 'ammo_socket';
+            if (needsEnemies && activeTargets.length <= 0) {
+                showToast('没有敌人可作用，药剂未消耗。');
+                return false;
+            }
+            if (targetMode === 'ammo_socket' && (!this.ammoQueue || this.ammoQueue.length <= 0)) {
+                showToast('没有弹药可强化，药剂未消耗。');
+                return false;
+            }
+            const targets = targetMode === 'ammo_socket' ? [] : activeTargets;
+            const point = this.combat_resolvePotionVfxPoint(targets, { targetMode });
+            this.combat_spawnPotionOrbCarrier(spellDef, targets, {
+                point,
+                targetMode,
+                root,
+                prepared,
+                potionDef,
+            });
+            return true;
+        }
+
+        if (root.formId === 'tower') {
+            return this.combat_spawnPotionTower(potionDef, prepared, root);
+        }
+
+        return this.combat_applyPotionSpellContent(potionDef, prepared, { releaseNode: root });
+    },
+
+    // @perf-impact: Root Orb carrier - one short-lived canvas carrier per potion release, using flat arc/line drawing and existing shatter budgets on rupture.
+    combat_spawnPotionOrbCarrier(spellDef, targets = [], opts = {}) {
+        if (!Array.isArray(this._potionOrbCarriers)) this._potionOrbCarriers = [];
+        const origin = opts.origin || { x: this.width / 2, y: Math.max(80, this.height - 82) };
+        const target = opts.point || this.combat_resolvePotionVfxPoint(targets, opts);
+        const profile = this.combat_getPotionVfxProfile(spellDef);
+        const color = spellDef.color || '#f8fafc';
+        const carrier = {
+            kind: 'potion_orb_carrier',
+            active: true,
+            spellDef,
+            potionDef: opts.potionDef || spellDef,
+            prepared: opts.prepared || {},
+            root: normalizePotionNode(opts.root || {}),
+            targets: (Array.isArray(targets) ? targets : [targets]).filter(Boolean),
+            children: Array.isArray(opts.root?.children) ? opts.root.children.slice() : [],
+            pos: { x: origin.x, y: origin.y },
+            origin: { x: origin.x, y: origin.y },
+            target: { x: target.x, y: target.y },
+            color,
+            radius: Math.max(14, Math.min(28, profile.radius * 0.22)),
+            age: 0,
+            duration: 34,
+            trail: [],
+            arrived: false,
+        };
+        this.combat_emitSpellFormCastCue(profile, {
+            origin,
+            point: target,
+            color,
+            radius: profile.radius,
+            intensity: 0.86,
+            targetMode: opts.targetMode || profile.targetMode,
+            budget: this.combat_getPotionVfxBudget(opts.targetMode || profile.targetMode),
+        });
+        this._potionOrbCarriers.push(carrier);
+        return carrier;
+    },
+
+    combat_updatePotionOrbCarrier(carrier, timeScale = 1, ctx = null) {
+        carrier.age += Math.max(0.25, timeScale || 1);
+        const t = Math.min(1, carrier.age / Math.max(1, carrier.duration));
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const lift = Math.sin(t * Math.PI) * 72;
+        carrier.pos.x = carrier.origin.x + (carrier.target.x - carrier.origin.x) * eased;
+        carrier.pos.y = carrier.origin.y + (carrier.target.y - carrier.origin.y) * eased - lift;
+        carrier.trail.push({ x: carrier.pos.x, y: carrier.pos.y, life: 12 });
+        carrier.trail = carrier.trail
+            .map(point => ({ ...point, life: point.life - timeScale }))
+            .filter(point => point.life > 0)
+            .slice(-8);
+
+        if (ctx && typeof ctx.save === 'function') {
+            ctx.save();
+            ctx.globalAlpha = 0.78;
+            ctx.strokeStyle = carrier.color;
+            ctx.lineWidth = 2;
+            if (carrier.trail.length > 1 && typeof ctx.beginPath === 'function') {
+                ctx.beginPath();
+                carrier.trail.forEach((point, index) => {
+                    if (index === 0) ctx.moveTo(point.x, point.y);
+                    else ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 0.92;
+            ctx.fillStyle = carrier.color;
+            ctx.beginPath?.();
+            ctx.arc?.(carrier.pos.x, carrier.pos.y, carrier.radius, 0, Math.PI * 2);
+            ctx.fill?.();
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 1;
+            ctx.stroke?.();
+            ctx.restore();
+        }
+
+        if (t >= 1 && !carrier.arrived) {
+            carrier.arrived = true;
+            carrier.active = false;
+            this.combat_releasePotionOrbCarrier(carrier);
+        }
+    },
+
+    combat_releasePotionOrbCarrier(carrier) {
+        const point = carrier.target;
+        const releaseProfile = this.combat_resolveSpellReleaseProfile(this.combat_getPotionVfxProfile(carrier.spellDef));
+        this.combat_playPotionShatterVFX(releaseProfile, carrier.targets, {
+            point,
+            origin: carrier.origin,
+            color: carrier.color,
+            radius: releaseProfile.radius,
+            intensity: 1.1,
+            targetMode: releaseProfile.targetMode,
+            budget: this.combat_getPotionVfxBudget(releaseProfile.targetMode),
+        });
+        this.combat_applyPotionSpellContent(carrier.potionDef, carrier.prepared, {
+            skipFormVfx: true,
+            releaseNode: carrier.root,
+            releasePoint: point,
+        });
+        for (const child of carrier.root.children || []) {
+            const childPotion = (POTION_SPELL_DB || []).find(p => p.id === (child.potionId || child.spellContentId));
+            if (!childPotion) continue;
+            this.combat_applyPotionSpellContent(childPotion, { ...carrier.prepared, _potionContentOnly: true }, {
+                releaseNode: child,
+                releasePoint: point,
+            });
+        }
+    },
+
+    // @perf-impact: Potion tower runtime - capped by prepared potion charges, flat canvas body and low-frequency pulses; no new CONFIG.performance fields.
+    combat_spawnPotionTower(potionDef, prepared, root) {
+        const activeTargets = (this.enemies || []).filter(e => e && e.active);
+        if (activeTargets.length <= 0) {
+            showToast('没有敌人可作用，药剂未消耗。');
+            return false;
+        }
+        if (!Array.isArray(this._potionTowers)) this._potionTowers = [];
+        const spellDef = this.combat_buildPotionSpellDef(potionDef, root);
+        const point = this.combat_resolvePotionVfxPoint(activeTargets, { targetMode: 'cluster_center' });
+        const quality = Math.max(1, Math.min(3, Number(prepared.quality) || 1));
+        const tower = {
+            kind: 'potion_tower',
+            active: true,
+            slotType: root.slotType || 'active',
+            potionId: potionDef.id,
+            potionDef,
+            prepared,
+            root: normalizePotionNode(root),
+            pos: { x: point.x, y: point.y + 18 },
+            width: 34,
+            height: 78,
+            hp: 24 + quality * 12 + Math.max(0, Number(this.round) || 1) * 2,
+            maxHp: 24 + quality * 12 + Math.max(0, Number(this.round) || 1) * 2,
+            lifeFrames: (root.slotType === 'death' ? 300 : 240) + quality * 30,
+            age: 0,
+            pulseInterval: root.slotType === 'death' ? 9999 : Math.max(54, 94 - quality * 10),
+            pulseTimer: root.slotType === 'death' ? 9999 : 18,
+            radius: 118 + quality * 14,
+            color: potionDef.color || '#f8fafc',
+            triggeredDeath: false,
+        };
+        this._potionTowers.push(tower);
+        this.combat_playSpellTowerVFX(this.combat_getPotionVfxProfile(spellDef), activeTargets, this.combat_buildSpellFormVfxContext(
+            this.combat_getPotionVfxProfile(spellDef),
+            spellDef,
+            activeTargets,
+            { point: tower.pos, radius: tower.radius, slotType: tower.slotType }
+        ));
+        showToast(`释放药剂：${potionDef.name}`);
+        return true;
+    },
+
+    combat_selectPotionTowerTargets(tower, limit = 1) {
+        return (this.enemies || [])
+            .filter(e => e && e.active && e.pos && Math.hypot(e.pos.x - tower.pos.x, e.pos.y - tower.pos.y) <= tower.radius)
+            .sort((a, b) => Math.hypot(a.pos.x - tower.pos.x, a.pos.y - tower.pos.y) - Math.hypot(b.pos.x - tower.pos.x, b.pos.y - tower.pos.y))
+            .slice(0, limit);
+    },
+
+    combat_potionTowerPulse(tower, reason = 'active') {
+        const targets = this.combat_selectPotionTowerTargets(tower, reason === 'death' ? 4 : 1);
+        if (targets.length <= 0) return false;
+        const round = Math.max(1, Number(this.round) || 1);
+        const quality = Math.max(1, Math.min(3, Number(tower.prepared?.quality) || 1));
+        const damage = Math.max(1, Math.round(round * quality * (reason === 'death' ? 3.2 : 1.45)));
+        targets.forEach(target => {
+            const result = target.takeDamage(damage);
+            const hp = result.hpDamage ?? result.actualDamage ?? 0;
+            this.combat_recordDamage?.(hp, tower.potionDef?.spellType || 'skill', 'main', this._currentDamageShotId);
+            if (tower.potionDef?.id === 'potion_frost_seal' && typeof target.applyTemp === 'function') target.applyTemp(-18 * quality);
+            if (tower.potionDef?.id === 'potion_venom_mist' && typeof target.applyVenom === 'function') target.applyVenom(quality + (reason === 'death' ? 2 : 0));
+            if (tower.potionDef?.id === 'potion_molten_flask' && typeof target.applyTemp === 'function') target.applyTemp(16 * quality);
+            if (hp > 0) this.spawn_createFloatingText?.(target.pos.x, target.pos.y - 16, `-${Math.ceil(hp)}`, tower.color, 11);
+            if (result.killed) this.spawn_addScore?.(target.maxHp, target);
+        });
+        this.spawn_createAssimilationWave?.(tower.pos.x, tower.pos.y - tower.height * 0.45, tower.color, {
+            maxRadius: reason === 'death' ? tower.radius : Math.max(46, tower.radius * 0.38),
+            intensity: reason === 'death' ? 0.82 : 0.48,
+            growthSpeed: reason === 'death' ? 4.4 : 2.8,
+            fadeSpeed: 0.06,
+        });
+        return true;
+    },
+
+    combat_destroyPotionTower(tower, reason = 'expired') {
+        if (!tower || !tower.active) return;
+        if (tower.slotType === 'death' && !tower.triggeredDeath) {
+            tower.triggeredDeath = true;
+            this.combat_potionTowerPulse(tower, 'death');
+        }
+        tower.active = false;
+        if (reason !== 'expired') this.spawn_createShockwave?.(tower.pos.x, tower.pos.y, tower.color);
+    },
+
+    combat_updatePotionTower(tower, timeScale = 1, ctx = null) {
+        tower.age += Math.max(0.25, timeScale || 1);
+        tower.pulseTimer -= timeScale;
+        const blockers = (this.enemies || []).filter(e => e && e.active && e.pos && Math.abs(e.pos.x - tower.pos.x) < tower.width * 0.85 && Math.abs(e.pos.y - tower.pos.y) < tower.height * 0.65);
+        for (const enemy of blockers) {
+            tower.hp -= Math.max(0.35, timeScale * 0.9);
+            enemy.dropTargetY = Math.min(enemy.dropTargetY || enemy.pos.y, enemy.pos.y + 0.12 * timeScale);
+        }
+        if (tower.slotType === 'active' && tower.pulseTimer <= 0) {
+            this.combat_potionTowerPulse(tower, 'active');
+            tower.pulseTimer = tower.pulseInterval;
+        }
+        if (tower.hp <= 0) this.combat_destroyPotionTower(tower, 'death');
+        if (tower.age >= tower.lifeFrames) this.combat_destroyPotionTower(tower, 'expired');
+
+        if (ctx && tower.active && typeof ctx.save === 'function') {
+            const x = tower.pos.x;
+            const baseY = tower.pos.y;
+            const topY = baseY - tower.height;
+            ctx.save();
+            ctx.globalAlpha = 0.88;
+            ctx.fillStyle = tower.color;
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath?.();
+            ctx.moveTo?.(x, topY);
+            ctx.lineTo?.(x + tower.width * 0.5, baseY);
+            ctx.lineTo?.(x - tower.width * 0.5, baseY);
+            ctx.closePath?.();
+            ctx.fill?.();
+            ctx.stroke?.();
+            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = '#111827';
+            ctx.fillRect?.(x - tower.width * 0.55, baseY + 6, tower.width * 1.1, 4);
+            ctx.fillStyle = tower.slotType === 'death' ? '#fb7185' : '#34d399';
+            ctx.fillRect?.(x - tower.width * 0.55, baseY + 6, tower.width * 1.1 * Math.max(0, tower.hp / tower.maxHp), 4);
+            ctx.restore();
+        }
+    },
+
+    combat_updatePotionRuntime(timeScale = 1, ctx = null) {
+        if (Array.isArray(this._potionOrbCarriers) && this._potionOrbCarriers.length > 0) {
+            for (const carrier of this._potionOrbCarriers) {
+                if (carrier.active) this.combat_updatePotionOrbCarrier(carrier, timeScale, ctx);
+            }
+            this._potionOrbCarriers = this._potionOrbCarriers.filter(carrier => carrier.active);
+        }
+        if (Array.isArray(this._potionTowers) && this._potionTowers.length > 0) {
+            for (const tower of this._potionTowers) {
+                if (tower.active) this.combat_updatePotionTower(tower, timeScale, ctx);
+            }
+            this._potionTowers = this._potionTowers.filter(tower => tower.active);
+        }
+    },
+
     combat_applyPotionSpell(potionDef, prepared) {
+        if ((prepared?.spellTree || (prepared?.formId && prepared.formId !== 'bottle')) && !prepared._potionContentOnly) {
+            const preparedWithTree = prepared.spellTree
+                ? prepared
+                : { ...prepared, spellTree: { root: this.combat_getPotionSpellTreeRoot(potionDef, prepared) } };
+            return this.combat_applyPotionSpellTree(potionDef, preparedWithTree);
+        }
+        return this.combat_applyPotionSpellContent(potionDef, prepared, {});
+    },
+
+    combat_applyPotionSpellContent(potionDef, prepared, opts = {}) {
         const p = potionDef.params || {};
         const quality = Math.max(1, Math.min(3, Number(prepared.quality) || 1));
-        const list = this.enemies.filter(e => e.active);
+        const list = (this.enemies || []).filter(e => e.active);
         const round = Math.max(1, Number(this.round) || 1);
         const color = potionDef.color || '#f8fafc';
+        const spellDef = this.combat_buildPotionSpellDef(potionDef, opts.releaseNode || null);
+        const playReleaseVfx = (targets, releaseOpts = {}) => {
+            if (opts.skipFormVfx) return opts.releasePoint || releaseOpts.point || null;
+            const point = releaseOpts.point || opts.releasePoint;
+            const origin = releaseOpts.origin || opts.releasePoint;
+            return this.combat_playSpellFormVFX(spellDef, targets, {
+                formId: spellDef.formId,
+                nestingMode: spellDef.nestingMode,
+                slotType: spellDef.slotType,
+                point,
+                origin,
+                ...releaseOpts,
+            });
+        };
         const damage = (mult = 1) => Math.max(1, Math.round(round * mult * quality));
         const dealTo = (e, dmg, attr = 'skill') => {
             const result = e.takeDamage(dmg);
@@ -843,7 +1195,7 @@ export const combat_system = {
         if (potionDef.id === 'potion_frost_seal') {
             if (!requireEnemies()) return false;
             flash(220);
-            this.combat_playPotionBottleVFX(potionDef, list, { radius: 124 + quality * 8, shakeMs: 120 });
+            playReleaseVfx(list, { radius: 124 + quality * 8, shakeMs: 120 });
             list.forEach(e => {
                 e.applyTemp(-Math.round((p.tempDown || 40) * quality));
                 e.frozenTurns = Math.max(e.frozenTurns || 0, Math.round((p.freezeFrames || 60) * quality));
@@ -855,7 +1207,7 @@ export const combat_system = {
         } else if (potionDef.id === 'potion_molten_flask') {
             if (!requireEnemies()) return false;
             flash(200);
-            this.combat_playPotionBottleVFX(potionDef, list, { radius: 116 + quality * 8, shakeMs: 110 });
+            playReleaseVfx(list, { radius: 116 + quality * 8, shakeMs: 110 });
             list.forEach(e => {
                 e.applyTemp(Math.round((p.tempUp || 45) * quality));
                 this.spawn_createParticle(e.pos.x, e.pos.y, color, 'spark');
@@ -867,7 +1219,7 @@ export const combat_system = {
             if (!requireEnemies()) return false;
             const source = list.slice().sort((a, b) => (b.displayHp || b.hp || 0) - (a.displayHp || a.hp || 0))[0];
             flash(180);
-            this.combat_playPotionBottleVFX(potionDef, [source], { radius: 82 + quality * 6 });
+            playReleaseVfx([source], { radius: 82 + quality * 6 });
             if (this.lightningBolts.length < CONFIG.performance[this.perfQualityLevel || 'high'].lightningLimit) {
                 this.lightningBolts.push(new LightningBolt(source.pos.x, 0, source.pos.x, source.pos.y));
             }
@@ -883,7 +1235,7 @@ export const combat_system = {
             for (let i = 0; i < swordCount; i++) {
                 swordTargets.push(list[Math.floor(Math.random() * list.length)]);
             }
-            this.combat_playPotionBottleVFX(potionDef, swordTargets, { radius: 74 + quality * 6 });
+            playReleaseVfx(swordTargets, { radius: 74 + quality * 6 });
             for (let i = 0; i < swordCount; i++) {
                 const target = swordTargets[i];
                 const spawnX = target.pos.x + (Math.random() - 0.5) * 60;
@@ -902,7 +1254,7 @@ export const combat_system = {
             const pushDistance = this.enemyHeight * (p.pushRows || 0.5) * quality;
             const targets = list.filter(e => Math.hypot(e.pos.x - center.pos.x, e.pos.y - center.pos.y) <= radius);
             flash(220);
-            this.combat_playPotionBottleVFX(potionDef, targets, { point: center.pos, radius, shakeMs: 170 });
+            playReleaseVfx(targets, { point: center.pos, radius, shakeMs: 170 });
             targets.forEach(e => {
                 e.dropTargetY = Math.max(80, e.dropTargetY - pushDistance);
                 e.pos.y = e.dropTargetY;
@@ -916,14 +1268,14 @@ export const combat_system = {
             const ammo = this.ammoQueue[0];
             ammo.multicast = (ammo.multicast || 0) + (p.multicastBonus || 1);
             ammo._potionEchoCopyChance = Math.max(ammo._potionEchoCopyChance || 0, p.copyChance || 0.45);
-            this.combat_playPotionBottleVFX(potionDef, [], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 56 });
+            playReleaseVfx([], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 56 });
             this.ui_updateAmmoUI();
             this.spawn_createFloatingText(this.width / 2, this.height - 120, 'ECHO POTION', color);
             try { audio.playPowerup(3); } catch (e2) {}
         } else if (potionDef.id === 'potion_venom_mist') {
             if (!requireEnemies()) return false;
             flash(180);
-            this.combat_playPotionBottleVFX(potionDef, list, { radius: 128 + quality * 8 });
+            playReleaseVfx(list, { radius: 128 + quality * 8 });
             list.forEach(e => {
                 if (typeof e.applyVenom === 'function') e.applyVenom((p.venomStacks || 3) * quality);
                 this.spawn_createParticle(e.pos.x, e.pos.y, color, 'venom');
@@ -939,7 +1291,7 @@ export const combat_system = {
             ammo.damage = (ammo.damage || 0) + (p.damageBonus || 6) * quality;
             ammo.isLaser = true;
             ammo._potionPrismFocus = true;
-            this.combat_playPotionBottleVFX(potionDef, [], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 62 });
+            playReleaseVfx([], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 62 });
             this.ui_updateAmmoUI();
             this.spawn_createFloatingText(this.width / 2, this.height - 120, 'PRISM POTION', color);
             try { audio.playPowerup(4); } catch (e2) {}
@@ -949,7 +1301,7 @@ export const combat_system = {
             const radius = (p.radius || 90) + quality * 10;
             const targets = list.filter(e => Math.hypot(e.pos.x - center.pos.x, e.pos.y - center.pos.y) <= radius);
             flash(260);
-            this.combat_playPotionBottleVFX(potionDef, targets, { point: center.pos, radius, shakeMs: 200 });
+            playReleaseVfx(targets, { point: center.pos, radius, shakeMs: 200 });
             targets.forEach(e => {
                 e.applyTemp((p.tempUp || 25) * quality);
                 this.spawn_createParticle(e.pos.x, e.pos.y, color, 'spark');

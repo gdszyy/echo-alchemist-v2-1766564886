@@ -36,19 +36,22 @@ Active skill visuals use two runtime tiers derived by `combat_getSkillVisualTier
 
 Balance note: default `skill_arcane_missiles` now includes a small flat damage floor, default `skill_kinetic_charge` is a modest 1 SP ammo setup, and high-value `skill_kinetic_burst` costs 2 SP so its +15 bounce package does not obsolete the default buff.
 
-## 0.8 Potion Alchemy Combat Slot (2026-06-26)
+## 0.8 Potion Alchemy Combat Slot (2026-06-30)
 
 `relic_sage_apothecary` unlocks a dedicated potion slot rendered by `UIManager.updateSkillBar()`. Potions are not `SKILL_DB` entries and must not consume SP or enter the normal skill cost/cooldown path.
 
 - Release entry: `combat_activatePotionSpell()`.
-- Effect dispatcher: `combat_applyPotionSpell(potionDef, prepared)`.
-- Runtime state: `preparedPotionSpell = { potionId, charges, maxCharges, quality, sourceRunes, createdRound }`.
+- Effect dispatcher: `combat_applyPotionSpell(potionDef, prepared)`. It remains the compatibility entry and forwards `prepared.spellTree` or non-bottle `prepared.formId` to `combat_applyPotionSpellTree()`.
+- Runtime state: `preparedPotionSpell = { potionId, charges, maxCharges, quality, sourceRunes, formId, nestingMode, slotType, spellTree, createdRound }`. `potionId` stays for old saves and HUD lookup; `spellTree.root` is the authoritative form/content node for new releases.
 - A potion charge is consumed only after the effect applies successfully. No-target and no-ammo cases must return without decrementing `charges`.
+- Root Orb runtime: `combat_spawnPotionOrbCarrier()` creates `kind: 'potion_orb_carrier'` even when `root.children` is empty. `combat_updatePotionRuntime()` drives the carrier from launcher origin to target/landing point; `combat_releasePotionOrbCarrier()` ruptures at arrival and then calls `combat_applyPotionSpellContent()` for the root content. Children are released inside the rupture only; they are never a precondition for the carrier.
+- Tower runtime: `combat_spawnPotionTower()` creates `kind: 'potion_tower'` with hp, lifetime, radius, slot type, pulse timer, and pulse interval. `combat_updatePotionTower()` handles ticking, blocking/collision pressure, active-slot pulses, and death/expiry. Active towers pulse periodically; death towers stay dormant until destroyed, then release once through `combat_destroyPotionTower()`.
 - Presentation dispatcher: `combat_playSpellFormVFX(spellDef, targets, opts)` is the generic spell-form entry. It keeps `bottle` routed through `combat_playPotionBottleVFX()` and provides visual branches for `orb`, `mine`, `beam`, `orbit`, `slash`, `meteor`, `sweeping_laser`, and `tower`. It must remain visual-only: no damage, status, DOM, save, or charge changes.
 - Bottle presentation: `combat_playPotionBottleVFX(potionDef, targets, opts)` reads `POTION_SPELL_DB[*].vfxProfile` and plays the shared bottle sequence: launcher ignition, short arcing trail, bottle shatter/seal pulse, and a semantic floating label. Enemy-target potions resolve their shatter point from the affected target set; ammo-enchant potions use the launcher/ammo socket point.
 - Potion shatter implementation is split by `vfxProfile.shatterStyle` in `combat_playPotionShatterVFX()`: `mist_bloom` emits lingering mist/venom blooms, `blast` uses projectile explosion, `mark` emits a seal plus short LightningBolt arcs, `shard_sigil` emits a shard sigil for construct summons, `collapse_ring` emits an inward pull ring, `seal` uses an ammo-socket assimilation pulse, and `overload_blast` adds overcharge sparks/bolts.
 - VFX must reuse existing combat helpers (`spawn_createParticle`, `spawn_createShockwave`, `combat_flyingSword_addSon`, `combat_lightning_triggerChain`, `spawn_createSkillIgnition`) and stay under the current `CONFIG.performance` budgets. New potion branches that add additional persistent visual objects must add their own `// @perf-impact` note and update `.cursor/rules/performance.md`.
-- Potion bottle VFX is a short-lived presentation layer only. It must not apply damage, status, DOM updates, or charge consumption; those stay in `combat_applyPotionSpell()`.
+- Potion bottle/form VFX is a short-lived presentation layer only. It must not apply damage, status, DOM updates, or charge consumption; those stay in `combat_applyPotionSpell()` / `combat_applyPotionSpellContent()`.
+- Shared legality comes from `src/potion_nesting.js`. Combat must reject illegal trees before spawning carriers/towers; do not duplicate Orb/Tower/Beam child rules in combat-only conditionals.
 
 ## 0.3 Combat Arena Bounds (2026-06-21)
 

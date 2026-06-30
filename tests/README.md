@@ -13,6 +13,8 @@
 | `validate_rune_spell_forms.mjs` | 静态校验 | Node.js（无需浏览器） | 验证符文词条 Spell Form V1 的中心法阵匹配契约 |
 | `validate_potion_vfx_contract.mjs` | 静态校验 | Node.js（无需浏览器） | 验证药剂法术的药瓶形态字段与战斗 VFX helper 契约 |
 | `validate_spell_vfx_design.mjs` | 静态校验 | Node.js（无需浏览器） | 验证法术形态特效设计文档覆盖所有形态与实现契约 |
+| `validate_potion_nesting.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证药剂嵌套合法性共享函数的正向与反向规则 |
+| `validate_potion_spell_tree_combat.mjs` | 运行时契约校验 | Node.js（无需浏览器） | 验证 Root Orb carrier、Tower active/death 与非法 spellTree 战斗行为 |
 | `ai_test_runner.js` | 运行时测试 | Puppeteer + 本地游戏服务 | 驱动浏览器进行实机行为验证 |
 
 ---
@@ -83,6 +85,29 @@ node tests/validate_spell_vfx_design.mjs
 - 文档包含表现矩阵、单形态规格、实现顺序和验收清单
 - 文档声明后续运行时入口、配置表、性能预算和 `@perf-impact` 约束
 
+### 1.5 药剂嵌套合法性校验（无需启动游戏）
+
+```bash
+node tests/validate_potion_nesting.mjs
+```
+
+验证内容：
+- Root Orb 无子节点也合法
+- Orb -> Orb、Beam 命中生成 Orb、纯扣血、链式反应、active/death 双槽混用均被共享规则拒绝
+- Tower active/death 与 construct 子节点禁用项走同一个 `src/potion_nesting.js` 入口
+
+### 1.6 药剂 spellTree 战斗运行时校验（无需启动游戏）
+
+```bash
+node tests/validate_potion_spell_tree_combat.mjs
+```
+
+验证内容：
+- Root Orb 在 `children: []` 时仍生成 `potion_orb_carrier`，飞行到点后才破裂结算
+- Active Tower 生成 `potion_tower` 正式实体并周期作用敌人
+- Death Tower 不提前 pulse，销毁时触发一次释放
+- 非法 Orb -> Orb 树不会生成 carrier 或 tower 运行时
+
 ### 2. 运行时自动化测试（需要本地游戏服务）
 
 **安装依赖：**
@@ -95,7 +120,7 @@ npm install puppeteer
 **启动游戏服务：**
 ```bash
 npm start
-# 默认监听 http://localhost:3000
+# 默认监听 http://localhost:3002
 ```
 
 **运行全部测试套件：**

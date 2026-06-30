@@ -14,13 +14,19 @@ UI 系统已按职责区域拆分为以下模块，均通过 `bind(this)` 组合
 | `src/ui/run_shop.js` | 局内商店/商人到访入口与底部倒计时 | `ui_updateRunShopScheduleUI`、`ui_showRunShop`、`ui_buyRunShopItem` 等 |
 | `src/ui/rune_launcher.js` | 炼金台界面（符文配置、背包、网格、合成重铸、药剂炼成、图鉴） | `ui_openRuneLauncher`、`ui_updateRuneGrid`、`ui_doRuneMerge`、`ui_confirmPotionAlchemy` 等 |
 
-### 1.1 炼金台药剂炼成（2026-06-26）
+### 1.1 炼金台药剂炼成（2026-06-30）
 
 `relic_sage_apothecary` 解锁后，`#rune-tab-potion` 才显示。药剂炼成 UI 必须继续留在 `src/ui/rune_launcher.js`，因为它直接消费 `runeInventory` 并刷新同一套库存卡片。
 
 - 可见标题使用“炼金台”，但历史文件名和 DOM 主容器 `phase-rune-launcher` 保持不变。
 - 药剂面板入口：`ui_updatePotionAlchemyPanel()`、`_ui_resolvePotionRecipe()`、`ui_confirmPotionAlchemy()`。
+- 法阵形态控件入口为 `#potion-form-controls` / `ui_selectPotionForm(formId, slotType)`。它只写入 `_potionAlchemyDraft.formId/nestingMode/slotType`，不展示最终药剂名、品质、装药量或具体效果。
+- UI、封装保存与战斗夹具必须调用 `src/potion_nesting.js` 的 `validatePotionSpellTree()` / `validatePotionNesting()`，禁止在 `rune_launcher.js` 里复制一套嵌套合法性矩阵。
+- `ui_confirmPotionAlchemy()` 写入 `preparedPotionSpell` 时必须保留旧 `potionId` 兼容字段，并同步保存 `formId/nestingMode/slotType/spellTree`；Root Orb / Tower 等非 bottle 形态依赖这些字段进入战斗。
 - 失败配方消耗选中符文并返还 `runFragments`，比例读取 `CONFIG.gameplay.potionAlchemyFailRefundRatio`。
+- C1 中断边界统一走 `ui_handlePotionAlchemyInterrupt(context)`：关闭炼金台用 `close_launcher`，切出药剂 Tab 用 `switch_tab`，进入战斗/回合横幅用 `enter_combat`。所有路径必须二次确认“已投入符文不返还”，只按失败规则返还局内碎片。
+- `sys_loadRunState()` 恢复已有 `potionAlchemyDraft.consumedRunes` 时应标记 `restoredFromSave`，药剂 UI 必须说明这些符文已消耗，关闭或进入战斗会按中断处理。
+- 覆盖已有 `preparedPotionSpell` 且仍有装药时，当前药剂条、封装提示和确认弹窗必须说明旧药剂与剩余装药不返还。
 - 药剂槽显示在 `systems.js` 的 `UIManager.updateSkillBar()` 中，点击后调用战斗层 `combat_activatePotionSpell()`；UI 不直接结算药剂战斗效果。
 
 ## 2. 模块加载方式

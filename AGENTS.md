@@ -120,6 +120,52 @@
    - 除非用户明确要求“打开预览”“启动服务”“运行 dev server”，否则 Agent 不应自动启动长期运行的本地服务。
    - 如确需启动，应先检查端口、复用现有服务，并在完成验证后关闭自己启动的进程。
 
+## 2.6 任务收尾与 Git 工作区清洁规范
+
+为避免每轮任务结束后遗留大量未归属文件、生成物或换行噪音，所有 Codex 在任务完成前必须执行以下收尾闸门。该闸门适用于代码、文档、素材、规划、验证和清理任务。
+
+1. **任务结束前必须查看 Git 状态**
+   - 至少执行一次：
+     ```powershell
+     git status --short --branch
+     ```
+   - 若修改过文本文件，还应执行：
+     ```powershell
+     git diff --check
+     ```
+   - 最终回复必须说明工作区状态：干净、仅有本次预期改动、仍有历史改动、或已用 stash 保存。
+
+2. **每个变脏路径都必须有归属**
+   - 运行时代码、资源、测试、规范文档：随当前任务交付，并在总结中列出。
+   - 自动函数索引：只能通过 `scripts/generate_index.py` 更新，严禁手工编辑。
+   - 临时脚本、截图、日志、下载包、一次性分析：放入 `tmp/`、`.codex_tmp/` 或 `tmp/codex/<REQ-ID>/` 等忽略目录；若已落入活跃目录，任务结束前必须删除、归档或说明保留原因。
+   - 美术/音频/外部资料：必须明确是运行时资产、审稿资料、归档资料还是临时来源文件；不得混在根目录或无说明的未跟踪列表中。
+
+3. **不得静默遗留未跟踪文件**
+   - 未跟踪文件若属于交付物，必须同步更新对应 manifest、资产清单、TODO 或规范文档。
+   - 未跟踪文件若不属于交付物，必须移动到忽略目录、删除，或在用户要求清理时用命名 stash 保存。
+   - 清理任务中优先使用可恢复方式：
+     ```powershell
+     git stash push -u -m "codex-clean-worktree-YYYY-MM-DD"
+     ```
+     不得在未确认内容可丢弃时直接删除或 reset。
+
+4. **换行与格式噪音必须收口**
+   - 如果 `git diff` 只显示 LF/CRLF、格式化或生成索引噪音，必须判断是否由当前任务引入。
+   - 与任务无关的换行大面积变更不得混入交付；必要时恢复该文件，或单独说明为格式规范化任务。
+
+5. **任务总结必须包含收尾证据**
+   - 验证命令与结果；未运行的验证要说明原因。
+   - 索引/规范/TODO/process insights 是否同步；不涉及也要说明。
+   - Dev server 是否仍在运行、端口与关闭方式。
+   - 当前 Git 状态，以及是否存在 stash、未推送提交或需要用户后续决策的文件。
+
+6. **计划批次完成后的状态一致性闸门**
+   - 每完成一个计划批次，除更新入口 TODO/计划外，还必须用 `rg` 搜索全仓活跃 work item 与相关活跃规范中的该批次状态词，确保没有旧 `debt` / `deferred` 残留。
+   - 推荐最小搜索范围：`docs/work_items/active/`、`TODO.md`、`docs/*todo*.md`、相关 `docs/*plan*.md`、相关 `docs/*contract*.md`、`.cursor/rules/`。搜索时应包含批次 ID、中文/英文关键词、`done`、`debt`、`deferred` 等状态词。
+   - 若发现旧状态与当前验收结论冲突，必须在同轮修正；若保留旧状态是有意的，必须在对应文档写明原因与下一步。
+   - 任务总结必须列出所有 dirty 路径的提交归属或隔离建议，例如“随本批次提交”“属于并行改动，需单独提交/命名 stash”“历史改动，未处理”。不得只说“工作区 dirty”而不给归属。
+
 ## 3. 代码风格约定
 本项目采用原生 JavaScript (ES Modules) 架构。所有新编写或重构的代码必须遵循以下风格：
 *   **命名规范**：
@@ -140,7 +186,34 @@
     *   复杂的算法和业务逻辑必须添加清晰的注释。
     *   移除无用的自动生成 TODO 注释。
 ## 4. 子模块规范文档索引
-为了指导各个子模块的开发和重构，项目在 `.cursor/rules/` 目录下维护了详细的模块规范文档。以下是当前的文档索引：
+为了指导各个子模块的开发和重构，项目按“入口规范 / 模块规则 / 机制计划 / 活跃需求 / 历史归档 / 自动索引”分层维护文档。Codex 介入时应先确定本轮修改属于哪一层，再读取对应入口，避免把旧设计稿、历史任务稿和当前权威规范混用。
+
+### 4.0 规范文档位置总览
+
+| 位置 | 用途 | 使用规则 |
+|------|------|----------|
+| `AGENTS.md` | 全项目 Codex 协作规范、编辑策略、收尾闸门、文档索引入口 | 每轮任务必读；新增跨项目流程规范优先写这里 |
+| `TODO.md` | 项目级进度大盘与当前优先级 | 批次状态变化必须同步 |
+| `.cursor/rules/*.md` | 稳定模块规范、数据索引、流程洞察、测试/性能规则 | 修改架构、API、状态流、性能或测试契约时必须同步 |
+| `.cursor/rules/auto_index/` | 大文件函数级索引，由脚本生成 | 只通过 `scripts/generate_index.py` 更新，严禁手动编辑 |
+| `docs/*_todo.md` / `docs/*_plan.md` / `docs/*_contract.md` | 机制计划、阶段路线、权威玩法合同 | 推进对应机制批次时同步状态词与验收清单 |
+| `docs/design/` | 当前活跃设计、资产契约、视觉方案 | UI/美术/资产接入前读取；接入资产后同步清单 |
+| `docs/architecture/` | 架构图、流程图、音乐等专项架构资料 | 架构或音乐系统相关任务读取 |
+| `docs/work_items/active/` | 当前活跃需求卡、治理卡、批次验收卡 | 每完成批次必须检查是否有旧 `debt` / `deferred` 残留 |
+| `docs/archive/` | 历史任务、旧设计、废弃方案 | 仅作历史参考，不作为实现依据；不得把新活跃规范写入归档目录 |
+| `src/combat/combat.md` | 战斗系统拆分后的模块规范 | 修改战斗药剂、伤害、释放入口或 VFX/结算边界时必读 |
+| `design_spec_bitmap.md` | 位图化视觉重构总规格 | 生成/接入位图、Sprite、图标替换时必读 |
+
+### 4.1 索引维护规则
+
+- `AGENTS.md` 只维护入口级索引和权威位置，不复制自动索引的行数/函数数明细；具体大文件清单以 `.cursor/rules/auto_index/INDEX.md` 为准。
+- 每完成一个计划批次，必须同步：入口 TODO/计划、相关合同/模块规范、活跃 work item、必要的 auto index。
+- 旧设计稿若已被当前合同或计划取代，必须移动或保持在 `docs/archive/`，并在活跃入口中明确“仅历史参考”。
+- 新增规范文档时，应在本节或对应上层索引中注册；新增流程洞察时还必须更新 `.cursor/rules/process_insights/index.md`。
+
+### 4.2 模块规范文档
+
+项目在 `.cursor/rules/` 目录下维护详细模块规范文档。以下是当前常用文档索引：
 *   **全局规范**：[`.cursor/rules/global.md`](.cursor/rules/global.md) - 包含项目整体架构概述、模块依赖关系及全局禁止行为清单。
 *   **音频系统规范**：[`.cursor/rules/audio.md`](.cursor/rules/audio.md) - 音频系统架构约定（SoundManager 类、延迟初始化机制、已知问题与修改规范）。
 *   **配置模块规范**：[`.cursor/rules/config.md`](.cursor/rules/config.md) - 全局配置结构（ELEMENT_CONFIG、RELIC_DB、SKILL_DB 等数据字典格式和修改规范）。
@@ -148,12 +221,18 @@
 *   **游戏阶段规范**：[`.cursor/rules/game_phase.md`](.cursor/rules/game_phase.md) - 阶段转换逻辑（命运抉择→研磨→战斗的状态机、各阶段的入口/出口条件）。
 *   **事件总线规范**：[`.cursor/rules/events.md`](.cursor/rules/events.md) - 事件总线机制（EventBus）、标准事件字典与事件通信规范。（Task 3.1 完成）
 *   **实体系统规范**：[`.cursor/rules/entities.md`](.cursor/rules/entities.md) - 实体系统拆分状态、依赖管理与性能要求规范。（Task 2.2 完成：已提取 Enemy 和 Projectile 类，entities.js 减少约 2004 行）
-*   **战斗系统规范**：[`src/combat/combat.md`](src/combat/combat.md) - 包含战斗模块拆分结构、职责边界、组合模式注入方式及 DOM 操作迁移计划。（Task 2.3 完成）
+*   **特效系统规范**：[`.cursor/rules/effects.md`](.cursor/rules/effects.md) - 粒子、特效对象、表现层边界与性能预算相关规则。
+*   **战斗系统规范**：[`.cursor/rules/combat.md`](.cursor/rules/combat.md) / [`src/combat/combat.md`](src/combat/combat.md) - 包含战斗模块拆分结构、职责边界、组合模式注入方式及 DOM 操作迁移计划。（Task 2.3 完成）
+*   **通用 UI 规范**：[`.cursor/rules/ui.md`](.cursor/rules/ui.md) - UI 通用交互、布局与样式约束。
 *   **UI 系统规范**：[`.cursor/rules/ui_system.md`](.cursor/rules/ui_system.md) - UI 子模块架构（hud.js、shop.js、rune_launcher.js）、函数命名约定、耦合点标记规范。
 *   **游戏系统与试炼场规范**：[`.cursor/rules/systems.md`](.cursor/rules/systems.md) - 包含试炼场（TrainingGround）场景化配置契约、真理之书（TruthBook）图鉴配置及 UI 渲染机制。
 *   **生成系统规范**：[`.cursor/rules/spawn_system.md`](.cursor/rules/spawn_system.md) - 导演系统阵型模板完整规范（所有阵型的设计意图、触发条件和实现细节）。（Task B.1/B.2 完成）
 *   **临场导演系统索引**：[`.cursor/rules/director_system.md`](.cursor/rules/director_system.md) - 局内压力画像、preset 标签、反压制调参旋钮、扩展流程与测试入口。
 *   **自适应性能系统规范**：[`.cursor/rules/performance.md`](.cursor/rules/performance.md) - 基于手机平均帧率的动态特效等级系统（FPS 采样器、三档预算表、所有消费端关联索引、Agent 修改防坑指南）。**凡涉及粒子数量、特效上限、Peg 光效、敌人光泽的修改，必须先读此文档。**
+*   **测试基础设施规范**：[`.cursor/rules/testing.md`](.cursor/rules/testing.md) - 试炼场、静态校验、Puppeteer 套件与测试覆盖边界。
+*   **教程系统规范**：[`.cursor/rules/tutorial_system.md`](.cursor/rules/tutorial_system.md) - 新手教程子系统、步骤状态与主页按钮调用规范。
+*   **训练场词条规范**：[`.cursor/rules/training_runeword.md`](.cursor/rules/training_runeword.md) - 词条试炼场场景与验证入口。
+*   **工具函数规范**：[`.cursor/rules/utils.md`](.cursor/rules/utils.md) - 通用工具模块职责与调用边界。
 *   **世界变迁模拟器规范**：[`.cursor/rules/world_sim.md`](.cursor/rules/world_sim.md) - `src/world_sim/` 元胞自动机星球演化引擎（地幔/气候/晶石/生物四层）的移植规范。**纯数据模块，当前未接入 `Game` 主类与 EventBus**；凡修改四层演化逻辑、元胞状态模型或欲接入 gameplay 时必读。
 *   **世界观正典**：[`docs/world_lore_canon.md`](docs/world_lore_canon.md) - 定义主角/核心锚点 NPC 重生循环、旧时代永生实验、晶石失控与文明反复灭绝的叙事真相。**凡修改剧情、NPC、教程文本、重生机制或将 `world_sim` 接入 gameplay 时，必须以此文档为上层约束。**
 
@@ -196,6 +275,7 @@
 | PI-003 | 子系统扩展与组合模式注入流程 | 新增子系统或修改 `core.js` 时 |
 | PI-004 | 性能预算扩展与新特效接入流程 | 新增粒子特效或高开销视觉效果时 |
 | PI-010 | PixiJS WebGL 渲染管线迁移流程与防坑指南 | 修改粒子系统、特效对象、渲染管线架构时 |
+| PI-012 | 任务收尾与 Git 工作区清洁流程 | 每个任务结束前、处理未跟踪文件或清理仓库时 |
 
 **Agent 维护规范**：
 - 当任务中发现隐蔽逻辑或耦合陷阱时，**必须**在任务完成后在此目录创建或更新对应洞察文档。
@@ -258,22 +338,13 @@ function combat_damageEnemy(enemy, projectile) {
 
 ### 6.4 已索引大文件清单
 
-以下文件已建立函数级索引，修改时必须同步更新：
+已索引文件明细、行数、函数数与索引文件路径以脚本生成的 [`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md) 为唯一来源。当前入口记录 36 个已索引文件；不要在 `AGENTS.md` 手工复制完整表格，避免行数和函数数过期。
 
-| 文件 | 行数 | 函数数 | @section 数 | 索引文件 |
-|------|------|--------|------------|----------|
-| `src/entities.js` | ~4741 | 104 | 21 | [auto_index/src_entities_js_index.md](.cursor/rules/auto_index/src_entities_js_index.md) |
-| `src/entities/enemy.js` | ~4418 | 26 | 18 | [auto_index/src_entities_enemy_js_index.md](.cursor/rules/auto_index/src_entities_enemy_js_index.md) |
-| `src/combat_system.js` | ~3331 | 42 | 22 | [auto_index/src_combat_system_js_index.md](.cursor/rules/auto_index/src_combat_system_js_index.md) |
-| `src/systems.js` | ~2810 | 85 | 10 | [auto_index/src_systems_js_index.md](.cursor/rules/auto_index/src_systems_js_index.md) |
-| `src/game_phase.js` | ~2461 | 16 | 15 | [auto_index/src_game_phase_js_index.md](.cursor/rules/auto_index/src_game_phase_js_index.md) |
-| `src/spawn_system.js` | ~2120 | 28 | 8 | [auto_index/src_spawn_system_js_index.md](.cursor/rules/auto_index/src_spawn_system_js_index.md) |
-| `src/game_system.js` | ~1788 | 42 | 0 | [auto_index/src_game_system_js_index.md](.cursor/rules/auto_index/src_game_system_js_index.md) |
-| `src/ui/rune_launcher.js` | ~1682 | 25 | 0 | [auto_index/src_ui_rune_launcher_js_index.md](.cursor/rules/auto_index/src_ui_rune_launcher_js_index.md) |
-| `src/effects/particles.js` | ~1371 | 58 | 0 | [auto_index/src_effects_particles_js_index.md](.cursor/rules/auto_index/src_effects_particles_js_index.md) |
-| `src/ui_system.js` | ~1352 | 40 | 0 | [auto_index/src_ui_system_js_index.md](.cursor/rules/auto_index/src_ui_system_js_index.md) |
+日常开发只需遵循：
 
-> **完整索引入口**：[`.cursor/rules/auto_index/INDEX.md`](.cursor/rules/auto_index/INDEX.md)
+- 修改已索引文件中的函数后，运行单文件索引更新命令。
+- 新增大文件或索引损坏时，再运行全量扫描。
+- 任务总结中说明哪些索引已通过脚本更新，哪些不涉及。
 
 ### 6.5 禁止行为
 

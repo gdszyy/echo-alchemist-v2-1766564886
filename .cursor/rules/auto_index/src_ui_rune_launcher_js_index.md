@@ -1,6 +1,6 @@
 # src\ui\rune_launcher.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 2703 | 函数数: 55 | 语言: javascript
+> 自动生成于 2026-06-30 | 总行数: 2861 | 函数数: 60 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -39,6 +39,11 @@
 | _ui_resetPotionAlchemyDraft | method | `_ui_resetPotionAlchemyDraft()` |  |
 | _ui_getPotionDraftRunes | method | `_ui_getPotionDraftRunes()` |  |
 | _ui_renderPotionDraftRunes | method | `_ui_renderPotionDraftRunes()` |  |
+| _ui_renderPotionFormControls | method | `_ui_renderPotionFormControls(result = null)` |  |
+| ui_selectPotionForm | method | `ui_selectPotionForm(formId, slotType = null)` |  |
+| _ui_getPotionInterruptMessage | method | `_ui_getPotionInterruptMessage(context = 'manual')` |  |
+| _ui_abortPotionAlchemyDraft | method | `_ui_abortPotionAlchemyDraft(context = 'manual')` |  |
+| ui_handlePotionAlchemyInterrupt | method | `ui_handlePotionAlchemyInterrupt(context = 'manual', options = {})` |  |
 | _ui_calcPotionDraftRefund | method | `_ui_calcPotionDraftRefund(runes, result = null)` |  |
 | _ui_consumePotionRune | method | `_ui_consumePotionRune(idx)` |  |
 | ui_updatePotionAlchemyPanel | method | `ui_updatePotionAlchemyPanel()` |  |

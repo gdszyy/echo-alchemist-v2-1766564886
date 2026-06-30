@@ -10,8 +10,9 @@
 
 ## 活跃洞察 (Active Insights)
 
-当前共有 **11** 条活跃洞察。
+当前共有 **12** 条活跃洞察。
 
+> **[2026-06-30 新增]** PI-012：任务收尾与 Git 工作区清洁流程（每轮任务结束前必须检查 `git status --short --branch` / `git diff --check`，所有 modified / untracked 路径必须有归属，临时产物进入忽略目录或命名 stash）。
 > **[2026-06-26 新增]** PI-011：敌人基座词条与常规词条相性流程（基座专属词条不进普通随机池，预设 / 随机大型基座 / Boss 入场强化统一走 `normalizeEnemyAffixesForArchetype()`）。
 > **[2026-06-25 新增]** PI-010：PixiJS WebGL 渲染管线迁移流程与防坑指南（7 个坑位：compaction instanceof 遗漏、粒子模式特殊同步、blendMode 不一致、_pixi/_pixiSprite 区分、BladeStormRing 未实例化、SwordQi 无需迁移、预烘焙纹理形状准确性）。
 > **[2026-06-23 更新]** PI-006 升版至 v1.8：纠正 v1.7 错误方向；精华奖励退出主循环，`marble_pack` 是开局与局内商店购买后的直接研磨入口。
@@ -38,6 +39,7 @@
 | PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.1 | entities, render_system, core | 2026-06-21 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |
 | PI-010 | PixiJS WebGL 渲染管线迁移流程与防坑指南 | v1.0 | render_system, particles, combat_system, spawn_system, game_phase, pixi_bridge, pixi_effect_adapter | 2026-06-25 | [PI-010_pixijs_webgl_rendering_migration.md](PI-010_pixijs_webgl_rendering_migration.md) |
 | PI-011 | 敌人基座词条与常规词条相性流程 | v1.0 | wave_presets, spawn_system, config, enemy_index | 2026-06-26 | [PI-011_enemy_base_affix_compatibility.md](PI-011_enemy_base_affix_compatibility.md) |
+| PI-012 | 任务收尾与 Git 工作区清洁流程 | v1.0 | AGENTS, global, git, workflow | 2026-06-30 | [PI-012_task_closeout_git_hygiene.md](PI-012_task_closeout_git_hygiene.md) |
 
 ### 按模块快速检索
 
@@ -60,6 +62,7 @@
 | `render/pixi_bridge.js` | PI-010（PixiJS 初始化、预烘焙纹理、粒子 Sprite 对象池、blendMode 设置） |
 | `render/pixi_effect_adapter.js` | PI-010（20 种特效适配器三函数、生命周期清理模式） |
 | `entities/enemy.js` | PI-009（Sprite 绘制层级、宽高比与居中逻辑） |
+| `AGENTS.md` / `.cursor/rules/global.md` / `TODO.md` | PI-012（任务结束前 Git 状态闸门、未跟踪文件归属、临时产物与 stash 清理规范） |
 
 ---
 
