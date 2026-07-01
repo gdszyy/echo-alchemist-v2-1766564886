@@ -1,7 +1,7 @@
 ---
 id: "PI-012"
-version: "v1.0"
-last_updated: "2026-06-30"
+version: "v1.1"
+last_updated: "2026-07-01"
 author: "Codex"
 related_modules: ["AGENTS", "global", "git", "workflow"]
 status: "active"
@@ -67,15 +67,39 @@ git stash apply 'stash@{0}'
 
 **正确做法**：未知内容优先 stash 或汇报，不直接删除。只有明确属于当前任务的一次性临时文件，才可删除；删除前确认路径在预期临时目录内。运行时资产和迁移工程必须由用户或需求卡决定是纳入、归档还是 stash。
 
+### 坑 5: 多个 Codex 共用同一个 checkout 并行写入
+
+**现象**：多个并行需求同时在根项目 checkout 中修改代码、资源、文档和自动索引，导致 `git status --short` 出现上百个 modified / deleted / untracked 路径。后续 Codex 无法判断哪些文件属于当前任务、哪些属于历史半成品、哪些应该提交或归档。
+
+**根因**：并行任务没有从入口处隔离。所有 Agent 共用一个工作区，把“开发现场”“集成现场”“临时产物池”和“验收基线”混成一个目录。
+
+**正确做法**：默认采用“一个需求一个隔离工作区”：
+
+```powershell
+git worktree add ..\echo-alchemist-REQ-YYYYMMDD-short-slug -b codex/REQ-YYYYMMDD-short-slug
+```
+
+每个需求同时拥有 `docs/work_items/active/<REQ-ID>.md` 和 `tmp/codex/<REQ-ID>/`。根 checkout 只做集成、验收和清洁基线。若开始时已经 dirty，先记录 baseline；用户要求清洁时，使用命名 stash 保护未知改动：
+
+```powershell
+git stash push -u -m "codex-clean-worktree-YYYY-MM-DD-before-<slug>"
+git stash list
+git stash apply 'stash@{0}'
+```
+
+PowerShell 中恢复 stash 必须给 `stash@{N}` 加引号。
+
 ## 关键耦合点
 
 - `AGENTS.md` 是每个 Codex 介入仓库的硬入口，必须写明任务收尾闸门。
 - `.cursor/rules/global.md` 是全局工程规范，负责把 Git 清洁纳入“禁止遗留脏状态”的工程约束。
 - `docs/work_items/active/<REQ-ID>.md` 记录当前工作流的临时产物、验证证据和收口状态。
 - `.gitignore` 只屏蔽确认为临时或编辑器缓存的路径；不能用 ignore 掩盖真实运行时资产缺失。
+- `git worktree` 是多 Codex 并行的默认隔离层；没有隔离时，需求卡必须显式记录 dirty baseline 和后续归属。
 
 ## 版本变更日志
 
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|---------|------|
+| v1.1 | 2026-07-01 | 补充多 Codex 共用 checkout 的坑位、worktree 隔离默认流程、命名 stash 清洁与恢复注意事项 | Codex |
 | v1.0 | 2026-06-30 | 初始记录：任务收尾 Git 状态闸门、未跟踪文件归属、stash 清理和换行噪音处理规范 | Codex |

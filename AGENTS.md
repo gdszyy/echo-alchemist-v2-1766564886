@@ -166,6 +166,37 @@
    - 若发现旧状态与当前验收结论冲突，必须在同轮修正；若保留旧状态是有意的，必须在对应文档写明原因与下一步。
    - 任务总结必须列出所有 dirty 路径的提交归属或隔离建议，例如“随本批次提交”“属于并行改动，需单独提交/命名 stash”“历史改动，未处理”。不得只说“工作区 dirty”而不给归属。
 
+## 2.7 多 Codex 并行与 Worktree 隔离规范
+
+为避免多个 Codex / Agent 在同一个 checkout 中交叉写入，项目默认采用“一个需求一个隔离工作区”的并行策略。
+
+1. **默认隔离单位**
+   - 一个需求必须对应一个 `REQ-YYYYMMDD-short-slug`。
+   - 一个需求必须对应一个 `codex/<REQ-ID>` 分支。
+   - 一个需求必须优先使用一个独立 `git worktree`，例如：
+     ```powershell
+     git worktree add ..\echo-alchemist-REQ-20260701-example -b codex/REQ-20260701-example
+     ```
+   - 对应需求卡放在 `docs/work_items/active/<REQ-ID>.md`，临时产物放在 `tmp/codex/<REQ-ID>/`。
+
+2. **主 checkout 的职责**
+   - 根项目 checkout 优先作为集成、验收和清洁基线使用。
+   - 不得让多个并行 Codex 同时在根 checkout 中进行大范围代码、资源或文档修改。
+   - 如果根 checkout 已经存在历史 dirty 状态，新的 Codex 必须先创建需求卡并记录 dirty baseline；未经用户明确要求，不得直接清理、删除、reset 或混合提交。
+
+3. **遇到已有 dirty 状态时**
+   - 先执行 `git status --short --branch`、`git diff --name-status` 和 `git ls-files --others --exclude-standard` 做归属盘点。
+   - 若用户要求“把工作区变干净”，优先使用命名 stash 保护未知改动：
+     ```powershell
+     git stash push -u -m "codex-clean-worktree-YYYY-MM-DD-before-<slug>"
+     ```
+   - 清理后再在干净基线上执行当前需求，并在总结中说明 stash 名称、恢复命令和是否包含 untracked 文件。
+
+4. **提交边界**
+   - 禁止把多个 REQ、多个 Agent、多个资产批次混进同一个提交。
+   - 如果一个文件已被其他并行任务改脏，当前 Codex 必须先检查 diff，并在需求卡中说明是延续同一批次还是需要拆分。
+   - 自动索引、资产清单、TODO 和流程洞察只能随对应需求提交；不得为了“看起来干净”提交无归属文件。
+
 ## 3. 代码风格约定
 本项目采用原生 JavaScript (ES Modules) 架构。所有新编写或重构的代码必须遵循以下风格：
 *   **命名规范**：

@@ -1,6 +1,6 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年6月30日
+**最后更新：** 2026年7月1日
 
 **状态词口径：** `done` / `placeholder` / `contract-only` / `debt`。
 **当前药剂线 done：** C1 中断与覆盖边界、C4 spellContent 解析、C6 多节点嵌套 UI、Root Orb carrier、Tower 基础系统（阻挡/承伤/范围/冷却/生命周期/互斥/非法树拒绝）、共享嵌套校验、C8 炼金台 runtime fallback 资产 polish。
@@ -8,6 +8,17 @@
 **当前药剂线 debt：** Tower 专用资产与长期平衡、正式 PNG/chroma 美术替换。
 
 > 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
+
+---
+
+## 2026-07-01 多 Codex 并行与 Worktree 隔离入口
+
+为解决多个 Codex 并行导致根 checkout 长期 dirty 的问题，项目规范已补齐“一个需求一个隔离工作区”的硬约束：
+
+- [`AGENTS.md`](AGENTS.md) 第 2.7 节：每个并行需求默认分配 `REQ-YYYYMMDD-short-slug`、`codex/<REQ-ID>` 分支、独立 `git worktree`、需求卡和 `tmp/codex/<REQ-ID>/` 临时目录。
+- [`.cursor/rules/global.md`](.cursor/rules/global.md) 第 8 节：根 checkout 优先作为集成与验收基线；已有 dirty 状态必须先盘点、归属或命名 stash。
+- [`.cursor/rules/process_insights/PI-012_task_closeout_git_hygiene.md`](.cursor/rules/process_insights/PI-012_task_closeout_git_hygiene.md)：升版记录多 Codex 共用 checkout 的坑位、worktree 隔离流程和 stash 恢复注意事项。
+- 当前 2026-07-01 并行现场已用命名 stash `codex-clean-worktree-2026-07-01-before-governance` 保护，后续恢复请使用 `git stash apply 'stash@{0}'` 或先用 `git stash list` 确认编号。
 
 ---
 

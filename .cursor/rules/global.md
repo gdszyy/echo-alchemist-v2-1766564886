@@ -231,9 +231,16 @@ node tests/ai_test_runner.js --suite <目标套件>  ← Layer T3 自动化回�
 
 ## 8. 任务收尾与工作区清洁规范
 
-> 详细入口见 [`AGENTS.md`](../../AGENTS.md) 第 2.6 节；流程复盘见 [`process_insights/PI-012_task_closeout_git_hygiene.md`](process_insights/PI-012_task_closeout_git_hygiene.md)。
+> 详细入口见 [`AGENTS.md`](../../AGENTS.md) 第 2.6 / 2.7 节；流程复盘见 [`process_insights/PI-012_task_closeout_git_hygiene.md`](process_insights/PI-012_task_closeout_git_hygiene.md)。
 
 每个 Codex 任务结束前都必须把工作区状态解释清楚。项目允许任务产生代码、文档、资源和索引改动，但不允许遗留“没人认领”的脏状态。
+
+### 多 Codex 并行基线
+
+- 默认使用 `git worktree` 隔离并行需求，格式为“一个 `REQ`、一个 `codex/<REQ-ID>` 分支、一个 worktree、一个需求卡、一个 `tmp/codex/<REQ-ID>/` 临时目录”。
+- 根 checkout 优先作为集成、验收与清洁基线，不作为多个 Codex 并行写入的共享工作区。
+- 如果根 checkout 已经 dirty，新任务必须先记录 baseline 和 dirty 路径归属；用户要求清洁时，优先用命名 stash 保护未知改动，再在干净基线上执行当前需求。
+- 禁止把多个 REQ、多个 Agent、多个资产批次或未归属 auto index 变化混进同一个提交。
 
 ### 必做收尾步骤
 
