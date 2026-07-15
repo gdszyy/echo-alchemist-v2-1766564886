@@ -34,8 +34,16 @@ import { SoundManager, audio, _setAudioInstance } from './audio.js';
 // 导入暗黑炼金 Psytrance 实时音乐引擎（纯合成，复用 SoundManager 的 ctx）
 import { MusicEngine } from './music_engine.js';
 
-// 导入 clip_pack 运行时加载器（填充 window.CLIP_PACKS 复数注册表，供引擎 mined brain 按 boss 启用）
-import { loadClipPacks } from './music_clip_packs.js';
+// clip_pack 属于可选运行时增强。缺失时必须保留 legacy 音乐并允许核心游戏启动。
+async function loadClipPacks() {
+    try {
+        const loader = await import('./music_clip_packs.js');
+        return typeof loader.loadClipPacks === 'function' ? await loader.loadClipPacks() : false;
+    } catch (error) {
+        console.warn('[Core] clip_pack loader unavailable; using legacy music:', error);
+        return false;
+    }
+}
 
 // 导入拆分后的子系统
 import { game_system } from './game_system.js';

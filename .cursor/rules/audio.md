@@ -36,6 +36,12 @@ globs: ["src/audio.js", "src/core.js"]
   - 播放声音前无需手动判断初始化状态，代理层已处理静默失败。
   - 需要确保 `AudioContext` 处于 running 状态时，调用 `audio.resume()`。
 
+### 2.1 可选 clip-pack 启动边界
+
+- `music_clip_packs.js` 是 boss/mined-brain 的可选增强，不得成为 `core.js` 的静态启动依赖；文件缺失、下载失败或 loader 抛错时，必须回退 legacy 音乐且继续创建全局 `game`。
+- `core.js::loadClipPacks()` 通过受控动态 `import()` 加载并在内部捕获失败；不得把该调用改回顶层静态 import。
+- 浏览器启动烟测至少确认主菜单首次交互后 `game` 可用、试炼场可进入；clip-pack 缺失只允许产生 warning，不得产生阻断页面的 module fetch error。
+
 ## 3. 音效方法全览（18个）
 
 ### 3.1 基础与控制

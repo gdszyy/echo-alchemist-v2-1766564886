@@ -10,8 +10,9 @@
 
 ## 活跃洞察 (Active Insights)
 
-当前共有 **12** 条活跃洞察。
+当前共有 **13** 条活跃洞察。
 
+> **[2026-07-15 新增]** PI-014：可选运行时模块不得以顶层静态 import 阻断核心启动；记录受控动态 import、legacy fallback 与不借用其他 dirty checkout 未跟踪文件的门禁。
 > **[2026-07-01 更新]** PI-012 升版至 v1.1：补充多 Codex 共用 checkout 的坑位，默认使用 `git worktree` 做“一个 REQ 一个工作区”隔离；用户要求清洁时优先命名 stash 保护未知改动。
 > **[2026-06-30 新增]** PI-012：任务收尾与 Git 工作区清洁流程（每轮任务结束前必须检查 `git status --short --branch` / `git diff --check`，所有 modified / untracked 路径必须有归属，临时产物进入忽略目录或命名 stash）。
 > **[2026-06-26 新增]** PI-011：敌人基座词条与常规词条相性流程（基座专属词条不进普通随机池，预设 / 随机大型基座 / Boss 入场强化统一走 `normalizeEnemyAffixesForArchetype()`）。
@@ -44,6 +45,7 @@
 | PI-010 | PixiJS WebGL 渲染管线迁移流程与防坑指南 | v1.0 | render_system, particles, combat_system, spawn_system, game_phase, pixi_bridge, pixi_effect_adapter | 2026-06-25 | [PI-010_pixijs_webgl_rendering_migration.md](PI-010_pixijs_webgl_rendering_migration.md) |
 | PI-011 | 敌人基座词条与常规词条相性流程 | v1.0 | wave_presets, spawn_system, config, enemy_index | 2026-06-26 | [PI-011_enemy_base_affix_compatibility.md](PI-011_enemy_base_affix_compatibility.md) |
 | PI-012 | 任务收尾与 Git 工作区清洁流程 | v1.1 | AGENTS, global, git, workflow | 2026-07-01 | [PI-012_task_closeout_git_hygiene.md](PI-012_task_closeout_git_hygiene.md) |
+| PI-014 | 可选运行时模块启动边界 | v1.0 | core, audio, optional runtime assets, git worktree | 2026-07-15 | [PI-014_optional_runtime_import_boot.md](PI-014_optional_runtime_import_boot.md) |
 
 ### 按模块快速检索
 
@@ -57,7 +59,7 @@
 | `rune_launcher.js` | PI-002（activeRunewordEffects 数据结构）、PI-008（教程覆盖层遮挡 Tab 修复） |
 | `tutorial_system.js` | PI-008（教程 DOM z-index 竞争与临时隐藏方案） |
 | `ui_system.js` | PI-001（multicast 颜色顺序、setDeepValue 双重调用）、PI-007（命运抗决动态数量与纯净精华注入 UI）、PI-008（ui_updateUI 重新激活底层面板遮挡 Tab） |
-| `core.js` | PI-003（_subsystems 数组、组合模式）、PI-006（enemy:killed 只登记延迟奖励）、PI-007（选择态与双倍同化率运行态初始化） |
+| `core.js` | PI-003（_subsystems 数组、组合模式）、PI-006（enemy:killed 只登记延迟奖励）、PI-007（选择态与双倍同化率运行态初始化）、PI-014（可选模块动态加载与 legacy fallback） |
 | `config.js` | PI-004（CONFIG.performance 三档配置）、PI-007（混沌精华 / 纯净精华 / 同化倍率显式配置） |
 | `spawn_system.js` | PI-004（EnergyOrb 聚合优化）、PI-007（预览状态与纯净精华注入面板联动）、PI-010（粒子模式 Sprite 获取条件扩展） |
 | `wave_presets.js` / `spawn_system.js` | PI-011（基座专属词条随机池过滤、基座相性表、Boss 入场强化过滤） |
