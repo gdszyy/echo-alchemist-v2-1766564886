@@ -33,7 +33,7 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
  *   targetId: string|null,         // 高亮目标元素的 DOM id（null 表示无高亮）
  *   highlightSelector: string|null,// 优先使用的 CSS 选择器（覆盖 targetId）
  *   title: string,                 // 步骤标题
- *   content: string,               // 步骤说明文本（支持 HTML）
+ *   content: string|Function,      // 步骤说明文本，或按输入设备返回 HTML 的函数
  *   position: string,              // 提示卡片位置：'top' | 'bottom' | 'center'
  *   noOverlay: boolean,            // 是否禁用遮罩（研磨阶段等需要玩家直接操作）
  *   waitForEvent: string|null,     // 等待某个 EventBus 事件后才自动前进
@@ -75,7 +75,7 @@ const TUTORIAL_STEPS = [
             <p class="mt-2">每一局都是独立的旅程，你需要收集弹珠、击败敌人。</p>
             <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方高亮按鈕，教程自动继续</p>
         `,
-        position: 'bottom-fixed',
+        position: 'top',
         noOverlay: false,
         waitForEvent: 'tutorial:relic_shown',
         waitForEventFilter: null,
@@ -86,67 +86,28 @@ const TUTORIAL_STEPS = [
     // 遗物面板全屏显示，卡片固定在底部中央，避免遮挡遗物
     {
         id: 'relic_selection',
-        phase: 'relic',
+        phase: null, // 遗物是 overlay；首局底层 phase 仍为 meta。
         targetId: null,
         highlightSelector: null,
         title: '选择你的起始遗物',
-        content: `
+        content: ({ coarsePointer }) => `
             <p><strong>遗物</strong>是强力的被动增益道具，将贯穿整局游戏。</p>
-            <p class="mt-2">点击任意一个遗物卡片，即可选择并继续。</p>
+            <p class="mt-2">${coarsePointer
+                ? '轻触一张遗物卡可先预览详情，<strong>再次轻触</strong>即可确认选择。'
+                : '<strong>单击</strong>任意一张遗物卡即可确认选择。'}</p>
+            <p class="mt-2">确认后会自动开启<strong>杂色弹珠包</strong>，并直接进入研磨阶段。</p>
             <p class="mt-2 text-cyan-300/80 text-xs">💡 不同遗物组合可以产生强大的协同效果</p>
         `,
         position: 'bottom-fixed',   // 特殊值：固定在屏幕底部，不跟随高亮元素
         noOverlay: true,            // 不遮罩，让玩家能点击遗物
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
-        // [开局命运选择修复] 遗物选完后进入的是命运时刻选择阶段（chaos_essence），
-        // 此时 isFateMomentPhase() 返回 true，必须允许该条件通过才能推进到弹珠选择步骤。
-        waitForEventFilter: (data) => data && data.to === 'selection',
-        autoAdvance: true,
-        actionLabel: null,
-        actionFn: null,
-    },
-    // ── 第 3 步：弹珠选择 ──────────────────────────────────────────────────────────────────────────────────────
-    // 选中3枚弹珠后自动推进，无「下一步」按鈕
-    {
-        id: 'marble_selection',
-        phase: 'selection',
-        targetId: 'phase-selection',
-        highlightSelector: '#marble-selection-grid',
-        title: '选择你的弹珠',
-        content: `
-            <p><strong>弹珠</strong>是你的主要攻击单位，每种弹珠有独特的属性和技能。</p>
-            <p class="mt-2">选择 <strong>3 枚弹珠</strong>组成本局弹药库，选齐后教程自动继续。</p>
-            <p class="mt-2 text-cyan-300/80 text-xs">💡 点击弹珠可预览详细属性，再次点击选中</p>
-        `,
-        position: 'bottom',
-        noOverlay: false,
-        waitForEvent: 'tutorial:marbles_ready',
-        waitForEventFilter: null,
-        autoAdvance: true,
-        actionLabel: null,
-        actionFn: null,
-    },
-    // ── 第 4 步：确认选择 ──────────────────────────────────────────────────────────────────────────────────────
-    {
-        id: 'confirm_selection',
-        phase: 'selection',
-        targetId: 'phase-selection',
-        highlightSelector: '#confirm-selection-btn',
-        title: '确认选择，开始研磨！',
-        content: `
-            <p>选好 3 枚弹珠后，点击高亮的「<strong>開始練金</strong>」按鈕进入研磨阶段。</p>
-            <p class="mt-2">研磨阶段中，你的弹珠将在钉盘中弹跳，装载战斗子弹。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方按鈕，教程自动继续</p>
-        `,
-        position: 'top',
-        noOverlay: false,
-        waitForEvent: EVENT_TYPES.PHASE_CHANGED,
+        // 首局 resolver 在遗物后消费 marble_pack，并直接切入 gathering；不存在普通 selection。
         waitForEventFilter: (data) => data && data.to === 'gathering',
         autoAdvance: true,
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 5 步：研磨阶段说明 ─────────────────────────────────────────────────
+    // ── 第 3 步：研磨阶段说明 ─────────────────────────────────────────────────
     // 取消遮罩，让玩家能直接操作钉板
     {
         id: 'gathering_intro',
@@ -155,7 +116,7 @@ const TUTORIAL_STEPS = [
         highlightSelector: null,
         title: '研磨阶段',
         content: `
-            <p>点击<strong>钉板上方区域</strong>投入弹珠，让它在钉盘中弹跳。</p>
+            <p>点击画布<strong>上方约 85% 的研磨区域</strong>投入弹珠，让它在钉盘中弹跳。</p>
             <p class="mt-2">每枚弹珠会根据碰撞到的钉子属性，<strong>装载对应的子弹效果</strong>。</p>
             <p class="mt-2"><strong>💡 提示：左右倾斜手机可以让弹珠向左或向右移动。</strong></p>
             <p class="mt-2">三枚弹珠全部装载完毕后，自动进入<strong>战斗阶段</strong>！</p>
@@ -169,7 +130,7 @@ const TUTORIAL_STEPS = [
         actionLabel: null,          // 纯等待玩家投入弹珠
         actionFn: null,
     },
-    // ── 第 6 步：战斗阶段 ─────────────────────────────────────────────────────
+    // ── 第 4 步：战斗阶段 ─────────────────────────────────────────────────────
     // noOverlay: true  → 不遮挡界面，玩家可直接操作
     // position: 'bottom-fixed' → 固定在底部，不遮挡战斗区域
     // waitForEvent: UI_AMMO_FIRED → 等玩家真正发射一颗子弹后自动推进
@@ -194,7 +155,7 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 7 步：教程完成 ─────────────────────────────────────────────────────
+    // ── 第 5 步：教程完成 ─────────────────────────────────────────────────────
     {
         id: 'tutorial_complete',
         phase: null,
@@ -225,6 +186,10 @@ export const tutorial_system = {
     _tutorialOverlayEl: null,
     _tutorialCardEl: null,
     _tutorialHighlightEl: null,
+    _tutorialStartCancel: null,
+    _tutorialPendingStartUnsubscribe: null,
+    _tutorialStartEpoch: 0,
+    _tutorialStepEpoch: 0,
 
     // ==================== 公开 API ====================
 
@@ -233,9 +198,8 @@ export const tutorial_system = {
      * @description 检查是否需要触发新手教程（首次游玩时自动调用）。
      */
     tutorial_checkAndStart() {
-        if (!this.saveData.tutorialCompleted) {
-            setTimeout(() => this.tutorial_start(), 800);
-        }
+        if (this.saveData?.tutorialCompleted === true) return;
+        this._tutorial_scheduleStart();
     },
 
     /**
@@ -245,7 +209,9 @@ export const tutorial_system = {
      * 主页「重新开始教程」按钮请调用 tutorial_restartFromHome()。
      */
     tutorial_start() {
-        if (this._tutorialActive) this.tutorial_end(false);
+        this._tutorial_cancelPendingStart();
+        if (this.saveData?.tutorialCompleted === true || this.phase !== 'meta') return;
+        if (this._tutorialActive) this.tutorial_end();
         this._tutorialActive = true;
         this._tutorialStepIndex = 0;
         // [爽游模式] 标记当前局为新手教程专属爽游局
@@ -262,7 +228,7 @@ export const tutorial_system = {
      */
     tutorial_restartFromHome() {
         // 1. 若当前有正在进行的教程，先清理
-        this.tutorial_end(false);
+        this.tutorial_end();
         // 2. 重置「教程已完成」标志，使教程可以重新触发
         this.saveData.tutorialCompleted = false;
         this.sys_saveData();
@@ -270,27 +236,31 @@ export const tutorial_system = {
         this.sys_clearRunState();
         // 4. 切换到主页（meta 阶段），确保教程从主页流程开始
         this.phase_switchPhase('meta');
-        // 5. 延迟启动教程（等待 meta 阶段 DOM 渲染完成）
-        // [BUGFIX] 增加安全性检查，防止多次点击导致重复启动
-        if (this._restartTimer) clearTimeout(this._restartTimer);
-        this._restartTimer = setTimeout(() => {
-            this.tutorial_start();
-            this._restartTimer = null;
-        }, 400);
+        // 5. 下一次绘制启动；重复重开、跳过或离开 meta 都会取消这次调度。
+        this._tutorial_scheduleStart();
     },
 
     /**
      * @method tutorial_end
      * @description 结束教程。
-     * @param {boolean} [markCompleted=true]
      */
-    tutorial_end(markCompleted = true) {
+    tutorial_end() {
         this._tutorialActive = false;
+        this._tutorial_cancelPendingStart();
         this._tutorial_cleanupListeners();
         this._tutorial_removeDOM();
         // [爽游模式] 注意：_isTutorialRun 不在此处清除，而是在 sys_resetGame 中清除
         // 这样可以确保整个 5 回合内爽游配置持续生效，不因教程卡片关闭而失效
-        if (markCompleted) {
+    },
+
+    /**
+     * @method tutorial_complete
+     * @description 教程完成/跳过的唯一持久化入口；重复调用不会重复写存档。
+     */
+    tutorial_complete() {
+        const shouldPersist = this.saveData?.tutorialCompleted !== true;
+        this.tutorial_end();
+        if (shouldPersist) {
             this.saveData.tutorialCompleted = true;
             this.sys_saveData();
         }
@@ -304,7 +274,7 @@ export const tutorial_system = {
         if (!this._tutorialActive) return;
         const nextIndex = this._tutorialStepIndex + 1;
         if (nextIndex >= TUTORIAL_STEPS.length) {
-            this.tutorial_end(true);
+            this.tutorial_complete();
             return;
         }
         this._tutorial_showStep(nextIndex);
@@ -315,10 +285,59 @@ export const tutorial_system = {
      * @description 跳过全部教程。
      */
     tutorial_skipAll() {
-        this.tutorial_end(true);
+        this.tutorial_complete();
     },
 
     // ==================== 内部方法 ====================
+
+    /**
+     * @method _tutorial_scheduleStart
+     * @description 在下一次绘制启动教程，并持有可取消句柄与 phase 失效监听。
+     * @private
+     */
+    _tutorial_scheduleStart() {
+        this._tutorial_cancelPendingStart();
+        if (this.saveData?.tutorialCompleted === true || this._tutorialActive || this.phase !== 'meta') return;
+
+        const startEpoch = this._tutorialStartEpoch;
+        this._tutorialPendingStartUnsubscribe = eventBus.on(EVENT_TYPES.PHASE_CHANGED, (data) => {
+            if (!data || data.to !== 'meta') this._tutorial_cancelPendingStart();
+        });
+
+        const runStart = () => {
+            if (startEpoch !== this._tutorialStartEpoch) return;
+            this._tutorialStartCancel = null;
+            const unsubscribe = this._tutorialPendingStartUnsubscribe;
+            this._tutorialPendingStartUnsubscribe = null;
+            if (unsubscribe) unsubscribe();
+            if (this.saveData?.tutorialCompleted === true || this._tutorialActive || this.phase !== 'meta') return;
+            this.tutorial_start();
+        };
+
+        if (typeof requestAnimationFrame === 'function') {
+            const frameId = requestAnimationFrame(runStart);
+            this._tutorialStartCancel = () => cancelAnimationFrame(frameId);
+        } else {
+            const timerId = setTimeout(runStart, 0);
+            this._tutorialStartCancel = () => clearTimeout(timerId);
+        }
+    },
+
+    /**
+     * @method _tutorial_cancelPendingStart
+     * @description 取消尚未运行的教程启动调度及其 phase 监听。
+     * @private
+     */
+    _tutorial_cancelPendingStart() {
+        this._tutorialStartEpoch = (this._tutorialStartEpoch || 0) + 1;
+        const cancel = this._tutorialStartCancel;
+        this._tutorialStartCancel = null;
+        if (cancel) cancel();
+
+        const unsubscribe = this._tutorialPendingStartUnsubscribe;
+        this._tutorialPendingStartUnsubscribe = null;
+        if (unsubscribe) unsubscribe();
+    },
 
     /**
      * @method _tutorial_createDOM
@@ -453,11 +472,11 @@ export const tutorial_system = {
      * @private
      */
     _tutorial_showStep(index) {
-        this._tutorialStepIndex = index;
         const step = TUTORIAL_STEPS[index];
         if (!step) return;
 
         this._tutorial_cleanupListeners();
+        this._tutorialStepIndex = index;
         // 移除上一步可能残留的钉盘引导框
         const oldGuide = document.getElementById('tutorial-launch-guide');
         if (oldGuide) oldGuide.remove();
@@ -479,14 +498,14 @@ export const tutorial_system = {
     /**
      * @method _tutorial_createLaunchGuide
      * @description 在钉盘顶部创建动态引导框，提示玩家点击上方区域投入弹珠。
-     * 引导框占据 canvas 高度的上 40%（与游戏内部发射判断逻辑一致）。
+     * 引导框占据 canvas 高度的上 85%（与 gathering 输入判断一致）。
      * @private
      */
     _tutorial_createLaunchGuide() {
         const canvas = document.querySelector('canvas');
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
-        const guideH = rect.height * 0.4;
+        const guideH = rect.height * 0.85;
 
         const guide = document.createElement('div');
         guide.id = 'tutorial-launch-guide';
@@ -573,7 +592,7 @@ export const tutorial_system = {
         if (titleEl) titleEl.textContent = step.title;
 
         const contentEl = document.getElementById('tutorial-content');
-        if (contentEl) contentEl.innerHTML = step.content;
+        if (contentEl) contentEl.innerHTML = this._tutorial_resolveContent(step);
 
         const nextBtn = document.getElementById('tutorial-next-btn');
         if (!nextBtn) return;
@@ -590,7 +609,7 @@ export const tutorial_system = {
             nextBtn.textContent = '开始游戏 🎮';
             nextBtn.style.background = 'linear-gradient(135deg, #059669, #10b981)';
             nextBtn.style.display = 'inline-block';
-            nextBtn.onclick = () => this.tutorial_end(true);
+            nextBtn.onclick = () => this.tutorial_complete();
 
         } else if (step.actionLabel) {
             // 需要玩家操作游戏：显示操作提示按钮
@@ -641,6 +660,22 @@ export const tutorial_system = {
             const waitHint = document.getElementById('tutorial-wait-hint');
             if (waitHint) waitHint.remove();
         }
+    },
+
+    /**
+     * @method _tutorial_resolveContent
+     * @description 根据当前输入设备解析步骤文案。
+     * @private
+     */
+    _tutorial_resolveContent(step) {
+        if (!step) return '';
+        const coarsePointer = typeof window !== 'undefined'
+            && typeof window.matchMedia === 'function'
+            && window.matchMedia('(pointer: coarse)').matches;
+        const content = typeof step.content === 'function'
+            ? step.content({ coarsePointer })
+            : step.content;
+        return typeof content === 'string' ? content : '';
     },
 
     /**
@@ -768,11 +803,9 @@ export const tutorial_system = {
      * @description 注册等待 EventBus 事件的监听器。
      * @private
      */
-    _tutorial_isStandardSelectionPhase() {
-        return !window.game || typeof game.ui_isFateMomentPhase !== 'function' || !game.ui_isFateMomentPhase();
-    },
-
     _tutorial_registerWaitEvent(step) {
+        const stepEpoch = this._tutorialStepEpoch;
+        const stepIndex = this._tutorialStepIndex;
         const unsubscribe = eventBus.on(step.waitForEvent, (data) => {
             if (step.waitForEventFilter && !step.waitForEventFilter(data)) return;
 
@@ -780,9 +813,12 @@ export const tutorial_system = {
             this._tutorialUnsubscribers = this._tutorialUnsubscribers.filter(fn => fn !== unsubscribe);
 
             if (step.autoAdvance) {
-                setTimeout(() => {
-                    if (this._tutorialActive) this.tutorial_nextStep();
-                }, 600);
+                // 事件命中后立即切步，先注册下一步监听，避免固定延迟漏掉紧随其后的 phase 事件。
+                if (this._tutorialActive
+                    && this._tutorialStepEpoch === stepEpoch
+                    && this._tutorialStepIndex === stepIndex) {
+                    this.tutorial_nextStep();
+                }
             } else {
                 const nextBtn = document.getElementById('tutorial-next-btn');
                 if (nextBtn) {
@@ -802,6 +838,7 @@ export const tutorial_system = {
      * @private
      */
     _tutorial_cleanupListeners() {
+        this._tutorialStepEpoch = (this._tutorialStepEpoch || 0) + 1;
         this._tutorialUnsubscribers.forEach(fn => {
             try { fn(); } catch (e) { /* ignore */ }
         });
