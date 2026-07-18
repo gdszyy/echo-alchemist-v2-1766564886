@@ -69,12 +69,92 @@ export const rune_launcher_system = {
 
     // ==================== 符文发射器 UI ====================
 
+    _ui_getDialogFocusable(container) {
+        if (!container || typeof container.querySelectorAll !== 'function') return [];
+        const selector = [
+            'button:not([disabled])',
+            '[href]',
+            'input:not([disabled])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])',
+        ].join(',');
+        return Array.from(container.querySelectorAll(selector)).filter(el => (
+            !el.disabled
+            && el.getAttribute?.('aria-hidden') !== 'true'
+            && !el.closest?.('.hidden')
+        ));
+    },
+
+    _ui_trapDialogFocus(container, event) {
+        if (!event || event.key !== 'Tab') return false;
+        const focusable = this._ui_getDialogFocusable(container);
+        if (focusable.length <= 0) {
+            event.preventDefault();
+            container?.focus?.();
+            return true;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement;
+        if (event.shiftKey && (active === first || !container.contains(active))) {
+            event.preventDefault();
+            last.focus();
+            return true;
+        }
+        if (!event.shiftKey && (active === last || !container.contains(active))) {
+            event.preventDefault();
+            first.focus();
+            return true;
+        }
+        return false;
+    },
+
+    _ui_focusFirstDialogControl(container) {
+        const first = this._ui_getDialogFocusable(container)[0];
+        (first || container)?.focus?.();
+    },
+
+    _ui_releaseRuneLauncherPauseLease() {
+        if (this._runeLauncherPauseToken == null || typeof this.sys_releasePauseLease !== 'function') {
+            return false;
+        }
+        const token = this._runeLauncherPauseToken;
+        this.sys_releasePauseLease(token);
+        this._runeLauncherPauseToken = null;
+        return true;
+    },
+
+    _ui_applyRuneLauncherSemantics(panel, isPCMode) {
+        if (!panel) return;
+        panel.setAttribute('aria-label', '炼金台与符文配置');
+        panel.setAttribute('aria-hidden', 'false');
+        panel.tabIndex = -1;
+        if (isPCMode) {
+            panel.setAttribute('role', 'region');
+            panel.removeAttribute('aria-modal');
+            return;
+        }
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+    },
+
     /**
      * 打开符文发射器面板
      */
     ui_openRuneLauncher() {
         const panel = document.getElementById('phase-rune-launcher');
-        const isPCMode = document.body.classList.contains('pc-mode');
+        const isPCMode = document.body.classList.contains('pc-mode')
+            || (typeof window !== 'undefined' && window.innerWidth > 1024);
+        if (panel && !isPCMode && !panel.contains(document.activeElement)) {
+            this._runeLauncherReturnFocus = document.activeElement;
+        }
+        if (isPCMode) {
+            this._ui_releaseRuneLauncherPauseLease();
+        } else if (panel && this._runeLauncherPauseToken == null && typeof this.sys_acquirePauseLease === 'function') {
+            const token = this.sys_acquirePauseLease('rune_launcher');
+            if (token != null) this._runeLauncherPauseToken = token;
+        }
         // [DEBUG-LOG] 每次点击时记录 phase-rune-launcher 面板的完整状态快照
         {
             const _rect = panel ? panel.getBoundingClientRect() : null;
@@ -101,6 +181,50 @@ export const rune_launcher_system = {
         }
 
         if (panel) {
+            this._ui_applyRuneLauncherSemantics(panel, isPCMode);
+            const closeButton = panel.querySelector('.rune-launcher-close-btn');
+            closeButton?.setAttribute('aria-label', '关闭炼金台');
+            panel._runeLauncherDialogOwner = this;
+            if (!panel._runeLauncherDialogBound) {
+                panel.addEventListener('keydown', event => {
+                    const owner = panel._runeLauncherDialogOwner;
+                    if (!owner) return;
+                    if (document.body.classList.contains('pc-mode') || window.innerWidth > 1024) return;
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const picker = document.getElementById('rune-picker-overlay');
+                        if (picker && !picker.classList.contains('hidden')) owner.ui_closeRunePicker();
+                        else owner.ui_closeRuneLauncher();
+                        return;
+                    }
+                    owner._ui_trapDialogFocus(panel, event);
+                });
+                panel._runeLauncherDialogBound = true;
+            }
+            if (!panel._runeLauncherViewportBound
+                && typeof window !== 'undefined'
+                && typeof window.addEventListener === 'function') {
+                window.addEventListener('resize', () => {
+                    const owner = panel._runeLauncherDialogOwner;
+                    // 与 ui_updatePCLayout() 使用同一断点，避免依赖 resize 监听器的注册顺序。
+                    const nowPCMode = window.innerWidth > 1024;
+                    if (!owner) return;
+                    if (!nowPCMode) {
+                        if (panel.getAttribute('role') === 'region') {
+                            panel.style.display = 'none';
+                            panel.setAttribute('aria-hidden', 'true');
+                        }
+                        return;
+                    }
+                    owner._ui_releaseRuneLauncherPauseLease();
+                    owner._ui_applyRuneLauncherSemantics(panel, true);
+                    const returnFocus = owner._runeLauncherReturnFocus;
+                    owner._runeLauncherReturnFocus = null;
+                    if (returnFocus?.isConnected !== false) returnFocus?.focus?.();
+                }, { passive: true });
+                panel._runeLauncherViewportBound = true;
+            }
             if (isPCMode) {
                 // PC 模式：面板已常驻在右侧边栏，不需要修改 display
                 // 仅刷新内容即可
@@ -111,14 +235,14 @@ export const rune_launcher_system = {
                 // 打开面板时必须显式恢复为 auto，否则面板内所有按钮和 Tab 均无法点击。
                 panel.style.pointerEvents = 'auto';
                 // [BUGFIX 第二道防线] 在面板上拦截 touchmove 事件，防止触摸滑动穿透到底层 Canvas。
-                // 使用 capture 阶段监听，确保在任何子元素处理之前先执行拦截。
+                // 在冒泡阶段截断，既让选项先识别 touchmove 取消，也不让事件穿透到 window/Canvas。
                 // 仅在首次打开时绑定一次（通过 dataset 标记防止重复绑定）。
                 if (!panel._touchMoveGuardBound) {
                     panel.addEventListener('touchmove', (e) => {
                         // 允许面板内部的滚动容器正常滚动（overflow-y: auto 的元素）
                         // 但阻止事件冒泡到 window，防止被 canvas 的 touchmove 处理器捕获
                         e.stopPropagation();
-                    }, { passive: true, capture: true });
+                    }, { passive: true });
                     panel._touchMoveGuardBound = true;
                 }
             }
@@ -146,6 +270,7 @@ export const rune_launcher_system = {
         this.ui_updateRuneGrid();
         // 关闭气泡提示（玩家已进入发射器）
         this._ui_hideRunewordBubble();
+        if (panel && !isPCMode) this._ui_focusFirstDialogControl(panel);
         // 首次打开时显示内部引导教学（移动端不影响 PC 端常驻）
         // [ARCHIVED] 教程功能暂时禁用，如需恢复请取消下方注释
         // if (!isPCMode && this.saveData && !this.saveData.runeLauncherTourDone) {
@@ -165,6 +290,19 @@ export const rune_launcher_system = {
                 ? this.meta_getResourceCount('rune_fragments')
                 : (this.saveData && this.saveData.runeFragments ? this.saveData.runeFragments : 0);
             el.textContent = fragments.toLocaleString();
+            const display = document.getElementById('launcher-shard-display');
+            if (display) {
+                let scopeLabel = document.getElementById('launcher-shard-scope-label');
+                if (!scopeLabel) {
+                    scopeLabel = document.createElement('span');
+                    scopeLabel.id = 'launcher-shard-scope-label';
+                    scopeLabel.className = 'text-[9px] text-purple-200/70 ml-1 whitespace-nowrap';
+                    display.appendChild(scopeLabel);
+                }
+                scopeLabel.textContent = '局外符文碎片';
+                display.setAttribute('aria-label', `局外符文碎片，跨局保留，当前 ${fragments}`);
+                display.title = '局外符文碎片：跨局保留，可用于永久成长';
+            }
         }
     },
 
@@ -181,7 +319,9 @@ export const rune_launcher_system = {
         }
         // [BUGFIX] 关闭时先清理内部蒙层和教学层，防止残留
         const pickerOverlay = document.getElementById('rune-picker-overlay');
-        if (pickerOverlay) pickerOverlay.classList.add('hidden');
+        if (pickerOverlay && !pickerOverlay.classList.contains('hidden')) {
+            this.ui_closeRunePicker({ restoreFocus: false });
+        }
         const tourOverlay = document.getElementById('rune-launcher-tour-overlay');
         if (tourOverlay) {
             tourOverlay.remove();
@@ -201,13 +341,21 @@ export const rune_launcher_system = {
         }
         const panel = document.getElementById('phase-rune-launcher');
         if (panel) {
-            const isPCMode = document.body.classList.contains('pc-mode');
+            const isPCMode = document.body.classList.contains('pc-mode')
+                || (typeof window !== 'undefined' && window.innerWidth > 1024);
             if (!isPCMode) {
                 // 移动端模式：隐藏全屏覆盖层
                 panel.style.display = 'none';
+                panel.setAttribute('aria-hidden', 'true');
+            } else {
+                this._ui_applyRuneLauncherSemantics(panel, true);
             }
             // PC 模式：面板常驻在右侧边栏，不隐藏
         }
+        this._ui_releaseRuneLauncherPauseLease();
+        const returnFocus = this._runeLauncherReturnFocus;
+        this._runeLauncherReturnFocus = null;
+        if (returnFocus?.isConnected !== false) returnFocus?.focus?.();
         return true;
     },
 
@@ -215,10 +363,16 @@ export const rune_launcher_system = {
     /**
      * 关闭符文选择弹出层
      */
-    ui_closeRunePicker() {
+    ui_closeRunePicker(options = {}) {
         const overlay = document.getElementById('rune-picker-overlay');
-        if (overlay) overlay.classList.add('hidden');
+        if (overlay) {
+            overlay.classList.add('hidden');
+            overlay.setAttribute('aria-hidden', 'true');
+        }
         this._pendingRuneGridIndex = null;
+        const returnFocus = this._runePickerReturnFocus;
+        this._runePickerReturnFocus = null;
+        if (options.restoreFocus !== false && returnFocus?.isConnected !== false) returnFocus?.focus?.();
     },
 
 
@@ -238,6 +392,9 @@ export const rune_launcher_system = {
             cell.id = `rune-cell-${i}`;
             cell.dataset.index = i;
             cell.dataset.state = 'idle'; // [bitmap-rune-grid] CSS 用 [data-state] 切换 idle/hover/filled 位图
+            cell.setAttribute('role', 'button');
+            cell.setAttribute('aria-label', `符文配置格 ${i + 1}`);
+            cell.tabIndex = 0;
             cell.className = [
                 'rune-grid-cell',
                 'w-16 h-16 flex items-center justify-center',
@@ -246,7 +403,7 @@ export const rune_launcher_system = {
                 'text-2xl',
             ].join(' ');
 
-            cell.addEventListener('click', () => {
+            const activateCell = () => {
                 const runeEntry = this.runeGrid[i];  // [Mixin 正常用法：读取 Game 实例状态]
                 if (runeEntry) {
                     // 已有符文：移除并放回库存（保留对象格式）
@@ -273,6 +430,12 @@ export const rune_launcher_system = {
                     this._pendingRuneGridIndex = i;
                     this.ui_openRunePicker(i);
                 }
+            };
+            cell.addEventListener('click', activateCell);
+            cell.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                activateCell();
             });
 
             container.appendChild(cell);
@@ -299,6 +462,31 @@ export const rune_launcher_system = {
         const tooltip = document.getElementById('runeword-preview-tooltip');
         const tooltipContent = document.getElementById('runeword-preview-content');
         if (!overlay || !list) return;
+
+        if (!overlay.contains(document.activeElement)) {
+            this._runePickerReturnFocus = document.activeElement;
+        }
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', `选择符文放入第 ${cellIndex + 1} 格`);
+        overlay.setAttribute('aria-hidden', 'false');
+        overlay.tabIndex = -1;
+        overlay._runePickerDialogOwner = this;
+        if (!overlay._runePickerDialogBound) {
+            overlay.addEventListener('keydown', event => {
+                const owner = overlay._runePickerDialogOwner;
+                if (!owner) return;
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    owner.ui_closeRunePicker();
+                    return;
+                }
+                owner._ui_trapDialogFocus(overlay, event);
+            });
+            overlay._runePickerDialogBound = true;
+        }
+        if (tooltip) tooltip.setAttribute('role', 'tooltip');
 
         list.innerHTML = '';
         if (detail) detail.innerHTML = '';
@@ -384,6 +572,12 @@ export const rune_launcher_system = {
 
             // --- 交互逻辑 ---
             let longPressTimer = null;
+            let didLongPress = false;
+            let pressCancelled = false;
+            let pressStartX = null;
+            let pressStartY = null;
+            let suppressClick = false;
+            let suppressClickTimer = null;
 
             const handleSelect = () => {
                 const removeIdx = this.runeInventory.indexOf(runeEntry);
@@ -391,8 +585,11 @@ export const rune_launcher_system = {
                     this.runeInventory.splice(removeIdx, 1);
                 }
                 this.runeGrid[cellIndex] = runeEntry;
-                this.ui_closeRunePicker();
+                this.ui_closeRunePicker({ restoreFocus: false });
                 this.ui_updateRuneGrid();
+                const refreshedCell = document.getElementById(`rune-cell-${cellIndex}`);
+                (refreshedCell || this._runePickerReturnFocus)?.focus?.();
+                this._runePickerReturnFocus = null;
                 // @section:rune_picker_place_audio - 符文从选择器放入格子的确认音效（600Hz）
                 audio.playTone(600, 'sine', 0.1, 0.2);
             };
@@ -416,40 +613,87 @@ export const rune_launcher_system = {
             };
 
             // 鼠标/触摸事件处理
-            const startPress = (e) => {
-                longPressTimer = setTimeout(showPreview, 500);
+            const startPress = (touch = null) => {
+                if (longPressTimer) clearTimeout(longPressTimer);
+                didLongPress = false;
+                pressCancelled = false;
+                pressStartX = Number.isFinite(touch?.clientX) ? touch.clientX : null;
+                pressStartY = Number.isFinite(touch?.clientY) ? touch.clientY : null;
+                longPressTimer = setTimeout(() => {
+                    longPressTimer = null;
+                    if (pressCancelled) return;
+                    didLongPress = true;
+                    showPreview();
+                }, 500);
             };
-            const endPress = (e) => {
+            const endPress = () => {
                 if (longPressTimer) {
                     clearTimeout(longPressTimer);
                     longPressTimer = null;
                 }
                 hidePreview();
+                pressStartX = null;
+                pressStartY = null;
+            };
+
+            const suppressSyntheticClick = () => {
+                suppressClick = true;
+                if (suppressClickTimer) clearTimeout(suppressClickTimer);
+                suppressClickTimer = setTimeout(() => {
+                    suppressClick = false;
+                    suppressClickTimer = null;
+                }, 800);
             };
 
             btn.addEventListener('mousedown', startPress);
             btn.addEventListener('mouseenter', () => renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn));
             btn.addEventListener('focus', () => renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn));
-            btn.addEventListener('mouseup', endPress);
-            btn.addEventListener('mouseleave', endPress);
+            btn.addEventListener('mouseup', () => {
+                if (didLongPress) suppressSyntheticClick();
+                endPress();
+            });
+            btn.addEventListener('mouseleave', () => {
+                pressCancelled = true;
+                endPress();
+            });
             btn.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // 防止触发 click
                 renderPickerDetail(runeEntry, runeDef, runeLevel, newRunewords, btn);
-                startPress(e);
-            }, { passive: false });
+                startPress(e.touches?.[0] || e.changedTouches?.[0] || null);
+            }, { passive: true });
+            btn.addEventListener('touchmove', (e) => {
+                const touch = e.touches?.[0] || e.changedTouches?.[0];
+                if (!touch || pressStartX == null || pressStartY == null) return;
+                const moved = Math.hypot(touch.clientX - pressStartX, touch.clientY - pressStartY);
+                if (moved < 10) return;
+                pressCancelled = true;
+                endPress();
+                suppressSyntheticClick();
+            }, { passive: true });
             btn.addEventListener('touchend', (e) => {
-                endPress(e);
-                // 如果没有触发长按（tooltip 还是隐藏的），则视为点击
-                if (tooltip && tooltip.classList.contains('hidden')) {
-                    handleSelect();
-                }
+                const shouldSelect = !pressCancelled && !didLongPress;
+                if (shouldSelect) e.preventDefault();
+                endPress();
+                suppressSyntheticClick();
+                if (shouldSelect) handleSelect();
+            }, { passive: false });
+            btn.addEventListener('touchcancel', () => {
+                pressCancelled = true;
+                endPress();
+                suppressSyntheticClick();
+            }, { passive: true });
+            btn.addEventListener('pointercancel', () => {
+                pressCancelled = true;
+                endPress();
+                suppressSyntheticClick();
             });
 
             btn.addEventListener('click', (e) => {
-                // 只有非触摸设备才在这里处理点击
-                if (e.pointerType !== 'touch') {
-                    handleSelect();
+                if (suppressClick) {
+                    suppressClick = false;
+                    e.preventDefault();
+                    return;
                 }
+                handleSelect();
             });
 
             list.appendChild(btn);
@@ -466,6 +710,7 @@ export const rune_launcher_system = {
         }
 
         overlay.classList.remove('hidden');
+        this._ui_focusFirstDialogControl(overlay);
     },
 
 
@@ -1128,7 +1373,7 @@ export const rune_launcher_system = {
             }
 
             this._ui_showRuneActionResult(
-                `⚗️ 合成成功！获得 ${runeName} Lv.${mergedLevel}，+${shardReward} 🔮 符文碎片`,
+                `⚗️ 合成成功！获得 ${runeName} Lv.${mergedLevel}，+${shardReward} 🔮 局外符文碎片`,
                 'success'
             );
             // @section:rune_merge_audio - 符文合成成功音效（880Hz 较响，强调成功感）
@@ -1469,7 +1714,7 @@ export const rune_launcher_system = {
             const collapse = !!draft.root && contentResult.status !== 'pending';
             return {
                 success: false,
-                reason: contentResult.reason || `未形成稳定结构。确认后会消耗符文并返还 ${refund} 局内碎片。`,
+                reason: contentResult.reason || `未形成稳定结构。确认后会消耗符文并返还 ${refund} 局内碎片（仅本局）。`,
                 refund,
                 elements,
                 levelSum,
@@ -1697,7 +1942,7 @@ export const rune_launcher_system = {
             manual: '放弃本次炼成？',
         };
         const prefix = prefixMap[context] || prefixMap.manual;
-        return `${prefix} 已投入符文不会返还，只按失败规则返还局内碎片。确认继续？`;
+        return `${prefix} 已投入符文不会返还，只按失败规则返还局内碎片（仅本局）。确认继续？`;
     },
 
     _ui_abortPotionAlchemyDraft(context = 'manual') {
@@ -1717,8 +1962,8 @@ export const rune_launcher_system = {
             consumedRunes: ledgerRunes.length,
         });
         this.potionRecipeHistory = this.potionRecipeHistory.slice(-10);
-        this._ui_showPotionActionResult(`炼成中断，返还 ${refund} 局内碎片；已投入符文不返还`, 'error');
-        showToast(`炼成中断，返还 ${refund} 局内碎片；符文不返还。`);
+        this._ui_showPotionActionResult(`炼成中断，返还 ${refund} 局内碎片（仅本局）；已投入符文不返还`, 'error');
+        showToast(`炼成中断，返还 ${refund} 局内碎片（仅本局）；符文不返还。`);
         this._ui_resetPotionAlchemyDraft();
         this._ui_renderPotionAlchemyInventory();
         this._ui_updatePotionAlchemyPreview();
@@ -1899,9 +2144,11 @@ export const rune_launcher_system = {
         this.runeInventory.forEach((runeEntry, idx) => {
             const info = this._ui_getPotionRuneEntry(idx);
             if (!info) return;
-            const card = document.createElement('div');
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.setAttribute('aria-label', `投入 ${info.def.name} Lv.${info.level}，符文投入后不可撤回`);
             card.className = [
-                'rune-list-card cursor-pointer select-none',
+                'rune-list-card w-full cursor-pointer select-none text-left',
             ].join(' ');
             card.innerHTML = `
                 <div class="rune-list-card__icon" style="font-size:22px;">${_ui_buildRuneIconHTML(info.def, info.level)}</div>
@@ -1916,6 +2163,19 @@ export const rune_launcher_system = {
             });
             container.appendChild(card);
         });
+    },
+
+    ui_continuePotionAlchemy() {
+        const inventory = document.getElementById('potion-rune-inventory');
+        const nextRune = inventory?.querySelector('button:not([disabled])');
+        if (!nextRune) {
+            showToast('库存中没有可继续投入的符文。');
+            return false;
+        }
+        nextRune.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+        nextRune.focus?.();
+        showToast('请选择下一枚符文继续投料；投入后不可撤回。');
+        return true;
     },
 
     /**
@@ -1983,6 +2243,24 @@ export const rune_launcher_system = {
         const preview = document.getElementById('potion-preview-card');
         const confirmBtn = document.getElementById('potion-confirm-btn');
         if (!preview || !confirmBtn) return;
+        let continueBtn = document.getElementById('potion-continue-btn');
+        if (!continueBtn) {
+            continueBtn = document.createElement('button');
+            continueBtn.id = 'potion-continue-btn';
+            continueBtn.type = 'button';
+            continueBtn.textContent = '继续投料（选择符文）';
+            continueBtn.className = 'hidden w-full mt-2 py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/80 text-amber-200 border border-amber-500/40 hover:bg-slate-700/80 cursor-pointer transition-all duration-200';
+            continueBtn.setAttribute('aria-controls', 'potion-rune-inventory');
+            continueBtn.addEventListener('click', () => this.ui_continuePotionAlchemy());
+            confirmBtn.parentElement?.appendChild(continueBtn);
+        }
+        const setContinueVisible = visible => {
+            if (visible) continueBtn.classList.remove('hidden');
+            else continueBtn.classList.add('hidden');
+            continueBtn.disabled = !visible;
+            continueBtn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        };
+        setContinueVisible(false);
         const draftRunes = this._ui_getPotionDraftRunes();
         const draft = this._ui_getPotionAlchemyDraft();
         const result = draftRunes.length > 0
@@ -2014,6 +2292,7 @@ export const rune_launcher_system = {
             confirmBtn.disabled = false;
             confirmBtn.className = 'w-full py-2 px-3 rounded-xl text-sm font-bold bg-emerald-700/70 text-emerald-100 border border-emerald-400/60 hover:bg-emerald-600/80 cursor-pointer transition-all duration-200 shadow-[0_0_8px_rgba(16,185,129,0.25)]';
             confirmBtn.textContent = this.preparedPotionSpell ? '手动接触并覆盖旧药剂' : '手动接触封装';
+            setContinueVisible(true);
             return;
         }
         if (draftRunes.length < POTION_SPELL_CONTENT_RUNE_COUNT) {
@@ -2075,6 +2354,7 @@ export const rune_launcher_system = {
                 </div>
             `;
             confirmBtn.textContent = this.preparedPotionSpell ? '手动接触并覆盖旧药剂' : '手动接触封装';
+            setContinueVisible(true);
         } else {
             if (result.status === 'pending') {
                 this._ui_getPotionAlchemyDraft().state = 'feeding';
@@ -2178,8 +2458,8 @@ export const rune_launcher_system = {
             const refund = this._ui_calcPotionDraftRefund(this._ui_getPotionAlchemyLedgerRunes(), result);
             this.runFragments = (this.runFragments || 0) + refund;
             this.potionRecipeHistory.push({ outcome: 'failure', refund, round: this.round || 1, elements: result.elements || [] });
-            this._ui_showPotionActionResult(`配方失稳，返还 ${refund} 局内碎片`, 'error');
-            showToast(`配方失稳，返还 ${refund} 局内碎片。`);
+            this._ui_showPotionActionResult(`配方失稳，返还 ${refund} 局内碎片（仅本局）`, 'error');
+            showToast(`配方失稳，返还 ${refund} 局内碎片（仅本局）。`);
             try { audio.playTone(260, 'sawtooth', 0.08, 0.12); } catch (e) {}
         }
 
@@ -2369,6 +2649,31 @@ export const rune_launcher_system = {
         const discovered = (this.saveData && this.saveData.discoveredRunewords) ? this.saveData.discoveredRunewords : [];  // [Mixin 正常用法：读取 Game 实例状态]
         const total = RUNEWORD_DB.length;
         const discoveredCount = RUNEWORD_DB.filter(rw => discovered.includes(rw.id)).length;
+        let activeIds = new Set();
+        if (Array.isArray(this.runeGrid)) {
+            const parsed = parseRuneGrid(this.runeGrid, RUNEWORD_DB);
+            activeIds = new Set((parsed.activatedRunewords || []).map(rw => rw.id));
+        } else if (this._activeRunewordIds instanceof Set) {
+            activeIds = new Set(this._activeRunewordIds);
+        }
+        const availableRuneCounts = new Map();
+        [...(this.runeGrid || []), ...(this.runeInventory || [])].forEach(entry => {
+            const runeId = getRuneId(entry);
+            if (!runeId) return;
+            availableRuneCounts.set(runeId, (availableRuneCounts.get(runeId) || 0) + 1);
+        });
+        const getMaterialStatus = rw => {
+            const required = new Map();
+            (rw.pattern || []).forEach(runeId => required.set(runeId, (required.get(runeId) || 0) + 1));
+            const missing = [];
+            required.forEach((count, runeId) => {
+                const shortage = Math.max(0, count - (availableRuneCounts.get(runeId) || 0));
+                if (shortage <= 0) return;
+                const runeDef = RUNE_DB.find(rune => rune.id === runeId);
+                missing.push(`${runeDef?.name || '未知符文'} x${shortage}`);
+            });
+            return { enough: missing.length === 0, missing };
+        };
 
         if (discoveredCountEl) discoveredCountEl.textContent = discoveredCount;
         if (totalCountEl) totalCountEl.textContent = total;
@@ -2399,6 +2704,8 @@ export const rune_launcher_system = {
             if (!isDiscovered) {
                 // 未发现：显示隐藏卡片
                 card.className = 'rune-list-card rune-list-card--locked';
+                card.dataset.codexState = 'undiscovered';
+                card.setAttribute('aria-label', '未发现词条，按组合提示尝试配置符文');
                 // 显示 pattern 中符文的元素类型作为提示
                 const patternHint = rw.pattern.map(runeId => {
                     const rd = RUNE_DB.find(r => r.id === runeId);
@@ -2419,8 +2726,26 @@ export const rune_launcher_system = {
             } else {
                 // 已发现：显示完整信息，默认展示 Lv.1 效果
                 const defaultLevel = 1;
-                card.className = 'rune-list-card rune-list-card--active';
+                const isActive = activeIds.has(rw.id);
+                const materialStatus = getMaterialStatus(rw);
+                const codexState = isActive ? 'active' : (materialStatus.enough ? 'activatable' : 'insufficient');
+                const actionLabel = isActive ? '已激活' : (materialStatus.enough ? '可激活' : '材料不足');
+                const actionClass = isActive
+                    ? 'text-emerald-200 bg-emerald-900/40 border-emerald-500/50'
+                    : materialStatus.enough
+                        ? 'text-amber-200 bg-amber-900/40 border-amber-500/50'
+                        : 'text-slate-400 bg-slate-900/60 border-slate-700/60';
+                const nextStep = isActive
+                    ? '当前 3×3 法阵已经生效。'
+                    : materialStatus.enough
+                        ? '材料已齐；返回配置页，按穿心法阵排列即可激活。'
+                        : `仍缺 ${materialStatus.missing.join('、')}；继续收集后再配置。`;
+                card.className = isActive
+                    ? 'rune-list-card rune-list-card--active'
+                    : 'rune-list-card rune-list-card--discovered';
                 card.dataset.runewordId = rw.id;
+                card.dataset.codexState = codexState;
+                card.setAttribute('aria-label', `${rw.name}，已发现，${actionLabel}`);
 
                 const patternIcons = rw.pattern.map(runeId => {
                     const rd = RUNE_DB.find(r => r.id === runeId);
@@ -2455,8 +2780,11 @@ export const rune_launcher_system = {
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-sm font-bold text-purple-100">${rw.name}</span>
                                 <span class="text-[10px] text-slate-400 bg-slate-800/60 px-1.5 py-0.5 rounded">${rw.effect_desc.match(/【(.+?)】/)?.[1] || ''}</span>
+                                <span class="text-[10px] text-purple-200 bg-purple-950/60 border border-purple-500/30 px-1.5 py-0.5 rounded">已发现</span>
+                                <span class="text-[10px] border px-1.5 py-0.5 rounded ${actionClass}">${actionLabel}</span>
                             </div>
                             <div class="text-[10px] text-slate-400 mt-1">符文组合: ${patternIcons}</div>
+                            <div class="text-[10px] text-slate-300 mt-1" data-codex-next-step="${codexState}">${nextStep}</div>
                         </div>
                     </div>
                     <div class="text-[10px] text-slate-300 leading-relaxed mb-3">${rw.effect_desc}</div>

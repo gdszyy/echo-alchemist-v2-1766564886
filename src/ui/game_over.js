@@ -38,6 +38,9 @@ export const game_over_mixin = {
      * 使用 setTimeout 延迟一帧，确保渲染循环安全退出后再切换阶段。
      */
     _gameover_triggerPhase() {
+        // 在局内碎片清零前收集完整快照；结算完成后把真实写入值附加到同一对象，
+        // 再传给延迟渲染，避免 gameover_show 从已清零状态重算收益。
+        const snapshot = this._gameover_collectSnapshot();
         // ==================== [v2 局内符文碎片结算] ====================
         // 局结束时把未消费的 runFragments 按比例转换为 saveData.runeFragments
         // 避免玩家屯币不花。比例由 CONFIG.gameplay.runShopEndOfRunFragmentSettle 控制。
@@ -45,6 +48,18 @@ export const game_over_mixin = {
         const ratio = cfg.runShopEndOfRunFragmentSettle != null ? cfg.runShopEndOfRunFragmentSettle : 0.3;
         const leftover = Math.max(0, this.runFragments || 0);
         const settled = Math.floor(leftover * ratio);
+        const readMetaFragments = () => {
+            if (typeof this.meta_getResourceCount === 'function') {
+                return Math.max(0, Number(this.meta_getResourceCount('rune_fragments') || 0));
+            }
+            return Math.max(0, Number(
+                this.saveData?.resources?.rune_fragments
+                ?? this.saveData?.runeFragments
+                ?? this.saveData?.currency
+                ?? 0
+            ));
+        };
+        const metaFragmentsBefore = readMetaFragments();
         if (settled > 0) {
             if (typeof this.meta_addCurrency === 'function') {
                 this.meta_addCurrency(settled);
@@ -56,6 +71,15 @@ export const game_over_mixin = {
                 this.saveData.currency = this.saveData.resources.rune_fragments;
             }
         }
+        const metaFragmentsAfter = readMetaFragments();
+        const actualSettled = Math.max(0, metaFragmentsAfter - metaFragmentsBefore);
+        Object.assign(snapshot, {
+            runFragmentsRemaining: leftover,
+            carryOutRatio: ratio,
+            carryOutEligible: settled,
+            settledRuneFragments: actualSettled,
+            metaRuneFragmentsAfter: metaFragmentsAfter,
+        });
         this.runFragments = 0;
 
         // [局内存档] 游戏结束时清除局内存档，防止下次进入 meta 时错误提示继续游戏
@@ -66,7 +90,7 @@ export const game_over_mixin = {
         // 延迟一帧，确保当前渲染帧安全完成
         setTimeout(() => {
             this.phase_switchPhase('gameover');
-            this.gameover_show();
+            this.gameover_show(snapshot);
         }, 50);
     },
 
@@ -74,9 +98,9 @@ export const game_over_mixin = {
      * @method gameover_show
      * @description 进入 gameover 阶段时调用，收集统计数据并渲染结算页面。
      */
-    gameover_show() {
-        // 收集本局统计数据快照（在 sys_resetGame 之前调用）
-        const snapshot = this._gameover_collectSnapshot();
+    gameover_show(settlementSnapshot = null) {
+        // 正常终局使用清零前传入的结算快照；兼容直接打开页面的调试入口。
+        const snapshot = settlementSnapshot || this._gameover_collectSnapshot();
         // 渲染页面
         this._gameover_render(snapshot);
     },
@@ -359,7 +383,16 @@ export const game_over_mixin = {
      * @param {Object} snapshot
      */
     _gameover_renderHarvest(snapshot) {
-        const { runeFragmentsGained, runesGained } = snapshot;
+        const {
+            runeFragmentsGained = 0,
+            runFragmentsRemaining = 0,
+            carryOutRatio = 0.3,
+            carryOutEligible = 0,
+            settledRuneFragments = 0,
+            metaRuneFragmentsAfter = 0,
+            runesGained = [],
+        } = snapshot;
+        const carryOutPercent = Math.round(Math.max(0, carryOutRatio) * 100);
 
         const runesHtml = runesGained.length > 0
             ? runesGained.map(r => {
@@ -395,12 +428,24 @@ export const game_over_mixin = {
                 <div class="w-1 h-4 bg-cyan-500 rounded-full"></div>
                 <span class="text-xs font-bold text-slate-400 tracking-widest uppercase">本局收获</span>
             </div>
-            <!-- 符文碎片 -->
-            <div class="flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-xl p-3 mb-3 hover:border-cyan-500/30 transition-colors">
-                <span class="text-2xl">🔮</span>
-                <div class="flex flex-col">
-                    <span class="text-lg font-bold text-cyan-400 tabular-nums">+${runeFragmentsGained.toLocaleString()}</span>
-                    <span class="text-[10px] text-slate-500 tracking-wider uppercase">符文碎片</span>
+            <!-- 局内获得、终局剩余、可带出与真实入账必须分开展示。 -->
+            <div class="grid grid-cols-2 gap-2 mb-3" aria-label="碎片结算：局内碎片转为局外符文碎片">
+                <div class="bg-slate-900/60 border border-amber-700/40 rounded-xl p-3">
+                    <div class="flex items-center gap-2"><span aria-hidden="true">🧩</span><span class="text-lg font-bold text-amber-300 tabular-nums">${runeFragmentsGained.toLocaleString()}</span></div>
+                    <div class="text-[10px] text-slate-400 mt-1">本局获得 · 局内碎片（仅本局）</div>
+                </div>
+                <div class="bg-slate-900/60 border border-amber-700/40 rounded-xl p-3">
+                    <div class="flex items-center gap-2"><span aria-hidden="true">🧩</span><span class="text-lg font-bold text-amber-200 tabular-nums">${runFragmentsRemaining.toLocaleString()}</span></div>
+                    <div class="text-[10px] text-slate-400 mt-1">结算前剩余 · 局内碎片</div>
+                </div>
+                <div class="bg-slate-900/60 border border-purple-700/40 rounded-xl p-3">
+                    <div class="flex items-center gap-2"><span aria-hidden="true">🔮</span><span class="text-lg font-bold text-purple-300 tabular-nums">${carryOutEligible.toLocaleString()}</span></div>
+                    <div class="text-[10px] text-slate-400 mt-1">${carryOutPercent}% 可带出 · 局外符文碎片</div>
+                </div>
+                <div class="bg-slate-900/60 border border-emerald-700/40 rounded-xl p-3">
+                    <div class="flex items-center gap-2"><span aria-hidden="true">🔮</span><span class="text-lg font-bold text-emerald-300 tabular-nums">+${settledRuneFragments.toLocaleString()}</span></div>
+                    <div class="text-[10px] text-slate-400 mt-1">已结算 · 局外符文碎片（跨局）</div>
+                    <div class="text-[9px] text-slate-600 mt-1">结算后持有 ${metaRuneFragmentsAfter.toLocaleString()}</div>
                 </div>
             </div>
             <!-- 符文列表 -->

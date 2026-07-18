@@ -1,7 +1,9 @@
 # src\ui\rune_launcher.js 函数索引
 
-> 自动生成于 2026-06-30 | 总行数: 3156 | 函数数: 68 | 语言: javascript
+> 自动生成于 2026-07-18 | 总行数: 3484 | 函数数: 74 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
+
+**巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -12,12 +14,17 @@
 | _ui_buildRuneIconHTML | function | `_ui_buildRuneIconHTML(runeDef, runeLevel, extraClass = '')` |  |
 | _ui_escapeHtml | function | `_ui_escapeHtml(value)` |  |
 | _ui_getStatInfo | function | `_ui_getStatInfo(key)` |  |
+| _ui_getDialogFocusable | method | `_ui_getDialogFocusable(container)` |  |
+| _ui_trapDialogFocus | method | `_ui_trapDialogFocus(container, event)` |  |
+| _ui_focusFirstDialogControl | method | `_ui_focusFirstDialogControl(container)` |  |
+| _ui_releaseRuneLauncherPauseLease | method | `_ui_releaseRuneLauncherPauseLease()` |  |
+| _ui_applyRuneLauncherSemantics | method | `_ui_applyRuneLauncherSemantics(panel, isPCMode)` |  |
 | ui_openRuneLauncher | method | `ui_openRuneLauncher()` |  |
 | _ui_updateLauncherShardCount | method | `_ui_updateLauncherShardCount()` |  |
 | ui_closeRuneLauncher | method | `ui_closeRuneLauncher()` |  |
-| ui_closeRunePicker | method | `ui_closeRunePicker()` |  |
+| ui_closeRunePicker | method | `ui_closeRunePicker(options = {})` |  |
 | ui_initRuneGrid | method | `ui_initRuneGrid()` |  |
-| ui_openRunePicker | method | `ui_openRunePicker(cellIndex)` |  |
+| ui_openRunePicker | method | `ui_openRunePicker(cellIndex)` | ⚠️ 巨型函数，见 @section 导航 |
 | ui_updateRuneGrid | method | `ui_updateRuneGrid()` |  |
 | _ui_updateRuneInventoryDisplay | method | `_ui_updateRuneInventoryDisplay()` |  |
 | _ui_renderLauncherInventory | method | `_ui_renderLauncherInventory()` |  |
@@ -58,6 +65,7 @@
 | _ui_renderPotionCurrent | method | `_ui_renderPotionCurrent()` |  |
 | _ui_renderAlchemyNotes | method | `_ui_renderAlchemyNotes()` |  |
 | _ui_renderPotionAlchemyInventory | method | `_ui_renderPotionAlchemyInventory()` |  |
+| ui_continuePotionAlchemy | method | `ui_continuePotionAlchemy()` |  |
 | _ui_updatePinboardFusionDisplay | method | `_ui_updatePinboardFusionDisplay()` |  |
 | _ui_updatePotionAlchemyPreview | method | `_ui_updatePotionAlchemyPreview()` |  |
 | ui_clearPotionSelection | method | `ui_clearPotionSelection()` |  |
@@ -78,13 +86,23 @@
 | ui_toggleEquipSkill | method | `ui_toggleEquipSkill(skillId)` |  |
 | ui_renderSkillEditor | method | `ui_renderSkillEditor()` |  |
 
+## 巨型函数内部节点 (@section 标记)
+
+### ui_openRunePicker
+
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:rune_picker_place_audio` | 符文从选择器放入格子的确认音效（600Hz） |
+| `@section:rune_hover_audio` | 符文词条悬停预览音效（880Hz 极轻，仅提示） |
+
+
 ## 其他 @section 标记
 
 | 节点标记 | 说明 |
 |----------|------|
 | `@section:rune_grid_remove_audio` | 符文格移除音效（400Hz，轻柔确认） |
-| `@section:rune_picker_place_audio` | 符文从选择器放入格子的确认音效（600Hz） |
-| `@section:rune_hover_audio` | 符文词条悬停预览音效（880Hz 极轻，仅提示） |
 | `@section:rune_merge_audio` | 符文合成成功音效（880Hz 较响，强调成功感） |
 | `@section:rune_reforge_audio` | 符文重铸完成音效（660Hz triangle，柔和质感） |
 | `@section:rune_auto_arrange_audio` | 符文自动排布完成音效（660Hz sine） |
