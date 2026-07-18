@@ -13,7 +13,17 @@
  * - 弹珠选择切换 (sys_toggleMarbleSelection)
  * - 分数乘数重置 (sys_resetMultiplier)
  */
-import { Vec2, showToast, RuneLoot, Enemy, RewardDropEffect, FieldLootItem, MarbleDefinition } from './entities.js';
+import {
+    Vec2,
+    showToast,
+    RuneLoot,
+    Enemy,
+    RewardDropEffect,
+    FieldLootItem,
+    MarbleDefinition,
+    Peg,
+    SpecialSlot,
+} from './entities.js';
 import { CONFIG, RELIC_DB, BOSS_DB, ENEMY_CURVE_CONFIG } from './config.js';
 import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
@@ -30,6 +40,35 @@ import {
     ensureModuleLayoutInstances,
     normalizeModuleInventory,
 } from './pinboard_modules.js';
+
+const RUN_STATE_SCHEMA = 'echo-alchemist-run-state';
+const RUN_STATE_VERSION = 2;
+const RUN_SAVE_POINTS = new Set(['round_start', 'selection', 'gathering_idle', 'combat_idle']);
+const PERMANENT_ROUND_BOOST = 'permanent';
+
+function _encodeRoundBoostMap(source) {
+    const result = {};
+    for (const [key, rawValue] of Object.entries(source || {})) {
+        if (rawValue === Infinity) result[key] = PERMANENT_ROUND_BOOST;
+        else if (Number.isFinite(rawValue) && rawValue >= 0) result[key] = rawValue;
+    }
+    return result;
+}
+
+function _decodeRoundBoostMap(source) {
+    const result = {};
+    for (const [key, rawValue] of Object.entries(source || {})) {
+        if (rawValue === PERMANENT_ROUND_BOOST) result[key] = Infinity;
+        else if (Number.isFinite(rawValue) && rawValue >= 0) result[key] = rawValue;
+    }
+    return result;
+}
+
+function _isValidRoundBoostMap(source) {
+    return !!source && typeof source === 'object' && !Array.isArray(source)
+        && Object.values(source).every(value => value === PERMANENT_ROUND_BOOST
+            || (Number.isFinite(value) && value >= 0));
+}
 
 function _getRoundStartBossThreat(game) {
     const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG);
@@ -55,6 +94,271 @@ function _getRoundStartBossThreat(game) {
 }
 
 export const game_system = {
+
+    /**
+     * Capture the current run/phase ownership for an asynchronous continuation.
+     * Phase-bound tokens are invalidated by an actual phase change; run-bound
+     * tokens survive phase changes but never survive abandon, game over or reset.
+     */
+    sys_captureLifecycleToken(options = {}) {
+        if (!Number.isInteger(this._runLifecycleEpoch)) this._runLifecycleEpoch = 1;
+        if (!Number.isInteger(this._phaseLifecycleEpoch)) this._phaseLifecycleEpoch = 1;
+        return Object.freeze({
+            runEpoch: this._runLifecycleEpoch,
+            phaseEpoch: options.phaseBound ? this._phaseLifecycleEpoch : null,
+        });
+    },
+
+    sys_isLifecycleTokenCurrent(token) {
+        if (!token || token.runEpoch !== this._runLifecycleEpoch) return false;
+        return token.phaseEpoch === null || token.phaseEpoch === this._phaseLifecycleEpoch;
+    },
+
+    sys_scheduleLifecycleTimeout(callback, delayMs = 0, options = {}) {
+        if (typeof callback !== 'function') return null;
+        if (!(this._lifecycleTimeouts instanceof Map)) this._lifecycleTimeouts = new Map();
+        const token = options.token || this.sys_captureLifecycleToken({ phaseBound: !!options.phaseBound });
+        const timeoutId = setTimeout(() => {
+            const record = this._lifecycleTimeouts?.get(timeoutId);
+            this._lifecycleTimeouts?.delete(timeoutId);
+            if (!this.sys_isLifecycleTokenCurrent(token)) {
+                if (typeof record?.onStale === 'function') record.onStale();
+                return;
+            }
+            callback();
+        }, Math.max(0, Number(delayMs) || 0));
+        this._lifecycleTimeouts.set(timeoutId, {
+            onCancel: options.onCancel || null,
+            onStale: options.onStale || options.onCancel || null,
+        });
+        return timeoutId;
+    },
+
+    sys_scheduleLifecycleFrame(callback, options = {}) {
+        if (typeof callback !== 'function') return null;
+        if (!(this._lifecycleFrames instanceof Map)) this._lifecycleFrames = new Map();
+        const token = options.token || this.sys_captureLifecycleToken({ phaseBound: !!options.phaseBound });
+        const frameId = requestAnimationFrame(() => {
+            const record = this._lifecycleFrames?.get(frameId);
+            this._lifecycleFrames?.delete(frameId);
+            if (!this.sys_isLifecycleTokenCurrent(token)) {
+                if (typeof record?.onStale === 'function') record.onStale();
+                return;
+            }
+            callback();
+        });
+        this._lifecycleFrames.set(frameId, {
+            onCancel: options.onCancel || null,
+            onStale: options.onStale || options.onCancel || null,
+        });
+        return frameId;
+    },
+
+    sys_cancelLifecycleTimeout(timeoutId) {
+        const record = this._lifecycleTimeouts?.get(timeoutId);
+        if (!record) return false;
+        clearTimeout(timeoutId);
+        this._lifecycleTimeouts.delete(timeoutId);
+        if (typeof record.onCancel === 'function') record.onCancel();
+        return true;
+    },
+
+    /**
+     * Execute a state-machine continuation in its owning gameplay phase. The
+     * Truth Book is a temporary phase with an explicit return target, so a due
+     * continuation is parked until that target returns. A real phase change
+     * cancels it instead of advancing behind the new flow.
+     */
+    sys_runOrDeferLifecycleContinuation(key, callback, options = {}) {
+        if (typeof callback !== 'function') return false;
+        const token = options.token || this.sys_captureLifecycleToken();
+        const expectedPhase = options.expectedPhase || this.phase || null;
+        const cancel = () => {
+            if (typeof options.onCancel === 'function') options.onCancel();
+            return false;
+        };
+        if (!this.sys_isLifecycleTokenCurrent(token)) return cancel();
+        const phaseMatches = !expectedPhase || this.phase === expectedPhase;
+        if (phaseMatches && !this.isPaused) {
+            callback();
+            return true;
+        }
+
+        const canReturnFromTemporaryPhase = this.phase === 'truth_book'
+            && this.truthBookReturnState?.phase === expectedPhase;
+        const canResumeAfterPause = phaseMatches && this.isPaused;
+        if (!canReturnFromTemporaryPhase && !canResumeAfterPause) return cancel();
+
+        if (!(this._deferredLifecycleContinuations instanceof Map)) {
+            this._deferredLifecycleContinuations = new Map();
+        }
+        const continuationKey = String(key || `continuation:${Date.now()}`);
+        if (!this._deferredLifecycleContinuations.has(continuationKey)) {
+            this._deferredLifecycleContinuations.set(continuationKey, {
+                callback,
+                token,
+                expectedPhase,
+                onCancel: options.onCancel || null,
+            });
+        }
+        return 'deferred';
+    },
+
+    sys_flushDeferredLifecycleContinuations() {
+        if (!(this._deferredLifecycleContinuations instanceof Map)
+            || this._deferredLifecycleContinuations.size === 0) return 0;
+        if (this.isPaused) return 0;
+        let executed = 0;
+        for (const [key, record] of [...this._deferredLifecycleContinuations]) {
+            if (this.isPaused) break;
+            if (!this.sys_isLifecycleTokenCurrent(record.token)) {
+                this._deferredLifecycleContinuations.delete(key);
+                if (typeof record.onCancel === 'function') record.onCancel();
+                continue;
+            }
+            if (this.phase === record.expectedPhase) {
+                this._deferredLifecycleContinuations.delete(key);
+                record.callback();
+                executed++;
+            } else if (this.phase !== 'truth_book') {
+                this._deferredLifecycleContinuations.delete(key);
+                if (typeof record.onCancel === 'function') record.onCancel();
+            }
+        }
+        return executed;
+    },
+
+    /**
+     * Invalidate every continuation owned by the previous run. Clearing native
+     * timers is an optimization; callback wrappers also check the epoch so a
+     * cancelled callback forced by a test/fake clock still cannot mutate state.
+     */
+    sys_invalidateRunLifecycle(reason = 'reset') {
+        this._runLifecycleEpoch = (Number.isInteger(this._runLifecycleEpoch) ? this._runLifecycleEpoch : 0) + 1;
+        this._phaseLifecycleEpoch = 1;
+
+        if (this._lifecycleTimeouts instanceof Map) {
+            for (const [timeoutId, record] of this._lifecycleTimeouts) {
+                clearTimeout(timeoutId);
+                if (typeof record?.onCancel === 'function') record.onCancel();
+            }
+            this._lifecycleTimeouts.clear();
+        }
+        if (this._lifecycleFrames instanceof Map) {
+            for (const [frameId, record] of this._lifecycleFrames) {
+                cancelAnimationFrame(frameId);
+                if (typeof record?.onCancel === 'function') record.onCancel();
+            }
+            this._lifecycleFrames.clear();
+        }
+        if (this._deferredLifecycleContinuations instanceof Map) {
+            for (const record of this._deferredLifecycleContinuations.values()) {
+                if (typeof record?.onCancel === 'function') record.onCancel();
+            }
+            this._deferredLifecycleContinuations.clear();
+        }
+        const potionContinuation = this._potionBlockedContinuation;
+        this._potionBlockedContinuation = null;
+        this._retryingPotionBlockedContinuation = false;
+        if (typeof potionContinuation?.onCancel === 'function') potionContinuation.onCancel();
+
+        if (typeof this.input_cancelActiveInteraction === 'function') {
+            this.input_cancelActiveInteraction(null, { reason: `lifecycle:${reason}` });
+        }
+        this._pauseLeases = new Map();
+        this.isPaused = false;
+        this._pausedFromPhase = null;
+        this._roundStartResolverActive = false;
+        this._roundStartResolverCurrentRewardId = null;
+        this._roundStartBannerActive = false;
+        this._roundStartBannerFlowKey = null;
+        this._roundStartTerminalKey = null;
+        this._roundStartCheckpointReady = false;
+        this._combatCheckpointReady = false;
+        this._roundFinalizeKey = null;
+        this._roundStartRelicHookDelayActive = false;
+        this._marblePackGrindActive = false;
+        return this._runLifecycleEpoch;
+    },
+
+    /**
+     * Acquire an opaque pause ownership token. Every caller must retain and
+     * release only its own token; gameplay resumes after the final lease leaves.
+     */
+    sys_acquirePauseLease(ownerId) {
+        const normalizedOwner = String(ownerId || '').trim();
+        if (!normalizedOwner) throw new TypeError('pause lease ownerId is required');
+        if (!(this._pauseLeases instanceof Map)) this._pauseLeases = new Map();
+        if (!Number.isInteger(this._pauseLeaseSequence)) this._pauseLeaseSequence = 0;
+        const token = Object.freeze({
+            leaseId: `${this._runLifecycleEpoch || 0}:${++this._pauseLeaseSequence}`,
+        });
+        if (this._pauseLeases.size === 0) this._pausedFromPhase = this.phase || null;
+        this._pauseLeases.set(token, normalizedOwner);
+        this.isPaused = true;
+        return token;
+    },
+
+    sys_releasePauseLease(token) {
+        if (!(this._pauseLeases instanceof Map) || !this._pauseLeases.has(token)) return false;
+        this._pauseLeases.delete(token);
+        if (this._pauseLeases.size === 0) {
+            this.isPaused = false;
+            this._pausedFromPhase = null;
+            this.sys_flushDeferredLifecycleContinuations();
+        } else {
+            this.isPaused = true;
+        }
+        return true;
+    },
+
+    sys_hasPendingPotionAlchemyDraft() {
+        return Array.isArray(this._potionAlchemyDraft?.consumedRunes)
+            && this._potionAlchemyDraft.consumedRunes.length > 0;
+    },
+
+    /**
+     * Own a transition that the player explicitly vetoed while an alchemy
+     * draft was still live. Rune-launcher actions save after the draft is
+     * resolved; sys_saveRunState uses that boundary to retry exactly once.
+     */
+    sys_deferPotionBlockedContinuation(key, callback, options = {}) {
+        if (typeof callback !== 'function') return false;
+        const continuationKey = String(key || `potion-transition:${this._runLifecycleEpoch || 0}`);
+        const current = this._potionBlockedContinuation;
+        if (current) {
+            if (this.sys_isLifecycleTokenCurrent(current.token)) return false;
+            if (typeof current.onCancel === 'function') current.onCancel();
+        }
+        this._potionBlockedContinuation = {
+            key: continuationKey,
+            callback,
+            expectedPhase: options.expectedPhase || this.phase || null,
+            token: options.token || this.sys_captureLifecycleToken(),
+            onCancel: options.onCancel || null,
+        };
+        return false;
+    },
+
+    sys_retryPotionBlockedContinuation() {
+        const record = this._potionBlockedContinuation;
+        if (!record || this._retryingPotionBlockedContinuation
+            || this.sys_hasPendingPotionAlchemyDraft()) return false;
+        const phaseMatches = !record.expectedPhase || this.phase === record.expectedPhase;
+        if (!this.sys_isLifecycleTokenCurrent(record.token) || !phaseMatches) {
+            this._potionBlockedContinuation = null;
+            if (typeof record.onCancel === 'function') record.onCancel();
+            return false;
+        }
+        this._potionBlockedContinuation = null;
+        this._retryingPotionBlockedContinuation = true;
+        try {
+            record.callback();
+            return true;
+        } finally {
+            this._retryingPotionBlockedContinuation = false;
+        }
+    },
 
     /**
      * @method sys_loop
@@ -442,6 +746,8 @@ export const game_system = {
         this.sys_queueRoundStartReward({ type: 'relic', source: 'run_start', round: this.round });
         // 开局直接给一次杂色弹珠包，作为本局第一次研磨入口；精华奖励不再参与主循环。
         this.sys_queueRoundStartReward({ type: 'marble_pack', packId: 'mixed', source: 'run_start', round: this.round });
+        this._roundStartCheckpointReady = true;
+        this.sys_saveRunState();
         this.sys_startRoundStartResolver();
     },
 
@@ -450,9 +756,14 @@ export const game_system = {
      * @description 重置游戏状态（清空实体、重置回合/分数/货币、清空临时升级）。
      */
     sys_resetGame() {
+
+        // @section:reset_lifecycle_pause - 生命周期与暂停清理
+        this.sys_invalidateRunLifecycle('reset');
         this.runCurrency = 0;
         this.gameOver = false;
-        // 重置暂停状态
+        // 生命周期失效会释放所有暂停 owner；这里同步清理兼容字段与面板。
+        this._pauseLeases = new Map();
+        this._pauseLeaseSequence = 0;
         this.isPaused = false;
         this._pausedFromPhase = null;
         const pauseOverlay = document.getElementById('phase-pause');
@@ -462,6 +773,7 @@ export const game_system = {
             pauseOverlay.classList.add('hidden-phase');
         }
 
+        // @section:reset_run_progression - 局内进度与选择态重置
         // 清空临时增强
         this.saveData.temporaryUpgrades = {};
         this.sys_saveData();
@@ -489,6 +801,16 @@ export const game_system = {
         this.replaceAmmoContext = null; // [tsk-668f3dba] 替换当前子弹阶段上下文
         this._chargedAmmoQueue = null; // [ammo-replace] 充能子弹
         this._roundStartResolverTotalCount = 0;
+        this._roundStartRewardSequence = 0;
+        this._roundStartResolverCurrentRewardId = null;
+        this._resolvedRoundStartRewardIds = new Set();
+        this._roundStartTerminalKey = null;
+        this._roundStartBannerFlowKey = null;
+        this._roundStartCheckpointReady = false;
+        this._combatCheckpointReady = false;
+        this._roundFinalizeKey = null;
+        this._marblePackGrindActive = false;
+        this._marblePackGrindKey = null;
         this._lastFiredAmmoSnapshot = null; // [bullet-charge-fix] 上回合实际发射的子弹快照
         this.ownedRelics = [];
         this.potionAlchemyUnlocked = false;
@@ -497,6 +819,8 @@ export const game_system = {
         this.potionRecipeHistory = [];
         this._potionAlchemyDraft = null;
         this._selectedPotionRuneIndices = new Set();
+        this._potionBlockedContinuation = null;
+        this._retryingPotionBlockedContinuation = false;
         
         // 补充遗物相关的重置字段
         this.pinkPegCount = 0;
@@ -511,12 +835,21 @@ export const game_system = {
         this._activeRunewordIds = new Set(); // [技能来源扩展] 重置激活词条集合
         this.marbleSizeBonus = 0;
 
+        // @section:reset_runtime_entities - 实体与运行态清空
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
         pixiCleanupAllEffects(this);
 
         // 清空实体
         this.enemies = [];
         this.projectiles = [];
+        this.activeWindMatrices = [];
+        this.windAnchors = [];
+        this.stormCores = [];
+        this.burstQueue = [];
+        this.pendingShots = [];
+        this._carryOverAmmo = null;
+        this._chaosSlotMachineActive = false;
+        this._inWallClearLotteryActive = false;
         this.dropBalls = [];
         this.ammoQueue = [];
         this.marbleQueue = [];
@@ -527,11 +860,13 @@ export const game_system = {
         // 钉盘形态遗物状态重置
         this.boardLayout = 'default';
 
+        // @section:reset_rune_skill_state - 符文技能状态重置
         // Task 1: 数据结构升级 - 局内重置时清空符文库存和网格
         // runeInventory 和 runeGrid 属于局内状态，每局开始时重置
         this.runeInventory = [];
         this.runeGrid = Array(9).fill(null);
         this.activeRunewordStats = {};
+        this.activeRunewordEffects = {};
         this.activeElementResonances = {};  // [属性共鸣] 重置属性共鸣状态
         this.runeLootItems = [];
         this.skillPoints = 0;
@@ -547,6 +882,7 @@ export const game_system = {
         // 更新符文数量显示
         this.ui_updateRuneCountDisplay();
 
+        // @section:reset_boss_difficulty - Boss与难度状态重置
         // 重置 Boss 系统状态
         this.bossHistory = [];
         
@@ -606,6 +942,7 @@ export const game_system = {
         this._bladeStormProjectile = null;
         this._bladeStormTimer = 0;
         
+        // @section:reset_stats_modules_shop - 统计模块与商店重置
         // [本局统计] 重置本局统计字段
         this.runKillCount = 0;
         this.runRuneFragmentsGained = 0;
@@ -640,6 +977,16 @@ export const game_system = {
         this.runShopStarterBoostDamageAmount = 0;
         this.runShopStarterBoostDamageRounds = 0;
         this._runShopInventoryGeneratedForRound = 0;
+        this._runShopSession = null;
+        this._runShopPauseLeaseToken = null;
+        this._runShopPurchaseInFlight = null;
+        this._relicOverlaySession = null;
+        this._relicOverlayPauseLeaseToken = null;
+        this._pauseMenuLeaseToken = null;
+        this._moduleEditorPauseLeaseToken = null;
+
+        // 输入状态必须与 run 生命周期同时清空，避免新局继承旧拖拽或待发射状态。
+        this.input_cancelActiveInteraction(null, { reason: 'reset' });
     },
 
     /**
@@ -713,8 +1060,13 @@ export const game_system = {
         // 辅助函数：获取鼠标/触摸在 Canvas 上的相对位置
         const getPos = (e) => {
             const rect = this.canvas.getBoundingClientRect();
-            let x = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
-            let y = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+            const contact = (e.touches && e.touches.length > 0)
+                ? e.touches[0]
+                : ((e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0] : e);
+            const fallbackX = (this.lastMousePos?.x || 0) + rect.left;
+            const fallbackY = (this.lastMousePos?.y || 0) + rect.top;
+            const x = Number.isFinite(contact?.clientX) ? contact.clientX : fallbackX;
+            const y = Number.isFinite(contact?.clientY) ? contact.clientY : fallbackY;
             return new Vec2(x - rect.left, y - rect.top);
         };
 
@@ -725,6 +1077,8 @@ export const game_system = {
         window.addEventListener('touchmove', e => this.input_handleInputMove(getPos(e), e), { passive: false });
         window.addEventListener('mouseup', e => this.input_handleInputEnd(getPos(e), e));
         window.addEventListener('touchend', e => this.input_handleInputEnd(getPos(e), e));
+        window.addEventListener('touchcancel', e => this.input_handleInputCancel(e), { passive: false });
+        window.addEventListener('pointercancel', e => this.input_handleInputCancel(e));
 
         // 确认选择按钮
         const confirmBtn = document.getElementById('confirm-selection-btn');
@@ -1002,6 +1356,18 @@ export const game_system = {
             return;
         }
 
+        if (typeof this.ui_handlePotionAlchemyInterrupt === 'function'
+            && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+            if (typeof this.sys_deferPotionBlockedContinuation === 'function') {
+                this.sys_deferPotionBlockedContinuation(
+                    `replace-ammo-confirm:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                    () => this.sys_confirmReplaceAmmo(),
+                    { expectedPhase: 'selection' }
+                );
+            }
+            return false;
+        }
+
         // 按选中索引构建最终 ammoQueue
         const finalAmmo = selectedIndices
             .filter(i => i >= 0 && i < allRecipes.length)
@@ -1046,7 +1412,6 @@ export const game_system = {
         }
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
-        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         // 进入战斗阶段
         if (typeof this.phase_startCombatPhase === 'function') {
             this.phase_startCombatPhase();
@@ -1066,6 +1431,17 @@ export const game_system = {
         if (newRecipes.length === 0) {
             showToast('当前没有新研磨子弹可跳过');
             return;
+        }
+        if (typeof this.ui_handlePotionAlchemyInterrupt === 'function'
+            && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+            if (typeof this.sys_deferPotionBlockedContinuation === 'function') {
+                this.sys_deferPotionBlockedContinuation(
+                    `replace-ammo-skip:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                    () => this.sys_skipReplaceAmmo(),
+                    { expectedPhase: 'selection' }
+                );
+            }
+            return false;
         }
         // 跳过：直接使用新研磨的子弹
         this.ammoQueue = newRecipes.slice();
@@ -1100,7 +1476,6 @@ export const game_system = {
         }
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
-        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         // 进入战斗阶段
         if (typeof this.phase_startCombatPhase === 'function') {
             this.phase_startCombatPhase();
@@ -1281,6 +1656,20 @@ export const game_system = {
         const incVal = allSame ? 5 : 1;
 
         const applyUpgrade = () => {
+            if (typeof this.ui_handlePotionAlchemyInterrupt === 'function'
+                && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+                if (typeof this.sys_deferPotionBlockedContinuation === 'function') {
+                    this.sys_deferPotionBlockedContinuation(
+                        `chaos-upgrade:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                        applyUpgrade,
+                        {
+                            expectedPhase: 'selection',
+                            onCancel: () => { this._chaosSlotMachineActive = false; },
+                        }
+                    );
+                }
+                return false;
+            }
             if (allSame) {
                 const attr = finalPicks[0];
                 charged.forEach(r => { r[attr] = (r[attr] || 0) + incVal; });
@@ -1317,7 +1706,6 @@ export const game_system = {
 
             if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
             if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
-            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
 
             this._chaosSlotMachineActive = false;
             if (typeof this.phase_startCombatPhase === 'function') {
@@ -1407,13 +1795,22 @@ export const game_system = {
      */
     sys_queueRoundStartReward(reward = {}) {
         if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
+        if (!(this._resolvedRoundStartRewardIds instanceof Set)) this._resolvedRoundStartRewardIds = new Set();
+        if (!Number.isInteger(this._roundStartRewardSequence)) this._roundStartRewardSequence = 0;
 
         const legacyRewardType = reward.type === 'essence' ? 'marble_pack' : reward.type;
         const requestedType = ['relic', 'marble_pack', 'run_resource_pack', 'chaos_essence', 'pure_essence'].includes(legacyRewardType)
             ? legacyRewardType
             : 'relic';
 
+        const rewardId = String(reward.id || reward.rewardId ||
+            `run-${this._runLifecycleEpoch || 0}-round-${reward.round || this.round || 1}-reward-${++this._roundStartRewardSequence}`);
+        const alreadyQueued = this.pendingRoundStartRewards.find(item => item?.id === rewardId);
+        if (alreadyQueued) return alreadyQueued;
+        if (this._resolvedRoundStartRewardIds.has(rewardId)) return null;
+
         const normalized = {
+            id: rewardId,
             type: requestedType,
             source: reward.source || 'unknown',
             round: reward.round || this.round || 1,
@@ -1426,11 +1823,27 @@ export const game_system = {
             fragmentAmount: Math.max(0, Math.floor(Number(reward.fragmentAmount || 0))),
         };
         this.pendingRoundStartRewards.push(normalized);
+        this._roundStartTerminalKey = null;
         eventBus.emit(EVENT_TYPES.ROUND_START_REWARD_QUEUED, {
             reward: { ...normalized },
             pendingCount: this.pendingRoundStartRewards.length,
         });
         return normalized;
+    },
+
+    sys_completeRoundStartReward(rewardId) {
+        const normalizedId = String(rewardId || '');
+        if (!normalizedId) return false;
+        if (!(this._resolvedRoundStartRewardIds instanceof Set)) this._resolvedRoundStartRewardIds = new Set();
+        if (this._resolvedRoundStartRewardIds.has(normalizedId)) return false;
+        const rewardIndex = (this.pendingRoundStartRewards || []).findIndex(item => item?.id === normalizedId);
+        if (rewardIndex < 0) return false;
+        this.pendingRoundStartRewards.splice(rewardIndex, 1);
+        this._resolvedRoundStartRewardIds.add(normalizedId);
+        if (this._roundStartResolverCurrentRewardId === normalizedId) {
+            this._roundStartResolverCurrentRewardId = null;
+        }
+        return true;
     },
 
     sys_rollMarblePackTypes(packId = 'mixed', count = CONFIG.gameplay.selectionReq || 3) {
@@ -1459,6 +1872,16 @@ export const game_system = {
     },
 
     sys_startMarblePackGrind(reward = {}) {
+        if (!Number.isInteger(this._marblePackEntrySequence)) this._marblePackEntrySequence = 0;
+        const entryId = String(reward.id || reward.rewardId || reward.entryId || reward._grindEntryId ||
+            `pack-${this._runLifecycleEpoch || 0}-${++this._marblePackEntrySequence}`);
+        reward._grindEntryId = entryId;
+        if (this._marblePackGrindKey === entryId) return false;
+        if (this._marblePackGrindActive && this.phase === 'gathering') return false;
+        this._marblePackGrindKey = entryId;
+        this._marblePackGrindActive = true;
+        this._roundStartCheckpointReady = false;
+
         const count = CONFIG.gameplay.selectionReq || 3;
         const marbleTypes = Array.isArray(reward.marbleTypes) && reward.marbleTypes.length > 0
             ? reward.marbleTypes.slice(0, count)
@@ -1480,15 +1903,19 @@ export const game_system = {
         this.marbleQueue = marbleTypes.map(type => new MarbleDefinition(type || 'white'));
         this.marblesPool = this.marbleQueue.slice();
 
-        if (typeof this.ui_hideRunShop === 'function') this.ui_hideRunShop();
+        // A pack purchase takes ownership of the transition. The generic shop
+        // close callback must not resume the resolver/banner in the same tick.
+        if (typeof this.ui_hideRunShop === 'function') {
+            this.ui_hideRunShop({ invokeOnClose: false, reason: 'marble_pack_grind' });
+        }
         if (typeof showToast === 'function') {
             showToast(`杂色弹珠包已开启：${marbleTypes.join(' / ')}，开始研磨。`);
         }
-        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         if (typeof this.phase_startGatheringPhase === 'function') this.phase_startGatheringPhase();
         if (typeof this.sys_showRoundStartBanner === 'function') {
-            this.sys_showRoundStartBanner({ enterCombat: false, protectCombat: false });
+            this.sys_showRoundStartBanner({ enterCombat: false, protectCombat: false, flowId: entryId });
         }
+        return true;
     },
 
     sys_grantRunResourcePack(reward = {}) {
@@ -1938,240 +2365,235 @@ export const game_system = {
      * @description 在回合开始前统一结算遗物/精华，再决定是否进入选择阶段。
      */
     sys_startRoundStartResolver() {
-        if (CONFIG.debug) console.log('[DEBUG][sys_startRoundStartResolver] 进入', {
-            _roundStartResolverActive: this._roundStartResolverActive,
-            pendingRoundStartRewards: JSON.stringify(this.pendingRoundStartRewards || []),
-            phase: this.phase,
-            round: this.round,
-        });
-        if (this._roundStartResolverActive) return;
-        if (!this.pendingRoundStartRewards) this.pendingRoundStartRewards = [];
-        if (!this._roundStartResolverTotalCount || this._roundStartResolverTotalCount < this.pendingRoundStartRewards.length) {
+
+        // @section:resolver_preflight - 重入守卫与队列清理
+        if (this._roundStartResolverActive) return false;
+        if (this._roundStartResolverCurrentRewardId && this._relicOverlaySession?.active) return false;
+        if (!Array.isArray(this.pendingRoundStartRewards)) this.pendingRoundStartRewards = [];
+        if (!(this._resolvedRoundStartRewardIds instanceof Set)) this._resolvedRoundStartRewardIds = new Set();
+
+        while (this.pendingRoundStartRewards[0]
+            && this._resolvedRoundStartRewardIds.has(this.pendingRoundStartRewards[0].id)) {
+            this.pendingRoundStartRewards.shift();
+        }
+
+        // @section:resolver_terminal_route - 空队列终点与横幅
+        const terminalKey = `${this._runLifecycleEpoch || 0}:${this.round || 1}`;
+        if (this.pendingRoundStartRewards.length === 0) {
+            if (this._roundStartTerminalKey === terminalKey) return false;
+            this._roundStartResolverActive = false;
+            this._roundStartResolverCurrentRewardId = null;
+            this._roundStartResolverTotalCount = 0;
+            eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                round: this.round || 1,
+                pendingCount: 0,
+                totalCount: 0,
+                resolvedCount: 0,
+            });
+            if (this.sys_maybeOfferRunShopBeforeRoundStart()) return true;
+            const bannerStarted = this.sys_showRoundStartBanner({
+                flowId: terminalKey,
+                retryOwner: () => this.sys_startRoundStartResolver(),
+            });
+            if (bannerStarted) {
+                this._roundStartTerminalKey = terminalKey;
+                this._roundStartCheckpointReady = false;
+            }
+            return bannerStarted;
+        }
+
+        if (!this._roundStartResolverTotalCount
+            || this._roundStartResolverTotalCount < this.pendingRoundStartRewards.length) {
             this._roundStartResolverTotalCount = this.pendingRoundStartRewards.length;
         }
 
-        // [BUGFIX] 切换到 selection 前先将 selectionMode 重置为 standard，
-        // 防止 phase_switchPhase 内部触发的 ui_updateUI 读取上一次的 selectionMode
-        // 渲染出旧的命运选择卡片（如 chaos_essence / pure_essence 界面）。
+        // @section:resolver_reward_identity - 奖励身份与进度上下文
+        const reward = this.pendingRoundStartRewards[0];
+        if (!reward.id) {
+            if (!Number.isInteger(this._roundStartRewardSequence)) this._roundStartRewardSequence = 0;
+            reward.id = `run-${this._runLifecycleEpoch || 0}-round-${reward.round || this.round || 1}-reward-${++this._roundStartRewardSequence}`;
+        }
+        const rewardType = reward.type === 'essence' ? 'marble_pack' : reward.type;
+        const totalRewards = this._roundStartResolverTotalCount || this.pendingRoundStartRewards.length;
+        const currentRewardIndex = Math.max(1, totalRewards - this.pendingRoundStartRewards.length + 1);
+
         this.selectionMode = 'standard';
         this.fateMomentContext = null;
-        // [tsk-bullet-ui] 修复闪烁：仅当下一个奖励是精华时才切到 selection 阶段。
-        // 遗物奖励使用 #phase-relic overlay（z-index:200）覆盖当前阶段，无需切到 selection；
-        // 之前无条件 phase_switchPhase('selection') 会让 phase-selection 面板先闪一帧
-        // 旧/空的弹珠选择内容，再被 phase-relic overlay 覆盖。
-        const _nextRewardType = (() => {
-            const r = (this.pendingRoundStartRewards || [])[0];
-            if (!r) return null;
-            return r.type === 'essence' ? 'marble_pack' : r.type;
-        })();
-        if ((_nextRewardType === 'chaos_essence' || _nextRewardType === 'pure_essence') && this.phase !== 'selection') {
-            // 同步预先清空残留的弹珠卡片，避免 ui_updateUI 渲染出旧 DOM 闪一帧
-            const _earlyGridEl = document.getElementById('marble-selection-grid');
-            if (_earlyGridEl) {
-                _earlyGridEl.style.cssText = '';
-                _earlyGridEl.innerHTML = '';
+        if ((rewardType === 'chaos_essence' || rewardType === 'pure_essence') && this.phase !== 'selection') {
+            const earlyGrid = document.getElementById('marble-selection-grid');
+            if (earlyGrid) {
+                earlyGrid.style.cssText = '';
+                earlyGrid.innerHTML = '';
             }
             this.phase_switchPhase('selection');
         }
+
+        // @section:resolver_atomic_commit - 生命周期守卫与原子消费
         this._roundStartResolverActive = true;
+        this._roundStartResolverCurrentRewardId = reward.id;
+        this._roundStartTerminalKey = null;
+        const lifecycleToken = this.sys_captureLifecycleToken();
+        const isCurrent = () => this.sys_isLifecycleTokenCurrent(lifecycleToken)
+            && this._roundStartResolverCurrentRewardId === reward.id
+            && !this._resolvedRoundStartRewardIds.has(reward.id);
+        const finishReward = () => {
+            if (!isCurrent() || !this.sys_completeRoundStartReward(reward.id)) return false;
+            this._roundStartResolverActive = false;
+            eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                round: this.round || 1,
+                pendingCount: this.pendingRoundStartRewards.length,
+                totalCount: totalRewards,
+                resolvedCount: currentRewardIndex,
+                currentRewardType: rewardType,
+                rewardId: reward.id,
+            });
+            return true;
+        };
+
         eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_STARTED, {
             round: this.round || 1,
             pendingCount: this.pendingRoundStartRewards.length,
-            totalCount: this._roundStartResolverTotalCount || this.pendingRoundStartRewards.length,
+            totalCount: totalRewards,
+            rewardId: reward.id,
         });
 
-        while (this.pendingRoundStartRewards.length > 0) {
-            const reward = this.pendingRoundStartRewards.shift();
-            if (!reward) continue;
+        const rewardLabel = rewardType === 'relic' ? '遗物线索'
+            : rewardType === 'marble_pack' ? '杂色弹珠包'
+                : rewardType === 'run_resource_pack' ? '局内资源包'
+                    : rewardType === 'pure_essence' ? '纯净精华' : '混沌精华';
+        if (totalRewards > 1) showToast(`回合奖励 ${currentRewardIndex}/${totalRewards}：${rewardLabel}`);
 
-            const rewardType = reward.type === 'essence' ? 'marble_pack' : reward.type;
-            const totalRewards = this._roundStartResolverTotalCount || (this.pendingRoundStartRewards.length + 1);
-            const currentRewardIndex = Math.max(1, totalRewards - this.pendingRoundStartRewards.length);
-            const rewardLabel = rewardType === 'relic'
-                ? '遗物线索'
-                : rewardType === 'marble_pack'
-                    ? '杂色弹珠包'
-                : rewardType === 'run_resource_pack'
-                    ? '局内资源包'
-                : rewardType === 'pure_essence'
-                    ? '纯净精华'
-                    : '混沌精华';
-            if (totalRewards > 1) {
-                showToast(`回合奖励 ${currentRewardIndex}/${totalRewards}：${rewardLabel}`);
-            }
-
-            if (rewardType === 'relic') {
-                const startSelection = () => {
-                    // [BUGFIX tsk-agnet-stage] 必须在 loot 飞行动画 callback 内才清除 resolver 标志，
-                    // 而不是动画播放前。否则在动画播放（300~600ms）期间 _roundStartResolverActive=false
-                    // 且遗物 overlay 尚未挂上 active-phase，phase_combat_update 在 ammoQueue 为空时
-                    // 会误触发敌人回合，表现为「打出最后一发子弹后下一个阶段不进入」。
-                    this._roundStartResolverActive = false;
-                    if (typeof this.ui_showRelicSelection === 'function') {
-                        this.ui_showRelicSelection({ resumeTarget: 'round_start_resolver', source: reward.source || 'unknown' });
-                    }
-                };
-
-                // 检查是否有掉落坐标，播放飞行动画
-                if (reward.dropX !== undefined && reward.dropY !== undefined) {
-                    // 移除场上的掉落物实体
-                    if (this.fieldLootItems) {
-                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
-                        if (item) item.active = false;
-                    }
-                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, 'relic', startSelection);
-                } else {
-                    startSelection();
-                }
-                return;
-            }
-
-            if (rewardType === 'marble_pack') {
-                const startPackGrind = () => {
-                    this._roundStartResolverActive = false;
-                    eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
-                        round: this.round || 1,
-                        pendingCount: this.pendingRoundStartRewards.length,
-                        totalCount: totalRewards,
-                        resolvedCount: currentRewardIndex,
-                        currentRewardType: rewardType,
-                    });
-                    this._roundStartResolverTotalCount = 0;
-                    if (typeof this.sys_startMarblePackGrind === 'function') this.sys_startMarblePackGrind(reward);
-                };
-                if (reward.dropX !== undefined && reward.dropY !== undefined && typeof this.ui_playLootToCardAnimation === 'function') {
-                    if (this.fieldLootItems) {
-                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
-                        if (item) item.active = false;
-                    }
-                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, startPackGrind);
-                } else if (typeof this.ui_playLootToCardAnimation === 'function') {
-                    const x = (this.width || 400) / 2;
-                    const y = Math.max(90, (this.height || 700) * 0.34);
-                    this.ui_playLootToCardAnimation(x, y, rewardType, startPackGrind);
-                } else {
-                    startPackGrind();
-                }
-                return;
-            }
-
-            if (rewardType === 'run_resource_pack') {
-                const grantPack = () => {
-                    if (typeof this.sys_grantRunResourcePack === 'function') this.sys_grantRunResourcePack(reward);
-                    if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
-                };
+        // @section:resolver_reward_animation - 奖励动画与延迟续接
+        const deactivateFieldLoot = () => {
+            const item = (this.fieldLootItems || []).find(entry => entry.id === reward.lootItemId);
+            if (item) item.active = false;
+        };
+        const playRewardAnimation = (callback) => {
+            if (reward.dropX !== undefined && reward.dropY !== undefined) deactivateFieldLoot();
+            if (typeof this.ui_playLootToCardAnimation !== 'function') return callback();
+            const x = reward.dropX !== undefined ? reward.dropX : (this.width || 400) / 2;
+            const y = reward.dropY !== undefined ? reward.dropY : Math.max(90, (this.height || 700) * 0.34);
+            const animationPhase = this.phase;
+            const cancelRewardContinuation = () => {
+                if (this._roundStartResolverCurrentRewardId !== reward.id
+                    || this._resolvedRoundStartRewardIds.has(reward.id)) return false;
                 this._roundStartResolverActive = false;
-                eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
-                    round: this.round || 1,
-                    pendingCount: this.pendingRoundStartRewards.length,
-                    totalCount: totalRewards,
-                    resolvedCount: currentRewardIndex,
-                    currentRewardType: rewardType,
-                });
-                if (reward.dropX !== undefined && reward.dropY !== undefined && typeof this.ui_playLootToCardAnimation === 'function') {
-                    if (this.fieldLootItems) {
-                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
-                        if (item) item.active = false;
-                    }
-                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, grantPack);
-                } else if (typeof this.ui_playLootToCardAnimation === 'function') {
-                    const x = (this.width || 400) / 2;
-                    const y = Math.max(90, (this.height || 700) * 0.34);
-                    this.ui_playLootToCardAnimation(x, y, rewardType, grantPack);
-                } else {
-                    grantPack();
+                this._roundStartResolverCurrentRewardId = null;
+                return true;
+            };
+            const continueAfterAnimation = () => {
+                if (!isCurrent()) return false;
+                if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                    return this.sys_runOrDeferLifecycleContinuation(
+                        `round-reward:${reward.id}:animation`,
+                        callback,
+                        {
+                            token: lifecycleToken,
+                            expectedPhase: animationPhase,
+                            onCancel: cancelRewardContinuation,
+                        }
+                    );
                 }
-                return;
-            }
+                if (this.phase !== animationPhase) return cancelRewardContinuation();
+                return callback();
+            };
+            return this.ui_playLootToCardAnimation(x, y, rewardType, continueAfterAnimation);
+        };
 
-            if (rewardType === 'chaos_essence' || rewardType === 'pure_essence') {
-                const startSelection = () => {
-                    this.pendingSelectionMode = {
-                        mode: rewardType,
-                        requiredCount: rewardType === 'pure_essence' ? 1 : (CONFIG.gameplay.selectionReq || 3),
-                        sourceRewardType: rewardType,
+        // @section:resolver_reward_routes - 各奖励类型提交路由
+        if (rewardType === 'relic') {
+            const showRelic = () => {
+                if (!isCurrent()) return false;
+                this._roundStartResolverActive = false;
+                if (typeof this.ui_showRelicSelection === 'function') {
+                    this.ui_showRelicSelection({
+                        resumeTarget: 'round_start_resolver',
                         source: reward.source || 'unknown',
-                        round: reward.round || this.round || 1,
-                        enemyType: reward.enemyType || null,
-                    };
-                    this.fateMomentContext = {
-                        active: true,
-                        type: rewardType,
-                        source: reward.source || 'unknown',
-                        round: reward.round || this.round || 1,
-                        enemyType: reward.enemyType || null,
-                        sourceRewardType: rewardType,
-                    };
-                    // [bullet-charge-fix] 精华触发时，优先使用「上回合实际发射的子弹快照」
-                    // 作为充能子弹源（_lastFiredAmmoSnapshot），保证子弹替换后玩家保留的子弹
-                    // 在下回合精华触发时仍能正确充能；只有在快照不存在时才回退到 marbleQueue 编译。
-                    if (Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0) {
-                        this._chargedAmmoQueue = this._lastFiredAmmoSnapshot.map(r => {
-                            const recipe = { ...r };
-                            recipe.finalHits = 0;
-                            recipe.multicast = r.multicast || 0;
-                            return recipe;
-                        });
-                    } else if (this.marbleQueue && this.marbleQueue.length > 0) {
-                        this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
-                            const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                            const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
-                            recipe.finalHits = 0;
-                            recipe.multicast = marbleDef.multicast || 0;
-                            recipe._marbleType = marbleDef.type;
-                            return recipe;
-                        });
-                    } else {
-                        this._chargedAmmoQueue = null;
-                    }
-                    this._roundStartResolverActive = false;
-                    eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
-                        round: this.round || 1,
-                        pendingCount: this.pendingRoundStartRewards.length,
-                        totalCount: totalRewards,
-                        resolvedCount: currentRewardIndex,
-                        currentRewardType: rewardType,
+                        rewardId: reward.id,
                     });
-                    this._roundStartResolverTotalCount = 0;
-                    const progressPrefix = totalRewards > 1 ? `(${currentRewardIndex}/${totalRewards}) ` : '';
-                    showToast(progressPrefix + (rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精华'));
-                    this.sys_initSelectionPhase();
-                };
-
-                // 检查是否有掉落坐标，播放飞行动画
-                if (reward.dropX !== undefined && reward.dropY !== undefined) {
-                    // 移除场上的掉落物实体
-                    if (this.fieldLootItems) {
-                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
-                        if (item) item.active = false;
-                    }
-                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, startSelection);
-                } else {
-                    startSelection();
                 }
-                return;
+                return true;
+            };
+            if (reward.dropX !== undefined && reward.dropY !== undefined) {
+                return playRewardAnimation(showRelic);
             }
+            return showRelic();
         }
 
-        this._roundStartResolverActive = false;
-        this._roundStartResolverTotalCount = 0;
-        eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
-            round: this.round || 1,
-            pendingCount: 0,
-            totalCount: 0,
-            resolvedCount: 0,
-        });
-        // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入战斗阶段
-        if (this.sys_maybeOfferRunShopBeforeRoundStart()) return;
-        this.sys_showRoundStartBanner();
+        if (rewardType === 'marble_pack') {
+            return playRewardAnimation(() => {
+                if (!finishReward()) return false;
+                this._roundStartResolverTotalCount = 0;
+                return this.sys_startMarblePackGrind({ ...reward, rewardId: reward.id });
+            });
+        }
+
+        if (rewardType === 'run_resource_pack') {
+            return playRewardAnimation(() => {
+                if (!finishReward()) return false;
+                this.sys_grantRunResourcePack(reward);
+                return this.sys_startRoundStartResolver();
+            });
+        }
+
+        if (rewardType === 'chaos_essence' || rewardType === 'pure_essence') {
+            return playRewardAnimation(() => {
+                if (!finishReward()) return false;
+                this.pendingSelectionMode = {
+                    mode: rewardType,
+                    requiredCount: rewardType === 'pure_essence' ? 1 : (CONFIG.gameplay.selectionReq || 3),
+                    sourceRewardType: rewardType,
+                    source: reward.source || 'unknown',
+                    round: reward.round || this.round || 1,
+                    enemyType: reward.enemyType || null,
+                };
+                this.fateMomentContext = { active: true, ...this.pendingSelectionMode, type: rewardType };
+                if (Array.isArray(this._lastFiredAmmoSnapshot) && this._lastFiredAmmoSnapshot.length > 0) {
+                    this._chargedAmmoQueue = this._lastFiredAmmoSnapshot.map(recipe => ({
+                        ...recipe,
+                        finalHits: 0,
+                        multicast: recipe.multicast || 0,
+                    }));
+                } else if (Array.isArray(this.marbleQueue) && this.marbleQueue.length > 0) {
+                    this._chargedAmmoQueue = this.marbleQueue.map(marbleDef => {
+                        const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
+                        const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, (marbleDef.multicast || 0) > 0);
+                        return { ...recipe, finalHits: 0, multicast: marbleDef.multicast || 0, _marbleType: marbleDef.type };
+                    });
+                } else {
+                    this._chargedAmmoQueue = null;
+                }
+                this._roundStartResolverTotalCount = 0;
+                const progressPrefix = totalRewards > 1 ? `(${currentRewardIndex}/${totalRewards}) ` : '';
+                showToast(progressPrefix + (rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精华'));
+                this._roundStartCheckpointReady = false;
+                this.sys_initSelectionPhase();
+                return true;
+            });
+        }
+
+        if (finishReward()) return this.sys_startRoundStartResolver();
+        return false;
     },
 
     /**
      * @method sys_continueRoundStartResolver
      * @description 遗物选择关闭后继续处理剩余的下一回合开始奖励。
      */
-    sys_continueRoundStartResolver() {
-        this.sys_startRoundStartResolver();
+    sys_continueRoundStartResolver(rewardId = null) {
+        if (this._roundStartResolverActive) return false;
+        const currentRewardId = rewardId || this._roundStartResolverCurrentRewardId;
+        if (currentRewardId) {
+            if (!this.sys_completeRoundStartReward(currentRewardId)) return false;
+            this._roundStartResolverActive = false;
+            eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
+                round: this.round || 1,
+                pendingCount: (this.pendingRoundStartRewards || []).length,
+                rewardId: currentRewardId,
+            });
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        }
+        return this.sys_startRoundStartResolver();
     },
 
     /**
@@ -2188,6 +2610,8 @@ export const game_system = {
         const protectCombat = options.protectCombat !== false && enterCombat;
         const durationMs = Math.max(1200, Number(options.durationMs) || 2200);
         const round = this.round || 1;
+        const flowId = String(options.flowId || `round-banner:${this._runLifecycleEpoch || 0}:${round}:${enterCombat ? 'combat' : 'display'}`);
+        if (this._roundStartBannerFlowKey === flowId) return false;
         const banner = document.getElementById('round-start-banner');
         const bannerText = document.getElementById('round-start-banner-text');
         const threatEl = document.getElementById('round-start-threat');
@@ -2199,8 +2623,19 @@ export const game_system = {
 
         if (enterCombat && typeof this.ui_handlePotionAlchemyInterrupt === 'function'
             && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+            if (typeof this.sys_deferPotionBlockedContinuation === 'function') {
+                const retryOwner = typeof options.retryOwner === 'function'
+                    ? options.retryOwner
+                    : () => this.sys_showRoundStartBanner(options);
+                this.sys_deferPotionBlockedContinuation(
+                    `round-banner-blocked:${flowId}`,
+                    retryOwner,
+                    { expectedPhase: this.phase }
+                );
+            }
             return false;
         }
+        this._roundStartBannerFlowKey = flowId;
 
         // [BUGFIX] 切换到 combat 阶段前，显式重置敌人回合状态。
         // 根因：phase_switchPhase('combat') 会让主循环 sys_loop 立即开始执行
@@ -2281,8 +2716,7 @@ export const game_system = {
             }
         }
 
-        // 横幅结束后隐藏；默认路径直接进入战斗阶段（无精华时跳过研磨）
-        setTimeout(() => {
+        const cleanupBanner = () => {
             if (banner) {
                 banner.classList.remove('round-banner-show', 'round-banner-glow');
                 banner.classList.remove('round-banner-has-threat');
@@ -2291,15 +2725,53 @@ export const game_system = {
             if (leftSidebar) {
                 leftSidebar.classList.remove('ammo-panel-charging', 'ammo-panel-charging-simple');
             }
+            if (protectCombat) this._roundStartBannerActive = false;
+        };
+        const cancelBanner = () => {
+            cleanupBanner();
+            if (this._roundStartBannerFlowKey === flowId) this._roundStartBannerFlowKey = null;
+            if (this._roundStartTerminalKey === flowId) this._roundStartTerminalKey = null;
+        };
+
+        // 横幅结束后隐藏；默认路径直接进入战斗阶段（无精华时跳过研磨）
+        const finishBanner = () => {
+            cleanupBanner();
             // Normal round start goes to combat; essence-triggered grinding is handled by ui_confirmSelection.
             // [BUGFIX 2] 横幅结束，清除保护标志，再进入战斗阶段
-            if (protectCombat) this._roundStartBannerActive = false;
             if (typeof options.onComplete === 'function') {
                 options.onComplete();
             } else if (enterCombat) {
                 this.phase_startCombatPhase();
             }
-        }, durationMs);
+        };
+        const lifecycleToken = typeof this.sys_captureLifecycleToken === 'function'
+            ? this.sys_captureLifecycleToken()
+            : null;
+        const expectedPhase = enterCombat ? 'combat' : this.phase;
+        const runFinishBanner = () => {
+            if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                const result = this.sys_runOrDeferLifecycleContinuation(
+                    `round-banner:${flowId}`,
+                    finishBanner,
+                    {
+                        token: lifecycleToken,
+                        expectedPhase,
+                        onCancel: cancelBanner,
+                    }
+                );
+                if (result === 'deferred') cleanupBanner();
+                return result;
+            }
+            return finishBanner();
+        };
+        if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+            this.sys_scheduleLifecycleTimeout(runFinishBanner, durationMs, {
+                token: lifecycleToken,
+                onCancel: cancelBanner,
+            });
+        } else {
+            setTimeout(runFinishBanner, durationMs);
+        }
         return true;
     },
 
@@ -2572,6 +3044,78 @@ export const game_system = {
         return panel.style.display !== '' && panel.style.display !== 'none';
     },
 
+    input_getEventIdentity(e) {
+        const touch = (e?.changedTouches && e.changedTouches.length > 0)
+            ? e.changedTouches[0]
+            : ((e?.touches && e.touches.length > 0) ? e.touches[0] : null);
+        if (touch && touch.identifier !== undefined) return `touch:${touch.identifier}`;
+        if (e && e.pointerId !== undefined) return `pointer:${e.pointerId}`;
+        return 'mouse';
+    },
+
+    input_isMatchingActiveInteraction(e) {
+        if (!this._activeInputIdentity) return true;
+        return this._activeInputIdentity === this.input_getEventIdentity(e);
+    },
+
+    /**
+     * Shared, idempotent end/cancel cleanup. Only the normal end path may commit
+     * a shot; cancellation always drops every pointer/drag/charge transient.
+     */
+    input_finishActiveInteraction(pos, e, options = {}) {
+        const commit = options.commit === true;
+        const wasDragging = !!this.isDragging;
+        const wasTiltingGrip = !!this.isTiltingGrip;
+        const targetPos = this.dragCurrent || this.lastMousePos || pos;
+
+        this.isDragging = false;
+        this.dragStart = null;
+        this.dragCurrent = null;
+        this.isTiltingGrip = false;
+        this.gripStartPos = null;
+        this._activeInputIdentity = null;
+        this._activeInputType = null;
+
+        if (wasTiltingGrip && this.boardTilt) {
+            this.boardTilt.target = { x: 0, y: 0 };
+        }
+
+        if (!commit) {
+            this.pendingFireVelocity = null;
+            this.pendingFireOrigin = null;
+            this.isChargingShot = false;
+            this.chargeProgress = 0;
+            return wasDragging || wasTiltingGrip;
+        }
+
+        if (wasDragging && targetPos) {
+            const launcherGeometry = calcCombatLauncherGeometryToTarget(this.width, this.height, targetPos);
+            const aimVector = targetPos.sub(launcherGeometry.port);
+            if (aimVector.y < -20) {
+                this.sys_resetMultiplier();
+                this.pendingFireVelocity = aimVector.norm().mult(12);
+                this.pendingFireOrigin = launcherGeometry.muzzle;
+                this.isChargingShot = true;
+                this.chargeProgress = 0;
+                audio.playTone(800, 'sine', 0.1, 0.1);
+            } else {
+                this.pendingFireVelocity = null;
+                this.pendingFireOrigin = null;
+                this.isChargingShot = false;
+                this.chargeProgress = 0;
+            }
+        }
+        return wasDragging || wasTiltingGrip;
+    },
+
+    input_cancelActiveInteraction(e, options = {}) {
+        if (e?.cancelable && typeof e.preventDefault === 'function') e.preventDefault();
+        return this.input_finishActiveInteraction(this.lastMousePos || null, e, {
+            commit: false,
+            reason: options.reason || 'cancel',
+        });
+    },
+
     /**
      * @method input_handleInputStart
      * @description 处理输入开始（鼠标按下/触摸开始）。
@@ -2608,6 +3152,12 @@ export const game_system = {
             // ui_handleSelectionClick 从未在任何历史版本中实现，是 AI 重构时引入的幽灵调用
             return;
         }
+
+        if (this._activeInputIdentity && !this.input_isMatchingActiveInteraction(e)) {
+            this.input_cancelActiveInteraction(null, { reason: 'superseded_input' });
+        }
+        this._activeInputIdentity = this.input_getEventIdentity(e);
+        this._activeInputType = e?.type || 'unknown';
 
         if (this.phase === 'gathering') {
             if (this.fortuneWheel.active && this.fortuneWheel.isPointInside(logicPos)) {
@@ -2684,32 +3234,17 @@ export const game_system = {
      * @description 处理输入结束（松手发射）。
      */
     input_handleInputEnd(pos, e) {
-        // [BUGFIX] 符文发射器打开时，屏蔽 canvas 输入结束事件，防止误触发射。
-        if (this._isRuneLauncherOpen()) return;
-        // [v2 重构] 编辑模式下不响应发射 / 倾斜结束逻辑。
-        if (this._moduleEditorActive) return;
-
-        if (this.isDragging) {
-            this.isDragging = false;
-            const targetPos = this.dragCurrent || this.lastMousePos;
-            const launcherGeometry = calcCombatLauncherGeometryToTarget(this.width, this.height, targetPos);
-            const aimVector = targetPos.sub(launcherGeometry.port);
-            if (aimVector.y < -20) {
-                this.sys_resetMultiplier();
-                this.pendingFireVelocity = aimVector.norm().mult(12);
-                this.pendingFireOrigin = launcherGeometry.muzzle;
-                this.isChargingShot = true;
-                this.chargeProgress = 0;
-                audio.playTone(800, 'sine', 0.1, 0.1);
-            } else {
-                this.pendingFireOrigin = null;
-            }
+        if (!this.input_isMatchingActiveInteraction(e)) return false;
+        // Overlay/editor can appear between pointer-down and pointer-up. The end
+        // event must still clean the old gesture, but it must never fire through.
+        if (this._isRuneLauncherOpen() || this._moduleEditorActive) {
+            return this.input_cancelActiveInteraction(e, { reason: 'overlay_opened' });
         }
+        return this.input_finishActiveInteraction(pos, e, { commit: true });
+    },
 
-        if (this.isTiltingGrip) {
-            this.isTiltingGrip = false;
-            this.boardTilt.target = { x: 0, y: 0 };
-        }
+    input_handleInputCancel(e) {
+        return this.input_cancelActiveInteraction(e, { reason: e?.type || 'input_cancel' });
     },
 
     /**
@@ -2802,13 +3337,257 @@ export const game_system = {
 
     // ==================== [局内存档] ====================
 
+    sys_getRunSavePoint() {
+        if (this.gameOver || ['shop', 'truth_book', 'gameover', 'training'].includes(this.phase)) return null;
+        if (this._roundStartResolverActive || this._roundStartBannerActive || this._roundStartRelicHookDelayActive) return null;
+        if (this._relicOverlaySession?.active || this._runShopSession?.active) return null;
+        if (this._chaosSlotMachineActive || this._inWallClearLotteryActive) return null;
+
+        const hasLiveProjectiles = (this.projectiles || []).some(projectile => projectile && projectile.active !== false);
+        const hasPendingBursts = (this.burstQueue || []).length > 0 || (this.pendingShots || []).length > 0;
+        if (hasLiveProjectiles || hasPendingBursts || this.pendingFireVelocity || this.isChargingShot) return null;
+
+        if (this._roundStartCheckpointReady && !this._roundStartResolverCurrentRewardId) {
+            return 'round_start';
+        }
+        if (this.phase === 'meta') return null;
+        if (this.phase === 'selection') return 'selection';
+        if (this.phase === 'gathering') {
+            const hasActiveOrbs = (this.energyOrbs || []).some(orb => orb && orb.active !== false);
+            const hasActiveSessions = (this.gatheringSessions || []).some(session => session && !session.isFinished);
+            const hasSpinningWheel = !!this.isWheelSpinning
+                || (this.triangleSideWheels || []).some(wheel => wheel && wheel.spinning);
+            const hasSettledAmmo = (this.ammoQueue || []).length > 0;
+            if ((this.dropBalls || []).length > 0 || hasActiveOrbs || hasActiveSessions
+                || hasSpinningWheel || hasSettledAmmo) return null;
+            return 'gathering_idle';
+        }
+        if (this.phase === 'combat') {
+            if (!this._combatCheckpointReady || this.isEnemyTurn || this.enemyWaveActive || this._runeClaimPending) return null;
+            return 'combat_idle';
+        }
+        return null;
+    },
+
+    /**
+     * Restore a checkpoint captured after combat round initialization without
+     * running that initialization a second time. The saved ammo/enemy state is
+     * already authoritative; this path only reactivates the phase and its UI.
+     */
+    sys_resumeCombatCheckpoint() {
+        this._combatCheckpointReady = false;
+        if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('combat');
+        else this.phase = 'combat';
+        if (typeof this.ui_updateUICache === 'function') this.ui_updateUICache();
+        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+        return true;
+    },
+
+    sys_validateRunStatePayload(state) {
+        if (!state || typeof state !== 'object' || Array.isArray(state)) return { valid: false, reason: 'not_object' };
+        if (state.schema !== RUN_STATE_SCHEMA) return { valid: false, reason: 'schema' };
+        if (state.version !== RUN_STATE_VERSION) return { valid: false, reason: 'version' };
+        if (!RUN_SAVE_POINTS.has(state.resumePoint)) return { valid: false, reason: 'resume_point' };
+        if (!Number.isInteger(state.round) || state.round < 1) return { valid: false, reason: 'round' };
+        if (!['meta', 'selection', 'gathering', 'combat'].includes(state.phase)
+            || (state.phase === 'meta' && state.resumePoint !== 'round_start')) {
+            return { valid: false, reason: 'phase' };
+        }
+        const validPhaseForResumePoint = {
+            round_start: new Set(['meta', 'combat']),
+            selection: new Set(['selection']),
+            gathering_idle: new Set(['gathering']),
+            combat_idle: new Set(['combat']),
+        };
+        if (!validPhaseForResumePoint[state.resumePoint]?.has(state.phase)) {
+            return { valid: false, reason: 'phase_resume_mismatch' };
+        }
+        const requiredArrayFields = [
+            'ammoQueue', 'marbleQueue', 'marblesPool', 'selectedMarbles',
+            'pendingRoundStartRewards', 'enemies', 'pegs', 'specialSlots',
+            'bottomRewardZones', 'projectiles',
+            'ownedRelics', 'unlockedSlots', 'purchasedSkillIds', 'equippedSkillIds',
+            'seenSkillIds', 'activeRunewordIds', 'knownPotionSpellIds',
+            'potionRecipeHistory', 'runeInventory', 'runeGrid', 'guaranteedNextRound',
+            'bossHistory', 'directorSeenAffixes', 'resolvedRoundStartRewardIds',
+            'unlockedModuleTypes', 'ownedModuleComponents', 'pendingFusions',
+            'runShopInventory', 'activeSkills', 'windAnchors', 'stormCores',
+            'bossDefeatedLog', 'roundDamageHistory',
+        ];
+        const optionalArrayFields = ['_chargedAmmoQueue', '_lastFiredAmmoSnapshot', '_carryOverAmmo', 'currentModuleLayout'];
+        if (requiredArrayFields.some(field => !Array.isArray(state[field]))
+            || optionalArrayFields.some(field => state[field] != null && !Array.isArray(state[field]))
+            || state.projectiles.length > 0
+            || state.runeGrid.length !== 9) {
+            return { valid: false, reason: 'queues' };
+        }
+        const maxSelection = Math.max(1, CONFIG.gameplay.selectionReq || 3);
+        const validSelectionModes = new Set(['standard', 'chaos_essence', 'pure_essence']);
+        const selectedMarblesValid = state.selectedMarbles.every(index => Number.isInteger(index)
+            && index >= 0 && index < state.marblesPool.length)
+            && new Set(state.selectedMarbles).size === state.selectedMarbles.length;
+        const replaceContext = state.replaceAmmoContext;
+        const replaceRecipes = replaceContext && typeof replaceContext === 'object' && !Array.isArray(replaceContext)
+            ? [...(Array.isArray(replaceContext.newRecipes) ? replaceContext.newRecipes : []),
+                ...(Array.isArray(replaceContext.chargedRecipes) ? replaceContext.chargedRecipes : [])]
+            : [];
+        const replaceContextValid = replaceContext == null || (
+            typeof replaceContext === 'object' && !Array.isArray(replaceContext)
+            && replaceContext.active === true
+            && Array.isArray(replaceContext.newRecipes)
+            && Array.isArray(replaceContext.chargedRecipes)
+            && Array.isArray(replaceContext.selectedIndices)
+            && replaceRecipes.length > 0
+            && replaceContext.selectedIndices.every(index => Number.isInteger(index)
+                && index >= 0 && index < replaceRecipes.length)
+            && new Set(replaceContext.selectedIndices).size === replaceContext.selectedIndices.length
+            && replaceContext.selectedIndices.length <= Math.min(maxSelection, replaceRecipes.length)
+            && replaceRecipes.every(recipe => recipe && typeof recipe === 'object' && !Array.isArray(recipe))
+        );
+        if (!Number.isInteger(state.selectionRequiredCount)
+            || state.selectionRequiredCount < 1
+            || state.selectionRequiredCount > maxSelection
+            || !validSelectionModes.has(state.selectionMode)
+            || !selectedMarblesValid
+            || !replaceContextValid
+            || !_isValidRoundBoostMap(state.assimilationBoostRounds)
+            || !_isValidRoundBoostMap(state.doubleAssimilationBoostRounds)) {
+            return { valid: false, reason: 'selection_shape' };
+        }
+        const malformedRecipe = state.ammoQueue.some(recipe => !recipe || typeof recipe !== 'object' || Array.isArray(recipe));
+        const malformedMarble = [...state.marbleQueue, ...state.marblesPool]
+            .some(marble => !marble || typeof marble !== 'object' || typeof marble.type !== 'string'
+                || (marble.collected != null && !Array.isArray(marble.collected))
+                || (marble.runeSlots != null && !Array.isArray(marble.runeSlots)));
+        const malformedEnemy = state.enemies.some(enemy => {
+            if (!enemy || typeof enemy !== 'object' || Array.isArray(enemy)
+                || !['x', 'y', 'width', 'height', 'hp', 'maxHp'].every(field => Number.isFinite(enemy[field]))
+                || typeof enemy.type !== 'string'
+                || (enemy.affixes != null && !Array.isArray(enemy.affixes))
+                || (enemy.footprintCells != null && !Array.isArray(enemy.footprintCells))
+                || (enemy.footprintMask != null && (!Array.isArray(enemy.footprintMask)
+                    || !enemy.footprintMask.every(row => Array.isArray(row))))
+                || (enemy.dropTargetY != null && !Number.isFinite(enemy.dropTargetY))
+                || (enemy.entranceTimer != null && !Number.isFinite(enemy.entranceTimer))
+                || (enemy._entranceStartY != null && !Number.isFinite(enemy._entranceStartY))
+                || (enemy.rewardType != null && typeof enemy.rewardType !== 'string')
+                || (enemy._pendingRewardType != null && typeof enemy._pendingRewardType !== 'string')) return true;
+            if (enemy.collisionShape === 'polygon') {
+                return !enemy.collisionData || typeof enemy.collisionData !== 'object'
+                    || !Array.isArray(enemy.collisionData.vertices)
+                    || enemy.collisionData.vertices.length < 3
+                    || enemy.collisionData.vertices.some(vertex => !vertex
+                        || !Number.isFinite(vertex.x) || !Number.isFinite(vertex.y));
+            }
+            if (enemy.collisionShape === 'arc') {
+                return !enemy.collisionData || typeof enemy.collisionData !== 'object'
+                    || !['radius', 'startAngle', 'endAngle', 'thickness']
+                        .every(field => Number.isFinite(enemy.collisionData[field]));
+            }
+            return enemy.collisionShape != null && enemy.collisionShape !== 'aabb';
+        });
+        const malformedPeg = state.pegs.some(peg =>
+            !peg || typeof peg !== 'object' || Array.isArray(peg)
+            || typeof peg.type !== 'string' || !Number.isFinite(peg.x) || !Number.isFinite(peg.y)
+            || (peg.segment != null && (typeof peg.segment !== 'object'
+                || !['x1', 'y1', 'x2', 'y2'].every(field => Number.isFinite(peg.segment[field])))));
+        const malformedSpecialSlot = state.specialSlots.some(slot =>
+            !slot || typeof slot !== 'object' || Array.isArray(slot)
+            || typeof slot.type !== 'string'
+            || !['x', 'y', 'x2', 'y2'].every(field => Number.isFinite(slot[field]))
+            || (slot.pegIndex != null && (!Number.isInteger(slot.pegIndex)
+                || slot.pegIndex < 0 || slot.pegIndex >= state.pegs.length))
+            || (slot.pegIndex2 != null && (!Number.isInteger(slot.pegIndex2)
+                || slot.pegIndex2 < 0 || slot.pegIndex2 >= state.pegs.length)));
+        const malformedRewardZone = state.bottomRewardZones.some(zone =>
+            !zone || typeof zone !== 'object' || Array.isArray(zone)
+            || typeof zone.id !== 'string' || typeof zone.type !== 'string'
+            || !['x', 'y', 'w', 'h', 'entryX1', 'entryX2'].every(field => Number.isFinite(zone[field])));
+        const malformedWindAnchor = state.windAnchors.some(anchor =>
+            !anchor || typeof anchor !== 'object' || Array.isArray(anchor)
+            || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y));
+        const malformedStormCore = state.stormCores.some(core =>
+            !core || typeof core !== 'object' || Array.isArray(core)
+            || !core.pos || !Number.isFinite(core.pos.x) || !Number.isFinite(core.pos.y)
+            || !Number.isFinite(core.radius) || !Number.isFinite(core.energy)
+            || !Number.isFinite(core.energyRequired));
+        const malformedReward = state.pendingRoundStartRewards.some(reward =>
+            !reward || typeof reward !== 'object' || typeof reward.id !== 'string' || !reward.id
+            || !['relic', 'marble_pack', 'run_resource_pack', 'chaos_essence', 'pure_essence', 'essence'].includes(reward.type));
+        const malformedRelic = state.ownedRelics.some(relicId => typeof relicId !== 'string');
+        const malformedSkillCharge = !Number.isFinite(state.skillChargeActualValue)
+            || !Number.isFinite(state.skillChargeLevel);
+        if (malformedRecipe || malformedMarble || malformedEnemy || malformedPeg
+            || malformedSpecialSlot || malformedRewardZone
+            || malformedWindAnchor || malformedStormCore
+            || malformedReward || malformedRelic || malformedSkillCharge) {
+            return { valid: false, reason: 'payload_shape' };
+        }
+        if (!state.activeRunewordEffects || typeof state.activeRunewordEffects !== 'object'
+            || Array.isArray(state.activeRunewordEffects)
+            || !Number.isInteger(state.runewordKillCount) || state.runewordKillCount < 0
+            || typeof state.prevRoundCleared !== 'boolean') {
+            return { valid: false, reason: 'runeword_state' };
+        }
+        const rewardIds = state.pendingRoundStartRewards.map(reward => reward?.id).filter(Boolean);
+        if (rewardIds.length !== state.pendingRoundStartRewards.length || new Set(rewardIds).size !== rewardIds.length) {
+            return { valid: false, reason: 'reward_ids' };
+        }
+        const routeInvalid = (state.resumePoint === 'selection'
+            && !(replaceContext?.active || state.marblesPool.length > 0))
+            || (state.resumePoint === 'gathering_idle'
+                && (state.ammoQueue.length > 0 || state.marbleQueue.length === 0))
+            || (state.resumePoint === 'combat_idle' && state.ammoQueue.length === 0);
+        if (routeInvalid) return { valid: false, reason: 'resume_invariant' };
+        return { valid: true, reason: null };
+    },
+
+    sys_getRunStateSummary(options = {}) {
+        const raw = localStorage.getItem('echo_alchemist_run_state');
+        if (!raw) return { valid: false, reason: 'missing', round: null, phase: null };
+        try {
+            const state = JSON.parse(raw);
+            const validation = this.sys_validateRunStatePayload(state);
+            if (!validation.valid) {
+                if (options.discardInvalid !== false) localStorage.removeItem('echo_alchemist_run_state');
+                return { ...validation, round: null, phase: null };
+            }
+            return {
+                valid: true,
+                reason: null,
+                round: state.round,
+                phase: state.phase,
+                resumePoint: state.resumePoint,
+                savedAt: state.savedAt || null,
+                state,
+            };
+        } catch (error) {
+            if (options.discardInvalid !== false) localStorage.removeItem('echo_alchemist_run_state');
+            return { valid: false, reason: 'parse', round: null, phase: null };
+        }
+    },
+
     /**
      * @method sys_saveRunState
      * @description 将当前局内关键状态序列化到 localStorage，供刷新后恢复。
      * 应在每回合结算完毕（phase_finalizeRound 末尾）调用。
      */
     sys_saveRunState() {
+
+        // @section:save_checkpoint_guard - 安全点与恢复写守卫
+        if (this._runStateRestoreActive) return false;
+        if (!this._retryingPotionBlockedContinuation
+            && typeof this.sys_retryPotionBlockedContinuation === 'function') {
+            this.sys_retryPotionBlockedContinuation();
+        }
+        const resumePoint = this.sys_getRunSavePoint();
+        if (!resumePoint) {
+            if (CONFIG.debug) console.info('[RunSave] 跳过非安全点存档', this.phase);
+            return false;
+        }
         try {
+            // @section:save_enemy_snapshot - 敌人与碰撞状态快照
             // --- 序列化 enemies ---
             const enemiesData = (this.enemies || []).map(e => {
                 const d = {
@@ -2816,6 +3595,17 @@ export const game_system = {
                     width: e.width, height: e.height,
                     hp: e.hp, maxHp: e.maxHp,
                     type: e.type, affixes: e.affixes ? [...e.affixes] : [],
+                    active: e.active !== false,
+                    dropTargetY: Number.isFinite(e.dropTargetY) ? e.dropTargetY : e.pos.y,
+                    entranceTimer: Number.isFinite(e.entranceTimer) ? e.entranceTimer : 0,
+                    _entranceStartY: Number.isFinite(e._entranceStartY) ? e._entranceStartY : null,
+                    _pendingEntrance: !!e._pendingEntrance,
+                    _spawnedThisTurn: !!e._spawnedThisTurn,
+                    hasActedThisTurn: !!e.hasActedThisTurn,
+                    rewardType: e.rewardType,
+                    _pendingRewardType: e._pendingRewardType,
+                    _roundStartRewardQueued: !!e._roundStartRewardQueued,
+                    isClone: !!e.isClone,
                     baseArchetype: e.baseArchetype || null,
                     gridCols: e.gridCols || 1,
                     gridRows: e.gridRows || 1,
@@ -2840,6 +3630,8 @@ export const game_system = {
                     carrierCooldown: e._carrierCooldown || 0,
                     temp: e.temp || 0,
                     frozenCount: e.frozenCount || 0,
+                    venomStacks: e.venomStacks || 0,
+                    wasFrozenLastTurn: !!e._wasFrozenLastTurn,
                     berserked: e.berserked || false,
                     rotationIndex: e.rotationIndex || 0,
                     rotationTurnCount: e.rotationTurnCount || 0,
@@ -2921,15 +3713,55 @@ export const game_system = {
                 return d;
             });
 
-            // --- 序列化 pegs（仅保存 type/level/frozenTurns/row/col，坐标由 initPachinko 重建）---
+            // @section:save_board_snapshot - 确定性钉盘几何快照
+            // A gathering checkpoint owns the exact generated board. Persist
+            // geometry as well as type state so reload cannot reroll pink pegs,
+            // reward lanes, barriers or random special-slot placement.
             const pegsData = (this.pegs || []).map(p => ({
+                x: p.pos?.x,
+                y: p.pos?.y,
                 type: p.type,
                 level: p.level || 1,
                 frozenTurns: p.frozenTurns || 0,
                 row: p.row,
                 col: p.col,
+                mirrorIdx: Number.isInteger(p.mirrorIdx) ? p.mirrorIdx : -1,
+                shape: p.shape || 'circle',
+                segment: p.segment ? { ...p.segment } : null,
+                thickness: Number.isFinite(p.thickness) ? p.thickness : null,
+                radius: Number.isFinite(p.radius) ? p.radius : null,
+                layoutRole: p.layoutRole || null,
+                rewardLaneType: p.rewardLaneType || null,
+                moduleSlotIdx: Number.isInteger(p.moduleSlotIdx) ? p.moduleSlotIdx : null,
+                infusedRuneId: p.infusedRuneId || null,
+                fusionSourceLevel: Number.isFinite(p.fusionSourceLevel) ? p.fusionSourceLevel : null,
             }));
+            const specialSlotsData = (this.specialSlots || []).map(slot => ({
+                x: slot.x,
+                y: slot.y,
+                x2: slot.x2,
+                y2: slot.y2,
+                type: slot.type,
+                persistent: !!slot.persistent,
+                activationCooldown: slot.activationCooldown || 0,
+                maxSessionCharges: slot.maxSessionCharges || 1,
+                launchSpeed: slot.launchSpeed || 13,
+                launchDirection: slot.launchDirection && typeof slot.launchDirection === 'object'
+                    ? { ...slot.launchDirection }
+                    : slot.launchDirection,
+                rotationSpeed: slot.rotationSpeed || 0,
+                rodCount: slot.rodCount || 5,
+                spinRadius: slot.spinRadius || 18,
+                spinVisual: slot.spinVisual !== false,
+                initialSpin: slot._spinAngle || 0,
+                pegIndex: Number.isInteger(slot.pegIndex) ? slot.pegIndex : null,
+                pegIndex2: Number.isInteger(slot.pegIndex2) ? slot.pegIndex2 : null,
+                moduleSlotIdx: Number.isInteger(slot.moduleSlotIdx) ? slot.moduleSlotIdx : null,
+                hit: !!slot.hit,
+            }));
+            const bottomRewardZonesData = (this.bottomRewardZones || []).map(zone => ({ ...zone }));
 
+            // @section:save_queue_snapshot - 弹珠与弹药队列快照
             // --- 序列化 marbleQueue（MarbleDefinition 对象）---
             const marbleQueueData = (this.marbleQueue || []).map(m => ({
                 type: m.type,
@@ -2951,8 +3783,13 @@ export const game_system = {
                 multicast: m.multicast || 0,
                 finalHits: m.finalHits || 0,
             }));
+            const ammoQueueData = (this.ammoQueue || []).map(recipe => JSON.parse(JSON.stringify(recipe)));
 
+            // @section:save_state_payload - 版本化运行态载荷
             const state = {
+                schema: RUN_STATE_SCHEMA,
+                version: RUN_STATE_VERSION,
+                resumePoint,
                 // 基础
                 phase: this.phase || 'meta',
                 round: this.round,
@@ -2960,11 +3797,19 @@ export const game_system = {
                 scoreMultiplier: this.scoreMultiplier || 1.0,
                 // 实体
                 enemies: enemiesData,
+                projectiles: [],
                 pegs: pegsData,
+                specialSlots: specialSlotsData,
+                bottomRewardZones: bottomRewardZonesData,
+                boardBottomY: Number.isFinite(this.boardBottomY) ? this.boardBottomY : 0,
+                ammoQueue: ammoQueueData,
                 marbleQueue: marbleQueueData,
                 marblesPool: marblesPoolData,
                 selectedMarbles: (this.selectedMarbles || []).slice(),
                 activeMarbleIndex: this.activeMarbleIndex || 0,
+                persistentThreshold: Number.isFinite(this.persistentThreshold)
+                    ? this.persistentThreshold
+                    : (CONFIG.gameplay.initTriggerThreshold || 1),
                 // 遗物
                 ownedRelics: (this.ownedRelics || []).slice(),
                 pinkPegCount: this.pinkPegCount || 0,
@@ -2990,11 +3835,12 @@ export const game_system = {
                 // 符文
                 runeInventory: (this.runeInventory || []).slice(),
                 runeGrid: (this.runeGrid || Array(9).fill(null)).slice(),
+                activeRunewordEffects: JSON.parse(JSON.stringify(this.activeRunewordEffects || {})),
                 // 弹珠解锁
                 unlockedWeights: { ...(this.unlockedWeights || {}) },
                 guaranteedNextRound: (this.guaranteedNextRound || []).slice(),
-                assimilationBoostRounds: { ...(this.assimilationBoostRounds || {}) },
-                doubleAssimilationBoostRounds: { ...(this.doubleAssimilationBoostRounds || {}) },
+                assimilationBoostRounds: _encodeRoundBoostMap(this.assimilationBoostRounds),
+                doubleAssimilationBoostRounds: _encodeRoundBoostMap(this.doubleAssimilationBoostRounds),
                 pendingSelectionMode: this.pendingSelectionMode ? { ...this.pendingSelectionMode } : null,
                 selectionMode: this.selectionMode || 'standard',
                 selectionRequiredCount: this.selectionRequiredCount || (CONFIG.gameplay.selectionReq || 3),
@@ -3013,6 +3859,7 @@ export const game_system = {
                 replaceAmmoContext: this.replaceAmmoContext ? JSON.parse(JSON.stringify(this.replaceAmmoContext)) : null, // [ammo-replace]
                 _chargedAmmoQueue: this._chargedAmmoQueue ? this._chargedAmmoQueue.map(r => ({ ...r })) : null, // [ammo-replace]
                 _lastFiredAmmoSnapshot: this._lastFiredAmmoSnapshot ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null, // [bullet-charge-fix]
+                _carryOverAmmo: this._carryOverAmmo ? this._carryOverAmmo.map(r => ({ ...r })) : null,
                 // Boss 系统
                 bossHistory: (this.bossHistory || []).slice(),
                 _pendingBossSpawn: this._pendingBossSpawn ? { ...this._pendingBossSpawn } : null,
@@ -3023,6 +3870,16 @@ export const game_system = {
                 _pendingBossRelic: this._pendingBossRelic || false,
                 _pendingRelicEvent: this._pendingRelicEvent || false,
                 pendingRoundStartRewards: (this.pendingRoundStartRewards || []).map(item => ({ ...item })),
+                resolvedRoundStartRewardIds: Array.from(this._resolvedRoundStartRewardIds || []),
+                roundStartRewardSequence: this._roundStartRewardSequence || 0,
+                roundStartResolver: {
+                    active: false,
+                    currentRewardId: null,
+                    totalCount: this._roundStartResolverTotalCount || 0,
+                },
+                overlayState: null,
+                marblePackGrindActive: !!this._marblePackGrindActive,
+                marblePackGrindKey: this._marblePackGrindKey || null,
                 // 难度
                 postBossMultiplier: this.postBossMultiplier || 1.0,
                 postBossSurgeRoundsLeft: this.postBossSurgeRoundsLeft || 0,
@@ -3055,8 +3912,21 @@ export const game_system = {
                 // 技能
                 skillPoints: this.skillPoints || 0,
                 activeSkills: (this.activeSkills || []).map(sk => sk.id || sk),
+                skillChargeActualValue: Number.isFinite(this.skillChargeActualValue) ? this.skillChargeActualValue : 0,
+                skillChargeLevel: Number.isFinite(this.skillChargeLevel) ? this.skillChargeLevel : 0,
+                windAnchors: (this.windAnchors || []).map(anchor => ({
+                    ...anchor,
+                    bulletConfig: anchor.bulletConfig ? { ...anchor.bulletConfig } : null,
+                })),
+                stormCores: (this.stormCores || []).map(core => ({
+                    ...core,
+                    pos: { x: core.pos?.x, y: core.pos?.y },
+                    bulletConfig: core.bulletConfig ? { ...core.bulletConfig } : null,
+                })),
                 // 统计
                 runKillCount: this.runKillCount || 0,
+                runewordKillCount: this.runewordKillCount || 0,
+                prevRoundCleared: !!this._prevRoundCleared,
                 runRuneFragmentsGained: this.runRuneFragmentsGained || 0,
                 bossDefeatedLog: (this.bossDefeatedLog || []).slice(),
                 roundDamageHistory: (this.roundDamageHistory || []).slice(),
@@ -3072,10 +3942,13 @@ export const game_system = {
                 // 时间戳
                 savedAt: Date.now(),
             };
+            // @section:save_atomic_commit - 原子写入与结果反馈
             localStorage.setItem('echo_alchemist_run_state', JSON.stringify(state));
             console.log(`[RunSave] 回合 ${this.round} 存档成功`);
+            return true;
         } catch (e) {
             console.error('[RunSave] 存档失败:', e);
+            return false;
         }
     },
 
@@ -3084,6 +3957,7 @@ export const game_system = {
      * @description 清除局内存档（游戏结束或新开一局时调用）。
      */
     sys_clearRunState() {
+        this.sys_invalidateRunLifecycle('clear_run_state');
         localStorage.removeItem('echo_alchemist_run_state');
         console.log('[RunSave] 局内存档已清除');
     },
@@ -3094,7 +3968,7 @@ export const game_system = {
      * @returns {boolean}
      */
     sys_hasRunState() {
-        return !!localStorage.getItem('echo_alchemist_run_state');
+        return this.sys_getRunStateSummary({ discardInvalid: true }).valid;
     },
 
     /**
@@ -3103,13 +3977,13 @@ export const game_system = {
      * 由 meta_continueRun() 调用。
      */
     sys_loadRunState() {
-        const raw = localStorage.getItem('echo_alchemist_run_state');
-        if (!raw) {
-            console.warn('[RunSave] 无局内存档可恢复');
-            return false;
-        }
+
+        // @section:load_preflight_reset - 校验与安全重置
+        const summary = this.sys_getRunStateSummary({ discardInvalid: true });
+        if (!summary.valid) return false;
+        this._runStateRestoreActive = true;
         try {
-            const state = JSON.parse(raw);
+            const state = summary.state;
             const savedPhase = state.phase || null;
 
             // --- 先重置游戏（清空实体、重置 UI）---
@@ -3117,10 +3991,12 @@ export const game_system = {
             // 注入局外升级（确保 CONFIG 参数正确）
             this.meta_applyUpgrades();
 
+            // @section:load_core_progression - 基础遗物符文选择态
             // --- 恢复基础字段 ---
             this.round = state.round || 1;
             this.score = state.score || 0;
             this.scoreMultiplier = state.scoreMultiplier || 1.0;
+            this.ammoQueue = (state.ammoQueue || []).map(recipe => JSON.parse(JSON.stringify(recipe)));
 
             // --- 恢复遗物 ---
             this.ownedRelics = (state.ownedRelics || []).slice();
@@ -3155,12 +4031,15 @@ export const game_system = {
             // --- 恢复符文 ---
             this.runeInventory = (state.runeInventory || []).slice();
             this.runeGrid = (state.runeGrid || Array(9).fill(null)).slice();
+            this.activeRunewordEffects = JSON.parse(JSON.stringify(state.activeRunewordEffects || {}));
 
             // --- 恢复弹珠解锁 ---
             this.unlockedWeights = { ...(state.unlockedWeights || {}) };
             this.guaranteedNextRound = (state.guaranteedNextRound || []).slice();
-            this.assimilationBoostRounds = { ...(state.assimilationBoostRounds || {}) };
-            this.doubleAssimilationBoostRounds = { ...(state.doubleAssimilationBoostRounds || state.assimilationBoostRounds || {}) };
+            this.assimilationBoostRounds = _decodeRoundBoostMap(state.assimilationBoostRounds);
+            this.doubleAssimilationBoostRounds = _decodeRoundBoostMap(
+                state.doubleAssimilationBoostRounds || state.assimilationBoostRounds
+            );
             this.pendingSelectionMode = state.pendingSelectionMode ? { ...state.pendingSelectionMode } : null;
             this.selectionMode = state.selectionMode || 'standard';
             this.bulletCapBonus = state.bulletCapBonus || 0;
@@ -3184,24 +4063,29 @@ export const game_system = {
                 const allRecipes = newRecipes.concat(chargedRecipes);
                 const bulletCap = (CONFIG.gameplay.selectionReq || 3);
                 const maxSelect = Math.min(bulletCap, allRecipes.length);
-                let selected = Array.isArray(this.replaceAmmoContext.selectedIndices)
+                const hasSavedSelection = Array.isArray(this.replaceAmmoContext.selectedIndices);
+                let selected = hasSavedSelection
                     ? this.replaceAmmoContext.selectedIndices.slice()
                     : [];
-                if (!selected.length && Number.isInteger(this.replaceAmmoContext.selectedIndex)) {
+                if (!hasSavedSelection && Number.isInteger(this.replaceAmmoContext.selectedIndex)) {
                     selected = [this.replaceAmmoContext.selectedIndex];
                 }
                 selected = [...new Set(selected.filter(i => i >= 0 && i < allRecipes.length))].slice(0, maxSelect);
-                for (let i = newRecipes.length; i < allRecipes.length && selected.length < maxSelect; i++) {
-                    if (!selected.includes(i)) selected.push(i);
-                }
-                for (let i = 0; i < allRecipes.length && selected.length < maxSelect; i++) {
-                    if (!selected.includes(i)) selected.push(i);
+                if (!hasSavedSelection) {
+                    for (let i = newRecipes.length; i < allRecipes.length && selected.length < maxSelect; i++) {
+                        if (!selected.includes(i)) selected.push(i);
+                    }
+                    for (let i = 0; i < allRecipes.length && selected.length < maxSelect; i++) {
+                        if (!selected.includes(i)) selected.push(i);
+                    }
                 }
                 this.replaceAmmoContext.selectedIndices = selected;
                 delete this.replaceAmmoContext.selectedIndex;
             }
             this._lastFiredAmmoSnapshot = state._lastFiredAmmoSnapshot ? state._lastFiredAmmoSnapshot.map(r => ({ ...r })) : null; // [bullet-charge-fix]
+            this._carryOverAmmo = state._carryOverAmmo ? state._carryOverAmmo.map(r => ({ ...r })) : null;
 
+            // @section:load_reward_director - 奖励队列与导演状态
             // --- 恢复 Boss 系统 ---
             this.bossHistory = (state.bossHistory || []).slice();
             this._pendingBossSpawn = state._pendingBossSpawn ? { ...state._pendingBossSpawn } : null;
@@ -3216,6 +4100,14 @@ export const game_system = {
                 type: item && item.type === 'essence' ? 'marble_pack' : item.type,
                 packId: item && item.packId ? item.packId : 'mixed',
             }));
+            this._resolvedRoundStartRewardIds = new Set(state.resolvedRoundStartRewardIds || []);
+            this._roundStartRewardSequence = state.roundStartRewardSequence || 0;
+            this._roundStartResolverTotalCount = state.roundStartResolver?.totalCount || this.pendingRoundStartRewards.length;
+            this._roundStartResolverActive = false;
+            this._roundStartResolverCurrentRewardId = null;
+            this._roundStartCheckpointReady = state.resumePoint === 'round_start';
+            this._marblePackGrindActive = !!state.marblePackGrindActive && state.resumePoint === 'gathering_idle';
+            this._marblePackGrindKey = state.marblePackGrindKey || null;
             if ((state._pendingRelicEvent || state._pendingBossRelic) && !this.pendingRoundStartRewards.some(item => item && item.type === 'relic')) {
                 this.pendingRoundStartRewards.push({ type: 'relic', amount: 0, source: 'legacy_save', round: state.round || 1, enemyType: null, enemyMaxHp: 0 });
             }
@@ -3228,6 +4120,7 @@ export const game_system = {
             this.difficultyGrowthFactor = state.difficultyGrowthFactor || 1.0;
             this.variantLevels = { ...(state.variantLevels || { flying_sword: 1 }) };
 
+            // @section:load_modules_economy - 模块商店技能与统计
             // --- 恢复钉盘形态 ---
             this.currentRows = state.currentRows || 0;
             this.boardLayout = state.boardLayout || 'default';
@@ -3279,11 +4172,29 @@ export const game_system = {
 
             // --- 恢复技能 ---
             this.skillPoints = state.skillPoints || 0;
+            this.skillChargeActualValue = Number.isFinite(state.skillChargeActualValue) ? state.skillChargeActualValue : 0;
+            this.skillChargeLevel = Number.isFinite(state.skillChargeLevel) ? state.skillChargeLevel : 0;
+            this.skillChargeTempValue = 0;
+            if (typeof this.combat_skillCharge_syncLegacyState === 'function') {
+                this.combat_skillCharge_syncLegacyState();
+            }
+            if (typeof this.combat_skillCharge_initUI === 'function') this.combat_skillCharge_initUI();
             this.ui.updateSkillPoints(this.skillPoints);
             this.ui?.updateSkillBar?.(this.skillPoints || 0, this.activeSkills || []);
+            this.windAnchors = state.windAnchors.map(anchor => ({
+                ...anchor,
+                bulletConfig: anchor.bulletConfig ? { ...anchor.bulletConfig } : null,
+            }));
+            this.stormCores = state.stormCores.map(core => ({
+                ...core,
+                pos: new Vec2(core.pos.x, core.pos.y),
+                bulletConfig: core.bulletConfig ? { ...core.bulletConfig } : null,
+            }));
 
             // --- 恢复统计 ---
             this.runKillCount = state.runKillCount || 0;
+            this.runewordKillCount = state.runewordKillCount || 0;
+            this._prevRoundCleared = !!state.prevRoundCleared;
             this.runRuneFragmentsGained = state.runRuneFragmentsGained || 0;
             this.bossDefeatedLog = (state.bossDefeatedLog || []).slice();
             this.roundDamageHistory = (state.roundDamageHistory || []).slice();
@@ -3296,9 +4207,21 @@ export const game_system = {
             // [V3 动态遗物保底] 恢复动态阈值，旧存档没有则随机生成一个
             this.nextRelicPityThreshold = state.nextRelicPityThreshold || (2 + Math.floor(Math.random() * 3));
 
+            // @section:load_enemy_hydration - 敌人与碰撞对象重建
             // --- 恢复 enemies ---
             this.enemies = (state.enemies || []).map(d => {
                 const e = new Enemy(d.x, d.y, d.width, d.height, d.hp, d.maxHp, d.type, d.affixes || []);
+                e.active = d.active !== false;
+                e.dropTargetY = Number.isFinite(d.dropTargetY) ? d.dropTargetY : d.y;
+                e.entranceTimer = Number.isFinite(d.entranceTimer) ? d.entranceTimer : 0;
+                e._entranceStartY = Number.isFinite(d._entranceStartY) ? d._entranceStartY : e.pos.y;
+                e._pendingEntrance = !!d._pendingEntrance;
+                e._spawnedThisTurn = !!d._spawnedThisTurn;
+                e.hasActedThisTurn = !!d.hasActedThisTurn;
+                if (Object.prototype.hasOwnProperty.call(d, 'rewardType')) e.rewardType = d.rewardType;
+                if (Object.prototype.hasOwnProperty.call(d, '_pendingRewardType')) e._pendingRewardType = d._pendingRewardType;
+                e._roundStartRewardQueued = !!d._roundStartRewardQueued;
+                e.isClone = !!d.isClone;
                 e.shieldCharges = d.shieldCharges || 0;
                 e.radiantAegis = d.radiantAegis || 0;
                 e.radiantAegisMax = d.radiantAegisMax || 0;
@@ -3323,6 +4246,8 @@ export const game_system = {
                 e._carrierCooldown = d.carrierCooldown || 0;
                 e.temp = d.temp || 0;
                 e.frozenCount = d.frozenCount || 0;
+                e.venomStacks = d.venomStacks || 0;
+                e._wasFrozenLastTurn = !!d.wasFrozenLastTurn;
                 e.berserked = d.berserked || false;
                 e.rotationIndex = d.rotationIndex || 0;
                 e.rotationTurnCount = d.rotationTurnCount || 0;
@@ -3403,21 +4328,24 @@ export const game_system = {
                 return e;
             });
 
+            // @section:load_board_hydration - 弹珠与确定性钉盘重建
             // --- 恢复 marbleQueue（重建 MarbleDefinition 对象）---
             // [ammo-replace 修复] 必须从存档恢复 marbleQueue，否则精华触发时
             // _chargedAmmoQueue 无法从 marbleQueue 编译（因为 marbleQueue 为空），
             // 导致研磨完成后子弹分配卡片不显示。
             if (state.marbleQueue && state.marbleQueue.length > 0) {
-                this.marbleQueue = state.marbleQueue.map(m => ({
-                    type: m.type || 'bounce',
-                    collected: Array.isArray(m.collected) ? [...m.collected] : [],
-                    runeSlots: Array.isArray(m.runeSlots) ? m.runeSlots.map(slot => ({ ...slot })) : [],
-                    maxRuneSlots: m.maxRuneSlots || 3,
-                    compiled: m.compiled || false,
-                    recipe: m.recipe ? { ...m.recipe } : null,
-                    multicast: m.multicast || 0,
-                    finalHits: m.finalHits || 0,
-                }));
+                this.marbleQueue = state.marbleQueue.map(m => {
+                    const marbleDef = new MarbleDefinition(m.type || 'bounce');
+                    marbleDef.collected = Array.isArray(m.collected) ? [...m.collected] : [];
+                    marbleDef.runeSlots = Array.isArray(m.runeSlots) ? m.runeSlots.map(slot => ({ ...slot })) : [];
+                    marbleDef.maxRuneSlots = m.maxRuneSlots || 3;
+                    if (typeof marbleDef.normalizeRuneSlots === 'function') marbleDef.normalizeRuneSlots();
+                    marbleDef.compiled = m.compiled || false;
+                    marbleDef.recipe = m.recipe ? { ...m.recipe } : null;
+                    marbleDef.multicast = m.multicast || 0;
+                    marbleDef.finalHits = m.finalHits || 0;
+                    return marbleDef;
+                });
             } else {
                 this.marbleQueue = [];
             }
@@ -3441,27 +4369,58 @@ export const game_system = {
                 ? state.selectedMarbles.filter(i => Number.isInteger(i) && i >= 0 && i < this.marblesPool.length)
                 : [];
             this.activeMarbleIndex = state.activeMarbleIndex || 0;
+            this.persistentThreshold = Number.isFinite(state.persistentThreshold)
+                ? state.persistentThreshold
+                : (CONFIG.gameplay.initTriggerThreshold || 1);
             this.gatheringSessions = [];
             this.currentSession = null;
 
-            // --- 恢复 pegs（通过 initPachinko 重建，然后覆盖 type/level/frozenTurns）---
-            // 先初始化钉盘（生成正确数量的钉子）
+            // Rebuild module-owned auxiliaries, then replace every randomized
+            // board entity with the validated checkpoint snapshot.
             this.phase_gathering_initPachinko(false);
-            // 再将存档中的 type/level/frozenTurns 覆盖到对应钉子
-            if (state.pegs && state.pegs.length > 0 && this.pegs) {
-                const minLen = Math.min(state.pegs.length, this.pegs.length);
-                for (let i = 0; i < minLen; i++) {
-                    const saved = state.pegs[i];
-                    const peg = this.pegs[i];
-                    if (peg && saved) {
-                        if (saved.type !== 'pink') {
-                            peg.type = saved.type || 'normal';
-                        }
-                        peg.level = saved.level || 1;
-                        peg.frozenTurns = saved.frozenTurns || 0;
-                    }
-                }
-            }
+            this.pegs = state.pegs.map(saved => {
+                const peg = new Peg(saved.x, saved.y, saved.type || 'normal');
+                peg.level = saved.level || 1;
+                peg.frozenTurns = saved.frozenTurns || 0;
+                peg.row = Number.isInteger(saved.row) ? saved.row : -1;
+                peg.col = Number.isInteger(saved.col) ? saved.col : -1;
+                peg.mirrorIdx = Number.isInteger(saved.mirrorIdx) ? saved.mirrorIdx : -1;
+                peg.shape = saved.shape || 'circle';
+                peg.segment = saved.segment ? { ...saved.segment } : null;
+                if (Number.isFinite(saved.thickness)) peg.thickness = saved.thickness;
+                if (Number.isFinite(saved.radius)) peg.radius = saved.radius;
+                peg.layoutRole = saved.layoutRole || null;
+                peg.rewardLaneType = saved.rewardLaneType || null;
+                if (Number.isInteger(saved.moduleSlotIdx)) peg.moduleSlotIdx = saved.moduleSlotIdx;
+                peg.infusedRuneId = saved.infusedRuneId || null;
+                if (Number.isFinite(saved.fusionSourceLevel)) peg.fusionSourceLevel = saved.fusionSourceLevel;
+                return peg;
+            });
+            this.specialSlots = state.specialSlots.map(saved => {
+                const slot = new SpecialSlot(saved.x, saved.y, saved.x2, saved.y2, saved.type, {
+                    persistent: saved.persistent,
+                    activationCooldown: saved.activationCooldown,
+                    maxSessionCharges: saved.maxSessionCharges,
+                    launchSpeed: saved.launchSpeed,
+                    launchDirection: saved.launchDirection && typeof saved.launchDirection === 'object'
+                        ? { ...saved.launchDirection }
+                        : saved.launchDirection,
+                    rotationSpeed: saved.rotationSpeed,
+                    rodCount: saved.rodCount,
+                    spinRadius: saved.spinRadius,
+                    spinVisual: saved.spinVisual,
+                    initialSpin: saved.initialSpin,
+                });
+                if (Number.isInteger(saved.pegIndex)) slot.pegIndex = saved.pegIndex;
+                if (Number.isInteger(saved.pegIndex2)) slot.pegIndex2 = saved.pegIndex2;
+                if (Number.isInteger(saved.moduleSlotIdx)) slot.moduleSlotIdx = saved.moduleSlotIdx;
+                slot.hit = !!saved.hit;
+                return slot;
+            });
+            this.bottomRewardZones = state.bottomRewardZones.map(zone => ({ ...zone }));
+            this.boardBottomY = Number.isFinite(state.boardBottomY)
+                ? state.boardBottomY
+                : this.pegs.reduce((maxY, peg) => Math.max(maxY, peg.segment?.y2 || peg.pos.y), 0);
 
             // --- 更新 UI ---
             document.getElementById('round-num').innerText = this.round;
@@ -3471,21 +4430,29 @@ export const game_system = {
             // --- 恢复符文词条效果（activeRunewordStats / activeRunewordEffects / activeSkills）---
             // ui_updateRuneGrid 需要 DOM 中的 rune-cell-* 元素存在
             // 这些元素在 ui_openRuneLauncher 时才会创建，此处用 setTimeout 延迟执行
-            setTimeout(() => {
+            const restoreRuneGrid = () => {
                 if (typeof this.ui_initRuneGrid === 'function') this.ui_initRuneGrid();
                 if (typeof this.ui_updateRuneGrid === 'function') this.ui_updateRuneGrid();
-            }, 100);
+            };
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(restoreRuneGrid, 100);
+            } else {
+                setTimeout(restoreRuneGrid, 100);
+            }
 
+            // @section:load_resume_route - 安全点分流与界面恢复
             // --- 下一回合开始统一结算（包括遗物/精华） ---
             // [tsk-668f3dba] 如果存档时正处于替换阶段，恢复替换 UI
-            const restoredMarbleTypes = (this.marblesPool || []).map(m => m.type).filter(Boolean);
+            const restoredMarblesPool = (this.marblesPool || []).slice();
+            const restoredMarbleTypes = restoredMarblesPool.map(m => m.type).filter(Boolean);
             const restoredSelectedMarbles = (this.selectedMarbles || []).slice();
             const restoredSelectionInjectedRune = this.selectionInjectedRune ? { ...this.selectionInjectedRune } : null;
             const restoredSelectionPreviewState = this.selectionPreviewState ? { ...this.selectionPreviewState } : null;
+            const resumePoint = state.resumePoint;
             const shouldRestoreSelection = savedPhase === 'selection'
                 || !!(this.fateMomentContext && this.fateMomentContext.active)
                 || (this.selectionMode && this.selectionMode !== 'standard');
-            if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
+            if (shouldRestoreSelection && this.replaceAmmoContext && this.replaceAmmoContext.active) {
                 this.phase_switchPhase('selection');
                 if (typeof this.ui_renderReplaceAmmoUI === 'function') {
                     this.ui_renderReplaceAmmoUI();
@@ -3497,6 +4464,22 @@ export const game_system = {
                     this.guaranteedNextRound = restoredMarbleTypes.slice();
                     this.spawn_generateMarbleOptions();
                     this.guaranteedNextRound = savedGuaranteedNextRound;
+                    // spawn_generateMarbleOptions owns DOM construction but also
+                    // creates fresh definitions. Put the validated saved objects
+                    // back and rebind cards so fused runeSlots/collected state is
+                    // not silently replaced by type-only candidates.
+                    this.marblesPool = restoredMarblesPool;
+                    document.querySelectorAll('#marble-selection-grid .select-card').forEach(card => {
+                        const marbleIndex = Number(card.dataset?.marbleIndex);
+                        const marble = this.marblesPool[marbleIndex];
+                        if (!marble) return;
+                        card.onclick = () => {
+                            this.sys_toggleMarbleSelection(marbleIndex, card);
+                            if (typeof this.spawn_showMarblePreview === 'function') {
+                                this.spawn_showMarblePreview(marble, null, {});
+                            }
+                        };
+                    });
                     this.selectedMarbles = restoredSelectedMarbles.filter(i => Number.isInteger(i) && i >= 0 && i < this.marblesPool.length);
                     this.selectionInjectedRune = restoredSelectionInjectedRune;
                     this.selectionPreviewState = restoredSelectionPreviewState;
@@ -3516,17 +4499,49 @@ export const game_system = {
                 if (previewMarble && typeof this.spawn_showMarblePreview === 'function') {
                     this.spawn_showMarblePreview(previewMarble, null, {});
                 }
+            } else if (resumePoint === 'gathering_idle') {
+                this.phase_switchPhase('gathering');
+                if (typeof this.ui_updateUICache === 'function') this.ui_updateUICache();
+                if (typeof this.ui_updateGatheringQueueUI === 'function') this.ui_updateGatheringQueueUI();
+                if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+                if (typeof this.combat_updateHitProgress === 'function') {
+                    this.combat_updateHitProgress(0, this.persistentThreshold);
+                }
+                if (!this._isTutorialRun && typeof this.ui_showModuleEditorEntry === 'function') {
+                    this.ui_showModuleEditorEntry();
+                }
+            } else if (resumePoint === 'combat_idle') {
+                this.sys_resumeCombatCheckpoint();
             } else {
+                this._runStateRestoreActive = false;
                 this.sys_startRoundStartResolver();
             }
 
+            this._runStateRestoreActive = false;
+            if (resumePoint === 'selection' || resumePoint === 'gathering_idle') {
+                this.sys_saveRunState();
+            }
             showToast(`✅ 已恢復 Round ${this.round} 的進度！`);
             console.log(`[RunSave] 成功恢復回合 ${this.round} 的存档`);
             return true;
         } catch (e) {
+            // @section:load_failure_recovery - 失败后二次重置清档
             console.error('[RunSave] 恢复存档失败:', e);
-            this.sys_clearRunState();
+            this._runStateRestoreActive = true;
+            try {
+                if (typeof this.sys_resetGame === 'function') this.sys_resetGame();
+                if (typeof this.meta_applyUpgrades === 'function') this.meta_applyUpgrades();
+                if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('meta');
+                else this.phase = 'meta';
+            } catch (resetError) {
+                console.error('[RunSave] 恢复失败后的安全重置也失败:', resetError);
+                this.phase = 'meta';
+            }
+            localStorage.removeItem('echo_alchemist_run_state');
+            if (typeof this.meta_updateContinueButton === 'function') this.meta_updateContinueButton();
             return false;
+        } finally {
+            this._runStateRestoreActive = false;
         }
     },
 

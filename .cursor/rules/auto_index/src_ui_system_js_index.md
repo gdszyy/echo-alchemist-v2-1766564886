@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 3416 | 函数数: 57 | 语言: javascript
+> 自动生成于 2026-07-18 | 总行数: 3586 | 函数数: 57 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -57,7 +57,7 @@
 | _moduleEditor_clearNotice | method | `_moduleEditor_clearNotice()` |  |
 | _moduleEditor_validateBeforeStart | method | `_moduleEditor_validateBeforeStart()` |  |
 | _moduleEditor_tryStartCollection | method | `_moduleEditor_tryStartCollection()` |  |
-| ui_hideModuleEditor | method | `ui_hideModuleEditor()` |  |
+| ui_hideModuleEditor | method | `ui_hideModuleEditor(options = {})` |  |
 | _moduleEditor_handleClick | method | `_moduleEditor_handleClick(logicPos)` |  |
 | _moduleEditor_getSlotRects | method | `_moduleEditor_getSlotRects()` |  |
 | _moduleEditor_getModulePlacementStatus | method | `_moduleEditor_getModulePlacementStatus(slotIdx, moduleId)` |  |

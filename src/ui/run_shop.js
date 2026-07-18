@@ -199,6 +199,42 @@ function ensureInventoryForCurrentVisit(game, count) {
         game.runShopInventory = generateInventoryForCurrentVisit(game, count);
         game._runShopInventoryGeneratedForRound = visitKey;
     }
+    if (!Number.isInteger(game._runShopItemSequence)) game._runShopItemSequence = 0;
+    (game.runShopInventory || []).forEach(item => {
+        if (!item.itemId) {
+            item.itemId = `shop-${visitKey}-${++game._runShopItemSequence}`;
+        }
+    });
+}
+
+function getDialogFocusable(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return [];
+    return Array.from(container.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
+        .filter(element => element && element.getAttribute('aria-hidden') !== 'true');
+}
+
+function trapDialogFocus(event, container, onEscape) {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        onEscape();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = getDialogFocusable(container);
+    if (focusable.length === 0) {
+        event.preventDefault();
+        container.focus?.();
+        return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
 }
 
 function applyStarterBoost(game) {
@@ -227,13 +263,7 @@ export const run_shop = {
         const cfg = CONFIG.gameplay || {};
         ensureInventoryForCurrentVisit(this, cfg.runShopItemsPerOffer || 5);
         this._runShopOpenedRound = this.round || 0;
-        this._runShopReason = options.reason || this._runShopReason || 'manual';
-        this._runShopOnClose = onClose || null;
-        this._runShopPausedByOverlay = false;
-        if (!onClose && ['gathering', 'combat', 'selection'].includes(this.phase) && !this.isPaused) {
-            this.isPaused = true;
-            this._runShopPausedByOverlay = true;
-        }
+        const requestedReason = options.reason || this._runShopReason || 'manual';
 
         let overlay = document.getElementById('run-shop-overlay');
         if (!overlay) {
@@ -249,8 +279,42 @@ export const run_shop = {
             `;
             document.body.appendChild(overlay);
         }
+        if (this._runShopSession?.active) {
+            this.ui_renderRunShop();
+            getDialogFocusable(overlay)[0]?.focus();
+            return false;
+        }
+        if (typeof this.input_cancelActiveInteraction === 'function') {
+            this.input_cancelActiveInteraction(null, { reason: 'overlay:run_shop' });
+        }
+        this._runShopReason = requestedReason;
+
+        const sessionId = `run-shop:${this._runLifecycleEpoch || 0}:${this.round || 1}:${Date.now()}`;
+        const session = {
+            id: sessionId,
+            active: true,
+            onClose: typeof onClose === 'function' ? onClose : null,
+            reason: this._runShopReason,
+            previousFocus: options.returnFocus || document.activeElement || null,
+            pauseToken: null,
+        };
+        if (typeof this.sys_acquirePauseLease === 'function') {
+            session.pauseToken = this.sys_acquirePauseLease(sessionId);
+        }
+        session.keydownHandler = event => trapDialogFocus(event, overlay, () => this.ui_hideRunShop({ reason: 'escape', sessionId }));
+        overlay.addEventListener('keydown', session.keydownHandler);
+        this._runShopSession = session;
+        this._runShopPauseLeaseToken = session.pauseToken;
+        this._runShopOnClose = session.onClose;
+
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'run-shop-dialog-title');
+        overlay.tabIndex = -1;
         overlay.style.display = 'flex';
         this.ui_renderRunShop();
+        (getDialogFocusable(overlay)[0] || overlay).focus?.();
+        return true;
     },
 
     ui_offerRunShop(onClose, reason = 'interval') {
@@ -277,9 +341,14 @@ export const run_shop = {
         }
         const reasonText = reason === 'boss' ? 'Boss 余波后，商人带来了稀有货架。' : '商人到访，可在下一轮研磨前调整构筑。';
         const openDisabled = affordableCount <= 0;
+        const openDisabledReason = openDisabled ? '当前没有买得起的商品' : '';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'run-shop-offer-title');
+        overlay.tabIndex = -1;
         overlay.innerHTML = `
             <div style="width:min(420px, 100%);background:rgba(15,23,42,0.97);border:1px solid rgba(168,85,247,0.45);border-radius:12px;padding:18px;box-shadow:0 18px 45px rgba(0,0,0,0.35);">
-                <div style="font-size:18px;font-weight:bold;color:#c084fc;margin-bottom:6px;">局内商人</div>
+                <div id="run-shop-offer-title" style="font-size:18px;font-weight:bold;color:#c084fc;margin-bottom:6px;">局内商人</div>
                 <div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:12px;">${reasonText}</div>
                 <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-bottom:14px;">
                     <span>持有 <b style="color:#fbbf24;">${fragments} 🔮</b></span>
@@ -287,18 +356,23 @@ export const run_shop = {
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button id="run-shop-offer-skip" style="padding:8px 12px;background:rgba(30,41,59,0.9);color:#cbd5e1;border:1px solid rgba(148,163,184,0.35);border-radius:6px;cursor:pointer;">继续</button>
-                    <button id="run-shop-offer-open" ${openDisabled ? 'disabled' : ''} style="padding:8px 14px;background:${openDisabled ? 'rgba(51,65,85,0.8)' : 'rgba(168,85,247,0.68)'};color:${openDisabled ? '#64748b' : '#fff'};border:1px solid rgba(216,180,254,0.65);border-radius:6px;cursor:${openDisabled ? 'not-allowed' : 'pointer'};font-weight:bold;">进入商店</button>
+                    <button id="run-shop-offer-open" ${openDisabled ? 'disabled' : ''} aria-disabled="${openDisabled ? 'true' : 'false'}" title="${openDisabledReason || '进入商店'}" aria-label="${openDisabledReason || '进入商店'}" style="padding:8px 14px;background:${openDisabled ? 'rgba(51,65,85,0.8)' : 'rgba(168,85,247,0.68)'};color:${openDisabled ? '#64748b' : '#fff'};border:1px solid rgba(216,180,254,0.65);border-radius:6px;cursor:${openDisabled ? 'not-allowed' : 'pointer'};font-weight:bold;">${openDisabledReason || '进入商店'}</button>
                 </div>
             </div>
         `;
         overlay.style.display = 'flex';
+        let settled = false;
         const closeOffer = () => {
+            if (settled) return false;
+            settled = true;
             overlay.style.display = 'none';
             if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+            return true;
         };
         const skipBtn = overlay.querySelector('#run-shop-offer-skip');
         if (skipBtn) {
             skipBtn.addEventListener('click', () => {
+                if (settled) return;
                 this.runShopInventory = [];
                 this._runShopInventoryGeneratedForRound = 0;
                 closeOffer();
@@ -308,10 +382,12 @@ export const run_shop = {
         const openBtn = overlay.querySelector('#run-shop-offer-open');
         if (openBtn && !openDisabled) {
             openBtn.addEventListener('click', () => {
+                if (settled) return;
                 closeOffer();
                 this.ui_showRunShop(onClose, { reason });
             });
         }
+        (skipBtn || openBtn || overlay).focus?.();
     },
 
     ui_hasAffordableRunShopItem() {
@@ -320,21 +396,46 @@ export const run_shop = {
         return countAffordable(this.runShopInventory, this.runFragments || 0) > 0;
     },
 
-    ui_hideRunShop() {
+    ui_hideRunShop(options = {}) {
         const overlay = document.getElementById('run-shop-overlay');
+        const session = this._runShopSession;
+        if (!session?.active) return false;
+        if (options.sessionId && options.sessionId !== session.id) return false;
+        session.active = false;
         if (overlay) overlay.style.display = 'none';
-        if (this._runShopPausedByOverlay) {
-            this.isPaused = false;
-            this._runShopPausedByOverlay = false;
+        if (overlay && session.keydownHandler) {
+            overlay.removeEventListener('keydown', session.keydownHandler);
         }
-        const cb = this._runShopOnClose;
+        const pauseToken = session.pauseToken;
+        session.pauseToken = null;
+        this._runShopPauseLeaseToken = null;
+        const cb = session.onClose;
+        session.onClose = null;
+        if (this._runShopSession === session) this._runShopSession = null;
         this._runShopOnClose = null;
-        if (typeof cb === 'function') cb();
+        if (pauseToken && typeof this.sys_releasePauseLease === 'function') {
+            this.sys_releasePauseLease(pauseToken);
+        }
+        if (options.restoreFocus !== false && !this._runShopSession?.active
+            && session.previousFocus?.isConnected !== false) {
+            session.previousFocus?.focus?.();
+        }
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        if (options.invokeOnClose !== false && typeof cb === 'function') cb();
+        return true;
     },
 
     ui_renderRunShop() {
         const overlay = document.getElementById('run-shop-overlay');
         if (!overlay) return;
+        const sessionId = this._runShopSession?.active ? this._runShopSession.id : null;
+        if (!sessionId) return;
+        const activeElement = document.activeElement;
+        const restoreFocusAfterRender = !!(activeElement
+            && typeof overlay.contains === 'function'
+            && overlay.contains(activeElement));
+        const focusedItemId = restoreFocusAfterRender ? activeElement.dataset?.itemId || null : null;
+        const focusedControlId = restoreFocusAfterRender ? activeElement.id || null : null;
         const cfg = CONFIG.gameplay || {};
         const inventory = Array.isArray(this.runShopInventory) ? this.runShopInventory : [];
         const fragments = this.runFragments || 0;
@@ -349,7 +450,8 @@ export const run_shop = {
                     it.rarity === 'rare' ? '#3b82f6' : '#94a3b8';
             const metaHtml = it.meta ? `<div style="font-size:9px;color:${rarityColor};line-height:1.35;text-transform:uppercase;">${it.meta}</div>` : '';
             const priceLabel = (it.price || 0) <= 0 ? '免费' : `${it.price} 🔮`;
-            return `<div data-item-idx="${i}" class="run-shop-item" style="cursor:${cursor};opacity:${opacity};background:rgba(30, 41, 59, 0.7);border:1px solid ${rarityColor};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:all 0.15s;">
+            const disabledReason = canAfford ? '' : `还差 ${Math.max(0, it.price - fragments)} 碎片`;
+            return `<button type="button" data-item-id="${it.itemId}" data-item-idx="${i}" class="run-shop-item" ${canAfford ? '' : 'disabled'} aria-disabled="${canAfford ? 'false' : 'true'}" title="${canAfford ? `购买 ${it.name}` : disabledReason}" aria-label="${it.name}，${priceLabel}${disabledReason ? `，${disabledReason}` : ''}" style="width:100%;text-align:left;color:inherit;cursor:${cursor};opacity:${opacity};background:rgba(30, 41, 59, 0.7);border:1px solid ${rarityColor};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:all 0.15s;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <div style="font-size:22px;">${it.icon}</div>
                     <div style="font-size:12px;font-weight:bold;color:${rarityColor};">${priceLabel}</div>
@@ -357,20 +459,24 @@ export const run_shop = {
                 <div style="font-size:13px;font-weight:bold;">${it.name}</div>
                 ${metaHtml}
                 <div style="font-size:10px;color:#94a3b8;line-height:1.4;">${it.desc}</div>
-            </div>`;
+                ${disabledReason ? `<div style="font-size:10px;color:#fca5a5;">${disabledReason}</div>` : ''}
+            </button>`;
         }).join('');
+
+        const canRefresh = fragments >= refreshCost;
+        const refreshReason = canRefresh ? '' : `还差 ${refreshCost - fragments} 碎片`;
 
         overlay.innerHTML = `
             <div style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 12px; padding: 18px; max-width: 760px; width: 100%; max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 14px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(168, 85, 247, 0.3);padding-bottom:10px;">
-                    <div style="font-size:18px;font-weight:bold;color:#c084fc;">局内商店</div>
+                    <div id="run-shop-dialog-title" style="font-size:18px;font-weight:bold;color:#c084fc;">局内商店</div>
                     <div style="font-size:13px;">持有: <span style="color:#fbbf24;font-weight:bold;">${fragments} 🔮</span></div>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:10px;">
                     ${itemsHtml || '<div style="color:#64748b;font-size:12px;">商店为空</div>'}
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(168, 85, 247, 0.3);padding-top:10px;">
-                    <button id="run-shop-refresh-btn" style="padding:6px 12px;background:rgba(56, 189, 248, 0.4);color:#fff;border:1px solid rgba(56, 189, 248, 0.7);border-radius:6px;cursor:pointer;font-size:12px;">刷新 (${refreshCost} 🔮)</button>
+                    <button id="run-shop-refresh-btn" ${canRefresh ? '' : 'disabled'} aria-disabled="${canRefresh ? 'false' : 'true'}" title="${canRefresh ? '刷新商品' : refreshReason}" style="padding:6px 12px;background:rgba(56, 189, 248, 0.4);color:#fff;border:1px solid rgba(56, 189,248,0.7);border-radius:6px;cursor:${canRefresh ? 'pointer' : 'not-allowed'};font-size:12px;">刷新 (${refreshCost} 🔮)${refreshReason ? ` · ${refreshReason}` : ''}</button>
                     <button id="run-shop-close-btn" style="padding:8px 18px;background:rgba(34, 197, 94, 0.55);color:#fff;border:1px solid rgba(34, 197, 94, 0.8);border-radius:6px;cursor:pointer;font-weight:bold;">离开商店</button>
                 </div>
             </div>
@@ -378,13 +484,13 @@ export const run_shop = {
 
         overlay.querySelectorAll('.run-shop-item').forEach(el => {
             el.addEventListener('click', () => {
-                const idx = parseInt(el.dataset.itemIdx, 10);
-                this.ui_buyRunShopItem(idx);
+                this.ui_buyRunShopItem(el.dataset.itemId, sessionId);
             });
         });
         const refreshBtn = overlay.querySelector('#run-shop-refresh-btn');
-        if (refreshBtn) {
+        if (refreshBtn && canRefresh) {
             refreshBtn.addEventListener('click', () => {
+                if (!this._runShopSession?.active || this._runShopSession.id !== sessionId) return;
                 if ((this.runFragments || 0) < refreshCost) {
                     if (window.showToast) window.showToast('碎片不足');
                     return;
@@ -392,6 +498,7 @@ export const run_shop = {
                 this.runFragments -= refreshCost;
                 this.runShopInventory = generateInventory(this, cfg.runShopItemsPerOffer || 5);
                 this._runShopInventoryGeneratedForRound = getRunShopVisitKey(this);
+                ensureInventoryForCurrentVisit(this, cfg.runShopItemsPerOffer || 5);
                 this.runShopRefreshes = (this.runShopRefreshes || 0) + 1;
                 if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
                 this.ui_renderRunShop();
@@ -404,20 +511,37 @@ export const run_shop = {
                     this.runShopInventory = []; // 非到访期的旧入口离开后清空，下次重新生成
                     this._runShopInventoryGeneratedForRound = 0;
                 }
-                if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-                this.ui_hideRunShop();
+                this.ui_hideRunShop({ sessionId });
             });
+        }
+        if (restoreFocusAfterRender) {
+            let nextFocus = null;
+            if (focusedItemId) {
+                nextFocus = Array.from(overlay.querySelectorAll('[data-item-id]'))
+                    .find(element => element.dataset?.itemId === focusedItemId) || null;
+            }
+            if (!nextFocus && focusedControlId) {
+                nextFocus = overlay.querySelector(`#${focusedControlId}`);
+            }
+            (nextFocus || getDialogFocusable(overlay)[0] || overlay).focus?.();
         }
     },
 
-    ui_buyRunShopItem(idx) {
+    ui_buyRunShopItem(itemRef, sessionId = null) {
+        const activeSession = this._runShopSession;
+        if (!activeSession?.active || (sessionId && sessionId !== activeSession.id)) return false;
         const inventory = Array.isArray(this.runShopInventory) ? this.runShopInventory : [];
+        const idx = typeof itemRef === 'string'
+            ? inventory.findIndex(item => item?.itemId === itemRef)
+            : Number(itemRef);
         const it = inventory[idx];
-        if (!it) return;
+        if (!it || it._sold || this._runShopPurchaseInFlight) return false;
         if ((this.runFragments || 0) < it.price) {
             if (window.showToast) window.showToast('碎片不足');
-            return;
+            return false;
         }
+        this._runShopPurchaseInFlight = it.itemId || `index:${idx}`;
+        it._sold = true;
         const cfg = CONFIG.gameplay || {};
         if (it.kind === 'module') {
             this.ownedModuleComponents = addModuleComponentToInventory(this.ownedModuleComponents, it.moduleId);
@@ -449,19 +573,60 @@ export const run_shop = {
             if (typeof this.combat_recomputeActiveSkills === 'function') this.combat_recomputeActiveSkills();
             if (window.showToast) window.showToast(`习得技能: ${it.name}`);
         } else if (it.kind === 'marble_pack') {
+            const startPurchasedPackGrind = purchasedPack => {
+                if (typeof this.sys_startMarblePackGrind === 'function') {
+                    this.sys_startMarblePackGrind(purchasedPack);
+                }
+            };
             this.runFragments -= it.price;
             inventory.splice(idx, 1);
-            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-            if (typeof this.sys_startMarblePackGrind === 'function') {
-                this.sys_startMarblePackGrind({ packId: it.packId || 'mixed', source: 'run_shop_purchase', round: this.round || 1 });
+            const purchasedPack = {
+                id: `purchase:${it.itemId}`,
+                packId: it.packId || 'mixed',
+                source: 'run_shop_purchase',
+                round: this.round || 1,
+                purchasedItemId: it.itemId,
+            };
+            // A skipped resolver relic can have other rewards before its queued
+            // pack. Replace that pack in place and resume the resolver so order
+            // is preserved; consuming a later pack and jumping straight to
+            // gathering would strand the earlier rewards.
+            if (this._runShopReason === 'skip_relic') {
+                const pendingRewards = Array.isArray(this.pendingRoundStartRewards)
+                    ? this.pendingRoundStartRewards
+                    : (this.pendingRoundStartRewards = []);
+                const queuedPackIndex = pendingRewards.findIndex(reward =>
+                    reward && (reward.type === 'marble_pack' || reward.type === 'essence'));
+                if (queuedPackIndex >= 0) {
+                    const queuedPack = pendingRewards[queuedPackIndex];
+                    pendingRewards[queuedPackIndex] = {
+                        ...queuedPack,
+                        type: 'marble_pack',
+                        packId: purchasedPack.packId,
+                        source: purchasedPack.source,
+                        purchasedItemId: purchasedPack.purchasedItemId,
+                    };
+                } else if (typeof this.sys_queueRoundStartReward === 'function') {
+                    this.sys_queueRoundStartReward({ ...purchasedPack, type: 'marble_pack' });
+                }
+                this.ui_hideRunShop({ invokeOnClose: false, reason: 'marble_pack_purchase' });
+                this._runShopPurchaseInFlight = null;
+                return typeof this.sys_startRoundStartResolver === 'function'
+                    ? this.sys_startRoundStartResolver()
+                    : false;
             }
-            return;
+            this.ui_hideRunShop({ invokeOnClose: false, reason: 'marble_pack_purchase' });
+            startPurchasedPackGrind(purchasedPack);
+            this._runShopPurchaseInFlight = null;
+            return true;
         }
         this.runFragments -= it.price;
         // 售出后从商店列表移除
         inventory.splice(idx, 1);
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        this._runShopPurchaseInFlight = null;
         this.ui_renderRunShop();
+        return true;
     },
 
     ui_updateRunShopScheduleUI() {

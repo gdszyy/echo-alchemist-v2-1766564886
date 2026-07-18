@@ -525,8 +525,14 @@ export const ui_system = {
      *      并放大成最终展示卡片，再淡出移交给后续选择 UI。
      */
     ui_playLootToCardAnimation(startX, startY, type, callback) {
+        const lifecycleToken = typeof this.sys_captureLifecycleToken === 'function'
+            ? this.sys_captureLifecycleToken()
+            : null;
         const container = document.getElementById('game-container');
-        if (!container) return callback && callback();
+        if (!container) {
+            if (!lifecycleToken || this.sys_isLifecycleTokenCurrent(lifecycleToken)) return callback && callback();
+            return false;
+        }
 
         let icon = '🏆';
         let glow = 'rgba(250, 204, 21, 0.85)';
@@ -653,8 +659,32 @@ export const ui_system = {
         const targetX = this.width / 2;
         const targetY = this.height * 0.4;
 
+        const cleanupAnimation = () => {
+            if (card.parentNode) card.parentNode.removeChild(card);
+            if (burst.parentNode) burst.parentNode.removeChild(burst);
+            if (ray.parentNode) ray.parentNode.removeChild(ray);
+        };
+        const schedule = (fn, delay) => {
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                return this.sys_scheduleLifecycleTimeout(fn, delay, {
+                    token: lifecycleToken,
+                    onCancel: cleanupAnimation,
+                });
+            }
+            return setTimeout(fn, delay);
+        };
+        const startFrame = (fn) => {
+            if (typeof this.sys_scheduleLifecycleFrame === 'function') {
+                return this.sys_scheduleLifecycleFrame(fn, {
+                    token: lifecycleToken,
+                    onCancel: cleanupAnimation,
+                });
+            }
+            return requestAnimationFrame(fn);
+        };
+
         // 触发开启脉冲
-        requestAnimationFrame(() => {
+        startFrame(() => {
             burst.style.boxShadow = `0 0 0 80px rgba(255,255,255,0)`;
             burst.style.opacity = '0';
             ray.querySelectorAll('div').forEach((beam) => {
@@ -665,31 +695,30 @@ export const ui_system = {
             });
 
             // 卡片从掉落物中蹦出（先稍微停留一帧再起飞，强化「打开掉落物」的感觉）
-            setTimeout(() => {
+            schedule(() => {
                 card.style.opacity = '1';
                 card.style.transform = 'translate(-50%, -50%) scale(0.6) rotate(-6deg)';
             }, 80);
 
             // 沿弧线飞向中心，并放大
-            setTimeout(() => {
+            schedule(() => {
                 card.style.left = targetX + 'px';
                 card.style.top = targetY + 'px';
                 card.style.transform = 'translate(-50%, -50%) scale(1.4) rotate(0deg)';
             }, 220);
 
             // 抵达后短暂停留 → 淡出，触发后续 UI
-            setTimeout(() => {
+            schedule(() => {
                 card.style.transition = 'transform 0.25s ease-in, opacity 0.25s ease-in';
                 card.style.opacity = '0';
                 card.style.transform = 'translate(-50%, -50%) scale(1.7) rotate(0deg)';
-                setTimeout(() => {
-                    if (card.parentNode) card.parentNode.removeChild(card);
-                    if (burst.parentNode) burst.parentNode.removeChild(burst);
-                    if (ray.parentNode) ray.parentNode.removeChild(ray);
+                schedule(() => {
+                    cleanupAnimation();
                     if (callback) callback();
                 }, 260);
             }, 920);
         });
+        return true;
     },
 
     ui_updateSlowMotion() {
@@ -888,6 +917,20 @@ export const ui_system = {
     ui_clearTransientOverlays(options = {}) {
         const keepRuneLauncher = !!options.keepRuneLauncher;
         const keepRelicOverlay = !!options.keepRelicOverlay;
+
+        if (!keepRelicOverlay && this._relicOverlaySession?.active
+            && typeof this.ui_closeRelicSelection === 'function') {
+            this.ui_closeRelicSelection({ resume: false, restoreFocus: false, outcome: 'cancelled' });
+        }
+        if (this._runShopSession?.active && typeof this.ui_hideRunShop === 'function') {
+            this.ui_hideRunShop({ invokeOnClose: false, restoreFocus: false, reason: 'transient_cleanup' });
+        }
+        if (this._moduleEditorActive && typeof this.ui_hideModuleEditor === 'function') {
+            this.ui_hideModuleEditor({ invokeOnComplete: false });
+        } else if (this._moduleEditorPauseLeaseToken && typeof this.sys_releasePauseLease === 'function') {
+            this.sys_releasePauseLease(this._moduleEditorPauseLeaseToken);
+            this._moduleEditorPauseLeaseToken = null;
+        }
 
         const bossOverlay = document.getElementById('boss-entrance-overlay');
         if (bossOverlay) {
@@ -1215,14 +1258,67 @@ export const ui_system = {
      * @param {Function} onComplete 玩家点击「进入战斗」按钮后的回调。
      */
     ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, onComplete) {
+        const runToken = typeof this.sys_captureLifecycleToken === 'function'
+            ? this.sys_captureLifecycleToken()
+            : null;
+        const phaseToken = typeof this.sys_captureLifecycleToken === 'function'
+            ? this.sys_captureLifecycleToken({ phaseBound: true })
+            : null;
+        const expectedPhase = this.phase;
+        if (!Number.isInteger(this._chaosSlotMachineSequence)) this._chaosSlotMachineSequence = 0;
+        const sessionKey = `chaos-slot:${this._runLifecycleEpoch || 0}:${++this._chaosSlotMachineSequence}`;
         const overlay = document.getElementById('chaos-slot-machine-overlay');
         const slotsEl = document.getElementById('chaos-slot-machine-slots');
         const resultEl = document.getElementById('chaos-slot-machine-result');
         const continueBtn = document.getElementById('chaos-slot-machine-continue');
         if (!overlay || !slotsEl || !resultEl || !continueBtn) {
-            if (typeof onComplete === 'function') onComplete();
+            if ((!runToken || this.sys_isLifecycleTokenCurrent(runToken)) && typeof onComplete === 'function') onComplete();
             return;
         }
+        this._chaosSlotMachineActive = true;
+        let completed = false;
+        let interruptionHandled = false;
+        const teardownSlotMachine = () => {
+            overlay.style.display = 'none';
+            continueBtn.onclick = null;
+        };
+        const cancelSlotMachine = () => {
+            if (completed) return;
+            completed = true;
+            this._chaosSlotMachineActive = false;
+            teardownSlotMachine();
+        };
+        const restartSlotMachine = () => {
+            if (completed) return false;
+            teardownSlotMachine();
+            this.ui_showChaosBulletSlotMachine(slotAttrs, finalPicks, ATTR_LABEL, allSame, onComplete);
+            return true;
+        };
+        const handlePhaseInterruption = () => {
+            if (completed || interruptionHandled) return;
+            interruptionHandled = true;
+            teardownSlotMachine();
+            if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                const result = this.sys_runOrDeferLifecycleContinuation(
+                    `${sessionKey}:restart`,
+                    restartSlotMachine,
+                    {
+                        token: runToken,
+                        expectedPhase,
+                        onCancel: cancelSlotMachine,
+                    }
+                );
+                if (result === 'deferred') this._chaosSlotMachineActive = true;
+                return result;
+            }
+            return cancelSlotMachine();
+        };
+        const schedule = (fn, delay) => typeof this.sys_scheduleLifecycleTimeout === 'function'
+            ? this.sys_scheduleLifecycleTimeout(fn, delay, { token: phaseToken, onCancel: handlePhaseInterruption })
+            : setTimeout(fn, delay);
+        const frame = fn => typeof this.sys_scheduleLifecycleFrame === 'function'
+            ? this.sys_scheduleLifecycleFrame(fn, { token: phaseToken, onCancel: handlePhaseInterruption })
+            : requestAnimationFrame(fn);
 
         slotsEl.innerHTML = '';
         resultEl.innerText = '';
@@ -1267,17 +1363,17 @@ export const ui_system = {
             const totalDistance = targetIdx * ITEM_HEIGHT;
             s.inner.style.top = '0px';
             s.inner.style.transition = `top ${baseSpinDuration + idx * stagger}ms cubic-bezier(0.15, 0.85, 0.25, 1)`;
-            requestAnimationFrame(() => {
+            frame(() => {
                 s.inner.style.top = `-${totalDistance}px`;
             });
-            setTimeout(() => {
+            schedule(() => {
                 s.inner.classList.remove('chaos-slot-spinning');
                 s.slotEl.classList.add('chaos-slot-locked');
             }, baseSpinDuration + idx * stagger);
         });
 
         const totalDuration = baseSpinDuration + (slotElements.length - 1) * stagger + 250;
-        setTimeout(() => {
+        schedule(() => {
             if (allSame) {
                 slotElements.forEach(s => s.slotEl.classList.add('chaos-slot-jackpot'));
                 const attr = finalPicks[0];
@@ -1288,8 +1384,24 @@ export const ui_system = {
             }
             continueBtn.style.display = 'inline-flex';
             continueBtn.onclick = () => {
-                overlay.style.display = 'none';
-                if (typeof onComplete === 'function') onComplete();
+                if (completed || (runToken && !this.sys_isLifecycleTokenCurrent(runToken))) return;
+                const completeSlotMachine = () => {
+                    if (completed) return false;
+                    completed = true;
+                    this._chaosSlotMachineActive = false;
+                    teardownSlotMachine();
+                    if (typeof onComplete === 'function') onComplete();
+                    return true;
+                };
+                if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                    this.sys_runOrDeferLifecycleContinuation(`${sessionKey}:complete`, completeSlotMachine, {
+                        token: runToken,
+                        expectedPhase,
+                        onCancel: cancelSlotMachine,
+                    });
+                } else {
+                    completeSlotMachine();
+                }
             };
         }, totalDuration);
     },
@@ -1626,20 +1738,25 @@ export const ui_system = {
 
     ui_toggleReplaceAmmoCard(globalIdx) {
         const ctx = this.replaceAmmoContext;
-        if (!ctx || !ctx.active) return;
+        if (!ctx || !ctx.active) return false;
         const selectedIndices = ctx.selectedIndices || [];
         const bulletCap = (CONFIG.gameplay.selectionReq || 3);
         const maxSelect = Math.min(bulletCap, ((ctx.newRecipes || []).length + (ctx.chargedRecipes || []).length));
         const idx = selectedIndices.indexOf(globalIdx);
+        let changed = false;
         if (idx > -1) {
             selectedIndices.splice(idx, 1);
+            changed = true;
         } else if (selectedIndices.length < maxSelect) {
             selectedIndices.push(globalIdx);
+            changed = true;
         } else {
             showToast(`最多选择 ${maxSelect} 枚子弹`);
         }
         ctx.selectedIndices = selectedIndices;
         this.ui_renderReplaceAmmoUI();
+        if (changed && typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        return changed;
     },
 
     ui_selectReplaceAmmoTarget(ammoIdx) {
@@ -2159,12 +2276,29 @@ export const ui_system = {
         const ok = this.sys_loadRunState();
         if (!ok) {
             if (typeof showToast === 'function') showToast('⚠️ 存档读取失败，请开始新游戏');
+            if (typeof this.phase_switchPhase === 'function' && this.phase !== 'meta') this.phase_switchPhase('meta');
+            this.meta_updateContinueButton();
         }
     },
 
     meta_updateContinueButton() {
         const btn = document.getElementById('meta-continue-btn');
-        if (btn) btn.style.display = this.sys_hasRunState() ? 'block' : 'none';
+        if (!btn) return;
+        const summary = typeof this.sys_getRunStateSummary === 'function'
+            ? this.sys_getRunStateSummary({ discardInvalid: true })
+            : { valid: !!this.sys_hasRunState?.(), round: null };
+        btn.style.display = summary.valid ? 'block' : 'none';
+        btn.disabled = !summary.valid;
+        btn.setAttribute('aria-disabled', summary.valid ? 'false' : 'true');
+        const roundEl = btn.querySelector('.continue-round');
+        if (roundEl) roundEl.textContent = summary.valid ? `Round ${summary.round}` : '无有效存档';
+        if (summary.valid) {
+            btn.title = `继续 Round ${summary.round}`;
+            btn.setAttribute('aria-label', `继续游戏，Round ${summary.round}`);
+        } else {
+            btn.title = '没有可安全恢复的局内存档';
+            btn.setAttribute('aria-label', '没有可安全恢复的局内存档');
+        }
     },
 
     meta_openShop() {
@@ -2339,10 +2473,12 @@ export const ui_system = {
         // 导致点击「⚙️」按鈕没有任何反应。这里改为正确的 id，并补上 hidden-phase / display 切换。
         const pause = document.getElementById('phase-pause');
         if (!pause) return;
-        if (!this.isPaused) {
-            this._pausedFromPhase = this.phase;
+        if (!this._pauseMenuLeaseToken && typeof this.input_cancelActiveInteraction === 'function') {
+            this.input_cancelActiveInteraction(null, { reason: 'overlay:pause_menu' });
         }
-        this.isPaused = true;
+        if (!this._pauseMenuLeaseToken && typeof this.sys_acquirePauseLease === 'function') {
+            this._pauseMenuLeaseToken = this.sys_acquirePauseLease('pause_menu');
+        }
         pause.classList.remove('hidden');
         pause.classList.remove('hidden-phase');
         pause.classList.add('active-phase');
@@ -2354,19 +2490,32 @@ export const ui_system = {
 
     ui_closePause() {
         const pause = document.getElementById('phase-pause');
-        this.isPaused = false;
-        this._pausedFromPhase = null;
-        if (!pause) return;
-        pause.classList.add('hidden');
-        pause.classList.add('hidden-phase');
-        pause.classList.remove('active-phase');
-        pause.style.display = 'none';
-        pause.style.pointerEvents = 'none';
+        const token = this._pauseMenuLeaseToken;
+        this._pauseMenuLeaseToken = null;
+        if (pause) {
+            pause.classList.add('hidden');
+            pause.classList.add('hidden-phase');
+            pause.classList.remove('active-phase');
+            pause.style.display = 'none';
+            pause.style.pointerEvents = 'none';
+        }
+        if (token && typeof this.sys_releasePauseLease === 'function') this.sys_releasePauseLease(token);
+        return !!pause;
     },
 
     ui_abandonRunToMeta() {
+        // Terminal ownership begins before any overlay releases its lease;
+        // otherwise the last release could flush a due continuation while the
+        // abandoned run is still current.
+        if (typeof this.sys_invalidateRunLifecycle === 'function') this.sys_invalidateRunLifecycle('abandon_begin');
         this.ui_closePause();
         if (typeof this.ui_clearTransientOverlays === 'function') this.ui_clearTransientOverlays();
+        // Abandon owns the terminal transition. Cancel an unfinished alchemy
+        // draft without allowing a confirmation dialog to veto launcher cleanup
+        // after the run has already been discarded.
+        if (typeof this.ui_handlePotionAlchemyInterrupt === 'function') {
+            this.ui_handlePotionAlchemyInterrupt('abandon_run', { confirm: false });
+        }
         if (typeof this.ui_closeRuneLauncher === 'function') this.ui_closeRuneLauncher();
         if (typeof this.sys_clearRunState === 'function') this.sys_clearRunState();
         if (typeof this.sys_resetGame === 'function') this.sys_resetGame();
@@ -2505,6 +2654,17 @@ export const ui_system = {
      * 本方法只负责：标记编辑态、冻结倾斜、挂载顶部 / 底部 DOM 控件。
      */
     ui_showModuleEditor(onComplete) {
+        if (this._moduleEditorActive) {
+            const activeLayer = document.getElementById('module-editor-layer');
+            const focusTarget = activeLayer?.querySelector(
+                'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            (focusTarget || activeLayer)?.focus?.();
+            return false;
+        }
+        if (typeof this.input_cancelActiveInteraction === 'function') {
+            this.input_cancelActiveInteraction(null, { reason: 'overlay:module_editor' });
+        }
         const cfg = CONFIG.gameplay || {};
         const cols = cfg.moduleCols || 4;
         const rows = cfg.moduleRows || 3;
@@ -2529,6 +2689,9 @@ export const ui_system = {
 
         this._moduleEditorState = { onComplete: onComplete || null };
         this._moduleEditorActive = true;
+        if (!this._moduleEditorPauseLeaseToken && typeof this.sys_acquirePauseLease === 'function') {
+            this._moduleEditorPauseLeaseToken = this.sys_acquirePauseLease('module_editor');
+        }
         this._moduleEditorSelectedComponentUid = null;
         this._moduleEditorSelectedSlotIdx = null;
         this.ui_hideModuleEditorEntry();
@@ -2543,6 +2706,7 @@ export const ui_system = {
         this._moduleEditor_ensureStyles();
 
         this.ui_renderModuleEditorControls();
+        return true;
     },
 
     /**
@@ -2803,7 +2967,8 @@ export const ui_system = {
     /**
      * 退出编辑模式：移除 DOM 控件与浮层，恢复正常采集输入。
      */
-    ui_hideModuleEditor() {
+    ui_hideModuleEditor(options = {}) {
+        const wasActive = !!this._moduleEditorActive;
         this._moduleEditorActive = false;
         const onComplete = (this._moduleEditorState || {}).onComplete;
         this._moduleEditorState = null;
@@ -2813,10 +2978,14 @@ export const ui_system = {
         if (layer) layer.remove();
         this._moduleEditor_clearNotice();
         this._moduleEditor_closePicker();
+        const token = this._moduleEditorPauseLeaseToken;
+        this._moduleEditorPauseLeaseToken = null;
+        if (token && typeof this.sys_releasePauseLease === 'function') this.sys_releasePauseLease(token);
         if (this.phase === 'gathering' && typeof this.ui_showModuleEditorEntry === 'function') {
             this.ui_showModuleEditorEntry();
         }
-        if (typeof onComplete === 'function') onComplete();
+        if (wasActive && options.invokeOnComplete !== false && typeof onComplete === 'function') onComplete();
+        return wasActive;
     },
 
     /**
@@ -3408,6 +3577,7 @@ export const ui_system = {
                 this.phase_gathering_initPachinko(false);
             }
             if (result.ok && typeof this._ui_updatePinboardFusionDisplay === 'function') this._ui_updatePinboardFusionDisplay();
+            if (result.ok && typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
             this._moduleEditor_closePicker();
             this.ui_renderModuleEditorControls();
         });

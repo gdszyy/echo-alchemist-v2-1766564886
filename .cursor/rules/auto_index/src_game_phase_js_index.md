@@ -1,9 +1,9 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-06-30 | 总行数: 4357 | 函数数: 41 | 语言: javascript
+> 自动生成于 2026-07-18 | 总行数: 4513 | 函数数: 41 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -39,7 +39,7 @@
 | phase_claimPendingRunes | method | `phase_claimPendingRunes()` |  |
 | phase_inWallClearTrigger | method | `phase_inWallClearTrigger()` |  |
 | phase_enemy_startLogic | method | `phase_enemy_startLogic()` |  |
-| phase_finalizeRound | method | `phase_finalizeRound()` |  |
+| phase_finalizeRound | method | `phase_finalizeRound()` | ⚠️ 巨型函数，见 @section 导航 |
 | phase_continueFinalizeRoundAfterRelicHooks | method | `phase_continueFinalizeRoundAfterRelicHooks()` |  |
 | phase_playChargeUpgradeFX | method | `phase_playChargeUpgradeFX(leftoverCount = 1)` |  |
 | smartScientific | method | `smartScientific(num, fractionDigits = 2)` |  |
@@ -69,6 +69,19 @@
 ### phase_enemy_processTurn
 
 > **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
+
+### phase_finalizeRound
+
+> 定位：`grep -n '@section:节点名'` 跳转到对应节点
+
+| 节点标记 | 说明 |
+|----------|------|
+| `@section:finalize_guard_snapshot` | 幂等闸门与战场快照 |
+| `@section:finalize_pressure_relief` | 劣势补偿与敌军增援 |
+| `@section:finalize_inventory_sync` | 符文库存同步 |
+| `@section:finalize_next_wave` | 下一回合波次生成 |
+| `@section:finalize_round_decay` | 跨回合增益递减 |
+| `@section:finalize_round_hooks` | 回合递增与遗物钩子 |
 
 ### phase_combat_update
 

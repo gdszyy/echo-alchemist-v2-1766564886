@@ -1,7 +1,7 @@
 ---
 id: "PI-007"
-version: "v1.3"
-last_updated: "2026-06-19"
+version: "v1.4"
+last_updated: "2026-07-18"
 author: "agt-50c9e9de-077"
 related_modules: ["ui/shop.js", "game_system.js", "ui_system.js", "spawn_system.js", "game_phase.js", "entities.js", "config.js", "core.js"]
 status: "active"
@@ -11,7 +11,7 @@ status: "active"
 
 ## 流程概述
 
-命运时刻相关改动横跨遗物 overlay、选择阶段运行态、预览 UI、实体注入链路与同化倍率结算。最容易出错的地方不是单个函数，而是“overlay 从哪里打开、关闭后应回到哪里”“当前选择阶段需要几枚弹珠”“纯净精华的注入结果何时真正进入实体数据”“同化率 x2 是否真的落到统一配置倍率”这四个耦合点。
+命运时刻相关改动横跨遗物 overlay、选择阶段运行态、预览 UI、实体注入链路与同化倍率结算。最容易出错的地方不是单个函数，而是“overlay 从哪里打开、关闭后应回到哪里”“当前选择阶段需要几枚弹珠”“纯净精华的注入结果何时真正进入实体数据”“同化率 x2 是否真的落到统一配置倍率”这四个耦合点。当前主动开局/局内商店研磨入口是 `marble_pack`；`chaos_essence` / `pure_essence` 只保留历史存档兼容与明确触发路径，不能反向污染主循环。
 
 ## 核心防坑指南
 
@@ -99,3 +99,34 @@ status: "active"
 | v1.1 | 2026-04-24 | 补充坑 5：phase_switchPhase 触发 ui_updateUI 时读取旧 selectionMode 渲染旧卡片 | agt |
 | v1.2 | 2026-04-24 | 补充坑 6：fateMomentContext 缺少 active 字段导致 ui_isFateMomentPhase() 失效 | agt |
 | v1.3 | 2026-06-19 | 补充 `_proceedToFateMomentSelection()` 也必须写入 active 字段 | codex |
+| v1.4 | 2026-07-18 | 补充 overlay session/pause lease、键盘焦点合同，以及 selection 完整存档恢复与回写守卫。 | Codex |
+
+### 坑 7: Overlay 回调没有 session 所有权
+
+**现象**：重复打开遗物、局内商店或模块编辑器后，旧 card/close/purchase handler 会关闭新 overlay、释放新 pause，或重复推进 resolver。
+
+**根因**：只保存一个 close callback 或布尔 paused 状态；异步 handler 无法证明自己仍属于当前 overlay session。
+
+**正确做法**：每次真实打开创建唯一 session ID，并独立持有 `sys_acquirePauseLease(ownerId)` 返回的 token。重复 open 只聚焦当前 session，不覆盖 callback 或再申请 lease。所有 card、购买、Escape、close 回调先核对 session ID；关闭时先把 session 标为 settled/closed、清理 handler，再释放自己的 lease。旧 token、重复 close 和过期 handler 必须无副作用。
+
+**关键位置**：`src/ui/shop.js`、`src/ui/run_shop.js`、`src/ui_system.js`。
+
+### 坑 8: JS Overlay 可点击但不可完整键盘操作
+
+**现象**：Tab 焦点落到遮罩下方，Escape 无法关闭，重渲染后焦点丢失，余额不足按钮仍可误触或读屏只听到“不可用”而不知道原因。
+
+**根因**：动态 overlay 只绑定 click，没有补齐 dialog 语义、focus trap、焦点恢复和 native disabled 状态。
+
+**正确做法**：打开时设置 `role="dialog"` / `aria-modal="true"`，记录触发前焦点并把焦点移入 overlay；Tab/Shift+Tab 在当前可操作项内循环，Escape 走幂等 close；列表重渲染后恢复同一商品/卡片或第一个可用元素；按钮同时写 native `disabled`、`aria-disabled` 与可读原因。关闭后仅在元素仍可聚焦时恢复原焦点。
+
+**关键位置**：`src/ui/shop.js`、`src/ui/run_shop.js`。
+
+### 坑 9: Selection 恢复只保存类型或恢复期间反向覆盖存档
+
+**现象**：双选存档刷新后退化为单选，弹珠 `collected` / `runeSlots` / `maxRuneSlots` / `persistentThreshold` 丢失；或者 UI 重建生成默认候选并把有效 checkpoint 覆盖掉。
+
+**根因**：序列化只保留 type，validator 不检查 `selectionRequiredCount`、索引与 replace 上下文；恢复调用普通生成路径时没有禁止 reentrant save。
+
+**正确做法**：selection checkpoint 保存完整 `MarbleDefinition`、选中索引、模式、required count、注入符文和预览态；每次普通选择或 replace-ammo 卡片 toggle 都要在状态变更后保存。校验要求 selected indices 在候选范围内，并验证 replace-ammo 两侧队列；恢复必须忠实保留玩家已验证的空/部分选择，不能自动补满。恢复在 `_runStateRestoreActive` 守卫下重建 DOM/预览，普通 save 在 hydration 结束前必须返回 `false`，随后只在完整状态就绪后写一次规范化 checkpoint。
+
+**关键位置**：`src/game_system.js` → `sys_validateRunStatePayload()` / `sys_loadRunState()`；`src/ui_system.js` → selection 重建与确认路径。

@@ -9,6 +9,17 @@ globs: ["src/game_phase.js"]
 - 阶段流转由 `game_phase.js` 统一管理。
 - 严禁跨阶段直接调用生命周期方法，必须通过标准状态机接口切换。
 
+### 1.1 Run 生命周期与异步所有权（2026-07-18）
+
+- `game_system.js` 用 `_runLifecycleEpoch` 标识整局所有权；abandon、gameover、清档和新局重置必须通过 `sys_invalidateRunLifecycle(reason)` 让上一局的 timer、rAF、banner、resolver 与动画回调失效。清除原生 timer 只是优化，回调执行前仍必须校验 token。
+- `phase_switchPhase(newPhase)` 仅在阶段真实变化时递增 `_phaseLifecycleEpoch`。阶段内异步使用 run token；不得跨阶段存活的回调使用 `{ phaseBound: true }`。
+- gameplay 延迟回调统一通过 `sys_scheduleLifecycleTimeout()` / `sys_scheduleLifecycleFrame()` 注册，并提供取消清理。新代码不得在阶段推进、奖励结算或 overlay 返回路径新增无守卫的 `setTimeout` / `requestAnimationFrame`。
+- `sys_runOrDeferLifecycleContinuation()` 只允许两类暂存：当前 gameplay phase 被 pause lease 冻结，或当前处于 `truth_book` 且 `truthBookReturnState.phase` 明确等于回调的预期 phase。真实换阶段、返回目标不匹配或 run token 失效时必须取消，不得在新流程背后推进旧状态机。
+- 暂停是可嵌套所有权，不是布尔开关。每个 overlay 通过 `sys_acquirePauseLease(ownerId)` 获取不透明 token，只能用 `sys_releasePauseLease(token)` 释放自己的 lease；最后一个 lease 释放后才恢复模拟。
+- 阶段切换与 run 失效必须调用 `input_cancelActiveInteraction()`。`touchcancel` / `pointercancel` 与普通结束共用幂等清理，但取消路径绝不能提交待发射输入。
+- gameover 首次命中必须先写终局状态并 invalidate run；`phase_combat_update()` 在 `gameOver` 后立即返回，禁止后续帧重复排队终局 callback。
+- 若进入战斗被未完成药剂炼成拒绝，必须由 run-token 约束的单一 continuation 持有重试；替换子弹、混沌升级和 gathering 收尾不得先清上下文或写入 selection 存档。药剂处理后的保存边界只重试一次，abandon/reset 必须取消该 owner。
+
 ## 2. 各阶段职责与出入口条件
 
 ### 2.0 研磨阶段点击发射规范（防坑）
@@ -22,7 +33,9 @@ globs: ["src/game_phase.js"]
 - **职责**: 玩家在回合开始前处理 round-start resolver 结算后的遗物线索与弹珠包研磨入口。当前主循环不再投放精华奖励；`marble_pack` 是显式研磨入口，`run_resource_pack` 仅用于旧存档兜底。
 - **[tsk-f35c6d10] 普通选择入口**：`sys_startRoundStartResolver()` 队列为空时，**不再**进入普通弹珠选择（`sys_initSelectionPhase()`），改为调用 `sys_showRoundStartBanner()` 直接进入战斗阶段（跳过研磨）。
 - **[杂色包开局]**：`sys_initGameStart()` 在队列遗物奖励后，额外队列一个 `marble_pack`（`packId: 'mixed'`, `source: 'run_start'`）奖励。遗物选完后，resolver 播放弹珠包飞行动画并调用 `sys_startMarblePackGrind()` 直接进入研磨。
-- **入口**: `sys_startRoundStartResolver()` 会先消费 `pendingRoundStartRewards`；若命中 `relic`，进入遗物事件；若命中 `marble_pack`，直接生成 3 枚包内弹珠并进入 `phase_startGatheringPhase()`；若命中旧 `run_resource_pack`，只发放局内碎片并自动继续 resolver。新主循环不得主动队列 `chaos_essence` / `pure_essence`。
+- **入口**: `sys_startRoundStartResolver()` 只窥视 `pendingRoundStartRewards[0]`，不得在异步动画或 overlay 成功回调前移出队列。每项奖励必须有稳定 `id`，仅 `sys_completeRoundStartReward(id)` 能原子消费一次；若命中 `relic`，进入遗物事件；若命中 `marble_pack`，消费成功后生成 3 枚包内弹珠并进入 `phase_startGatheringPhase()`；若命中旧 `run_resource_pack`，消费成功后只发放局内碎片并自动继续 resolver。新主循环不得主动队列 `chaos_essence` / `pure_essence`。
+- **幂等边界**: 同一 reward ID 的动画回调、`sys_continueRoundStartResolver(id)`、遗物 close/skip 与商店购买可被重复触发，但副作用只能提交一次。遗物跳过后进入商店购买 `marble_pack` 时，购买流接管并原子消费队列中原有 pack，禁止同一动作进入两次 gathering。
+- **队列顺序与落盘边界**：跳过遗物后的商店 pack 必须原位替换队列中待处理的 `marble_pack`，保留更早奖励与原稳定 ID，不得插队。`run_resource_pack` 必须在碎片发放和 reward ID 消费都完成后、打开下一项 overlay 前写入 round-start checkpoint。
 - **弹珠包边界**：`marble_pack` 不得写入 `pendingSelectionMode.sourceRewardType = 'marble_pack'`，不得展示命运选择。商店购买弹珠包后也必须直接进入研磨结算；若已有可保留子弹，`sys_startMarblePackGrind()` 负责写入 `_chargedAmmoQueue`，研磨完成后再进入替换子弹阶段。
 - **[tsk-668f3dba] 替换子弹阶段（当前实现）**：当弹珠包研磨或历史精华兼容流程带有可保留子弹时，系统会将既有子弹写入**充能子弹**（`_chargedAmmoQueue`，`multicast`/`finalHits` 重置为 0）。研磨阶段全部弹珠结算完毕后，若 `_chargedAmmoQueue` 非空，自动调用 `sys_initReplaceAmmoPhase()` 进入替换阶段；否则直接进入战斗。
   - `replaceAmmoContext`：替换阶段上下文，包含 `active`、`newRecipes`（本回合新研磨，左侧）、`chargedRecipes`（上回合充能子弹，右侧）、`selectedIndices`（多选索引数组，默认全选右侧充能子弹）。
@@ -40,6 +53,7 @@ globs: ["src/game_phase.js"]
 - **旧资源包边界**：`run_resource_pack` 只增加 `runFragments` 并播放资源反馈，不得进入 `selection` / `gathering`，不得重建 `marbleQueue` 或 `_chargedAmmoQueue`。新主循环应使用局内商店弹珠包作为研磨入口。
 - **弹珠符文槽**: 选择阶段的弹珠预览面板允许把符文直接融合进已选弹珠；每颗弹珠最多 3 个 `runeSlots`，融合会立即消耗 `runeInventory` 中的符文。进入研磨/编译时槽位以 `source: 'rune_slot'` 临时加入属性，结算写回 `marble.collected` 时必须过滤，避免重复叠层。
 - **实现**: 默认路径先调用 `phase_switchPhase('combat')` 切换背景，然后显示 `#round-start-banner` 游戏容器内大字提示（「第 X 回合開始」），持续约 2.2 秒后自动调用 `phase_startCombatPhase()` 进入战斗。弹珠包开包/历史精华兼容等显式研磨入口仍必须直接调用 `phase_startGatheringPhase()`，但可以把横幅作为非阻塞 overlay 播放，不得为了横幅把弹珠包重新路由到战斗入口。
+- **终点提交**: resolver 的 terminal key 与 banner flow key 只有在横幅实际启动后才能提交。若药剂炼成中断确认被取消，必须保留可重试状态，不能提前占用 key 导致回合永久停在横幅前。
 - **下一 Boss 威胁预告**: `#round-start-banner` 内的 `#round-start-threat` 必须显示下一 Boss 倒计时；未遭遇 Boss 只能显示未知 Boss + 剪影预告，已遭遇 Boss 才显示名称。预告数据统一来自 `src/utils/boss_schedule_utils.js`，不得调用会写入 `bossHistory` 的 `spawn_selectBossForRound()`。
 - **子弹队列边界（2026-06-19）**: `sys_showRoundStartBanner()` 只负责进入下一轮战斗阶段，普通回合开始时不得从 `_lastFiredAmmoSnapshot` 或 `marbleQueue` 重建 `ammoQueue`。这两个来源仅用于精华触发 / 子弹替换等显式充能流程，避免下一回合待发射子弹串成上一轮保留子弹或新生成候选弹珠。
 - **空弹珠兜底（2026-06-19）**: `phase_startGatheringPhase()` 只允许由精华/命运选择等显式研磨入口调用，并必须在真正初始化时确认 `marbleQueue` 非空；若存档恢复、overlay 返回或特殊流程清空了队列，应通过 `buildFallbackMarbleQueue()` 从选择池/当前权重补齐可发射弹珠，禁止进入没有弹珠的研磨阶段。
@@ -87,10 +101,15 @@ globs: ["src/game_phase.js"]
   - 失败: 玩家防线被突破，调用 `sys_clearRunState()` 清除局内存档，游戏结束 (Game Over)。
 
 ### 2.4 局内存档与刷新恢复
-- **存档时机**: `phase_finalizeRound()` 末尾，`round++` 之后、`sys_startRoundStartResolver()` 之前；此外，进入命运时刻阶段、切换弹珠选择、绑定纯净精华符文时，也应即时调用 `sys_saveRunState()`，避免刷新后丢失当前选择与注入上下文。
-- **存档内容**: `phase`、round、score、enemies（含 Vec2 坐标）、pegs（type/level/frozenTurns）、ownedRelics、runeInventory、runeGrid、unlockedWeights、guaranteedNextRound、`pendingRoundStartRewards`、`pendingSelectionMode`、`selectionMode`、`selectionRequiredCount`、`marblesPool`、`selectedMarbles`、`selectionInjectedRune`、`selectionPreviewState`、`relicOverlayReturnState`、`fateMomentContext`、`replaceAmmoContext`（[tsk-668f3dba] 替换子弹阶段上下文）、`doubleAssimilationBoostRounds`、Boss 系统字段、难度字段、钉盘形态、`runFragments` / `runShopInventory` / `runShopRefreshes` / `_runShopOpenedRound` / `runShopNextOfferRound` / `runShopActiveUntilRound` / `runShopLastArrivalRound` / `runShopScheduleStartRound` / `runShopScheduleGap` / `runShopStarterBoostClaimed` / `runShopStarterBoostDamageAmount` / `runShopStarterBoostDamageRounds` / `_runShopInventoryGeneratedForRound`、技能、统计数据等。
+- **格式合同**: `echo_alchemist_run_state` 必须带固定 `schema`、整数 `version`、`resumePoint` 与 `savedAt`。解析失败、版本不兼容、重复/缺失 reward ID、非法 phase/resumePoint 或关键队列缺失时，继续入口必须隐藏并安全丢弃坏档。
+- **安全点**: 只允许保存 `round_start`、`selection`、`gathering_idle`、`combat_idle`。resolver/banner/relic hook 正在推进、遗物/商店 overlay 打开、弹射物/爆发/待发射/充能仍活动、研磨球体/能量球/session/转盘仍活动或敌人回合进行中时，`sys_saveRunState()` 必须返回 `false`，且不得覆盖上一个有效 checkpoint。
+- `round_start` 只能由显式 `_roundStartCheckpointReady` 判定，禁止因为 combat 中仍有 pending reward 就推断为回合起点；`combat_idle` 也只能在战斗初始化完成后的短暂 `_combatCheckpointReady` 窗口写入。
+- **存档内容**: `phase`、round、score、enemies、pegs、`ammoQueue`、`marbleQueue`、ownedRelics、runeInventory、runeGrid、unlockedWeights、`pendingRoundStartRewards`（稳定 ID）、已消费 reward IDs/序号、selection/replace-ammo 上下文、Boss/难度/钉盘、run shop、技能和统计数据。安全点不序列化活动 projectile 或 overlay；这两类运行态必须在恢复时为空。
+- `selection` 必须保留完整 `MarbleDefinition`（含 `collected`、`runeSlots`、`maxRuneSlots`）和 `persistentThreshold`；恢复期间禁止 `spawn_generateMarbleOptions()` 等 UI 重建路径回写存档。`gathering_idle` 必须保存并恢复确切 Peg/挡板、粉钉、special slot 与底部奖励区几何，禁止刷新重掷盘面。
+- 永久同化增益不得直接 JSON 序列化 `Infinity`，必须使用 `permanent` sentinel 并在 load 时还原；enemy 毒层/解冻边沿、风锚/风暴核心、跨回合清屏标志和 runeword kill count 必须成组 save/load/reset。
 - **恢复入口**: Meta 页面「繼續上次游戲」按钮（`#meta-continue-btn`），调用 `meta_continueRun()`。
-- **恢复流程**: `sys_resetGame()` + `meta_applyUpgrades()` → 注入存档状态 → `phase_gathering_initPachinko(true)` 重建钉盘 → 若存档处于 `replaceAmmoContext.active`，直接恢复替换子弹 UI；若存档来自 `selection` / 命运时刻，必须重建候选卡片 DOM、恢复 `selectedMarbles` / `selectionInjectedRune` / 预览态并执行 `ui_refreshSelectionModeUI()`；只有普通回合恢复才进入 `sys_startRoundStartResolver()` 继续结算待处理遗物/精华。
+- **恢复流程**: 先深度校验 payload，再在 restore-write guard 下执行 `sys_resetGame()` + `meta_applyUpgrades()` 与状态注入。`selection` 重建候选/替换 UI；`gathering_idle` 直接恢复稳定钉盘与队列；`combat_idle` 恢复 `ammoQueue`/敌人后进入战斗但不得重放 round 初始化；`round_start` 重新进入 resolver。恢复不得重放上次安全点之后未提交的 overlay 或动画副作用；任一 hydration 异常必须二次 reset、清档并回到 meta。
+- **继续入口**: `meta_updateContinueButton()` 只能读取已校验摘要，并显示存档真实 `Round N`；坏档或不兼容版本不得显示伪继续按钮。
 - **清档时机**: 游戏结束（`_gameover_triggerPhase`）或新开一局（`meta_startRun`）时自动清除。
 
 ## 3. 阶段转换规范
@@ -99,10 +118,12 @@ globs: ["src/game_phase.js"]
 
 ## 3.1 暂停机制 (Pause)
 - 暂停**不是阶段切换**，而是以 DOM-only overlay 方式叠加在当前阶段上方。
-- 暂停由 `ui_openPause()` 触发，设置 `this.isPaused = true`，`sys_loop` 将跳过所有物理更新。
-- 恢复由 `ui_closePause()` 触发，设置 `this.isPaused = false`。
+- `ui_openPause()`、遗物 overlay、局内商店和模块编辑器各自持有独立 pause lease；重复打开同一 overlay 不得重复申请或覆盖已有 token/close callback。
+- 重复打开同一 overlay/module editor 只能聚焦已有 session；card、购买、Escape 和 close handler 必须捕获 session ID，旧 session 的事件不得作用于后继 session。
+- 关闭路径必须先把 session 标记为 settled/closed，再释放自身 token；禁止直接写 `this.isPaused = false`。只有 pause registry 为空时 `sys_releasePauseLease()` 才恢复模拟。
+- abandon/gameover/reset 会让旧 lease 失效；旧 token 的重复或乱序释放必须返回 `false`，不能解除新局 owner。
 - 仅允许在 `gathering`、`combat`、`training` 阶段暂停；其他阶段调用 `ui_openPause()` 无效。
-- `sys_resetGame()` 中会自动重置 `isPaused = false`。
+- `sys_resetGame()` 会清空 lease registry 与所有 overlay token 兼容字段。
 
 ## 4. 敌人回合逻辑与温度结算
 ### 4.1 扫描波与行动

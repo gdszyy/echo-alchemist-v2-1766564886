@@ -56,6 +56,36 @@ function _isCoarsePointerInput() {
     return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 }
 
+function _getDialogFocusable(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return [];
+    return Array.from(container.querySelectorAll('button:not([disabled]), [href], [role="button"], [tabindex]:not([tabindex="-1"])'))
+        .filter(element => element && element.getAttribute('aria-hidden') !== 'true');
+}
+
+function _trapDialogFocus(event, container, onEscape) {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        onEscape();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = _getDialogFocusable(container);
+    if (focusable.length === 0) {
+        event.preventDefault();
+        container.focus?.();
+        return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
 function _grantRelicResourcePack(game, multiplier = 0.5) {
     const base = CONFIG.gameplay?.runResourcePackFragments || 48;
     const amount = Math.max(1, Math.round(base * multiplier));
@@ -85,6 +115,31 @@ export const shop_system = {
         // 1. 记录之前的状态 (用于关闭时恢复)
         this.stateBeforeRelic = options.resumeTarget || this.phase;
         const isReroll = options.isReroll === true;
+        const existingSession = this._relicOverlaySession;
+        if (existingSession?.active && !isReroll) {
+            const existingOverlay = document.getElementById('phase-relic');
+            (_getDialogFocusable(existingOverlay)[0] || existingOverlay)?.focus?.();
+            return false;
+        }
+        if (!existingSession?.active && typeof this.input_cancelActiveInteraction === 'function') {
+            this.input_cancelActiveInteraction(null, { reason: 'overlay:relic' });
+        }
+        const session = existingSession?.active ? existingSession : {
+            id: `relic:${this._runLifecycleEpoch || 0}:${options.rewardId || Date.now()}`,
+            active: true,
+            settled: false,
+            rewardId: options.rewardId || null,
+            returnState: { phase: options.resumeTarget || this.phase },
+            previousFocus: document.activeElement || null,
+            pauseToken: null,
+            choiceIds: [],
+        };
+        if (!session.pauseToken && typeof this.sys_acquirePauseLease === 'function') {
+            session.pauseToken = this.sys_acquirePauseLease(session.id);
+        }
+        this._relicOverlaySession = session;
+        this._relicOverlayPauseLeaseToken = session.pauseToken;
+        this.relicOverlayReturnState = { ...session.returnState, rewardId: session.rewardId };
 
         // --- 配置权重 ---
         const RARITY_WEIGHTS = CONFIG.balance.relicRarityWright;
@@ -102,6 +157,7 @@ export const shop_system = {
             resumeTarget: options.resumeTarget || this.stateBeforeRelic,
             source: options.source || null,
             showAllRelics,
+            rewardId: session.rewardId,
         };
         if (!isReroll) this.relicRerollUsed = false;
         this.relicSelectionContext = showAllRelics && options.source === 'debug_pick_any_relic'
@@ -190,6 +246,7 @@ export const shop_system = {
                 pool.splice(selectedIdx, 1);
             }
         }
+        session.choiceIds = choices.map(relic => relic.id);
 
         // 计数器自增（每次打开遗物选择界面时计数）
         if (!showAllRelics && !isReroll) this.relicSelectionCount = (this.relicSelectionCount || 0) + 1;
@@ -237,9 +294,13 @@ export const shop_system = {
             container.innerHTML = '';
             
             choices.forEach(relic => {
+                const cardSessionId = session.id;
                 const el = document.createElement('div');
                 el.className = `relic-card ${relic.rarity || 'common'}`; 
                 el.tabIndex = 0;
+                el.setAttribute('role', 'button');
+                el.setAttribute('aria-label', `选择遗物 ${relic.name}：${relic.desc}`);
+                el.dataset.relicId = relic.id;
                 el.dataset.rarity = relic.rarity || 'common';
                 const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
                 const max = relic.maxStacks || 1;
@@ -285,7 +346,13 @@ export const shop_system = {
                         if (window.showToast) showToast('再次點擊以選擇該遺物');
                         return;
                     }
-                    this.ui_selectRelic(relic);
+                    this.ui_selectRelic(relic, { sessionId: cardSessionId });
+                };
+                el.onkeydown = (e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.ui_selectRelic(relic, { sessionId: cardSessionId });
                 };
                 el.onmouseenter = () => renderRelicPreview(relic, el);
                 el.onfocus = () => renderRelicPreview(relic, el);
@@ -306,7 +373,10 @@ export const shop_system = {
             overlay.classList.toggle('relic-debug-picker', showAllRelics);
             const titleEl = overlay.querySelector('.relic-title-block h2');
             const subtitleEl = overlay.querySelector('.relic-title-block p');
-            if (titleEl) titleEl.textContent = showAllRelics ? '测试遗物库' : '古代遺物';
+            if (titleEl) {
+                titleEl.id = 'relic-dialog-title';
+                titleEl.textContent = showAllRelics ? '测试遗物库' : '古代遺物';
+            }
             if (subtitleEl) subtitleEl.textContent = showAllRelics ? '点击切换多个开局遗物，返回商店后从首页开始下一局生效' : '命運的饋贈，選擇一種力量';
             const skipBtn = document.getElementById('relic-skip-to-shop-btn');
             if (skipBtn) {
@@ -329,11 +399,25 @@ export const shop_system = {
                 rerollBtn.onclick = () => this.ui_rerollRelicSelection();
             }
             overlay.style.display = 'flex';
+            overlay.style.pointerEvents = 'auto';
             overlay.classList.remove('hidden-phase');
             overlay.classList.add('active-phase');
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-labelledby', 'relic-dialog-title');
+            overlay.tabIndex = -1;
+            if (!session.keydownHandler) {
+                session.keydownHandler = event => _trapDialogFocus(event, overlay, () => {
+                    if (showAllRelics) this.ui_closeRelicSelection();
+                    else this.ui_skipRelic();
+                });
+                overlay.addEventListener('keydown', session.keydownHandler);
+            }
+            (_getDialogFocusable(overlay)[0] || overlay).focus?.();
         }
         // 通知教程系统：遗物选择界面已打开
         eventBus.emit('tutorial:relic_shown');
+        return true;
     },
 
     /**
@@ -388,6 +472,17 @@ export const shop_system = {
                 });
             }
             return;
+        }
+
+        const relicSession = this._relicOverlaySession;
+        if (!options.skipClose) {
+            if (!relicSession?.active || relicSession.settled) return false;
+            if (options.sessionId && options.sessionId !== relicSession.id) return false;
+            if (Array.isArray(relicSession.choiceIds) && relicSession.choiceIds.length > 0
+                && !relicSession.choiceIds.includes(relic.id)) return false;
+            // Claim the UI action before applying any effect. Queued click/key
+            // events from the old card can no longer grant the relic twice.
+            relicSession.settled = true;
         }
 
         if (!this.ownedRelics) this.ownedRelics = [];
@@ -517,8 +612,7 @@ export const shop_system = {
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
             if (rewardOnlyTypes.has(mt)) {
                 if (window.showToast) showToast(`${display}奖励区权重提升！只能通过底部奖励区获得。`);
-                return;
-            }
+            } else {
             // 2. 立即提供局内资源包，让玩家去商店消费。
             const packFragments = _grantRelicResourcePack(this, 0.5);
             // 3. 永久翻倍同化概率
@@ -528,6 +622,7 @@ export const shop_system = {
             this.doubleAssimilationBoostRounds[mt] = Infinity;
             // 4. 提示
             if (window.showToast) showToast(`${display}权重提升！资源包 +${packFragments}，去局内商店换构筑。`);
+            }
         } else if (relic.effect === 'assimilation_surge') {
             // [兼容旧存档] 保留旧效果处理
             const mt = relic.marbleType;
@@ -632,104 +727,113 @@ export const shop_system = {
             this.combat_recomputeActiveSkills();
         }
 
-        if (!options.skipClose) this.ui_closeRelicSelection();
+        if (!options.skipClose) this.ui_closeRelicSelection({ outcome: 'selected' });
+        return true;
+    },
+
+    ui_resumeRelicReturnState(returnState = {}, options = {}) {
+        if (returnState.phase === 'gathering') {
+            if (typeof this.phase_gathering_attemptComplete === 'function') this.phase_gathering_attemptComplete();
+            return true;
+        }
+        if (returnState.phase === 'selection') {
+            if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('selection');
+            if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
+            return true;
+        }
+        if (returnState.phase === 'round_start_resolver') {
+            if (options.rewardCompleted) {
+                return typeof this.sys_startRoundStartResolver === 'function'
+                    ? this.sys_startRoundStartResolver()
+                    : false;
+            }
+            return typeof this.sys_continueRoundStartResolver === 'function'
+                ? this.sys_continueRoundStartResolver(options.rewardId || null)
+                : false;
+        }
+        if (returnState.phase === 'shop') {
+            if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('shop');
+            if (typeof this.ui_renderShop === 'function') this.ui_renderShop();
+            return true;
+        }
+        if (returnState.phase === 'training') {
+            if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('training');
+            return true;
+        }
+        if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase();
+        return true;
     },
 
     /**
-     * 跳过遗物选择 → 进入局内商店
-     * [v2 调整] 不再奖励 500 score；改为打开局内商店，本回合丧失遗物。
-     * 商店关闭后接续 round-start resolver，继续后续遗物/弹珠包流程。
+     * 跳过遗物选择 → 进入局内商店。The session is settled before
+     * granting the bonus so click/Escape races cannot pay twice.
      */
     ui_skipRelic() {
+        const session = this._relicOverlaySession;
+        if (!session?.active || session.settled) return false;
+        session.settled = true;
+        const returnState = { ...(session.returnState || { phase: this.stateBeforeRelic }) };
+        const rewardId = session.rewardId || null;
+        const returnFocus = session.previousFocus || null;
+        if (rewardId && typeof this.sys_completeRoundStartReward === 'function') {
+            this.sys_completeRoundStartReward(rewardId);
+        }
+
         const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);
         if (skipBonus > 0) {
             this.runFragments = (this.runFragments || 0) + skipBonus;
-            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         }
         if (window.showToast) showToast(skipBonus > 0 ? `放棄遗物，获得 ${skipBonus} 碎片` : "放棄遗物，进入局内商店");
-        // 关闭遗物界面，但不进入下一阶段；改为打开商店
-        const overlay = document.getElementById('phase-relic');
-        if (overlay) {
-            overlay.style.display = 'none';
-            overlay.classList.remove('active-phase');
-            overlay.classList.remove('relic-debug-picker');
-            overlay.classList.add('hidden-phase');
-        }
-        this.relicSelectionContext = null;
-        this._lastRelicSelectionOptions = null;
-        this.relicRerollUsed = false;
-        const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
-        this.relicOverlayReturnState = null;
-        // 标记本回合已弃权遗物，避免回到 resolver 时再次弹出（防止重复打开）
+        this.ui_closeRelicSelection({ resume: false, restoreFocus: false, outcome: 'skipped' });
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         this._relicSkippedThisRound = true;
         if (typeof this.ui_showRunShop === 'function') {
             this.ui_showRunShop(() => {
-                // 商店关闭后回到原 resolver / phase，但本次的 relic 奖励已被消费，所以
-                // sys_continueRoundStartResolver 会自然处理下一个奖励（如有）。
-                if (returnState.phase === 'gathering') {
-                    if (typeof this.phase_gathering_attemptComplete === 'function') this.phase_gathering_attemptComplete();
-                    return;
-                }
-                if (returnState.phase === 'selection') {
-                    if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('selection');
-                    if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
-                    return;
-                }
-                if (returnState.phase === 'round_start_resolver') {
-                    if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
-                    return;
-                }
-                if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase();
-            }, { reason: 'skip_relic' });
+                this.ui_resumeRelicReturnState(returnState, { rewardCompleted: true });
+            }, { reason: 'skip_relic', returnFocus });
         } else {
-            // 兜底：商店未挂载时退回原行为
-            this.ui_closeRelicSelection();
+            this.ui_resumeRelicReturnState(returnState, { rewardCompleted: true });
         }
+        return true;
     },
 
     /**
      * 关闭界面并恢复
      */
-    ui_closeRelicSelection() {
+    ui_closeRelicSelection(options = {}) {
+        const session = this._relicOverlaySession;
+        if (!session?.active) return false;
+        session.active = false;
+        const returnState = { ...(session.returnState || { phase: this.stateBeforeRelic }) };
+        const rewardId = session.rewardId || null;
         const overlay = document.getElementById('phase-relic');
         if (overlay) {
             overlay.style.display = 'none';
             overlay.classList.remove('active-phase');
             overlay.classList.remove('relic-debug-picker');
             overlay.classList.add('hidden-phase');
+            overlay.style.pointerEvents = 'none';
+            if (session.keydownHandler) overlay.removeEventListener('keydown', session.keydownHandler);
         }
+        const pauseToken = session.pauseToken;
+        session.pauseToken = null;
+        this._relicOverlayPauseLeaseToken = null;
+        if (this._relicOverlaySession === session) this._relicOverlaySession = null;
         this.relicSelectionContext = null;
         this._lastRelicSelectionOptions = null;
         this.relicRerollUsed = false;
-
-        const returnState = this.relicOverlayReturnState || { phase: this.stateBeforeRelic };
         this.relicOverlayReturnState = null;
-
-        if (returnState.phase === 'gathering') {
-            if (typeof this.phase_gathering_attemptComplete === 'function') this.phase_gathering_attemptComplete();
-            return;
+        this.stateBeforeRelic = null;
+        if (pauseToken && typeof this.sys_releasePauseLease === 'function') {
+            this.sys_releasePauseLease(pauseToken);
         }
-
-        if (returnState.phase === 'selection') {
-            // [BUGFIX] 移除多余的 ui_updateUI() 调用：
-            // phase_switchPhase 内部已调用 ui_updateUI()，再重复调用会用旧 selectionMode 覆盖界面。
-            if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('selection');
-            if (typeof this.ui_refreshSelectionModeUI === 'function') this.ui_refreshSelectionModeUI();
-            return;
+        if (options.restoreFocus !== false && !this._relicOverlaySession?.active
+            && session.previousFocus?.isConnected !== false) {
+            session.previousFocus?.focus?.();
         }
-
-        if (returnState.phase === 'round_start_resolver') {
-            if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
-            return;
-        }
-
-        if (returnState.phase === 'shop') {
-            if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('shop');
-            if (typeof this.ui_renderShop === 'function') this.ui_renderShop();
-            return;
-        }
-
-        if (typeof this.sys_initSelectionPhase === 'function') this.sys_initSelectionPhase(); 
+        if (options.resume === false) return true;
+        this.ui_resumeRelicReturnState(returnState, { rewardId, rewardCompleted: false });
+        return true;
     },
 
     /**
@@ -906,9 +1010,19 @@ export const shop_system = {
                     
                     const buyBtn = document.createElement('button');
                     buyBtn.className = `px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${canAfford ? 'bg-amber-500 hover:bg-amber-400 text-slate-900 shadow-lg shadow-amber-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
-                    buyBtn.innerText = isDebugRelicPicker ? '选择' : '升级';
+                    const shortfall = Math.max(0, cost - playerHas);
+                    buyBtn.disabled = !canAfford;
+                    buyBtn.setAttribute('aria-disabled', canAfford ? 'false' : 'true');
+                    buyBtn.title = canAfford ? `${isDebugRelicPicker ? '选择' : '升级'} ${upgrade.name}` : `还差 ${shortfall} ${resDef.name || '资源'}`;
+                    buyBtn.setAttribute('aria-label', canAfford
+                        ? `${isDebugRelicPicker ? '选择' : '升级'} ${upgrade.name}，花费 ${cost}`
+                        : `${upgrade.name} 无法购买，还差 ${shortfall} ${resDef.name || '资源'}`);
+                    buyBtn.innerText = canAfford
+                        ? (isDebugRelicPicker ? '选择' : '升级')
+                        : `还差 ${shortfall}`;
                     buyBtn.onclick = (e) => {
                         e.stopPropagation();
+                        if (!canAfford) return;
                         if (typeof this.meta_buyUpgrade === 'function') this.meta_buyUpgrade(upgrade.id);
                     };
                     

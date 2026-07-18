@@ -595,6 +595,15 @@ export const game_phase = {
      */
     phase_switchPhase(newPhase) {
         const oldPhase = this.phase;
+        // game_over.js owns a short presentation delay. If a new run starts
+        // during that delay, reject the stale transition at the coordinator.
+        if (newPhase === 'gameover' && !this.gameOver) return false;
+        if (oldPhase !== newPhase) {
+            this._phaseLifecycleEpoch = (Number.isInteger(this._phaseLifecycleEpoch) ? this._phaseLifecycleEpoch : 0) + 1;
+            if (typeof this.input_cancelActiveInteraction === 'function') {
+                this.input_cancelActiveInteraction(null, { reason: `phase:${oldPhase}->${newPhase}` });
+            }
+        }
         this.phase = newPhase;
 
         // [DEBUG-LOG] 记录每次 phase 切换的来源和调用栈
@@ -620,6 +629,10 @@ export const game_phase = {
         this.ui_updateUI(); // 更新 UI 界面
         // [重构] 将阶段标题的 DOM 操作集中到 ui_system.js 的 ui_onPhaseChange 方法中
         this.ui_onPhaseChange(newPhase);
+        if (typeof this.sys_flushDeferredLifecycleContinuations === 'function') {
+            this.sys_flushDeferredLifecycleContinuations();
+        }
+        return true;
     },
 
 /**
@@ -666,9 +679,11 @@ export const game_phase = {
         }
 
         this.phase_switchPhase('gathering');
-        requestAnimationFrame(() => {
-            this.ui_updateUICache();
-        });
+        if (typeof this.sys_scheduleLifecycleFrame === 'function') {
+            this.sys_scheduleLifecycleFrame(() => this.ui_updateUICache(), { phaseBound: true });
+        } else {
+            requestAnimationFrame(() => this.ui_updateUICache());
+        }
         // 确保每次进入收集阶段都初始化钉板，因为钉板可能在战斗阶段被清空
         // 或者在游戏重置后需要初始化。
         this.phase_gathering_initPachinko(this.round > 1);
@@ -697,6 +712,9 @@ export const game_phase = {
         if (!skipEditor && typeof this.ui_showModuleEditorEntry === 'function') {
             this.ui_showModuleEditorEntry();
         }
+        // Gathering initialization is the single owner of its stable checkpoint,
+        // regardless of whether the entry came from a pack or a selection flow.
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
     },
 
 /**
@@ -1529,10 +1547,18 @@ phase_gathering_getRandomPegType() {
     phase_startCombatPhase() {
         if (typeof this.ui_handlePotionAlchemyInterrupt === 'function'
             && !this.ui_handlePotionAlchemyInterrupt('enter_combat')) {
+            if (typeof this.sys_deferPotionBlockedContinuation === 'function') {
+                this.sys_deferPotionBlockedContinuation(
+                    `enter-combat:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                    () => this.phase_startCombatPhase(),
+                    { expectedPhase: this.phase }
+                );
+            }
             return false;
         }
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止阶段切换后孤立 Sprite 残留
         pixiCleanupAllEffects(this);
+        this._marblePackGrindActive = false;
 
         this.isEnemyTurn = false;
         this.energyOrbs = [];
@@ -1690,7 +1716,7 @@ phase_gathering_getRandomPegType() {
             // 激活入场动画计时器
             pendingBoss.entranceTimer = 90;
             // 延迟一帧再触发事件，确保战斗阶段已完全切换后再播放全屏演出
-            setTimeout(() => {
+            const announceBoss = () => {
                 eventBus.emit('boss:spawned', {
                     boss: pendingBoss,
                     bossId: pendingBoss.bossType,
@@ -1699,7 +1725,21 @@ phase_gathering_getRandomPegType() {
                     round: this.round
                 });
                 showToast(`☠️ ${pendingBoss.bossName} 出现！`);
-            }, 100);
+            };
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(announceBoss, 100, { phaseBound: true });
+            } else {
+                setTimeout(announceBoss, 100);
+            }
+        }
+        // Only this post-initialization instant is a replay-safe combat
+        // checkpoint. Later shop/module saves must preserve it instead of
+        // serializing a partially consumed player turn.
+        this._combatCheckpointReady = true;
+        try {
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        } finally {
+            this._combatCheckpointReady = false;
         }
         return true;
     },
@@ -2118,13 +2158,18 @@ phase_gathering_getRandomPegType() {
             eventBus.emit(EVENT_TYPES.UI_RUNE_CLAIM_AFTER_ENEMY, { runes: pendingRunes });
             // 4. 延迟检测是否可以组成词条，如可以则展示气泡提示
             //    延迟 800ms 以等待符文飞入动画播放完毕
-            setTimeout(() => {
+            const showRunewordHint = () => {
                 if (this._ui_checkRunewordBubble) {
                     // 重置气泡关闭标记（新符文入库应重新提示）
                     this._runewordBubbleDismissed = false;
                     this._ui_checkRunewordBubble();
                 }
-            }, 800);
+            };
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(showRunewordHint, 800, { phaseBound: true });
+            } else {
+                setTimeout(showRunewordHint, 800);
+            }
         }
     },
 
@@ -2260,6 +2305,12 @@ phase_gathering_getRandomPegType() {
      * @description [修改版] 回合结算，包含劣势补偿机制(自动极速)
      */
     phase_finalizeRound() {
+
+        // @section:finalize_guard_snapshot - 幂等闸门与战场快照
+        if (this.gameOver) return false;
+        const finalizeKey = `${this._runLifecycleEpoch || 0}:${this.round || 1}`;
+        if (this._roundFinalizeKey === finalizeKey) return false;
+        this._roundFinalizeKey = finalizeKey;
         // 1. 统计当前存活敌人数据
         const activeEnemies = this.enemies.filter(e => e.active);
         // [清屏检测] 仅统计围墙内 (pos.y > 0) 且能被子弹击中的敌人。
@@ -2269,6 +2320,7 @@ phase_gathering_getRandomPegType() {
         // Math.round 处理浮点误差，/50 是行高，确保归类准确
         const uniqueRows = new Set(activeEnemies.map(e => Math.round(e.pos.y / this.enemyHeight)));
         
+        // @section:finalize_pressure_relief - 劣势补偿与敌军增援
         // 2. 触发条件判定：行数 <= 1 或 总数 <= 5
         if (uniqueRows.size <= 1 || activeEnemies.length <= 5) {
             let buffCount = 0;
@@ -2322,6 +2374,7 @@ phase_gathering_getRandomPegType() {
             }
         }
 
+        // @section:finalize_inventory_sync - 符文库存同步
         // --- [符文领取] 掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
         // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
         this.saveData.runeInventory = (this.runeInventory || []).slice();
@@ -2329,6 +2382,7 @@ phase_gathering_getRandomPegType() {
 
         // --- 以下保持原有的回合结算逻辑 ---
         
+        // @section:finalize_next_wave - 下一回合波次生成
         // =========================================
         // Boss 回合触发检测
         // =========================================
@@ -2369,6 +2423,7 @@ phase_gathering_getRandomPegType() {
         // [清屏状态] 将本回合清屏结果写入标志位，供下一回合读取
         this._prevRoundCleared = clearedThisRound;
 
+        // @section:finalize_round_decay - 跨回合增益递减
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
             showToast("強敵來襲！HP x" + this.nextRoundHpMultiplier);
@@ -2427,6 +2482,7 @@ phase_gathering_getRandomPegType() {
             }
         }
         
+        // @section:finalize_round_hooks - 回合递增与遗物钩子
         this.round++;
         this.prevRoundDamage = this.roundDamage;
         this.roundDamage = 0;
@@ -2441,10 +2497,38 @@ phase_gathering_getRandomPegType() {
         }
         if (relicHookDelayMs > 0) {
             this._roundStartRelicHookDelayActive = true;
-            setTimeout(() => {
+            const lifecycleToken = typeof this.sys_captureLifecycleToken === 'function'
+                ? this.sys_captureLifecycleToken()
+                : null;
+            const cancelHookContinuation = () => {
+                this._roundStartRelicHookDelayActive = false;
+            };
+            const continueAfterHooks = () => {
                 this._roundStartRelicHookDelayActive = false;
                 this.phase_continueFinalizeRoundAfterRelicHooks();
-            }, relicHookDelayMs);
+            };
+            const runContinuation = () => {
+                if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                    return this.sys_runOrDeferLifecycleContinuation(
+                        `round-start-hooks:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                        continueAfterHooks,
+                        {
+                            token: lifecycleToken,
+                            expectedPhase: 'combat',
+                            onCancel: cancelHookContinuation,
+                        }
+                    );
+                }
+                return continueAfterHooks();
+            };
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(runContinuation, relicHookDelayMs, {
+                    token: lifecycleToken,
+                    onCancel: cancelHookContinuation,
+                });
+            } else {
+                setTimeout(runContinuation, relicHookDelayMs);
+            }
             return;
         }
         this.phase_continueFinalizeRoundAfterRelicHooks();
@@ -2460,6 +2544,7 @@ phase_gathering_getRandomPegType() {
         if (this._isTutorialRun && this.round > 5) {
             this.gameOver = true;
             this._isTutorialRunCleared = true; // 标记为胜利结局
+            if (typeof this.sys_invalidateRunLifecycle === 'function') this.sys_invalidateRunLifecycle('gameover');
             this._gameover_triggerPhase();
             return;
         }
@@ -2468,6 +2553,7 @@ phase_gathering_getRandomPegType() {
         if (this.input_checkDefeat()) {
             this.gameOver = true;
             // [游戏结束] 切换到结算阶段
+            if (typeof this.sys_invalidateRunLifecycle === 'function') this.sys_invalidateRunLifecycle('gameover');
             this._gameover_triggerPhase();
             return;
         }
@@ -2498,6 +2584,7 @@ phase_gathering_getRandomPegType() {
         if (this.ammoQueue.length === 0) {
             // [局内存档] 每回合结算完毕后自动存档，防止刷新丢失进度
             // round-start resolver 会在存档恢复时继续处理 pendingRoundStartRewards。
+            this._roundStartCheckpointReady = true;
             this.sys_saveRunState();
 
             // [v2 局内商店] 不再每回合自动弹出；商店仅在「跳过遗物」(ui_skipRelic) 路径下打开。
@@ -2518,8 +2605,15 @@ phase_gathering_getRandomPegType() {
         // 1. 中心三层 Shockwave（金/紫/青，错峰模拟蓄能层叠）
         if (typeof this.spawn_createShockwave === 'function') {
             this.spawn_createShockwave(cx, cy, '#fde047');
-            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#a78bfa'), 90);
-            setTimeout(() => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#22d3ee'), 180);
+            const secondWave = () => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#a78bfa');
+            const thirdWave = () => this.spawn_createShockwave && this.spawn_createShockwave(cx, cy, '#22d3ee');
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(secondWave, 90, { phaseBound: true });
+                this.sys_scheduleLifecycleTimeout(thirdWave, 180, { phaseBound: true });
+            } else {
+                setTimeout(secondWave, 90);
+                setTimeout(thirdWave, 180);
+            }
         }
         // 2. 大范围扩散光晕（复用 HealWave 的扩散环 + 中心光晕表达）
         if (typeof this.spawn_createHealWave === 'function') {
@@ -2663,6 +2757,8 @@ phase_gathering_getRandomPegType() {
      */
     // @section:combat_update_timescale - 时间缩放与暂停状态检查
     phase_combat_update(timeScale) {
+        if (this.gameOver) return;
+        if (this._roundStartCheckpointReady || this._potionBlockedContinuation) return;
         if (this._relicCombatCinematicFrames > 0) {
             this._relicCombatCinematicFrames -= timeScale;
             this.isVisualEffectActive = true;
@@ -3067,7 +3163,9 @@ phase_gathering_getRandomPegType() {
             if (this.input_checkDefeat()) {
                 this.gameOver = true;
                 // [游戏结束] 切换到结算阶段
+                if (typeof this.sys_invalidateRunLifecycle === 'function') this.sys_invalidateRunLifecycle('gameover');
                 this._gameover_triggerPhase();
+                return;
             }
 
             // 更新和绘制弹丸
@@ -3551,10 +3649,38 @@ phase_gathering_getRandomPegType() {
                             this._runeClaimPending = true;
                             this.phase_claimPendingRunes();
                             // 延迟 600ms 让符文飞入动画播放完毕，再进入回合结算
-                            setTimeout(() => {
+                            const lifecycleToken = typeof this.sys_captureLifecycleToken === 'function'
+                                ? this.sys_captureLifecycleToken()
+                                : null;
+                            const cancelRuneFinalize = () => {
+                                this._runeClaimPending = false;
+                            };
+                            const finalizeAfterRuneClaim = () => {
                                 this._runeClaimPending = false;
                                 this.phase_finalizeRound();
-                            }, 600);
+                            };
+                            const runFinalize = () => {
+                                if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                                    return this.sys_runOrDeferLifecycleContinuation(
+                                        `rune-claim-finalize:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                                        finalizeAfterRuneClaim,
+                                        {
+                                            token: lifecycleToken,
+                                            expectedPhase: 'combat',
+                                            onCancel: cancelRuneFinalize,
+                                        }
+                                    );
+                                }
+                                return finalizeAfterRuneClaim();
+                            };
+                            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                                this.sys_scheduleLifecycleTimeout(runFinalize, 600, {
+                                    token: lifecycleToken,
+                                    onCancel: cancelRuneFinalize,
+                                });
+                            } else {
+                                setTimeout(runFinalize, 600);
+                            }
                         }
                     }
                     return;
@@ -3748,16 +3874,46 @@ phase_gathering_getRandomPegType() {
 
         if (this.ammoQueue.length === 0) return;
 
+        const lifecycleToken = typeof this.sys_captureLifecycleToken === 'function'
+            ? this.sys_captureLifecycleToken()
+            : null;
+        const runGatheringContinuation = (key, callback) => {
+            if (typeof this.sys_runOrDeferLifecycleContinuation === 'function') {
+                return this.sys_runOrDeferLifecycleContinuation(key, callback, {
+                    token: lifecycleToken,
+                    expectedPhase: 'gathering',
+                });
+            }
+            return callback();
+        };
         if (this._chargedAmmoQueue && this._chargedAmmoQueue.length > 0) {
-            setTimeout(() => {
+            const enterReplacementOrCombat = () => {
                 if (typeof this.sys_initReplaceAmmoPhase === 'function') {
                     this.sys_initReplaceAmmoPhase();
                 } else {
                     this.phase_startCombatPhase();
                 }
-            }, 500);
+            };
+            const runReplacementOrCombat = () => runGatheringContinuation(
+                `gathering-replace:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                enterReplacementOrCombat
+            );
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(runReplacementOrCombat, 500, { token: lifecycleToken });
+            } else {
+                setTimeout(runReplacementOrCombat, 500);
+            }
         } else {
-            setTimeout(() => this.phase_startCombatPhase(), 500);
+            const enterCombat = () => this.phase_startCombatPhase();
+            const runEnterCombat = () => runGatheringContinuation(
+                `gathering-combat:${this._runLifecycleEpoch || 0}:${this.round || 1}`,
+                enterCombat
+            );
+            if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+                this.sys_scheduleLifecycleTimeout(runEnterCombat, 500, { token: lifecycleToken });
+            } else {
+                setTimeout(runEnterCombat, 500);
+            }
         }
     },
     
