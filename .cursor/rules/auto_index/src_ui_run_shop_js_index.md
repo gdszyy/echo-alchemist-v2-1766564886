@@ -1,6 +1,6 @@
 # src\ui\run_shop.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 520 | 函数数: 18 | 语言: javascript
+> 自动生成于 2026-07-20 | 总行数: 712 | 函数数: 23 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -19,11 +19,16 @@
 | generateInventoryForCurrentVisit | function | `generateInventoryForCurrentVisit(game, count)` |  |
 | getRunShopVisitKey | function | `getRunShopVisitKey(game)` |  |
 | ensureInventoryForCurrentVisit | function | `ensureInventoryForCurrentVisit(game, count)` |  |
+| getDialogFocusable | function | `getDialogFocusable(container)` |  |
+| isVisibleFocusTarget | function | `isVisibleFocusTarget(target)` |  |
+| resolveOverlayCloseFocusTarget | function | `resolveOverlayCloseFocusTarget(target)` |  |
+| restoreFocusAfterOverlayClose | function | `restoreFocusAfterOverlayClose(game, target)` |  |
+| trapDialogFocus | function | `trapDialogFocus(event, container, onEscape)` |  |
 | applyStarterBoost | function | `applyStarterBoost(game)` |  |
 | ui_showRunShop | method | `ui_showRunShop(onClose, options = {})` |  |
 | ui_offerRunShop | method | `ui_offerRunShop(onClose, reason = 'interval')` |  |
 | ui_hasAffordableRunShopItem | method | `ui_hasAffordableRunShopItem()` |  |
-| ui_hideRunShop | method | `ui_hideRunShop()` |  |
+| ui_hideRunShop | method | `ui_hideRunShop(options = {})` |  |
 | ui_renderRunShop | method | `ui_renderRunShop()` |  |
-| ui_buyRunShopItem | method | `ui_buyRunShopItem(idx)` |  |
+| ui_buyRunShopItem | method | `ui_buyRunShopItem(itemRef, sessionId = null)` |  |
 | ui_updateRunShopScheduleUI | method | `ui_updateRunShopScheduleUI()` |  |

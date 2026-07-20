@@ -86,6 +86,31 @@ function _trapDialogFocus(event, container, onEscape) {
     }
 }
 
+function _isVisibleFocusTarget(target) {
+    if (!target || target.isConnected === false) return false;
+    return typeof target.getClientRects !== 'function' || target.getClientRects().length > 0;
+}
+
+function _resolveOverlayCloseFocusTarget(target) {
+    if (_isVisibleFocusTarget(target)) return target;
+    let scope = target?.parentElement || null;
+    while (scope && scope !== document.body) {
+        const fallback = _getDialogFocusable(scope).find(_isVisibleFocusTarget);
+        if (fallback) return fallback;
+        scope = scope.parentElement;
+    }
+    const activePhase = document.querySelector?.('.active-phase');
+    return _getDialogFocusable(activePhase).find(_isVisibleFocusTarget) || null;
+}
+
+function _restoreFocusAfterOverlayClose(game, target) {
+    if (game._relicOverlaySession?.active || game._runShopSession?.active) return false;
+    const focusTarget = _resolveOverlayCloseFocusTarget(target);
+    if (!focusTarget) return false;
+    focusTarget.focus?.();
+    return document.activeElement === focusTarget;
+}
+
 function _grantRelicResourcePack(game, multiplier = 0.5) {
     const base = CONFIG.gameplay?.runResourcePackFragments || 48;
     const amount = Math.max(1, Math.round(base * multiplier));
@@ -195,7 +220,7 @@ export const shop_system = {
         // 如果池子空了（全收集了），就给一些保底的或者是空的
         if (pool.length === 0) {
             if (window.showToast) showToast("已收集所有遗物！");
-            this.ui_closeRelicSelection();
+            this.ui_closeRelicSelection({ sessionId: session.id });
             return;
         }
 
@@ -382,7 +407,9 @@ export const shop_system = {
             if (skipBtn) {
                 const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);
                 skipBtn.textContent = showAllRelics ? '返回商店' : `放棄遺物 → +${skipBonus} 碎片并进商店`;
-                skipBtn.onclick = showAllRelics ? () => this.ui_closeRelicSelection() : () => this.ui_skipRelic();
+                skipBtn.onclick = showAllRelics
+                    ? () => this.ui_closeRelicSelection({ sessionId: session.id })
+                    : () => this.ui_skipRelic({ sessionId: session.id });
             }
             let rerollBtn = document.getElementById('relic-reroll-btn');
             if (!rerollBtn && skipBtn && skipBtn.parentNode) {
@@ -408,8 +435,8 @@ export const shop_system = {
             overlay.tabIndex = -1;
             if (!session.keydownHandler) {
                 session.keydownHandler = event => _trapDialogFocus(event, overlay, () => {
-                    if (showAllRelics) this.ui_closeRelicSelection();
-                    else this.ui_skipRelic();
+                    if (showAllRelics) this.ui_closeRelicSelection({ sessionId: session.id });
+                    else this.ui_skipRelic({ sessionId: session.id });
                 });
                 overlay.addEventListener('keydown', session.keydownHandler);
             }
@@ -727,7 +754,9 @@ export const shop_system = {
             this.combat_recomputeActiveSkills();
         }
 
-        if (!options.skipClose) this.ui_closeRelicSelection({ outcome: 'selected' });
+        if (!options.skipClose) {
+            this.ui_closeRelicSelection({ outcome: 'selected', sessionId: relicSession?.id });
+        }
         return true;
     },
 
@@ -768,9 +797,10 @@ export const shop_system = {
      * 跳过遗物选择 → 进入局内商店。The session is settled before
      * granting the bonus so click/Escape races cannot pay twice.
      */
-    ui_skipRelic() {
+    ui_skipRelic(options = {}) {
         const session = this._relicOverlaySession;
         if (!session?.active || session.settled) return false;
+        if (options.sessionId && options.sessionId !== session.id) return false;
         session.settled = true;
         const returnState = { ...(session.returnState || { phase: this.stateBeforeRelic }) };
         const rewardId = session.rewardId || null;
@@ -784,7 +814,12 @@ export const shop_system = {
             this.runFragments = (this.runFragments || 0) + skipBonus;
         }
         if (window.showToast) showToast(skipBonus > 0 ? `放棄遗物，获得 ${skipBonus} 碎片` : "放棄遗物，进入局内商店");
-        this.ui_closeRelicSelection({ resume: false, restoreFocus: false, outcome: 'skipped' });
+        this.ui_closeRelicSelection({
+            resume: false,
+            restoreFocus: false,
+            outcome: 'skipped',
+            sessionId: session.id,
+        });
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
         this._relicSkippedThisRound = true;
         if (typeof this.ui_showRunShop === 'function') {
@@ -803,6 +838,7 @@ export const shop_system = {
     ui_closeRelicSelection(options = {}) {
         const session = this._relicOverlaySession;
         if (!session?.active) return false;
+        if (options.sessionId && options.sessionId !== session.id) return false;
         session.active = false;
         const returnState = { ...(session.returnState || { phase: this.stateBeforeRelic }) };
         const rewardId = session.rewardId || null;
@@ -827,12 +863,15 @@ export const shop_system = {
         if (pauseToken && typeof this.sys_releasePauseLease === 'function') {
             this.sys_releasePauseLease(pauseToken);
         }
-        if (options.restoreFocus !== false && !this._relicOverlaySession?.active
-            && session.previousFocus?.isConnected !== false) {
-            session.previousFocus?.focus?.();
+        try {
+            if (options.resume !== false) {
+                this.ui_resumeRelicReturnState(returnState, { rewardId, rewardCompleted: false });
+            }
+        } finally {
+            if (options.restoreFocus !== false) {
+                _restoreFocusAfterOverlayClose(this, session.previousFocus);
+            }
         }
-        if (options.resume === false) return true;
-        this.ui_resumeRelicReturnState(returnState, { rewardId, rewardCompleted: false });
         return true;
     },
 
@@ -840,6 +879,7 @@ export const shop_system = {
      * [UI] 渲染商店内容
      */
     ui_renderShop() {
+        // @section:shop_resource_summary - 刷新商店资源摘要
         const categoryContainer = document.getElementById('shop-category-tabs');
         const itemsContainer = document.getElementById('shop-items-container');
         const currencyDisplay = document.getElementById('shop-currency-display');
@@ -889,7 +929,7 @@ export const shop_system = {
             this.meta_currentShopCategory = 'attribute';
         }
         
-        // 1. 渲染分类标签
+        // @section:shop_category_navigation - 渲染分类与预览
         const renderShopPreview = (upgrade, state, cardEl) => {
             const preview = document.getElementById('shop-upgrade-preview');
             if (!preview || !upgrade || !state) return;
@@ -935,7 +975,7 @@ export const shop_system = {
             }
         }
 
-        // 2. 渲染升级项
+        // @section:shop_upgrade_cards - 渲染升级商品卡
         if (itemsContainer) {
             itemsContainer.innerHTML = '';
             const upgrades = META_SHOP_CONFIG.upgrades.filter(u =>
@@ -1039,6 +1079,7 @@ export const shop_system = {
                 
                 itemsContainer.appendChild(card);
             });
+            // @section:shop_initial_preview - 初始化首项预览
             const firstCard = itemsContainer.querySelector('.shop-upgrade-card');
             if (upgrades.length > 0 && firstCard) {
                 const first = upgrades[0];

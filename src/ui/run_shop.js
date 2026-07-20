@@ -213,6 +213,31 @@ function getDialogFocusable(container) {
         .filter(element => element && element.getAttribute('aria-hidden') !== 'true');
 }
 
+function isVisibleFocusTarget(target) {
+    if (!target || target.isConnected === false) return false;
+    return typeof target.getClientRects !== 'function' || target.getClientRects().length > 0;
+}
+
+function resolveOverlayCloseFocusTarget(target) {
+    if (isVisibleFocusTarget(target)) return target;
+    let scope = target?.parentElement || null;
+    while (scope && scope !== document.body) {
+        const fallback = getDialogFocusable(scope).find(isVisibleFocusTarget);
+        if (fallback) return fallback;
+        scope = scope.parentElement;
+    }
+    const activePhase = document.querySelector?.('.active-phase');
+    return getDialogFocusable(activePhase).find(isVisibleFocusTarget) || null;
+}
+
+function restoreFocusAfterOverlayClose(game, target) {
+    if (game._runShopSession?.active || game._relicOverlaySession?.active) return false;
+    const focusTarget = resolveOverlayCloseFocusTarget(target);
+    if (!focusTarget) return false;
+    focusTarget.focus?.();
+    return document.activeElement === focusTarget;
+}
+
 function trapDialogFocus(event, container, onEscape) {
     if (event.key === 'Escape') {
         event.preventDefault();
@@ -416,12 +441,14 @@ export const run_shop = {
         if (pauseToken && typeof this.sys_releasePauseLease === 'function') {
             this.sys_releasePauseLease(pauseToken);
         }
-        if (options.restoreFocus !== false && !this._runShopSession?.active
-            && session.previousFocus?.isConnected !== false) {
-            session.previousFocus?.focus?.();
+        try {
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+            if (options.invokeOnClose !== false && typeof cb === 'function') cb();
+        } finally {
+            if (options.restoreFocus !== false) {
+                restoreFocusAfterOverlayClose(this, session.previousFocus);
+            }
         }
-        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        if (options.invokeOnClose !== false && typeof cb === 'function') cb();
         return true;
     },
 

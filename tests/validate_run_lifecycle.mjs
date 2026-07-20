@@ -206,6 +206,12 @@ console.log('===================================================\n');
     clock.runAll({ includeCancelled: true });
     check(mutations === 0, 'run epoch rejects a forced stale timeout callback');
 
+    let frameMutations = 0;
+    game.sys_scheduleLifecycleFrame(() => frameMutations++);
+    game.sys_invalidateRunLifecycle('forced-frame');
+    clock.runAll({ includeCancelled: true });
+    check(frameMutations === 0, 'run epoch rejects a forced stale animation-frame callback');
+
     const phaseToken = game.sys_captureLifecycleToken({ phaseBound: true });
     game._phaseLifecycleEpoch++;
     check(game.sys_isLifecycleTokenCurrent(phaseToken) === false, 'phase epoch invalidates phase-bound continuations');
@@ -391,6 +397,174 @@ console.log('===================================================\n');
     'a stale run-shop handler cannot buy from a closed or replaced session');
 }
 
+// Reopening and closing the run shop never replaces callback ownership or
+// lets an old DOM handler settle a newer session.
+{
+    const game = bind(makeLifecycleGame(), run_shop);
+    const overlay = new FakeElement('run-shop-overlay');
+    elements.set('run-shop-overlay', overlay);
+    game.runShopInventory = [{
+        itemId: 'session-test-item',
+        kind: 'damage',
+        price: 5,
+        value: 1,
+        name: 'session test item',
+    }];
+    game._runShopInventoryGeneratedForRound = game.round;
+    game.ui_renderRunShop = () => {};
+    game.sys_saveRunState = () => true;
+
+    let firstCloses = 0;
+    let replacementCloses = 0;
+    const firstOnClose = () => { firstCloses++; };
+    check(game.ui_showRunShop(firstOnClose, { reason: 'first-open' }) === true,
+        'run shop creates its first owned session');
+    const firstSession = game._runShopSession;
+    check(game.ui_showRunShop(() => { replacementCloses++; }, { reason: 'repeat-open' }) === false
+        && game._runShopSession === firstSession
+        && game._runShopSession.onClose === firstOnClose,
+    'repeat-opening run shop preserves the original session and onClose owner');
+    check(game.ui_hideRunShop({ sessionId: firstSession.id }) === true
+        && game.ui_hideRunShop({ sessionId: firstSession.id }) === false
+        && firstCloses === 1
+        && replacementCloses === 0,
+    'repeat-closing one run-shop session invokes only its original callback once');
+
+    game.round++;
+    let secondCloses = 0;
+    check(game.ui_showRunShop(() => { secondCloses++; }, { reason: 'next-session' }) === true,
+        'run shop can create a fresh session after the prior close');
+    const secondSession = game._runShopSession;
+    check(secondSession.id !== firstSession.id
+        && game.ui_hideRunShop({ sessionId: firstSession.id }) === false
+        && game._runShopSession === secondSession
+        && secondSession.active === true
+        && secondCloses === 0,
+    'stale run-shop session close cannot settle or replace the current session');
+    check(game.ui_hideRunShop({ sessionId: secondSession.id }) === true
+        && game.ui_hideRunShop({ sessionId: secondSession.id }) === false
+        && secondCloses === 1,
+    'fresh run-shop session also settles exactly once');
+    elements.delete('run-shop-overlay');
+}
+
+// Overlay close restores focus after its continuation has rebuilt the phase,
+// but an old owner never steals focus from a newer modal opened by that continuation.
+{
+    const runShopGame = bind(makeLifecycleGame(), run_shop);
+    const runShopOverlay = new FakeElement('run-shop-overlay');
+    const runShopTrigger = new FakeElement('run-shop-trigger');
+    const relicModalFocus = new FakeElement('relic-modal-focus');
+    elements.set('run-shop-overlay', runShopOverlay);
+    runShopGame.runShopInventory = [];
+    runShopGame._runShopInventoryGeneratedForRound = runShopGame.round;
+    runShopGame.ui_renderRunShop = () => {};
+    runShopGame.sys_saveRunState = () => true;
+
+    document.activeElement = runShopTrigger;
+    runShopGame.ui_showRunShop(() => { document.activeElement = body; }, { reason: 'focus-restore' });
+    const restoreSessionId = runShopGame._runShopSession.id;
+    check(runShopGame.ui_hideRunShop({ sessionId: restoreSessionId }) === true
+        && document.activeElement === runShopTrigger,
+    'run shop restores its trigger after the close continuation rebuilds the underlying phase');
+
+    const hiddenRunShopTrigger = new FakeElement('hidden-run-shop-trigger');
+    const visibleRunShopFallback = new FakeElement('visible-run-shop-fallback');
+    const runShopFallbackScope = new FakeElement('run-shop-fallback-scope');
+    hiddenRunShopTrigger.getClientRects = () => [];
+    visibleRunShopFallback.getClientRects = () => [{}];
+    runShopFallbackScope.querySelectorAll = () => [hiddenRunShopTrigger, visibleRunShopFallback];
+    hiddenRunShopTrigger.parentElement = runShopFallbackScope;
+    document.activeElement = hiddenRunShopTrigger;
+    runShopGame.ui_showRunShop(() => { document.activeElement = body; }, { reason: 'focus-fallback' });
+    const fallbackSessionId = runShopGame._runShopSession.id;
+    check(runShopGame.ui_hideRunShop({ sessionId: fallbackSessionId }) === true
+        && document.activeElement === visibleRunShopFallback,
+    'run shop falls back to a visible control when its original trigger becomes hidden');
+
+    document.activeElement = runShopTrigger;
+    runShopGame.ui_showRunShop(() => {
+        runShopGame._relicOverlaySession = { active: true };
+        relicModalFocus.focus();
+    }, { reason: 'focus-handoff' });
+    const handoffSessionId = runShopGame._runShopSession.id;
+    check(runShopGame.ui_hideRunShop({ sessionId: handoffSessionId }) === true
+        && document.activeElement === relicModalFocus,
+    'closing run shop never steals focus from a newer relic overlay opened by its continuation');
+    runShopGame._relicOverlaySession = null;
+    elements.delete('run-shop-overlay');
+
+    const relicGame = bind(makeLifecycleGame(), shop_system);
+    const relicOverlay = new FakeElement('phase-relic');
+    const relicTrigger = new FakeElement('relic-trigger');
+    const runShopModalFocus = new FakeElement('run-shop-modal-focus');
+    let relicReleases = 0;
+    let relicResumes = 0;
+    let relicFocuses = 0;
+    relicTrigger.focus = () => { relicFocuses++; document.activeElement = relicTrigger; };
+    elements.set('phase-relic', relicOverlay);
+    relicGame.sys_releasePauseLease = () => { relicReleases++; return true; };
+    relicGame._relicOverlaySession = {
+        id: 'relic-focus-restore',
+        active: true,
+        previousFocus: relicTrigger,
+        returnState: { phase: 'training' },
+        pauseToken: 'relic-focus-token',
+    };
+    relicGame.ui_resumeRelicReturnState = () => {
+        relicResumes++;
+        document.activeElement = body;
+        return true;
+    };
+    check(relicGame.ui_closeRelicSelection({ sessionId: 'stale-relic-session' }) === false
+        && relicGame._relicOverlaySession.active === true,
+    'stale relic close cannot settle the current overlay session');
+    check(relicGame.ui_closeRelicSelection({ sessionId: 'relic-focus-restore' }) === true
+        && relicGame.ui_closeRelicSelection({ sessionId: 'relic-focus-restore' }) === false
+        && document.activeElement === relicTrigger
+        && relicReleases === 1
+        && relicResumes === 1
+        && relicFocuses === 1,
+    'relic overlay restores focus, resumes and releases its lease exactly once');
+
+    const hiddenRelicTrigger = new FakeElement('hidden-relic-trigger');
+    const visibleRelicFallback = new FakeElement('visible-relic-fallback');
+    const relicFallbackScope = new FakeElement('relic-fallback-scope');
+    hiddenRelicTrigger.getClientRects = () => [];
+    visibleRelicFallback.getClientRects = () => [{}];
+    relicFallbackScope.querySelectorAll = () => [hiddenRelicTrigger, visibleRelicFallback];
+    hiddenRelicTrigger.parentElement = relicFallbackScope;
+    relicGame._relicOverlaySession = {
+        id: 'relic-focus-fallback',
+        active: true,
+        previousFocus: hiddenRelicTrigger,
+        returnState: { phase: 'training' },
+        pauseToken: 'relic-focus-token-fallback',
+    };
+    check(relicGame.ui_closeRelicSelection({ sessionId: 'relic-focus-fallback' }) === true
+        && document.activeElement === visibleRelicFallback,
+    'relic overlay falls back to a visible control when its original trigger becomes hidden');
+
+    relicGame._relicOverlaySession = {
+        id: 'relic-focus-handoff',
+        active: true,
+        previousFocus: relicTrigger,
+        returnState: { phase: 'training' },
+        pauseToken: 'relic-focus-token-2',
+    };
+    relicGame.ui_resumeRelicReturnState = () => {
+        relicGame._runShopSession = { active: true };
+        runShopModalFocus.focus();
+        return true;
+    };
+    check(relicGame.ui_closeRelicSelection() === true
+        && document.activeElement === runShopModalFocus,
+    'closing relic overlay never steals focus from a newer run shop opened by its continuation');
+    relicGame._runShopSession = null;
+    elements.delete('phase-relic');
+    document.activeElement = body;
+}
+
 // A resource reward is durably committed before the next relic overlay owns
 // the screen, closing the refresh window between adjacent rewards.
 {
@@ -471,6 +645,49 @@ console.log('===================================================\n');
     check(!game.pendingFireVelocity && !game.pendingFireOrigin && !game.isChargingShot && game.chargeProgress === 0, 'input cancel clears pending shot/charge without firing');
     game.input_handleInputCancel({ type: 'pointercancel', cancelable: true, preventDefault: () => prevented++ });
     check(prevented === 2, 'repeated touch/pointer cancellation is idempotent');
+
+    const nextPoint = {
+        x: 120,
+        y: 200,
+        sub() { return this; },
+    };
+    let cleanStart = null;
+    game._isRuneLauncherOpen = () => false;
+    game.input_getTiltOffset = () => ({ x: 0, y: 0 });
+    game.phase_handleInputStart = pos => {
+        cleanStart = {
+            activeIdentity: game._activeInputIdentity,
+            activeType: game._activeInputType,
+            isDragging: game.isDragging,
+            dragStart: game.dragStart,
+            dragCurrent: game.dragCurrent,
+            isTiltingGrip: game.isTiltingGrip,
+            gripStartPos: game.gripStartPos,
+            pendingFireVelocity: game.pendingFireVelocity,
+            pendingFireOrigin: game.pendingFireOrigin,
+            isChargingShot: game.isChargingShot,
+            chargeProgress: game.chargeProgress,
+        };
+        game.isDragging = true;
+        game.dragStart = pos;
+    };
+    game.input_handleInputStart(nextPoint, { type: 'pointerdown', pointerId: 42 });
+    check(cleanStart?.activeIdentity === 'pointer:42'
+        && cleanStart.activeType === 'pointerdown'
+        && cleanStart.isDragging === false
+        && cleanStart.dragStart === null
+        && cleanStart.dragCurrent === null
+        && cleanStart.isTiltingGrip === false
+        && cleanStart.gripStartPos === null
+        && cleanStart.pendingFireVelocity === null
+        && cleanStart.pendingFireOrigin === null
+        && cleanStart.isChargingShot === false
+        && cleanStart.chargeProgress === 0,
+    'new pointer input starts clean after cancellation without inheriting drag, grip or pending shot state');
+    check(game._activeInputIdentity === 'pointer:42'
+        && game.isDragging === true
+        && game.dragStart === nextPoint,
+    'new pointer input owns only its new identity and press state');
 }
 
 // Versioned safe checkpoints and bad-save degradation.

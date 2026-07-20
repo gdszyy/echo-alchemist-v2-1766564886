@@ -1,9 +1,9 @@
 # REQ-20260717-run-lifecycle-integrity: Run 生命周期完整性收口
 
-状态：Goal Active
+状态：Goal Complete
 负责人：Codex
-最后更新：2026-07-18
-当前里程碑：M3
+最后更新：2026-07-20
+当前里程碑：M5
 分支：`codex/REQ-20260717-run-lifecycle-integrity`
 Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 基线提交：`6f5a74e`
@@ -96,13 +96,13 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 - [x] M0 合同读取：Goal B、入口规范、PI 与写集边界明确
 - [x] M1 基线与方案：独立 worktree、REQ 卡、T1 红绿基线与函数/状态风险测试矩阵已完成
 - [x] M2 实现完成：生命周期、resolver、pause、save、input、overlay 与商店合同完成
-- [ ] M3 验证完成：专项 T1、既有 T1 与浏览器全链路全部通过
+- [x] M3 验证完成：专项 T1、既有 T1 与浏览器全链路全部通过
 - [x] M4 索引同步：相关 auto index、`game_phase.md`、PI-006/007 与流程洞察注册表已同步
-- [ ] M5 收口交付：服务关闭、临时文件清理、状态词/Git 归属检查、提交完成
+- [x] M5 收口交付：服务关闭、临时文件清理、状态词/Git 归属检查、提交完成
 
 ## 验收标准
 
-- `node --check` 五个获准源码全部通过。
+- `node --check` 五个获准源码与专项测试文件全部通过。
 - `node tests/validate_run_lifecycle.mjs` 全绿。
 - `node tests/validate_phase_contracts.mjs` 全绿；已知 gathering HUD 顺序敏感红基线不得被忽略。
 - `node tests/validate_scenarios.js` 全绿。
@@ -119,11 +119,42 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 | 日期 | 阶段 | Codex 动作 | 结果 | 下一步 |
 | :--- | :--- | :--- | :--- | :--- |
 | 2026-07-18 | Intake | 读取 Goal B、AGENTS/global/TODO/P0 TODO、game_phase/ui_system/testing、PI-001/006/007/012 与索引入口 | 合同、禁止写集与 T1→浏览器闸门明确 | 创建隔离分支并记录基线 |
-| 2026-07-18 | Goal Active | 从 `6f5a74e` 创建独立 worktree；记录根 checkout 历史 dirty baseline，不清理、不搬运 | 分支/目录隔离完成 | 运行未改代码 T1 并审计实现 |
-| 2026-07-18 | Goal Active | 未改代码基线：五个 `node --check` 通过；`validate_scenarios` 128/128；`validate_phase_contracts` 173/174 | 唯一红项为 umbrella 合同已记录的 gathering HUD 坐标顺序敏感断言；共享测试不可在本批修改 | 完成函数/状态审计并设计专项 T1 |
+| 2026-07-18 | M1 | 从 `6f5a74e` 创建独立 worktree；记录根 checkout 历史 dirty baseline，不清理、不搬运 | 分支/目录隔离完成 | 运行未改代码 T1 并审计实现 |
+| 2026-07-18 | M1 | 未改代码基线：五个 `node --check` 通过；`validate_scenarios` 128/128；`validate_phase_contracts` 173/174 | 唯一红项为 umbrella 合同已记录的 gathering HUD 坐标顺序敏感断言；共享测试不可在本批修改 | 完成函数/状态审计并设计专项 T1 |
 | 2026-07-18 | M2 | 落地 run/phase token、可嵌套 pause lease、输入统一取消、stable reward ID/原子消费、overlay session、药剂阻断单 owner 重试与版本化安全点存档恢复 | `validate_run_lifecycle` 90/90；覆盖 stale callback、奖励幂等、双选/replace-ammo 部分选择、确定性钉盘恢复、坏档与 hydration 失败、重复 overlay/购买/close | 同步规则与自动索引 |
 | 2026-07-18 | M4 | 同步 `game_phase.md`、PI-006 v1.9、PI-007 v1.4、洞察注册表，并用 `scripts/generate_index.py` 更新三个大文件索引 | 索引器识别的新巨型函数已补齐 `@section` 导航；未手工编辑 auto index | 构建共享基线修复后的临时集成验证面 |
 | 2026-07-18 | M3 | 本分支复跑五个 `node --check`、专项与既有 T1 | lifecycle 90/90、scenarios 128/128；phase contracts 173/174，唯一红项仍为未获准修改的共享 HUD runner 基线 | 在临时 detached worktree 合入共享测试修复 `6c3c53d`，全部 T1 绿后再跑浏览器 |
+| 2026-07-19 | M3 | 在临时 detached worktree 将本 REQ `1146b4b` 与共享 HUD runner 修复 `6c3c53d` 合并为验证面 `0cc8a2b`，先执行全部 T1 | 五个 `node --check` 5/5；lifecycle 90/90；scenarios 128/128；phase contracts 174/174，满足“T1 全绿后才跑浏览器” | 启动 localhost:3002 浏览器全链路 |
+| 2026-07-19 | M3 | 浏览器验证遗物 dialog/键盘焦点、跳过→商店、disabled 原因、Escape、双刷新恢复、嵌套 pause owner、abandon 终止，以及真实购买弹珠包 | Enter 选择遗物后只进入一次 Round 1；36 碎片购买 18 碎片弹珠包后只进入一次 gathering；双刷新均恢复同一队列；外层暂停关闭后模块编辑器仍保持；abandon 后等待 2.5 秒未重开回调；控制台 error 为 0 | 清理浏览器、服务与临时验证面 |
+| 2026-07-20 | M5 | 关闭浏览器标签并精准停止 localhost:3002 服务 PID `10536`；移除临时验证依赖和 detached worktree | 3002 无监听；临时 `src/music_clip_packs.js`（SHA-256 `F74E95BDA4C8A635A59A3A88A3B2EA372B944D30090C74804693BD6114475563`）未提交且已删除；临时 worktree 已移除 | 完成状态词、diff 与 Git 归属闸门 |
+| 2026-07-20 | M3 | 补齐 Goal B 指定的浏览器安全点刷新：gathering、combat、selection；在 selection 1/3 状态重复刷新并双击 Continue | gathering 三弹队列、combat 敌人 HP/弹药、selection 已选 fire 1/3 均原样恢复；Continue 仅消费一次且没有重复 resolver/overlay | 独立审计剩余索引与焦点证据 |
+| 2026-07-20 | M2/M4 | 独立审计发现 `run_shop.js` / `shop.js` auto index 过期，以及 overlay close 在 phase resume/onClose 前恢复焦点；补齐 stale relic sessionId、回调后焦点恢复、隐藏触发器的可见 fallback 与重复关闭测试 | `scripts/generate_index.py` 重建两个索引；`ui_renderShop` 四个巨型函数 section 已登记；lifecycle 提升至 106/106 | 全部 T1 再绿后复测浏览器焦点链 |
+| 2026-07-20 | M3 | 在全部 T1 绿后复测遗物 Enter 选择与 Escape 放弃→局内商店→Escape，并对两条链各再按一次 Escape | 两条关闭链均回到 `phase-training`，焦点落在可见 `#train-sidebar-toggle`；重复 Escape 不穿透、可见 modal 为 0；控制台 error 为 0 | 关闭浏览器与服务 |
+| 2026-07-20 | M5 | 关闭浏览器标签，精准停止复测服务 PID `32288`，再次按固定哈希删除临时 `src/music_clip_packs.js` | 3002 无监听、临时文件不存在；仅剩本 REQ 六个预期 dirty 路径 | 最终 T1、状态词、diff 与提交闸门 |
+
+## UX 关闭证据
+
+| ID | 关闭实现 | 验证证据 |
+| :--- | :--- | :--- |
+| `UX-P0-03` | run/phase epoch、受控 timeout/RAF 与终止时统一失效 | lifecycle T1 推进假时钟；浏览器 abandon 后等待 2.5 秒仍停留 meta，无 overlay/继续入口复活 |
+| `UX-P0-04` | stable reward ID、原子消费、resolver/session/in-flight 幂等与商店购买顺序保持 | lifecycle T1 重复 close/continue/购买；浏览器跳过后真实购买 `marble_pack`，只进入一次 gathering |
+| `UX-P0-05` | schema v2、安全 checkpoint、完整队列/选择/钉板状态序列化与失败双重清理 | lifecycle T1 覆盖 gathering/selection/replace-ammo/坏档/hydration 失败；浏览器分别刷新恢复 gathering 三弹队列、combat 敌人 HP/弹药、selection 已选 fire 1/3 |
+| `UX-P0-06` | `sys_acquirePauseLease(ownerId)` / `sys_releasePauseLease(token)` 与 overlay 自有 lease | lifecycle T1 覆盖嵌套、乱序、重复与无效 token；浏览器先关外层暂停，内层模块编辑器仍保持暂停与打开状态 |
+| `UX-P1-03` | 遗物/商店 dialog 语义、键盘、Escape、焦点圈定与恢复；旧 sessionId 不得关闭新 overlay | 浏览器验证 `role=dialog`/`aria-modal`、Tab/Shift+Tab 环、Enter 选择遗物、Escape 关闭商店；原触发器因 phase 恢复隐藏时，两条链均 fallback 到可见 `#train-sidebar-toggle`，重复 Escape 无穿透 |
+| `UX-P1-04` | 原生 `disabled` + `aria-disabled` + 可读缺额原因 | 浏览器 12 碎片时 18 碎片商品不可触发且显示“还差 6 碎片”；36 碎片时同商品可购买 |
+| `UX-P1-10` | 继续入口读取经校验 checkpoint 的真实 Round，坏档不暴露入口 | lifecycle T1 覆盖坏档；浏览器三类安全点均显示并恢复 `Round 1`，selection 双击 Continue 仍只恢复一次 |
+| `UX-P1-14` | pointer/touch 正常结束与 cancel 进入同一幂等输入清理 | lifecycle T1 覆盖 `pointercancel`、`touchcancel`、active pointer/drag/press 全清理，并验证下一次 pointer 输入仅拥有新 identity/press 状态 |
+
+浏览器验证使用的 `src/music_clip_packs.js` 是根 checkout 开始前已有的未跟踪依赖；因 `core.js` 当前存在静态 import，临时复制到验证 worktree 后才可启动模块。该文件不属于本 REQ、未进入提交，两轮浏览器验证结束后均按 SHA-256 `F74E95BDA4C8A635A59A3A88A3B2EA372B944D30090C74804693BD6114475563` 核对并删除。中央 TODO、P0 TODO 与 umbrella 主卡仍按冻结写集交给 integration owner 同步，本 REQ 只在本卡记录关闭证据。
+
+## 最终验证（2026-07-20）
+
+- `node --check`：五个获准源码 + `tests/validate_run_lifecycle.mjs`，6/6 通过。
+- `node tests/validate_run_lifecycle.mjs`：106/106 通过。
+- `node tests/validate_scenarios.js`：128/128 通过。
+- 共享 HUD runner 修复 `6c3c53d` 对应的 phase contract 内容在当前源码上无落盘执行：174/174 通过；本 REQ 未越界修改共享 runner。
+- localhost:3002 浏览器全链路：gathering/combat/selection 安全点、重复 Continue、遗物/商店键盘与焦点、disabled 原因、嵌套 pause owner、abandon 终止均通过；最终控制台 error 为 0。
+- 浏览器标签已关闭；PID `32288` 已停止；3002 无监听；临时验证依赖已删除。
 
 ## 根 checkout dirty baseline（只读归属）
 
@@ -143,11 +174,11 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 
 ## 收口清单
 
-- [ ] 无未归属临时文件
-- [ ] 无越界文件改动
-- [ ] 所有相关 auto index 由脚本更新
-- [ ] 模块规范与 PI 已同步
-- [ ] 专项与回归 T1 证据已记录
-- [ ] 浏览器证据、端口、PID 与服务关闭状态已记录
-- [ ] 中央 TODO/umbrella 同步明确交给 integration 批次
-- [ ] `git diff --check` 与 `git status --short --branch` 已记录
+- [x] 无未归属临时文件
+- [x] 无越界文件改动
+- [x] 所有相关 auto index 由脚本更新
+- [x] 模块规范与 PI 已同步
+- [x] 专项与回归 T1 证据已记录
+- [x] 浏览器证据、端口、PID 与服务关闭状态已记录
+- [x] 中央 TODO/umbrella 同步明确交给 integration 批次
+- [x] `git diff --check` 与 `git status --short --branch` 已记录
