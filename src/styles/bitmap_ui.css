@@ -187,8 +187,10 @@
     box-shadow: none !important;
     color: transparent !important; /* 隐藏原有 emoji */
     font-size: 0 !important;
-    width: 32px !important;
-    height: 32px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
 }
 
 #settings-btn:hover {
@@ -203,9 +205,10 @@
     box-shadow: none !important;
     color: #f8fafc !important;
     font-size: 0 !important;
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
 }
 
 #speed-btn:hover {
@@ -218,7 +221,7 @@
     left: 50%;
     bottom: 4px;
     transform: translateX(-50%);
-    font-size: 9px;
+    font-size: 10px;
     line-height: 1;
     font-weight: 900;
     color: #f8fafc;
@@ -611,7 +614,7 @@
 
 #phase-truth-book .truth-search {
     width: 100%;
-    min-height: 38px;
+    min-height: 44px;
     padding: 0 12px;
     border: 1px solid rgba(51, 65, 85, 0.75);
     background: rgba(2, 6, 23, 0.72);
@@ -638,15 +641,36 @@
 }
 
 @media (max-width: 720px) {
+    #phase-truth-book {
+        align-items: stretch;
+        justify-content: flex-start;
+        flex-direction: column;
+        padding: 0;
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
     #phase-truth-book > .flex.flex-col {
+        flex: 0 0 auto;
         padding: 14px !important;
         gap: 10px;
+        width: 100%;
+        height: auto !important;
+        min-height: 100%;
+        min-width: 0;
     }
 
     #phase-truth-book > .flex.flex-col > .flex.justify-between {
+        position: sticky;
+        top: 0;
+        z-index: 20;
         margin-bottom: 10px !important;
+        padding: 6px 0 10px;
         align-items: flex-start !important;
         gap: 12px;
+        background: linear-gradient(180deg, rgba(2, 6, 23, 0.98) 72%, rgba(2, 6, 23, 0.86));
     }
 
     #phase-truth-book h2 {
@@ -665,28 +689,30 @@
     #phase-truth-book > .flex.flex-col > .flex.flex-1 {
         flex-direction: column !important;
         gap: 12px !important;
+        flex: 0 0 auto;
+        min-width: 0;
     }
 
     #phase-truth-book .w-1\/3.custom-scrollbar,
     #phase-truth-book .truth-sidebar {
         width: 100% !important;
         flex: 0 0 auto;
-        max-height: 238px;
-        overflow-y: hidden !important;
-        overflow-x: auto !important;
+        max-height: none;
+        overflow: visible !important;
         padding-right: 0 !important;
+        min-width: 0;
     }
 
     #phase-truth-book .truth-category-tabs {
-        grid-template-columns: repeat(5, minmax(118px, 1fr));
-        overflow-x: auto;
-        padding-bottom: 4px;
-        scroll-snap-type: x proximity;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+        padding-bottom: 0;
+        min-width: 0;
     }
 
     #phase-truth-book .truth-category-btn {
-        scroll-snap-align: start;
-        min-height: 58px;
+        min-width: 0;
+        min-height: 52px;
     }
 
     #phase-truth-book .truth-category-hint {
@@ -694,30 +720,28 @@
     }
 
     #truth-entry-list {
-        flex-direction: row !important;
+        flex-direction: column !important;
         gap: 8px !important;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 4px;
-        scroll-snap-type: x proximity;
+        overflow: visible;
+        padding-bottom: 0;
+        min-width: 0;
     }
 
     #truth-enemy-list,
     #truth-attr-list {
-        flex-direction: row !important;
+        flex-direction: column !important;
         gap: 8px !important;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 4px;
-        scroll-snap-type: x proximity;
+        overflow: visible;
+        padding-bottom: 0;
+        min-width: 0;
     }
 
     #phase-truth-book .truth-list-btn {
-        flex: 0 0 132px;
-        min-width: 132px;
-        min-height: 74px;
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+        min-height: 64px;
         padding: 10px !important;
-        scroll-snap-align: start;
     }
 
     #phase-truth-book .truth-list-btn .text-2xl {
@@ -730,13 +754,16 @@
     }
 
     #phase-truth-book .truth-list-btn .text-\[9px\] {
-        font-size: 0.62rem !important;
+        font-size: 0.625rem !important;
         line-height: 1.25;
     }
 
     #truth-detail-panel {
-        min-height: 330px;
+        flex: 0 0 auto;
+        min-width: 0;
+        min-height: 430px;
         border-radius: 14px !important;
+        overflow: visible !important;
     }
 
     #truth-empty-state {
@@ -754,9 +781,117 @@
         padding: 12px !important;
     }
 
+    #truth-content {
+        height: auto !important;
+        min-height: 430px;
+        overflow: visible;
+    }
+
+    #truth-content > .flex-1 {
+        flex: 0 0 280px;
+        min-height: 280px;
+    }
+
+    #truth-item-desc,
+    #truth-item-name,
+    #truth-item-tags {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
     #truth-item-name {
         font-size: 1.2rem !important;
         line-height: 1.15;
+    }
+
+    #phase-truth-book .truth-book-close,
+    #phase-truth-book .truth-demo-reset {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px;
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+}
+
+/* Mobile accessibility: pause owns one bounded vertical scroll region. */
+#phase-pause {
+    padding: 0;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
+#phase-pause .pause-dialog-shell {
+    box-sizing: border-box;
+    min-height: 0;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+#phase-pause .pause-dialog-header,
+#phase-pause .pause-dialog-actions {
+    flex: 0 0 auto;
+}
+
+#phase-pause .pause-dialog-scroll {
+    min-height: 0;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
+#phase-pause .pause-dialog-actions {
+    padding-bottom: 0;
+}
+
+#phase-pause .pause-close-button,
+#phase-pause .pause-setting-row,
+#phase-pause .pause-btn-abandon,
+#phase-pause .pause-btn-resume,
+#phase-pause .pause-perf-btn {
+    min-height: 44px;
+    touch-action: manipulation;
+}
+
+#phase-pause .pause-close-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+}
+
+#phase-pause .pause-setting-row {
+    width: 100%;
+    text-align: left;
+}
+
+#phase-pause .pause-volume-slider {
+    min-height: 32px;
+    touch-action: pan-x;
+}
+
+@media (max-width: 420px) {
+    #phase-pause .pause-dialog-header {
+        margin-bottom: 10px !important;
+    }
+
+    #phase-pause .pause-dialog-header h2 {
+        font-size: 1.35rem !important;
+    }
+
+    #phase-pause .pause-perf-row {
+        flex-wrap: wrap;
+    }
+
+    #phase-pause .pause-perf-btns {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    #phase-pause .pause-perf-btn {
+        min-width: 0;
+        padding: 4px 6px;
     }
 }
 
@@ -797,6 +932,85 @@
     background-position: center, center !important;
     background-repeat: no-repeat, no-repeat !important;
     background-color: #020617 !important;
+}
+
+@media (max-width: 1024px) {
+    body:not(.pc-mode) #phase-shop {
+        align-items: stretch;
+        overflow: hidden;
+        padding: 0;
+    }
+
+    body:not(.pc-mode) #phase-shop .shop-layout-shell {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        min-height: 0;
+        padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+        overflow: hidden;
+    }
+
+    body:not(.pc-mode) #phase-shop .shop-topbar {
+        flex: 0 0 auto;
+        min-height: 44px;
+        margin-bottom: 8px;
+    }
+
+    body:not(.pc-mode) #phase-shop .shop-back-button {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+
+    body:not(.pc-mode) #phase-shop #shop-resource-overview {
+        flex: 0 0 auto;
+        gap: 4px;
+        margin-bottom: 8px;
+    }
+
+    body:not(.pc-mode) #phase-shop #shop-resource-overview > div {
+        padding: 6px;
+    }
+
+    body:not(.pc-mode) #phase-shop #shop-category-tabs {
+        flex: 0 0 auto;
+        min-height: 44px;
+        margin-bottom: 8px;
+        padding-bottom: 0;
+        overflow-y: hidden;
+        touch-action: pan-x;
+    }
+
+    body:not(.pc-mode) #phase-shop #shop-category-tabs > button {
+        min-height: 44px;
+    }
+
+    body:not(.pc-mode) #phase-shop .shop-upgrade-card button {
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+
+    body:not(.pc-mode) #phase-shop #shop-upgrade-preview {
+        flex: 0 0 auto;
+        min-height: 0;
+        max-height: none;
+        margin-bottom: 8px;
+        padding: 10px 12px;
+        overflow: visible;
+    }
+
+    body:not(.pc-mode) #phase-shop #shop-items-container {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
 /* =====================================================
@@ -1630,9 +1844,10 @@ body.pc-mode #pc-right-rune-mount {
 @media (max-width: 420px) {
     #settings-btn,
     #speed-btn {
-        width: 30px !important;
-        height: 30px !important;
-        min-width: 30px !important;
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
     }
 
     .recipe-hud-floating {
@@ -1665,7 +1880,6 @@ body:not(.pc-mode) #info-drawer.translate-y-full {
     min-height: max(54px, calc(env(safe-area-inset-top) + 46px)) !important;
 }
 
-#unified-top-bar.is-combat #combat-status-panel,
 #unified-top-bar.is-combat #sp-panel {
     display: none !important;
 }
@@ -1689,7 +1903,7 @@ body:not(.pc-mode) #info-drawer.translate-y-full {
 
 .run-shop-status-dock.is-combat-top .run-shop-status-copy {
     gap: 5px;
-    font-size: 8px;
+    font-size: 10px;
 }
 
 .run-shop-status-dock.is-combat-top .run-shop-status-track {
@@ -1697,10 +1911,10 @@ body:not(.pc-mode) #info-drawer.translate-y-full {
 }
 
 .run-shop-status-dock.is-combat-top #run-shop-status-open {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 2px 6px;
-    font-size: 9px;
+    font-size: 10px;
 }
 
 #combat-bottom-dock {
@@ -2167,8 +2381,20 @@ body:not(.pc-mode) #info-drawer.translate-y-full {
     height: 6px !important;
 }
 
-#combat-bottom-dock .skill-disabled-reason {
-    display: none !important;
+#combat-bottom-dock .skill-button:disabled .skill-disabled-reason {
+    display: block;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    padding: 2px 1px;
+    border-radius: 4px;
+    color: #f8fafc;
+    background: rgba(2, 6, 23, 0.9);
+    font-size: 10px;
+    line-height: 1.05;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
 }
 
 @media (max-width: 340px) {
@@ -3365,9 +3591,9 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 #combat-bottom-dock .skill-cost-badge {
     right: 1px !important;
     bottom: 1px !important;
-    min-width: 11px !important;
-    height: 11px !important;
-    font-size: 7px !important;
+    min-width: 14px !important;
+    height: 14px !important;
+    font-size: 10px !important;
 }
 
 #combat-bottom-dock #combat-rune-charge-ui.skill-charge-meter-v2 {
@@ -3453,10 +3679,10 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     position: absolute;
     right: 0;
     bottom: 0;
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     align-items: center;
     justify-content: center;
     padding: 0;
@@ -4154,7 +4380,8 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 .skill-editor-title { margin: 0; font-size: 17px; font-weight: 700; color: #f1f5f9; }
 .skill-editor-count { font-size: 12px; color: #94a3b8; }
 .skill-editor-close-btn {
-    width: 30px; height: 30px;
+    width: 44px; height: 44px;
+    min-width: 44px; min-height: 44px;
     border-radius: 8px;
     background: rgba(15, 23, 42, 0.8);
     border: 1px solid rgba(148, 163, 184, 0.4);
@@ -4238,6 +4465,77 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
         var(--combat-skill-wing) !important;
 }
 
+@media (max-width: 1024px) {
+    body:not(.pc-mode) #combat-bottom-dock {
+        --combat-console-height: 120px !important;
+        --combat-ammo-wing: clamp(126px, 36vw, 156px);
+        --combat-skill-wing: clamp(126px, 36vw, 152px);
+        grid-template-columns:
+            var(--combat-ammo-wing)
+            minmax(72px, 1fr)
+            var(--combat-skill-wing) !important;
+    }
+
+    body:not(.pc-mode) #combat-bottom-dock .combat-ammo-pane {
+        transform: none !important;
+    }
+
+    body:not(.pc-mode) #combat-bottom-dock .skill-button-grid {
+        left: 50% !important;
+        top: 14px !important;
+        width: 92px !important;
+        height: 92px !important;
+        transform: translateX(-50%) !important;
+        grid-template-columns: repeat(2, 44px) !important;
+        grid-template-rows: repeat(2, 44px) !important;
+        column-gap: 4px !important;
+        row-gap: 4px !important;
+    }
+
+    body:not(.pc-mode) #combat-bottom-dock .skill-button {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+
+    body:not(.pc-mode) #combat-bottom-dock .skill-button:disabled .skill-button-icon {
+        transform: translateY(-5px);
+    }
+
+    body:not(.pc-mode) #combat-bottom-dock .combat-console-actions {
+        top: 10px !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        grid-template-rows: repeat(2, 44px) !important;
+        gap: 6px !important;
+    }
+
+    body:not(.pc-mode) #combat-bottom-dock .combat-dock-icon-btn,
+    body:not(.pc-mode) #combat-bottom-dock .combat-rune-config-btn {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #phase-pause *,
+    #phase-shop *,
+    #phase-truth-book *,
+    #skill-editor-overlay *,
+    #combat-status-panel,
+    #combat-bottom-dock .skill-button,
+    #combat-bottom-dock .combat-dock-icon-btn,
+    #combat-bottom-dock .combat-rune-config-btn {
+        animation-duration: 0.01ms;
+        animation-iteration-count: 1;
+        transition-duration: 0.01ms;
+        scroll-behavior: auto;
+    }
+}
+
 #combat-bottom-dock .combat-ammo-pane {
     transform: scale(1.08) !important;
     transform-origin: left bottom !important;
@@ -4286,14 +4584,14 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 
 #combat-bottom-dock .combat-ammo-label {
     display: inline !important;
-    font-size: 6px !important;
+    font-size: clamp(10px, 2.5vw, 11px) !important;
     line-height: 1 !important;
     color: rgba(148, 163, 184, 0.72) !important;
 }
 
 #combat-bottom-dock .combat-ammo-name {
     max-width: 100% !important;
-    font-size: clamp(8px, 2vw, 10px) !important;
+    font-size: clamp(10px, 2vw, 11px) !important;
     line-height: 1.05 !important;
     text-align: left !important;
 }
@@ -4306,7 +4604,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     height: 15px !important;
     padding: 1px 3px !important;
     border-radius: 4px !important;
-    font-size: 9px !important;
+    font-size: 10px !important;
 }
 
 #combat-bottom-dock .combat-ammo-attribute-row {
@@ -4331,7 +4629,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     min-width: 0 !important;
     display: grid !important;
     grid-template-columns: 1fr !important;
-    grid-template-rows: minmax(0, 1fr) 9px !important;
+    grid-template-rows: minmax(0, 1fr) 10px !important;
     align-items: center !important;
     justify-items: center !important;
     gap: 0 !important;
@@ -4348,7 +4646,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 
 #combat-bottom-dock .combat-ammo-attribute-chip .attribute-chip-value {
     min-width: 0 !important;
-    font-size: clamp(7px, 1.8vw, 10px) !important;
+    font-size: 10px !important;
     line-height: 1 !important;
     text-align: center !important;
 }
@@ -4360,13 +4658,13 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 
 #combat-bottom-dock .combat-ammo-attribute-chip.is-more .attribute-chip-value {
     color: #e2e8f0 !important;
-    font-size: clamp(7px, 1.6vw, 9px) !important;
+    font-size: 10px !important;
 }
 
 #combat-bottom-dock .combat-ammo-queue-strip {
     position: absolute !important;
-    left: 30.2% !important;
-    right: 22.7% !important;
+    left: 24% !important;
+    right: 7% !important;
     top: 24.7% !important;
     bottom: auto !important;
     height: 16.4% !important;
@@ -4395,20 +4693,20 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
 
 #combat-bottom-dock .combat-ammo-queue-chip {
     display: grid !important;
-    grid-template-columns: 17px 13px minmax(0, 1fr) !important;
+    grid-template-columns: 15px 15px minmax(0, 1fr) !important;
     grid-template-rows: 1fr !important;
     align-items: center !important;
     justify-items: center !important;
-    gap: 3px !important;
-    padding: 2px 5px 2px 4px !important;
+    gap: 2px !important;
+    padding: 2px 3px !important;
     overflow: visible !important;
 }
 
 #combat-bottom-dock .combat-ammo-queue-chip::after {
     content: 'NEXT 2' !important;
     right: 4px !important;
-    top: -5px !important;
-    font-size: 5px !important;
+    top: -8px !important;
+    font-size: 10px !important;
     color: rgba(148, 163, 184, 0.84) !important;
     letter-spacing: 0 !important;
 }
@@ -4424,7 +4722,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     grid-row: 1 !important;
     grid-column: 2 !important;
     color: #fff7ed !important;
-    font-size: 8px !important;
+    font-size: 10px !important;
     line-height: 1 !important;
 }
 
@@ -4453,13 +4751,13 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     position: absolute !important;
     right: -2px !important;
     bottom: -3px !important;
-    min-width: 7px !important;
-    height: 7px !important;
+    min-width: 10px !important;
+    height: 10px !important;
     padding: 0 1px !important;
     border-radius: 999px !important;
     color: #fff7ed !important;
     background: rgba(7, 10, 23, 0.84) !important;
-    font: 900 6px/7px Cinzel, serif !important;
+    font: 900 10px/10px Cinzel, serif !important;
     text-align: center !important;
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.82) !important;
 }
@@ -4475,7 +4773,7 @@ body.pc-mode #combat-bottom-dock #damage-stats-btn {
     align-items: center !important;
     justify-content: center !important;
     color: rgba(226, 232, 240, 0.68) !important;
-    font: 900 6px/1 Cinzel, serif !important;
+    font: 900 10px/1 Cinzel, serif !important;
     text-align: center !important;
 }
 

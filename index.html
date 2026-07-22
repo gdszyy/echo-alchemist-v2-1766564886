@@ -14,9 +14,14 @@
             color: #e2e8f0;
             font-family: 'Noto Serif TC', serif;
             overflow: hidden;
-            touch-action: none;
+            touch-action: manipulation;
             user-select: none;
             -webkit-user-select: none;
+        }
+
+        /* Canvas owns combat gestures; overlays remain free to expose vertical scrolling. */
+        #gameCanvas {
+            touch-action: none;
         }
 
         /* ===== PC 响应式三栏布局 Wrapper ===== */
@@ -1281,13 +1286,16 @@
             background: rgba(148, 163, 184, 0.22);
         }
         @media (max-width: 720px) {
+            #unified-top-bar {
+                grid-template-columns: minmax(88px, 0.82fr) minmax(96px, 1fr) minmax(132px, 0.95fr);
+            }
             .combat-status-panel {
                 padding: 2px 5px;
                 gap: 4px;
             }
             .combat-status-main {
                 gap: 4px;
-                font-size: 0.58rem;
+                font-size: 10px;
             }
             .combat-status-metric .combat-status-label {
                 display: none;
@@ -1309,7 +1317,7 @@
         @media (max-width: 420px) {
             #unified-top-bar {
                 height: max(70px, calc(env(safe-area-inset-top) + 64px));
-                grid-template-columns: minmax(72px, 0.82fr) minmax(112px, 1fr) minmax(76px, 0.78fr);
+                grid-template-columns: minmax(90px, 0.82fr) minmax(52px, 1fr) minmax(132px, 0.95fr);
                 gap: 4px;
                 padding-left: 5px;
                 padding-right: 5px;
@@ -1328,9 +1336,10 @@
             }
             #speed-btn,
             #settings-btn {
-                width: 28px;
-                height: 28px;
-                min-width: 28px;
+                width: 44px;
+                height: 44px;
+                min-width: 44px;
+                min-height: 44px;
                 font-size: 0.78rem;
             }
             #combat-rune-slot-row {
@@ -1348,7 +1357,7 @@
         }
         #unified-top-bar.is-gathering {
             height: max(52px, calc(env(safe-area-inset-top) + 46px));
-            grid-template-columns: minmax(74px, 0.78fr) minmax(168px, 1.24fr) minmax(86px, 0.8fr);
+            grid-template-columns: minmax(74px, 0.78fr) minmax(140px, 1.24fr) minmax(126px, 0.9fr);
             gap: 5px;
             padding-left: 8px;
             padding-right: 8px;
@@ -1392,9 +1401,10 @@
         }
         #unified-top-bar.is-gathering #speed-btn,
         #unified-top-bar.is-gathering #settings-btn {
-            width: 28px !important;
-            height: 28px !important;
-            min-width: 28px !important;
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
         }
         #phase-gathering {
             padding-top: max(52px, calc(env(safe-area-inset-top) + 46px));
@@ -1402,7 +1412,7 @@
         @media (max-width: 420px) {
             #unified-top-bar.is-gathering {
                 height: max(50px, calc(env(safe-area-inset-top) + 44px));
-                grid-template-columns: minmax(62px, 0.7fr) minmax(138px, 1.15fr) minmax(78px, 0.78fr);
+                grid-template-columns: minmax(62px, 0.7fr) minmax(90px, 1.15fr) minmax(132px, 0.95fr);
                 gap: 3px;
                 padding-left: 5px;
                 padding-right: 5px;
@@ -4801,6 +4811,11 @@
     <div id="pc-left-combat" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
         <div id="pc-left-drawer-mount" style="flex:1; overflow:hidden;"></div>
     </div>
+    <!-- 训练场专属左栏：仅由 TrainingGround 在 PC training 生命周期内挂载。 -->
+    <div id="pc-left-training" style="display:none; flex-direction:column; width:100%; min-height:0;">
+        <div class="text-xs font-bold text-cyan-400/70 tracking-widest uppercase mb-3 font-[Cinzel]">训练配置</div>
+        <div id="pc-left-training-controls-mount" style="flex:1; min-height:0;"></div>
+    </div>
 </aside>
 
 <div id="game-container">
@@ -4849,7 +4864,8 @@
         <!-- 左侧：阶段标题 + SP 宝石 -->
         <div class="top-bar-left">
             <div id="top-phase-label" class="text-xs font-bold text-amber-400/80 font-[Cinzel] tracking-wider whitespace-nowrap"></div>
-            <div id="combat-status-panel" class="combat-status-panel is-hidden" aria-live="polite">
+            <span id="combat-status-home" hidden aria-hidden="true"></span>
+            <div id="combat-status-panel" class="combat-status-panel is-hidden" role="status" aria-label="战斗态势" aria-live="polite">
                 <div class="combat-status-main">
                     <span id="combat-threat-pill" class="combat-status-pill">
                         <span class="combat-status-dot"></span>
@@ -4885,10 +4901,10 @@
                 <span>🔰</span><span id="shield-count">0</span>
             </div>
             <div class="round-pill">R <span id="round-num" class="stat-highlight">1</span></div>
-            <button id="speed-btn">⏩</button>
+            <button id="speed-btn" type="button" aria-label="切换游戏速度" title="切换游戏速度">⏩</button>
             <!-- 设置按钮容器（相对定位，为下拉面板提供锁定点） -->
             <div style="position: relative;">
-                <button id="settings-btn" title="设置">⚙️</button>
+                <button id="settings-btn" type="button" title="暂停与设置" aria-label="打开暂停菜单" aria-haspopup="dialog">⚙️</button>
                 <div id="settings-panel" class="hidden">
                     <div class="settings-item" id="mute-item" onclick="game.sys_toggleMute()">
                         <span class="s-icon" id="mute-icon">🔊</span>
@@ -5274,9 +5290,9 @@
 
     <!-- [META] 炼金工坊 (商店) UI -->
     <div id="phase-shop" class="ui-overlay" style="display: none; background: #020617; pointer-events: auto; z-index: 300;">
-        <div class="w-full max-w-md h-full flex flex-col p-6">
-            <div class="flex justify-between items-center mb-6">
-                <button onclick="game.phase_switchPhase('meta')" class="text-slate-400 hover:text-white transition-colors">
+        <div class="shop-layout-shell w-full max-w-md h-full min-h-0 flex flex-col p-6">
+            <div class="shop-topbar flex justify-between items-center mb-6">
+                <button type="button" onclick="game.phase_switchPhase('meta')" aria-label="返回主菜单" class="shop-back-button text-slate-400 hover:text-white transition-colors">
                     <span class="text-2xl">⬅️</span>
                 </button>
                 <h2 class="text-2xl font-[Cinzel] text-amber-100 tracking-widest">煉金工坊</h2>
@@ -5297,7 +5313,7 @@
 
             <div id="shop-upgrade-preview"></div>
 
-            <div id="shop-items-container" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+            <div id="shop-items-container" role="region" aria-label="商品列表" tabindex="0" class="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
                 <!-- 动态生成升级项 -->
             </div>
         </div>
@@ -5419,7 +5435,7 @@
 
     <!-- Phase 3: Combat -->
     <div id="phase-combat" class="ui-overlay" style="display: none;">
-        <div id="combat-bottom-dock" aria-label="战斗底部操作区">
+        <div id="combat-bottom-dock" role="group" aria-label="战斗底部操作区">
             <div class="combat-dock-pane combat-ammo-pane">
                 <div id="recipe-hud-container" class="z-40 pointer-events-none"></div>
                 <div class="combat-console-actions">
@@ -5461,11 +5477,11 @@
     </div>
 
     <!-- [技能装配系统] 技能编辑器 overlay -->
-    <div id="skill-editor-overlay" class="skill-editor-overlay" style="display:none;">
+    <div id="skill-editor-overlay" class="skill-editor-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="skill-editor-title">
         <div class="skill-editor-modal">
             <div class="skill-editor-header">
                 <div class="skill-editor-titles">
-                    <h3 class="skill-editor-title">技能装配</h3>
+                    <h3 id="skill-editor-title" class="skill-editor-title">技能装配</h3>
                     <span id="skill-editor-count" class="skill-editor-count">已装备 0/4</span>
                 </div>
                 <button id="skill-editor-close-btn" type="button" class="skill-editor-close-btn" aria-label="关闭">✕</button>
@@ -5476,12 +5492,12 @@
     </div>
 
     <!-- Phase: Truth Book (Encyclopedia) -->
-    <div id="phase-truth-book" class="ui-overlay hidden-phase" style="display: none; z-index: 300; background: rgba(2, 6, 23, 0.98); pointer-events: auto;">
+    <div id="phase-truth-book" class="ui-overlay hidden-phase" style="display: none; z-index: 300; background: rgba(2, 6, 23, 0.98); pointer-events: auto;" role="dialog" aria-modal="true" aria-labelledby="truth-book-title">
         <div class="flex flex-col w-full h-full p-6">
             <!-- Header -->
             <div class="flex justify-between items-center mb-6 shrink-0">
-                <h2 class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之書 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
-                <button onclick="game.ui_closeTruthBook()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
+                <h2 id="truth-book-title" class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之書 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
+                <button type="button" onclick="game.ui_closeTruthBook()" aria-label="关闭真理之书" class="truth-book-close w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
             </div>
 
             <div class="flex flex-1 min-h-0 gap-6">
@@ -5524,7 +5540,7 @@
                 <div class="text-[9px] text-cyan-700 font-mono" id="truth-sim-time">T: 000</div>
             </div>
 
-            <button onclick="game.truthBook.resetDemo()" class="absolute top-4 right-4 z-10 w-8 h-8 rounded bg-slate-800/50 hover:bg-cyan-600/20 border border-slate-700 hover:border-cyan-400/50 text-slate-400 hover:text-cyan-300 transition-all flex items-center justify-center" title="重置演示">
+            <button type="button" onclick="game.truthBook.resetDemo()" aria-label="重置真理之书演示" class="truth-demo-reset absolute top-4 right-4 z-10 w-8 h-8 rounded bg-slate-800/50 hover:bg-cyan-600/20 border border-slate-700 hover:border-cyan-400/50 text-slate-400 hover:text-cyan-300 transition-all flex items-center justify-center" title="重置演示">
                 ⟳
             </button>
 
@@ -5643,64 +5659,64 @@
     </div>
 
     <!-- ==================== 暂停页面 ==================== -->
-    <div id="phase-pause" class="ui-overlay hidden-phase" style="display: none;">
-        <div class="flex flex-col w-full h-full" style="padding-top: max(60px, env(safe-area-inset-top)); padding-bottom: max(20px, env(safe-area-inset-bottom));">
+    <div id="phase-pause" class="ui-overlay hidden-phase" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+        <div class="pause-dialog-shell flex flex-col w-full h-full">
             
             <!-- 页头 -->
-            <div class="flex items-center justify-between px-5 mb-4">
+            <div class="pause-dialog-header flex items-center justify-between px-5 mb-4">
                 <div>
-                    <h2 class="text-2xl font-bold text-slate-100 font-[Cinzel] tracking-wide">游戏暂停</h2>
+                    <h2 id="pause-title" class="text-2xl font-bold text-slate-100 font-[Cinzel] tracking-wide">游戏暂停</h2>
                     <p class="text-slate-500 text-xs mt-0.5">PAUSED</p>
                 </div>
-                <button onclick="game.ui_closePause()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 transition-all text-lg">&#x2715;</button>
+                <button type="button" onclick="game.ui_closePause()" aria-label="关闭暂停菜单并继续游戏" class="pause-close-button w-9 h-9 flex items-center justify-center rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 transition-all text-lg">&#x2715;</button>
             </div>
 
             <!-- 可滚动内容区 -->
-            <div class="flex-1 overflow-y-auto px-5" style="-webkit-overflow-scrolling: touch;">
+            <div id="pause-scroll-region" class="pause-dialog-scroll flex-1 overflow-y-auto px-5" tabindex="0" aria-label="暂停菜单设置与本局信息">
 
                 <!-- 设置区 -->
                 <div class="mb-6">
                     <div class="pause-section-title">设置</div>
 
-                    <div class="pause-setting-row" id="pause-mute-row" onclick="game.sys_toggleMute(); game.ui_syncPauseSettings();">
+                    <button type="button" class="pause-setting-row" id="pause-mute-row" onclick="game.sys_toggleMute(); game.ui_syncPauseSettings();">
                         <span class="ps-icon" id="pause-mute-icon">🔊</span>
                         <span class="ps-label">音效</span>
                         <span class="ps-badge" id="pause-mute-badge">开启</span>
-                    </div>
+                    </button>
 
-                    <div class="pause-setting-row" id="pause-damage-numbers-row" onclick="game.sys_toggleDamageNumbers(); game.ui_syncPauseSettings();">
+                    <button type="button" class="pause-setting-row" id="pause-damage-numbers-row" onclick="game.sys_toggleDamageNumbers(); game.ui_syncPauseSettings();">
                         <span class="ps-icon">🔢</span>
                         <span class="ps-label">伤害数字</span>
                         <span class="ps-badge" id="pause-damage-numbers-badge">开启</span>
-                    </div>
+                    </button>
 
-                    <div class="pause-setting-row" id="pause-crt-row" onclick="game.sys_toggleCrt(); game.ui_syncPauseSettings();">
+                    <button type="button" class="pause-setting-row" id="pause-crt-row" onclick="game.sys_toggleCrt(); game.ui_syncPauseSettings();">
                         <span class="ps-icon">📺</span>
                         <span class="ps-label">CRT 特效</span>
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
-                    </div>
+                    </button>
 
                     <!-- 音量控制滑块 -->
                     <div class="pause-volume-row">
                         <span class="ps-icon">🔊</span>
                         <span class="ps-label">音效音量</span>
-                        <input type="range" id="pause-sfx-volume" class="pause-volume-slider" min="0" max="100" value="100" oninput="game.sys_setSfxVolume(this.value / 100)">
+                        <input type="range" id="pause-sfx-volume" class="pause-volume-slider" min="0" max="100" value="100" aria-label="音效音量" oninput="game.sys_setSfxVolume(this.value / 100)">
                     </div>
 
                     <div class="pause-volume-row">
                         <span class="ps-icon">🎵</span>
                         <span class="ps-label">音乐音量</span>
-                        <input type="range" id="pause-bgm-volume" class="pause-volume-slider" min="0" max="100" value="100" oninput="game.sys_setBgmVolume(this.value / 100)">
+                        <input type="range" id="pause-bgm-volume" class="pause-volume-slider" min="0" max="100" value="100" aria-label="音乐音量" oninput="game.sys_setBgmVolume(this.value / 100)">
                     </div>
 
                     <div class="pause-perf-row">
                         <span class="ps-icon">⚡</span>
                         <span class="ps-label">渲染品质</span>
-                        <div class="pause-perf-btns">
-                            <button class="pause-perf-btn" id="pause-perf-low"  onclick="game.sys_setPerfQuality('low')">低</button>
-                            <button class="pause-perf-btn" id="pause-perf-medium" onclick="game.sys_setPerfQuality('medium')">中</button>
-                            <button class="pause-perf-btn" id="pause-perf-high" onclick="game.sys_setPerfQuality('high')">高</button>
-                            <button class="pause-perf-btn" id="pause-perf-auto" onclick="game.sys_setPerfQuality('auto')">自动</button>
+                        <div class="pause-perf-btns" role="group" aria-label="渲染品质">
+                            <button type="button" class="pause-perf-btn" id="pause-perf-low"  onclick="game.sys_setPerfQuality('low')">低</button>
+                            <button type="button" class="pause-perf-btn" id="pause-perf-medium" onclick="game.sys_setPerfQuality('medium')">中</button>
+                            <button type="button" class="pause-perf-btn" id="pause-perf-high" onclick="game.sys_setPerfQuality('high')">高</button>
+                            <button type="button" class="pause-perf-btn" id="pause-perf-auto" onclick="game.sys_setPerfQuality('auto')">自动</button>
                         </div>
                     </div>
 
@@ -5716,7 +5732,7 @@
 
                 <!-- 放弃本局按钮 -->
                 <div class="mb-4">
-                    <button onclick="if(confirm('确定放弃本局并返回主界面？')) { game.ui_abandonRunToMeta(); }" class="pause-btn-abandon">
+                    <button id="pause-abandon-button" type="button" onclick="if(confirm('确定放弃本局并返回主界面？')) { game.ui_abandonRunToMeta(); }" class="pause-btn-abandon">
                         放弃本局
                     </button>
                 </div>
@@ -5724,8 +5740,8 @@
             </div>
 
             <!-- 继续游戏按钮（固定底部） -->
-            <div class="px-5 mt-3" style="padding-bottom: max(16px, env(safe-area-inset-bottom));">
-                <button onclick="game.ui_closePause()" class="pause-btn-resume">继续游戏</button>
+            <div class="pause-dialog-actions px-5 mt-3">
+                <button id="pause-resume-button" type="button" onclick="game.ui_closePause()" class="pause-btn-resume">继续游戏</button>
             </div>
         </div>
     </div>
@@ -5733,6 +5749,10 @@
 
 <!-- ===== PC 右侧边栏：符文发射器常驻 ===== -->
 <aside id="pc-right-sidebar">
+    <!-- 训练场专属右栏：退出 training 后恢复符文发射器挂载。 -->
+    <div id="pc-right-training" style="display:none; flex-direction:column; width:100%; height:100%; min-height:0;">
+        <div id="pc-right-training-scenes-mount" style="flex:1; min-height:0;"></div>
+    </div>
     <div id="pc-right-rune-mount" class="w-full h-full"></div>
 </aside>
 

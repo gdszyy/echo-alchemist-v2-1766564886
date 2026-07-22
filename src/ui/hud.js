@@ -693,7 +693,11 @@ export const hud_system = {
 
                         const chipAttrs = document.createElement('span');
                         chipAttrs.className = 'combat-ammo-queue-attrs';
-                        _buildCombatQueueAttributeIcons(profile, 4).forEach(attrIcon => {
+                        const maxQueueAttributeIcons = (
+                            typeof window !== 'undefined'
+                            && window.matchMedia?.('(max-width: 1024px)').matches
+                        ) ? 2 : 4;
+                        _buildCombatQueueAttributeIcons(profile, maxQueueAttributeIcons).forEach(attrIcon => {
                             chipAttrs.appendChild(attrIcon);
                         });
 
@@ -1011,16 +1015,18 @@ export const hud_system = {
             ? canvasEl.getBoundingClientRect()
             : null;
         if (!canvasRect || !canvasRect.width || !canvasRect.height) return null;
+        const canvasLeft = canvasRect.left;
+        const canvasTop = canvasRect.top;
+        const scaleX = (this.width || canvasRect.width) / canvasRect.width;
+        const scaleY = (this.height || canvasRect.height) / canvasRect.height;
 
         const rect = el.getBoundingClientRect();
         if (!rect || (rect.width === 0 && rect.height === 0)) return null;
 
         const anchorX = Number.isFinite(options.anchorX) ? options.anchorX : 0.5;
         const anchorY = Number.isFinite(options.anchorY) ? options.anchorY : 0.5;
-        const scaleX = (this.width || canvasRect.width) / canvasRect.width;
-        const scaleY = (this.height || canvasRect.height) / canvasRect.height;
-        let x = (rect.left + rect.width * anchorX - canvasRect.left) * scaleX;
-        let y = (rect.top + rect.height * anchorY - canvasRect.top) * scaleY;
+        let x = (rect.left + rect.width * anchorX - canvasLeft) * scaleX;
+        let y = (rect.top + rect.height * anchorY - canvasTop) * scaleY;
 
         if (options.clamp !== false) {
             x = Math.max(0, Math.min(this.width || canvasRect.width, x));

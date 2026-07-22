@@ -1,6 +1,6 @@
 # src\systems.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 6209 | 函数数: 87 | 语言: javascript
+> 自动生成于 2026-07-22 | 总行数: 6662 | 函数数: 100 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -20,6 +20,8 @@
 | renderAttributeControls | method | `renderAttributeControls()` |  |
 | updateBulletPreview | method | `updateBulletPreview()` |  |
 | switchTab | method | `switchTab(tabName)` |  |
+| _stopSkillBarTurnWatch | method | `_stopSkillBarTurnWatch()` |  |
+| _syncSkillBarTurnWatch | method | `_syncSkillBarTurnWatch()` |  |
 | updateSkillBar | method | `updateSkillBar(currentSP, activeSkills)` |  |
 | updateSkillPoints | method | `updateSkillPoints(current, max = null)` |  |
 | showEnemyInfo | method | `showEnemyInfo(enemy)` |  |
@@ -78,6 +80,17 @@
 | fireBulletWithEffects | method | `fireBulletWithEffects(recipe)` |  |
 | resetBullet | method | `resetBullet()` |  |
 | update | method | `update()` |  |
+| _moveTrainingNode | method | `_moveTrainingNode(nodeId, mountId)` |  |
+| _restoreTrainingNode | method | `_restoreTrainingNode(nodeId, homeId)` |  |
+| _mountTrainingCombatStatus | method | `_mountTrainingCombatStatus()` |  |
+| _restoreTrainingCombatStatus | method | `_restoreTrainingCombatStatus()` |  |
+| _captureTrainingLayoutState | method | `_captureTrainingLayoutState()` |  |
+| _setTrainingPanelExpanded | method | `_setTrainingPanelExpanded()` |  |
+| _syncTrainingResponsiveLayout | method | `_syncTrainingResponsiveLayout()` |  |
+| _bindTrainingLayoutResize | method | `_bindTrainingLayoutResize()` |  |
+| _unbindTrainingLayoutResize | method | `_unbindTrainingLayoutResize()` |  |
+| _restoreTrainingResponsiveLayout | method | `_restoreTrainingResponsiveLayout()` |  |
+| _restoreTrainingLayoutState | method | `_restoreTrainingLayoutState()` |  |
 | enter | method | `enter()` |  |
 | exit | method | `exit()` |  |
 | toggleMainPanel | method | `toggleMainPanel()` |  |
@@ -118,9 +131,8 @@
 
 | 节点标记 | 说明 |
 |----------|------|
-| `@section:ui_event_binding` | 鼠标/触摸/键盘事件绑定 |
-| `@section:ui_hud_components` | HUD 组件初始化（血条/弹药/符文槽） |
-| `@section:ui_overlay_panels` | Overlay 面板初始化（商店/命运/设置） |
+| `@section:training_responsive_styles` | 训练场响应式布局样式 |
+| `@section:training_accessible_markup` | 训练场可达控制结构 |
 
 ### createCombatContext
 

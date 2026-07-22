@@ -740,7 +740,7 @@ const TRUTH_BOOK_CORE_ENTRIES = [
         title: '子弹替换',
         icon: '🔁',
         tags: ['充能子弹', 'New Grind', 'Charged'],
-        content: '当上一轮已有可保留弹药，而本轮又完成研磨时，系统会进入子弹替换阶段。左侧展示本轮新研磨子弹，右侧展示上轮保留下来的充能子弹；玩家最多选择子弹上限数量进入战斗。纯净精华跳过研磨时会只展示可保留的充能子弹，并隐藏“跳过”按钮，避免空弹药进入战斗。',
+        content: '当上一轮已有可保留弹药，而本轮又完成研磨时，系统会进入子弹替换阶段。左侧展示本轮新研磨子弹，右侧展示上轮保留下来的充能子弹；玩家最多选择子弹上限数量进入战斗。当前主循环以弹珠包研磨为入口；纯净/混沌精华仅保留旧存档和调试兼容，不再作为新奖励来源。',
         loop: [
             { type: 'log', text: '上一轮弹药进入 Charged 队列' },
             { type: 'wait', frames: 90 },
@@ -752,14 +752,14 @@ const TRUTH_BOOK_CORE_ENTRIES = [
     {
         id: 'truth_core_drop_pity',
         categoryId: 'core',
-        title: '遗物/精华保底',
+        title: '遗物线索保底',
         icon: '🎁',
-        tags: ['精华 5 行', '遗物 13 行', '密度限制'],
-        content: '敌人奖励采用动态掉落与保底机制。连续 4 行未掉落精华时，第 5 行强制触发精华；连续 12 行未掉落遗物时，第 13 行强制触发遗物。若玩家战力碾压当前敌人，保底会暂停；若场上奖励敌人过多，掉落概率会衰减，达到硬上限后本行不再新增奖励。',
+        tags: ['动态 2–4 行', '仅遗物线索', '密度/战力门槛'],
+        content: '当前主循环的敌人奖励只会标记遗物线索，不再新增混沌或纯净精华。每次遗物线索命中后，下一次保底阈值会在 2–4 行之间重新随机；只有玩家三回合平均伤害不足以覆盖当前与临近威胁时才允许触发。战力碾压会暂停保底，场上奖励达到密度硬上限时本行也不会新增奖励。',
         loop: [
-            { type: 'log', text: '保底计数随无掉落行推进' },
+            { type: 'log', text: '遗物线索阈值随机为 2–4 行' },
             { type: 'wait', frames: 90 },
-            { type: 'log', text: '战力碾压/奖励密度会暂停保底' },
+            { type: 'log', text: '威胁不足或奖励过密时暂停保底' },
             { type: 'wait', frames: 120 },
             { type: 'reset' }
         ]
@@ -826,6 +826,8 @@ class UIManager {
         this.hoveredEnemy = null;
         this.isOpen = false;
         this.spContainer = document.getElementById('sp-panel');
+        this._skillBarTurnWatchFrame = 0;
+        this._skillBarEnemyTurnSnapshot = null;
         const afx = CONFIG.balance.affixes;
         
         this.affixDict = {
@@ -1006,9 +1008,64 @@ class UIManager {
         }
     }
 
+    _stopSkillBarTurnWatch() {
+        if (
+            this._skillBarTurnWatchFrame
+            && typeof window !== 'undefined'
+            && typeof window.cancelAnimationFrame === 'function'
+        ) {
+            window.cancelAnimationFrame(this._skillBarTurnWatchFrame);
+        }
+        this._skillBarTurnWatchFrame = 0;
+        this._skillBarEnemyTurnSnapshot = null;
+    }
+
+    _syncSkillBarTurnWatch() {
+        const mainGame = typeof game !== 'undefined' ? game : null;
+        if (
+            !mainGame
+            || mainGame.phase !== 'combat'
+            || typeof window === 'undefined'
+            || typeof window.requestAnimationFrame !== 'function'
+        ) {
+            this._stopSkillBarTurnWatch();
+            return;
+        }
+
+        this._skillBarEnemyTurnSnapshot = !!mainGame.isEnemyTurn;
+        if (this._skillBarTurnWatchFrame) return;
+
+        const watchEnemyTurn = () => {
+            const liveGame = typeof game !== 'undefined' ? game : null;
+            if (
+                !liveGame
+                || liveGame.phase !== 'combat'
+                || !document.getElementById('skill-bar')
+            ) {
+                this._skillBarTurnWatchFrame = 0;
+                this._skillBarEnemyTurnSnapshot = null;
+                return;
+            }
+
+            // Register the next frame before rendering so updateSkillBar cannot
+            // create a second watcher while synchronizing this state edge.
+            this._skillBarTurnWatchFrame = window.requestAnimationFrame(watchEnemyTurn);
+            const nextState = !!liveGame.isEnemyTurn;
+            if (nextState === this._skillBarEnemyTurnSnapshot) return;
+
+            this._skillBarEnemyTurnSnapshot = nextState;
+            this.updateSkillBar(liveGame.skillPoints ?? 0, liveGame.activeSkills || []);
+        };
+
+        this._skillBarTurnWatchFrame = window.requestAnimationFrame(watchEnemyTurn);
+    }
+
     updateSkillBar(currentSP, activeSkills) {
         const container = document.getElementById('skill-bar');
-        if (!container) return;
+        if (!container) {
+            this._stopSkillBarTurnWatch();
+            return;
+        }
         currentSP = Math.max(0, Number(currentSP) || 0);
         container.innerHTML = '';
         // 仅渲染已解锁的技能，而非遍历全部 SKILL_DB
@@ -1024,7 +1081,10 @@ class UIManager {
         } else {
             delete container.dataset.overflowSkillCount;
         }
-        if (skillsToRender.length === 0 && !potionUnlocked) return;
+        if (skillsToRender.length === 0 && !potionUnlocked) {
+            this._stopSkillBarTurnWatch();
+            return;
+        }
 
         const maxVisibleSP = 5;
         const maxSP = Math.min(maxVisibleSP, Math.max(CONFIG.gameplay.maxSkillPoints || 0, currentSP));
@@ -1047,18 +1107,25 @@ class UIManager {
         visibleSkills.forEach(skill => {
             const cost = Math.max(0, Number(skill.cost) || 0);
             const btn = document.createElement('button');
-            const isDisabled = currentSP < cost;
-            const disabledReason = isDisabled ? `SP不足` : '';
+            let disabledReason = '';
+            if (currentSP < cost) disabledReason = 'SP不足';
+            else if (!game || game.phase !== 'combat') disabledReason = '仅战斗可用';
+            else if (game.isEnemyTurn) disabledReason = '敌方行动中';
+            const isDisabled = disabledReason !== '';
             btn.type = 'button';
             btn.className = 'skill-button';
             btn.disabled = isDisabled;
-            btn.title = `${skill.name} · ${skill.desc || ''}`;
+            btn.setAttribute('aria-disabled', String(isDisabled));
+            btn.title = isDisabled
+                ? `${skill.name} · ${disabledReason} · ${skill.desc || ''}`
+                : `${skill.name} · ${skill.desc || ''}`;
             btn.setAttribute(
                 'aria-label',
                 isDisabled
-                    ? `${skill.name}，需要 ${cost} SP，当前 ${currentSP} SP`
+                    ? `${skill.name}，不可用：${disabledReason}，需要 ${cost} SP，当前 ${currentSP} SP`
                     : `${skill.name}，消耗 ${cost} SP`
             );
+            if (disabledReason) btn.dataset.disabledReason = disabledReason;
             if (!isDisabled) {
                 btn.style.borderColor = skill.color;
                 btn.style.background = `linear-gradient(145deg, ${adjustColorBrightness(skill.color, 0.4)} 0%, rgba(15, 23, 42, 0.96) 78%)`;
@@ -1068,7 +1135,7 @@ class UIManager {
                 <span class="skill-ready-mark" aria-hidden="true"></span>
                 <span class="skill-button-icon" aria-hidden="true">${skill.icon}</span>
                 <span class="skill-cost-badge" aria-hidden="true">${cost}</span>
-                <span class="skill-disabled-reason" aria-hidden="true">${disabledReason}</span>
+                <span class="skill-disabled-reason" aria-hidden="${disabledReason ? 'false' : 'true'}">${disabledReason}</span>
             `;
             if (!isDisabled) {
                 const stopProp = (e) => { e.stopPropagation(); };
@@ -1087,19 +1154,28 @@ class UIManager {
                 : null;
             const charges = Math.max(0, Number(preparedPotion?.charges) || 0);
             const maxCharges = Math.max(charges, Number(preparedPotion?.maxCharges) || 0);
-            const isDisabled = !potionDef || charges <= 0 || !game || game.phase !== 'combat' || game.isEnemyTurn;
+            let disabledReason = '';
+            if (!potionDef) disabledReason = '空槽';
+            else if (charges <= 0) disabledReason = '空瓶';
+            else if (!game || game.phase !== 'combat') disabledReason = '仅战斗可用';
+            else if (game.isEnemyTurn) disabledReason = '敌方行动中';
+            const isDisabled = disabledReason !== '';
             const color = potionDef?.color || '#94a3b8';
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'skill-button potion-skill-button';
             btn.disabled = isDisabled;
-            btn.title = potionDef ? `${potionDef.name} · ${potionDef.desc || ''}` : '空药剂槽';
+            btn.setAttribute('aria-disabled', String(isDisabled));
+            btn.title = potionDef
+                ? `${potionDef.name}${disabledReason ? ` · ${disabledReason}` : ''} · ${potionDef.desc || ''}`
+                : '空药剂槽 · 空槽';
             btn.setAttribute(
                 'aria-label',
                 potionDef
-                    ? `${potionDef.name}，剩余 ${charges}/${maxCharges || charges} 装药`
-                    : '空药剂槽'
+                    ? `${potionDef.name}，剩余 ${charges}/${maxCharges || charges} 装药${disabledReason ? `，不可用：${disabledReason}` : ''}`
+                    : '空药剂槽，不可用：空槽'
             );
+            if (disabledReason) btn.dataset.disabledReason = disabledReason;
             if (!isDisabled && potionDef) {
                 btn.style.borderColor = color;
                 btn.style.background = `linear-gradient(145deg, ${adjustColorBrightness(color, 0.35)} 0%, rgba(15, 23, 42, 0.96) 78%)`;
@@ -1109,7 +1185,7 @@ class UIManager {
                 <span class="skill-ready-mark" aria-hidden="true"></span>
                 <span class="skill-button-icon" aria-hidden="true">${potionDef?.icon || '🧪'}</span>
                 <span class="skill-cost-badge" aria-hidden="true">${maxCharges ? `${charges}/${maxCharges}` : '0'}</span>
-                <span class="skill-disabled-reason" aria-hidden="true">${potionDef ? (charges <= 0 ? '空瓶' : '') : '空瓶'}</span>
+                <span class="skill-disabled-reason" aria-hidden="${disabledReason ? 'false' : 'true'}">${disabledReason}</span>
             `;
             if (!isDisabled && potionDef) {
                 const stopProp = (e) => { e.stopPropagation(); };
@@ -1125,6 +1201,7 @@ class UIManager {
             grid.appendChild(btn);
         }
         container.appendChild(grid);
+        this._syncSkillBarTurnWatch();
     }
 
     updateSkillPoints(current, max = null) {
@@ -3950,6 +4027,8 @@ class TrainingGround {
         const defaultSkill = (SKILL_DB || []).find(sk => sk.source === 'base') || (SKILL_DB || [])[0];
         this.selectedSkillId = defaultSkill ? defaultSkill.id : null;
         this._savedSkillSandboxState = null;
+        this._savedTrainingLayoutState = null;
+        this._trainingLayoutResizeHandler = null;
         this.stats = {
             totalDamage: 0,
             lastTotal: 0,
@@ -3968,8 +4047,11 @@ class TrainingGround {
         const ui = document.createElement('div');
         ui.id = 'phase-training';
         ui.className = 'ui-overlay hidden-phase';
-        ui.style.cssText = 'display: none; z-index: 400; background: transparent; pointer-events: auto; flex-direction: row;';
+        ui.style.cssText = 'display: none; z-index: 400; background: transparent; pointer-events: auto;';
+        ui.setAttribute('role', 'region');
+        ui.setAttribute('aria-label', '训练场');
 
+        // @section:training_responsive_styles - 训练场响应式布局样式
         const style = document.createElement('style');
         style.innerHTML = `
             #phase-training {
@@ -3977,6 +4059,10 @@ class TrainingGround {
                 inset: 0;
                 display: flex;
                 flex-direction: row;
+                justify-content: flex-start;
+                box-sizing: border-box;
+                min-width: 0;
+                min-height: 0;
                 padding-top: 0 !important; /* 覆盖 .ui-overlay 的 70px padding-top */
                 padding-bottom: 0 !important;
             }
@@ -3987,15 +4073,6 @@ class TrainingGround {
                 min-width: 0;
                 display: flex;
                 flex-direction: column;
-            }
-            body.pc-mode #phase-training {
-                justify-content: center;
-                background: #020617;
-            }
-            body.pc-mode #train-main-area {
-                flex: 0 0 min(480px, calc(100dvh * 9 / 16));
-                width: min(480px, calc(100dvh * 9 / 16));
-                max-width: 480px;
             }
             /* 右侧边栏 */
             #train-sidebar {
@@ -4008,12 +4085,6 @@ class TrainingGround {
                 z-index: 500;
                 transition: width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s;
                 overflow: hidden;
-            }
-            body.pc-mode #train-sidebar {
-                flex: 0 0 220px;
-                width: 220px;
-                min-width: 220px;
-                max-height: 100dvh;
             }
             #train-sidebar.collapsed {
                 width: 32px;
@@ -4046,7 +4117,7 @@ class TrainingGround {
                 font-weight: bold;
                 color: #64748b;
                 border-bottom: 2px solid transparent;
-                // @section:ui_event_binding - 鼠标/触摸/键盘事件绑定
+                /* 交互状态过渡。 */
                 transition: all 0.2s;
                 background: transparent;
                 white-space: nowrap;
@@ -4147,7 +4218,7 @@ class TrainingGround {
                 transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 z-index: 500;
                 display: flex;
-                // @section:ui_hud_components - HUD 组件初始化（血条/弹药/符文槽）
+                /* 训练场配置面板采用纵向布局。 */
                 flex-direction: column;
             }
             body.pc-mode #train-control-panel {
@@ -4252,7 +4323,7 @@ class TrainingGround {
                 font-size: 10px;
                 color: #818cf8;
                 background: rgba(99,102,241,0.12);
-                // @section:ui_overlay_panels - Overlay 面板初始化（商店/命运/设置）
+                /* 训练场状态标签。 */
                 border: 1px solid rgba(99,102,241,0.25);
                 border-radius: 4px;
                 padding: 1px 7px;
@@ -4305,26 +4376,180 @@ class TrainingGround {
             .train-skill-desc { color:#94a3b8; font-size:10px; line-height:1.45; }
             .train-skill-source { color:#64748b; font-size:10px; }
             .train-skill-current { margin-top:8px; padding:7px 9px; border-radius:8px; background:rgba(30,41,59,0.55); border:1px solid #334155; color:#a5b4fc; font-size:11px; line-height:1.5; }
-            @media (max-width: 767px) {
-                .train-panel-content { max-height: 50vh; }
+            #train-combat-status-mount {
+                flex: 1 1 auto;
+                min-width: 0;
+                max-width: 250px;
+            }
+            #train-combat-status-mount .combat-status-panel {
+                width: 100%;
+                min-height: 28px;
+            }
+            #pc-left-training-controls-mount #train-control-panel {
+                position: static;
+                inset: auto;
+                width: 100%;
+                max-width: none;
+                max-height: none;
+                margin: 0;
+                transform: none;
+                overflow: visible;
+                background: transparent;
+                border: 0;
+                backdrop-filter: none;
+            }
+            #pc-left-training-controls-mount #train-toggle-main {
+                display: none;
+            }
+            #pc-left-training-controls-mount .train-panel-content,
+            #pc-left-training-controls-mount .train-skill-grid {
+                max-height: none;
+                overflow: visible;
+            }
+            #pc-left-training-controls-mount .train-panel-content {
+                padding: 10px;
+            }
+            #pc-left-training-controls-mount #panel-bullet > .flex {
+                flex-direction: column;
+            }
+            #pc-left-training-controls-mount #train-attr-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            #pc-left-training-controls-mount #panel-bullet > .flex > .w-32 {
+                width: 100%;
+                min-height: 80px;
+                flex-direction: row;
+            }
+            #pc-right-training-scenes-mount #train-sidebar {
+                width: 100%;
+                min-width: 0;
+                height: auto;
+                max-height: none;
+                overflow: visible;
+                border-left: 0;
+                background: transparent;
+            }
+            #pc-right-training-scenes-mount .train-scenario-list,
+            #pc-right-training-scenes-mount .train-scenario-desc {
+                flex: 0 0 auto;
+                max-height: none;
+                overflow: visible;
+            }
+            @media (max-width: 1024px) {
+                #phase-training {
+                    flex-direction: column;
+                    align-items: stretch;
+                    overflow-y: auto;
+                    touch-action: pan-y;
+                    overscroll-behavior-y: contain;
+                    -webkit-overflow-scrolling: touch;
+                }
+                #train-main-area {
+                    flex: 0 0 auto;
+                    width: 100%;
+                    min-height: 100%;
+                    overflow: visible;
+                }
+                .train-top-bar {
+                    position: sticky;
+                    top: 0;
+                    z-index: 520;
+                    flex: 0 0 44px;
+                    height: 44px;
+                    min-height: 44px;
+                }
+                #train-control-panel {
+                    position: relative;
+                    inset: auto;
+                    flex: 0 0 auto;
+                    width: 100%;
+                    margin-top: auto;
+                    transform: none;
+                    overflow: visible;
+                }
+                #train-control-panel.collapsed {
+                    max-height: 44px;
+                    transform: none;
+                    overflow: hidden;
+                }
+                #train-toggle-main {
+                    position: static;
+                    width: 100%;
+                    min-height: 44px;
+                    transform: none;
+                    border-radius: 0;
+                    touch-action: manipulation;
+                }
+                .train-panel-content {
+                    max-height: none;
+                    overflow: visible;
+                }
                 #train-attr-grid { grid-template-columns: repeat(2, 1fr) !important; }
-                #train-sidebar { width: 160px; min-width: 160px; }
-                .train-skill-grid { grid-template-columns:1fr; max-height:34vh; }
+                #train-sidebar,
+                #train-sidebar.collapsed {
+                    flex: 0 0 auto;
+                    width: 100%;
+                    min-width: 0;
+                    max-height: none;
+                    overflow: visible;
+                    border-top: 1px solid #1e293b;
+                    border-left: 0;
+                }
+                .train-scenario-list,
+                .train-scenario-desc {
+                    flex: 0 0 auto;
+                    max-height: none;
+                    overflow: visible;
+                }
+                .train-skill-grid {
+                    grid-template-columns:1fr;
+                    max-height:none;
+                    overflow:visible;
+                }
+                .train-sidebar-header,
+                .train-scat-btn,
+                .train-scenario-btn,
+                .train-demo-btn,
+                .train-reset-btn,
+                .train-tab-btn,
+                .train-skill-action {
+                    min-height: 44px;
+                    touch-action: manipulation;
+                }
+                #train-simulation-label,
+                #train-stats {
+                    display: none;
+                }
+                #train-combat-status-mount {
+                    max-width: none;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                #phase-training *,
+                #pc-left-training *,
+                #pc-right-training * {
+                    animation-duration: 0.01ms;
+                    animation-iteration-count: 1;
+                    transition-duration: 0.01ms;
+                    scroll-behavior: auto;
+                }
             }
         `;
         document.head.appendChild(style);
 
+        // @section:training_accessible_markup - 训练场可达控制结构
         ui.innerHTML = `
                 <!-- 左侧主战斗区域 -->
             <div id="train-main-area">
                 <!-- 顶部状态栏 -->
-                <div class="absolute top-0 left-0 right-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 z-20">
-                    <div class="text-slate-400 text-[10px] uppercase tracking-wider flex items-center gap-2">
+                <div class="train-top-bar absolute top-0 left-0 right-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between gap-2 px-2 z-20">
+                    <div id="train-simulation-label" class="text-slate-400 text-[10px] uppercase tracking-wider flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                         Combat Simulation
                     </div>
+                    <div id="train-combat-status-mount"></div>
                     <div id="train-stats" class="text-amber-400 font-mono text-xs">DPS: 0 | TOTAL: 0</div>
-                    <button onclick="game.trainingGround.exit()" class="text-slate-400 hover:text-white text-sm">退出</button>
+                    <button id="train-exit-button" type="button" onclick="game.trainingGround.exit()" aria-label="退出训练场" class="min-w-11 min-h-11 flex items-center justify-center text-slate-300 hover:text-white text-sm touch-manipulation">退出</button>
                 </div>
                 <!-- 符文词条效果横幅 -->
                 <div id="train-runeword-banner">
@@ -4338,23 +4563,24 @@ class TrainingGround {
                 </div>
                 <!-- 快捷操作按鈕 (仅在面板收起时显示) -->
                 <div id="train-quick-actions" class="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-4 z-[450] transition-opacity duration-300">
-                    <button onclick="game.trainingGround.fireBullet()" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                    <button type="button" onclick="game.trainingGround.fireBullet()" aria-label="发射测试子弹" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">🔥</span>
                     </button>
-                    <button onclick="game.trainingGround.spawnCustomEnemy()" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                    <button type="button" onclick="game.trainingGround.spawnCustomEnemy()" aria-label="召唤测试敌人" class="w-12 h-12 rounded-full bg-red-600/80 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">👾</span>
                     </button>
-                    <button onclick="game.trainingGround.activateSkillForTest()" class="w-12 h-12 rounded-full bg-violet-600/80 backdrop-blur-md border border-violet-300/50 text-white shadow-lg shadow-violet-500/20 flex items-center justify-center active:scale-90 transition-transform">
+                    <button type="button" onclick="game.trainingGround.activateSkillForTest()" aria-label="释放测试技能" class="w-12 h-12 rounded-full bg-violet-600/80 backdrop-blur-md border border-violet-300/50 text-white shadow-lg shadow-violet-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">✨</span>
                     </button>
                 </div>
                 <!-- 底部控制面板 -->
+                <span id="train-control-home" hidden aria-hidden="true"></span>
                 <div id="train-control-panel" class="collapsed">
-                    <button id="train-toggle-main" onclick="game.trainingGround.toggleMainPanel()">▲ 展开配置</button>
+                    <button id="train-toggle-main" type="button" onclick="game.trainingGround.toggleMainPanel()" aria-expanded="false">▲ 展开配置</button>
                     <div class="flex border-b border-slate-700 bg-slate-900/50">
-                        <button onclick="game.trainingGround.switchTab('bullet')" id="tab-btn-bullet" class="train-tab-btn active">子弹编辑</button>
-                        <button onclick="game.trainingGround.switchTab('enemy')" id="tab-btn-enemy" class="train-tab-btn">敌人配置</button>
-                        <button onclick="game.trainingGround.switchTab('skill')" id="tab-btn-skill" class="train-tab-btn">技能测试</button>
+                        <button type="button" onclick="game.trainingGround.switchTab('bullet')" id="tab-btn-bullet" class="train-tab-btn active">子弹编辑</button>
+                        <button type="button" onclick="game.trainingGround.switchTab('enemy')" id="tab-btn-enemy" class="train-tab-btn">敌人配置</button>
+                        <button type="button" onclick="game.trainingGround.switchTab('skill')" id="tab-btn-skill" class="train-tab-btn">技能测试</button>
                     </div>
                     <!-- 子弹编辑面板 -->
                     <div id="panel-bullet" class="train-panel-content active">
@@ -4386,9 +4612,12 @@ class TrainingGround {
                         <div id="train-skill-controls"></div>
                     </div>
                 </div>
+                <span id="train-sidebar-home" hidden aria-hidden="true"></span>
             </div>
         `;
-        document.body.appendChild(ui);
+        const gameContainer = document.getElementById('game-container');
+        if (!gameContainer) return;
+        gameContainer.appendChild(ui);
         this.initSidebar();
         this.renderAttributeControls();
         this.updateBulletPreview();
@@ -4965,23 +5194,25 @@ class TrainingGround {
     initSidebar() {
         const sidebar = document.createElement('div');
         sidebar.id = 'train-sidebar';
+        sidebar.setAttribute('role', 'complementary');
+        sidebar.setAttribute('aria-label', '训练场场景配置');
         sidebar.innerHTML = `
             <!-- 侧边栏标题 -->
             <div class="train-sidebar-header">
                 <span class="text-xs font-bold tracking-widest text-cyan-400 uppercase">場景配置</span>
-                <button id="train-sidebar-toggle" onclick="game.trainingGround.toggleSidebar()" title="收起側邊欄" class="text-slate-500 hover:text-slate-300 text-xs transition-colors">◀</button>
+                <button id="train-sidebar-toggle" type="button" onclick="game.trainingGround.toggleSidebar()" title="收起场景配置" aria-label="收起场景配置" aria-expanded="true" class="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-slate-200 text-xs transition-colors">◀</button>
             </div>
             <!-- 分类 Tab -->
             <div class="train-sidebar-tabs" id="train-sidebar-tabs">
-                <button onclick="game.trainingGround.switchCategory('enemy')" id="scat-btn-enemy" class="train-scat-btn active">敵人</button>
-                <button onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
-                <button onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
-                <button onclick="game.trainingGround.switchCategory('skill')" id="scat-btn-skill" class="train-scat-btn">技能</button>
-                <button onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
-                <button onclick="game.trainingGround.switchCategory('resonance')" id="scat-btn-resonance" class="train-scat-btn" title="屬性共鳴 1/2/3 階驗證">共鳴</button>
-                <button onclick="game.trainingGround.switchCategory('relic')" id="scat-btn-relic" class="train-scat-btn">遺物</button>
-                <button onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
-                <button onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敵人 V2 美術驗收場景">驗收</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('enemy')" id="scat-btn-enemy" class="train-scat-btn active">敵人</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('skill')" id="scat-btn-skill" class="train-scat-btn">技能</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('resonance')" id="scat-btn-resonance" class="train-scat-btn" title="屬性共鳴 1/2/3 階驗證">共鳴</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('relic')" id="scat-btn-relic" class="train-scat-btn">遺物</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敵人 V2 美術驗收場景">驗收</button>
             </div>
             <!-- 场景列表 -->
             <div id="train-scenario-list" class="train-scenario-list"></div>
@@ -4989,8 +5220,8 @@ class TrainingGround {
             <div id="train-scenario-desc" class="train-scenario-desc">← 選擇一個場景開始演示</div>
             <!-- 操作按钮 -->
             <div class="train-sidebar-actions">
-                <button onclick="game.trainingGround.triggerScenarioAction()" id="train-demo-btn" class="train-demo-btn" disabled>▶ 觸發演示</button>
-                <button onclick="game.trainingGround.resetCurrentScenario()" id="train-reset-btn" class="train-reset-btn" disabled>⟳ 重置場景</button>
+                <button type="button" onclick="game.trainingGround.triggerScenarioAction()" id="train-demo-btn" class="train-demo-btn" disabled>▶ 觸發演示</button>
+                <button type="button" onclick="game.trainingGround.resetCurrentScenario()" id="train-reset-btn" class="train-reset-btn" disabled>⟳ 重置場景</button>
             </div>
         `;
         document.getElementById('phase-training').appendChild(sidebar);
@@ -5028,7 +5259,7 @@ class TrainingGround {
                 ? `<span class="train-scenario-asset-tag" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:10px;font-family:monospace;background:${assetTagColor(s.assetHitTag)};color:#fff;vertical-align:middle;">${s.assetHitTag}</span>`
                 : '';
             return `
-            <button onclick="game.trainingGround.loadScenario('${s.id}')"
+            <button type="button" onclick="game.trainingGround.loadScenario('${s.id}')"
                 id="scenario-btn-${s.id}"
                 class="train-scenario-btn ${this.currentScenario?.id === s.id ? 'active' : ''}">
                 <span class="train-scenario-icon">${s.icon}</span>
@@ -5061,7 +5292,7 @@ class TrainingGround {
 
         // 0b. 根据分类动态调整 combatGridTopY
         // 符文词条分类有顶部横幅（约70px），需要让敵人在横幅下方居中偏上放置
-        const trainTopBarH = 40;
+        const trainTopBarH = window.innerWidth > 1024 ? 40 : 44;
         if (scenario.categoryId === 'runeword' || scenario.categoryId === 'resonance') {
             // 横幅高度约70px，在其下方保留 8px 间距
             const bannerH = 70;
@@ -5279,18 +5510,29 @@ class TrainingGround {
         const toggleBtn = document.getElementById('train-sidebar-toggle');
         if (!sidebar) return;
         const isCollapsed = sidebar.classList.toggle('collapsed');
-        if (toggleBtn) toggleBtn.textContent = isCollapsed ? '▶' : '◀';
+        if (toggleBtn) {
+            toggleBtn.textContent = isCollapsed ? '▶' : '◀';
+            toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+            toggleBtn.setAttribute('aria-label', isCollapsed ? '展开场景配置' : '收起场景配置');
+            toggleBtn.title = isCollapsed ? '展开场景配置' : '收起场景配置';
+        }
     }
 
     /**
      * 将侧边栏收起（仅收起，不切换）
      */
     collapseSidebar() {
+        if (window.innerWidth <= 1024) return;
         const sidebar = document.getElementById('train-sidebar');
         const toggleBtn = document.getElementById('train-sidebar-toggle');
         if (!sidebar) return;
         sidebar.classList.add('collapsed');
-        if (toggleBtn) toggleBtn.textContent = '▶';
+        if (toggleBtn) {
+            toggleBtn.textContent = '▶';
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            toggleBtn.setAttribute('aria-label', '展开场景配置');
+            toggleBtn.title = '展开场景配置';
+        }
     }
 
     /**
@@ -5450,23 +5692,201 @@ class TrainingGround {
         }
     }
 
+    _moveTrainingNode(nodeId, mountId) {
+        const node = document.getElementById(nodeId);
+        const mount = document.getElementById(mountId);
+        if (node && mount && node.parentElement !== mount) mount.appendChild(node);
+    }
+
+    _restoreTrainingNode(nodeId, homeId) {
+        const node = document.getElementById(nodeId);
+        const home = document.getElementById(homeId);
+        if (!node || !home || !home.parentNode) return;
+        if (node.previousElementSibling !== home || node.parentNode !== home.parentNode) {
+            home.parentNode.insertBefore(node, home.nextSibling);
+        }
+    }
+
+    _mountTrainingCombatStatus() {
+        this._moveTrainingNode('combat-status-panel', 'train-combat-status-mount');
+        this.game.ui_updateCombatStatusPanel?.(true);
+    }
+
+    _restoreTrainingCombatStatus() {
+        this._restoreTrainingNode('combat-status-panel', 'combat-status-home');
+    }
+
+    _captureTrainingLayoutState() {
+        if (this._savedTrainingLayoutState) return;
+        const panel = document.getElementById('train-control-panel');
+        const sidebar = document.getElementById('train-sidebar');
+        const quickActions = document.getElementById('train-quick-actions');
+        const skillBar = document.getElementById('skill-bar');
+        this._savedTrainingLayoutState = {
+            combatGridTopY: this.game.combatGridTopY,
+            skillBarDisplay: skillBar?.style.display || '',
+            panelCollapsed: !!panel?.classList.contains('collapsed'),
+            sidebarCollapsed: !!sidebar?.classList.contains('collapsed'),
+            quickOpacity: quickActions?.style.opacity || '',
+            quickPointerEvents: quickActions?.style.pointerEvents || ''
+        };
+    }
+
+    _setTrainingPanelExpanded() {
+        const panel = document.getElementById('train-control-panel');
+        const panelToggle = document.getElementById('train-toggle-main');
+        const sidebar = document.getElementById('train-sidebar');
+        const sidebarToggle = document.getElementById('train-sidebar-toggle');
+        const quickActions = document.getElementById('train-quick-actions');
+        panel?.classList.remove('collapsed');
+        sidebar?.classList.remove('collapsed');
+        if (panelToggle) {
+            panelToggle.innerText = '▼ 收起配置';
+            panelToggle.setAttribute('aria-expanded', 'true');
+        }
+        if (sidebarToggle) {
+            sidebarToggle.textContent = '◀';
+            sidebarToggle.setAttribute('aria-expanded', 'true');
+            sidebarToggle.setAttribute('aria-label', '收起场景配置');
+            sidebarToggle.title = '收起场景配置';
+        }
+        if (quickActions) {
+            quickActions.style.opacity = '0';
+            quickActions.style.pointerEvents = 'none';
+        }
+    }
+
+    _syncTrainingResponsiveLayout() {
+        if (!this.active) return;
+        const isDesktop = window.innerWidth > 1024;
+        const trainTopBarHeight = isDesktop ? 40 : 44;
+        const phase = document.getElementById('phase-training');
+        const leftSidebar = document.getElementById('pc-left-sidebar');
+        const rightSidebar = document.getElementById('pc-right-sidebar');
+        const leftTraining = document.getElementById('pc-left-training');
+        const rightTraining = document.getElementById('pc-right-training');
+        const leftGathering = document.getElementById('pc-left-gathering');
+        const leftCombat = document.getElementById('pc-left-combat');
+        const runeMount = document.getElementById('pc-right-rune-mount');
+        this.game.combatGridTopY = trainTopBarHeight + 8 + this.game.enemyHeight / 2;
+
+        phase?.classList.toggle('is-pc-training-layout', isDesktop);
+        if (isDesktop) {
+            this._moveTrainingNode('train-control-panel', 'pc-left-training-controls-mount');
+            this._moveTrainingNode('train-sidebar', 'pc-right-training-scenes-mount');
+            if (leftSidebar) leftSidebar.style.display = 'flex';
+            if (rightSidebar) rightSidebar.style.display = 'flex';
+            if (leftGathering) leftGathering.style.display = 'none';
+            if (leftCombat) leftCombat.style.display = 'none';
+            if (leftTraining) leftTraining.style.display = 'flex';
+            if (rightTraining) rightTraining.style.display = 'flex';
+            if (runeMount) runeMount.style.display = 'none';
+        } else {
+            this._restoreTrainingNode('train-control-panel', 'train-control-home');
+            this._restoreTrainingNode('train-sidebar', 'train-sidebar-home');
+            if (leftTraining) leftTraining.style.display = 'none';
+            if (rightTraining) rightTraining.style.display = 'none';
+            if (runeMount) runeMount.style.display = '';
+            if (leftSidebar) leftSidebar.style.display = 'none';
+            if (rightSidebar) rightSidebar.style.display = 'none';
+        }
+
+        this._setTrainingPanelExpanded();
+        if (this._trainingDesktopLayout !== isDesktop) {
+            phase?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            this._trainingDesktopLayout = isDesktop;
+        }
+    }
+
+    _bindTrainingLayoutResize() {
+        if (this._trainingLayoutResizeHandler) return;
+        this._trainingLayoutResizeHandler = () => {
+            if (!this.active) return;
+            if (this._trainingLayoutResizeFrame) cancelAnimationFrame(this._trainingLayoutResizeFrame);
+            this._trainingLayoutResizeFrame = requestAnimationFrame(() => {
+                this._trainingLayoutResizeFrame = 0;
+                this._syncTrainingResponsiveLayout();
+            });
+        };
+        window.addEventListener('resize', this._trainingLayoutResizeHandler);
+    }
+
+    _unbindTrainingLayoutResize() {
+        if (this._trainingLayoutResizeHandler) {
+            window.removeEventListener('resize', this._trainingLayoutResizeHandler);
+            this._trainingLayoutResizeHandler = null;
+        }
+        if (this._trainingLayoutResizeFrame) {
+            cancelAnimationFrame(this._trainingLayoutResizeFrame);
+            this._trainingLayoutResizeFrame = 0;
+        }
+    }
+
+    _restoreTrainingResponsiveLayout() {
+        this._restoreTrainingNode('train-control-panel', 'train-control-home');
+        this._restoreTrainingNode('train-sidebar', 'train-sidebar-home');
+        const phase = document.getElementById('phase-training');
+        const leftTraining = document.getElementById('pc-left-training');
+        const rightTraining = document.getElementById('pc-right-training');
+        const runeMount = document.getElementById('pc-right-rune-mount');
+        phase?.classList.remove('is-pc-training-layout');
+        if (leftTraining) leftTraining.style.display = 'none';
+        if (rightTraining) rightTraining.style.display = 'none';
+        if (runeMount) runeMount.style.display = '';
+        this._trainingDesktopLayout = null;
+    }
+
+    _restoreTrainingLayoutState() {
+        const saved = this._savedTrainingLayoutState;
+        if (!saved) return;
+        const panel = document.getElementById('train-control-panel');
+        const panelToggle = document.getElementById('train-toggle-main');
+        const sidebar = document.getElementById('train-sidebar');
+        const sidebarToggle = document.getElementById('train-sidebar-toggle');
+        const quickActions = document.getElementById('train-quick-actions');
+        const skillBar = document.getElementById('skill-bar');
+        panel?.classList.toggle('collapsed', saved.panelCollapsed);
+        sidebar?.classList.toggle('collapsed', saved.sidebarCollapsed);
+        if (panelToggle) {
+            panelToggle.innerText = saved.panelCollapsed ? '▲ 展开配置' : '▼ 收起配置';
+            panelToggle.setAttribute('aria-expanded', String(!saved.panelCollapsed));
+        }
+        if (sidebarToggle) {
+            sidebarToggle.textContent = saved.sidebarCollapsed ? '▶' : '◀';
+            sidebarToggle.setAttribute('aria-expanded', String(!saved.sidebarCollapsed));
+            sidebarToggle.setAttribute('aria-label', saved.sidebarCollapsed ? '展开场景配置' : '收起场景配置');
+        }
+        if (quickActions) {
+            quickActions.style.opacity = saved.quickOpacity;
+            quickActions.style.pointerEvents = saved.quickPointerEvents;
+        }
+        if (skillBar) skillBar.style.display = saved.skillBarDisplay;
+        this.game.combatGridTopY = saved.combatGridTopY;
+        ['phase-training', 'train-scenario-list', 'train-scenario-desc'].forEach(id => {
+            const node = document.getElementById(id);
+            if (node) node.scrollTop = 0;
+        });
+        this._savedTrainingLayoutState = null;
+    }
+
     enter() {
+        if (this.active) {
+            this._syncTrainingResponsiveLayout();
+            return;
+        }
+        this._captureTrainingLayoutState();
         this.active = true;
         this._captureSkillSandboxState();
         this.game.hasCombatWall = true; 
         this.game.phase_switchPhase('training');
-        // 试炼场顶部栏高度为 40px（h-10），重新计算 combatGridTopY
+        // 试炼场顶部栏桌面为 40px、移动端为 44px，重新计算 combatGridTopY
         // 避免使用 unified-top-bar（52px）导致的顶部空档
-        const trainTopBarH = 40;
+        const trainTopBarH = window.innerWidth > 1024 ? 40 : 44;
         this.game.combatGridTopY = trainTopBarH + 8 + this.game.enemyHeight / 2;
         document.getElementById('phase-training').style.display = 'flex';
         document.getElementById('phase-training').classList.remove('hidden-phase');
         document.getElementById('phase-training').classList.add('active-phase');
-        const trainSidebar = document.getElementById('train-sidebar');
-        const trainSidebarToggle = document.getElementById('train-sidebar-toggle');
-        const compactTrainingLayout = window.innerWidth <= 767;
-        if (trainSidebar) trainSidebar.classList.toggle('collapsed', compactTrainingLayout);
-        if (trainSidebarToggle) trainSidebarToggle.textContent = compactTrainingLayout ? '>' : '<';
+        this._setTrainingPanelExpanded();
         // [特效残留修复] 清空实体/特效数组前先释放其 PixiJS 资源（子弹拖尾/光晕、粒子、持续元素特效等），
         // 否则进入训练场时上一场的残留 Sprite 会孤立留在共享效果容器上不消失。
         pixiCleanupAllEffects(this.game);
@@ -5500,10 +5920,23 @@ class TrainingGround {
         this.renderSkillControls();
         const sharedSkillBar = document.getElementById('skill-bar');
         if (sharedSkillBar) sharedSkillBar.style.display = 'none';
+        this._mountTrainingCombatStatus();
+        this._bindTrainingLayoutResize();
+        this._syncTrainingResponsiveLayout();
+        this.game.ui_updateCombatStatusPanel?.(true);
     }
 
     exit() {
+        if (!this.active) {
+            this._unbindTrainingLayoutResize();
+            this._restoreTrainingResponsiveLayout();
+            this._restoreTrainingCombatStatus();
+            return;
+        }
         this.active = false;
+        this._unbindTrainingLayoutResize();
+        this._restoreTrainingResponsiveLayout();
+        this._restoreTrainingCombatStatus();
         this.game.hasCombatWall = false; 
         this.game.windAnchors = []; 
         this.game.activeWindMatrices = [];
@@ -5512,6 +5945,8 @@ class TrainingGround {
         document.getElementById('phase-training').classList.add('hidden-phase');
         this._restoreSkillSandboxState();
         this.game.phase_switchPhase('meta');
+        this.game.ui_updatePCLayout?.();
+        this._restoreTrainingLayoutState();
     }
 
     toggleMainPanel() {
@@ -5520,6 +5955,7 @@ class TrainingGround {
         const quickActions = document.getElementById('train-quick-actions');
         const isCollapsed = panel.classList.toggle('collapsed');
         btn.innerText = isCollapsed ? '▲ 展开配置' : '▼ 收起配置';
+        btn.setAttribute('aria-expanded', String(!isCollapsed));
         if (quickActions) {
             quickActions.style.opacity = isCollapsed ? '1' : '0';
             quickActions.style.pointerEvents = isCollapsed ? 'auto' : 'none';
@@ -5557,6 +5993,12 @@ class TruthBook {
     }
 
     initUI() {
+        const truthRoot = document.getElementById('phase-truth-book');
+        if (truthRoot) truthRoot.scrollTop = 0;
+        if (!this.currentEntry) {
+            document.getElementById('truth-empty-state')?.classList.remove('hidden');
+            document.getElementById('truth-content')?.classList.add('hidden');
+        }
         const searchInput = document.getElementById('truth-search');
         if (searchInput && !searchInput.dataset.truthBound) {
             searchInput.addEventListener('input', () => {
@@ -5654,6 +6096,7 @@ class TruthBook {
 
     createListButton(entry) {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = 'truth-list-btn flex items-center gap-3 p-3 w-full bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-cyan-900/20 hover:border-cyan-500/50 transition-all text-left group mb-2';
         btn.dataset.entryId = entry.id;
         const iconWrap = document.createElement('span');
@@ -5735,6 +6178,16 @@ class TruthBook {
             btnElement.classList.add('border-cyan-500', 'bg-cyan-900/30');
         }
         this.startDemo(entry);
+        if (window.matchMedia?.('(max-width: 720px)').matches) {
+            requestAnimationFrame(() => {
+                const truthRoot = document.getElementById('phase-truth-book');
+                const detailPanel = document.getElementById('truth-detail-panel');
+                if (!truthRoot || !detailPanel) return;
+                const rootRect = truthRoot.getBoundingClientRect();
+                const detailRect = detailPanel.getBoundingClientRect();
+                truthRoot.scrollTop += detailRect.top - rootRect.top;
+            });
+        }
     }
 
     resetDemo() { if (this.currentEntry) this.startDemo(this.currentEntry); }

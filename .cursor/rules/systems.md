@@ -1,6 +1,6 @@
 # 游戏系统与试炼场规范 (systems.js)
 
-> 最后更新：修复 `systems.js` 遗漏导入 `EVENT_TYPES` 导致 TrainingGround.enter() 抛出 ReferenceError 的 Bug。已将第 17 行的 `import { eventBus }` 补全为 `import { eventBus, EVENT_TYPES }`。
+> 最后更新（2026-07-20）：REQ-20260717-mobile-ui-accessibility 收口暂停、商店、训练场与真理之书移动滚动，桌面三栏挂载、战斗态势、真实回合技能状态与 dock 微文案可见性；仅调整 UI/可访问性合同，不改变流程与数值。
 
 本文档定义了 `src/systems.js` 中包含的核心子系统规范，重点涵盖 **试炼场 (TrainingGround)** 和 **真理之书 (TruthBook)** 的架构约定与场景化配置扩展方法。
 
@@ -195,7 +195,55 @@
 - `flame_sword`、`elemental_fusion`、`thunder_scatter`、`armor_piercing_meteor`
 - `sword_resonance`、`storm_resonance`
 
-## 5. 全局禁止行为
+## 5. 移动端可访问性合同
+
+本节是 `REQ-20260717-mobile-ui-accessibility` 固化的运行时合同，适用于 360×800、390×844、480×854 和桌面布局。后续 Codex 修改暂停、商店壳层、试炼场、真理之书或战斗 HUD 时必须保留这些不变量。
+
+### 5.1 暂停菜单
+
+- `#phase-pause` 只负责裁切对话框边界；`#pause-scroll-region` 是唯一的纵向滚动所有者，必须保持 `min-height: 0`、`overflow-y: auto` 与 `touch-action: pan-y`。
+- “放弃本局”位于该滚动区内，“继续游戏”位于固定底部操作区；两者和关闭按钮都必须具备稳定 ID/可访问名称与至少 44px 的触控尺寸。
+- 打开暂停页的 `#settings-btn` 本身也是关键入口，在 360/390/480 移动视口必须保持至少 44×44px、明确 `aria-label`，不得只修复弹窗内部按钮而保留不可达入口。
+- 安全区只能在暂停 shell 的一个层级消费一次。不得通过全局 `overflow: hidden`、重复 safe-area padding 或无边界 `!important` 隐藏不可达内容。
+
+### 5.2 试炼场响应式所有权
+
+- 非 PC 模式下，`#phase-training` 是唯一的纵向滚动根；配置面板、场景列表、场景说明和底部动作必须释放自身纵向滚动，且 `scrollWidth === clientWidth`。
+- 移动状态栏与退出按钮至少 44px；配置切换按钮不得覆盖退出按钮。动态注入的 CSS 必须使用合法 CSS 注释，禁止在模板字符串中混入 `//` 注释导致后续声明失效。
+- `#train-sidebar-home` 必须位于 `#train-main-area` 内，使移动端恢复后的 sidebar 与配置面板共同撑开 sticky 页头的 containing block；禁止把 marker 放回 main-area 之后，否则滚到场景列表底部时退出按钮会再次离屏。
+- `#combat-status-panel` 是全局唯一节点。进入训练场时移动到 `#train-combat-status-mount`，退出时恢复到 `#combat-status-home`；禁止复制第二份态势条。
+- PC 模式使用可逆三栏挂载：配置面板进入 `#pc-left-training-controls-mount`，战场保持中央，场景侧栏进入 `#pc-right-training-scenes-mount`。左侧窄栏的弹珠编辑区必须纵向堆叠并使用两列属性网格，禁止套用整页宽屏五列布局。
+- `enter()` 必须捕获进入前布局状态并绑定具名 resize handler；`exit()` 必须解绑、恢复 home marker、隐藏训练专属左右栏并恢复符文挂载，不得遗留节点或内联显示状态。
+
+### 5.3 真理之书单轴合同与文案来源
+
+- 720px 及以下由 `#phase-truth-book` 统一纵向滚动；分类使用宽度受限的两列网格，条目列表纵向排列，分类、条目和正文不得产生嵌套横向滚动。
+- 移动端选择条目后只能调整真理之书根节点的 `scrollTop`。禁止对详情调用 `scrollIntoView()`，因为它会连带滚动 `#game-container` 并把标题/关闭按钮推离视口。
+- 移动页头必须 sticky，关闭目标至少 44×44px；内层 flex 必须 `flex: 0 0 auto`，让 containing block 覆盖完整详情高度。每次 `initUI()` 打开时将根 `scrollTop` 复位为 0，并在没有当前条目时恢复空态、隐藏旧详情，确保“查看详情→关闭→重开”仍从可退出位置开始。
+- 保底说明以现行运行时合同为准：遗物线索为动态 2–4 行；精华不再新增，仅保留 legacy/debug 兼容说明。不得恢复过期的固定“精华 5 行 / 遗物 13 行”文案。
+
+### 5.4 商店移动列表
+
+- 非 PC 模式下，`#phase-shop .shop-layout-shell` 必须保持 `min-height: 0` 与作用域内的边界裁切；安全区只由该 shell 消费一次。
+- `#shop-items-container` 是商品列表唯一纵向滚动所有者，必须保持 `flex: 1 1 0`、`min-height: 0`、`overflow-x: hidden`、`overflow-y: auto` 与 `touch-action: pan-y`。预览区不得再创建嵌套纵向滚动。
+- 360×800 下商品列表可浏览高度不得低于 240px；返回按钮、移动分类和购买目标至少 44px。购买按钮的业务可用性由 shop/lifecycle 所有者维护，本合同不得越界修改价格、购买回调或资源判定。
+
+### 5.5 战斗态势、dock 与技能禁用原因
+
+- `#combat-status-panel` 仅在 `combat` / `training` 可见，其余阶段隐藏；位图样式不得再次用强制选择器遮蔽它。
+- 1024px 及以下的 `#combat-bottom-dock` 固定为 120px，并与 canvas 底边对齐；弹药区不得通过缩放向上侵入战场安全区。技能与主要动作目标至少 44×44px。
+- 禁用技能必须同步原生 `disabled` 与 `aria-disabled="true"`，可访问名称和 `.skill-disabled-reason` 同时给出原因。普通技能必须与 `combat_activateSkill()` 的 phase / enemy-turn / SP 拒绝条件一致；当前稳定原因包括 `SP不足`、`空槽`、`空瓶`、`仅战斗可用`、`敌方行动中`。
+- `UIManager` 以单例 `requestAnimationFrame` 边沿监听同步 `isEnemyTurn`：只在 combat 存活、只在 false/true 翻转时重绘技能栏、离开 combat 或缺少技能栏时停止。该监听只刷新 UI，禁止拦截或改写回合状态与战斗流程。
+- 移动 dock 的实际弹药名、伤害、属性值、队列标签/伤害/徽标、技能成本与禁用原因均不得低于 10px；移动队列最多展示“首属性 + 更多计数”两枚图标，避免四枚徽标压缩到不可读。禁用原因可换行，但其边界必须保持在 44×44px 技能目标内。
+- `prefers-reduced-motion: reduce` 必须按组件覆盖暂停、商店、真理之书、技能编辑器、态势条与战斗 dock，不得用全局动画禁用规则兜底。
+
+### 5.6 验证闸门
+
+- 静态验证：`node tests/validate_mobile_ui_contracts.mjs`（当前 58 条），并回归 `validate_scenarios.js` 与 `validate_phase_contracts.mjs`。
+- 浏览器验证必须覆盖 360×800、390×844、480×854 和桌面视口；交互使用真实屏幕坐标，记录目标中心、`elementFromPoint` 命中、`scrollWidth/clientWidth`、`scrollHeight/clientHeight` 与截图。
+- 训练场退出必须同时验证移动→桌面→移动 resize 和退出后的 home marker 恢复；真理之书条目选择与商店列表滚动必须确认 `#game-container.scrollTop === 0`；移动 dock 必须确认逻辑 canvas 中 `dockTop = canvas.height - 120`。
+
+## 6. 全局禁止行为
 
 *   **禁止修改 DOM 结构**：若需调整试炼场布局，必须修改 `initUI()` 或 `initSidebar()` 中生成的 HTML 字符串，严禁尝试去 `index.html` 中寻找这些元素。
 *   **禁止绕过场景系统硬编码测试**：测试新机制时，必须通过在 `TRAINING_SCENARIOS` 中添加临时场景来进行，严禁直接修改 `TrainingGround.enter()` 的初始逻辑。
