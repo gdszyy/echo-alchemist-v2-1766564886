@@ -1,8 +1,9 @@
 # REQ-20260627-health-all-phases
 
-Status: debt
+Status: Active
 Owner: Codex
 Started: 2026-06-27
+Last updated: 2026-07-22
 
 ## Scope
 
@@ -11,9 +12,16 @@ Continue from `docs/health_all_phases_goal_handoff.md` and advance Echo Alchemis
 Current checkpoint focus:
 
 - [x] Checkpoint 0: baseline verification.
-- [ ] Checkpoint 1: P1 interaction health.
+- [x] Checkpoint 1: 2026-07-17 UI / interaction hardening（实现、A-D 集成与 Goal E 最终全量证据均已关闭）。
+  - [x] Desktop、360×800、390×844、480×854 与代码合同的审计范围已冻结。
+  - [x] P0/P1/P2 backlog 已登记到 `docs/p0_interaction_optimization_todo.md`。
+  - [x] `REQ-20260717-first-run-tutorial` 已集成并关闭。
+  - [x] `REQ-20260717-run-lifecycle-integrity` 已集成并关闭。
+  - [x] `REQ-20260717-mobile-ui-accessibility` 已集成并关闭。
+  - [x] `REQ-20260717-launcher-settlement-ux` 已集成并关闭。
   - [x] Pinboard fusion feedback is visible from the rune launcher configuration tab.
-  - [ ] Remaining P1 items: full launcher information hierarchy, codex card states, mobile long-list safe-area review, reward/shop/truth-book card grammar.
+  - [x] `REQ-20260717-ui-polish-integration` 已完成代码合并、冲突修复、全量 T1、四视口 T3、索引与文档收口；最终代码/测试/索引提交为 `aecef4a`。
+  - [x] 本 checkpoint 的遗留项已明确分流：`VIS-P2-01` 语言/版本、`VIS-P2-02` 正式位图、`VIS-P2-03` offline shell/CSS cleanup 继续作为 P2 debt，不冒充本轮完成。
 
 Deferred checkpoints remain tracked in the handoff document:
 
@@ -34,8 +42,63 @@ Deferred checkpoints remain tracked in the handoff document:
 - Keep runtime code, generated/runtime assets, archived material, and scratch files in separate commits.
 - Do not leave a dev server running silently.
 - Add `// @perf-impact` and performance assessment for new high-cost particles, glow, blend modes, or rendering work.
+- Do not run the four implementation goals in the dirty root checkout. Each goal owns one `codex/<REQ-ID>` branch, one sibling worktree, one request card, and one temp directory.
+- Shared TODOs, this umbrella card, `tests/ai_test_runner.js`, cross-workstream terminology, and final acceptance are integration-owned. Source owners regenerate only their own large-file indexes; integration performs the final generator-backed consistency pass.
+
+## 2026-07-17 Parallel Goal Package
+
+Goals A-D were executed in isolated worktrees and merged serially by Goal E. The frozen cross-workstream interface is `sys_acquirePauseLease(ownerId) -> opaque token` plus `sys_releasePauseLease(token)`: every overlay releases only its own token, and no close path may directly force `isPaused = false`.
+
+| Goal | Request ID | Ownership / contract | Integration status |
+| :--- | :--- | :--- | :--- |
+| A | `REQ-20260717-first-run-tutorial` | Tutorial-only flow: `relic -> marble_pack -> gathering -> combat`, cancellable start, truthful device copy, one completion owner | Integrated / Closed：`d7ea424 -> 4d568c3` |
+| B | `REQ-20260717-run-lifecycle-integrity` | Run/phase epoch, resolver/reward idempotence, safe save restore, input cancel, nested pause lease, shop/relic ARIA | Integrated / Closed：`1146b4b` / `8461cfb -> 7a97ce5` / `0dfb075` |
+| C | `REQ-20260717-mobile-ui-accessibility` | HTML/CSS shell, pause/training/truth-book/shop scrolling, combat HUD visibility, mobile safe boundary | Integrated / Closed：`50e8532 -> f8d0055` |
+| D | `REQ-20260717-launcher-settlement-ux` | Launcher touch/focus/lease, codex action states, alchemy CTA, currency scope, real 30% settlement display | Integrated / Closed：`4b27547 -> 56c1993` |
+| E | `REQ-20260717-ui-polish-integration` | Shared docs/tests, terminology, ARIA/CSS/pause conflicts, runtime-semantic phase contract, full T1/T3 and Git closure | Goal Complete / Closed：integration fix `db5efa6`；optional boot `0767b3f`；最终实现 `aecef4a` |
+
+### Goal A — First-run tutorial
+
+- Exclusive write set was `src/tutorial_system.js`, its focused T1/rule/card, and generator-owned index.
+- Acceptance required fresh desktop/mobile completion without manual skip, cancellable delayed start, real event-driven steps, truthful single-click/coarse-pointer copy, the 85% gathering threshold, and one idempotent completion point.
+
+### Goal B — Run lifecycle integrity
+
+- Exclusive source ownership covered run lifecycle, phase coordinator, run shop and relic/shop overlays.
+- Acceptance required stale-callback cancellation after abandon/gameover/new run, atomic reward/resolver progression, versioned safe restore, nested pause leases, input-cancel cleanup, truthful Continue round, and keyboard/ARIA-safe overlays.
+
+### Goal C — Mobile UI and system-page accessibility
+
+- Exclusive source ownership covered `index.html`, `bitmap_ui.css`, `systems.js`, `ui/hud.js`, its focused T1/rule/card, and generator-owned indexes.
+- Acceptance required real-coordinate reachability and single-axis scrolling at 360×800 / 390×844 / 480×854, desktop training layout integrity, visible combat status/disabled reasons, safe dock boundaries, and reduced-motion support.
+
+### Goal D — Launcher, codex, and settlement UX
+
+- Exclusive source ownership covered `src/ui/rune_launcher.js`, `src/ui/game_over.js`, its focused T1/rule/card, and generator-owned indexes.
+- Acceptance required short-tap selection versus long-press explanation, `touchcancel` safety, launcher-owned pause lease, dialog/focus behavior, honest codex states, executable alchemy CTAs, distinct currency scopes, and display values sourced from the real 30% settlement write.
+
+### Goal E — Serial integration and acceptance
+
+```text
+/goal 执行 REQ-20260717-ui-polish-integration：在干净集成 worktree 依次合并 A-D，解决 pause lease、术语、ARIA、CSS 状态和测试冲突，修正当前 phase-contract 顺序敏感红基线，完成全量 T1/T3、四档视口浏览器回归、索引/TODO/需求卡同步与 Git 收口。完整执行合同见主需求卡 Goal E。部分合并、红测或预算耗尽均不算完成。
+```
+
+- Merge order and audited mappings: A `d7ea424 -> 4d568c3`; B `1146b4b` / `8461cfb -> 7a97ce5` / `0dfb075`; C `50e8532 -> f8d0055`; D `4b27547 -> 56c1993`.
+- Integration-owned fixes: `db5efa6` for pause lease/terminology/ARIA/CSS/lifecycle conflicts and `0767b3f` for optional clip-pack boot behavior.
+- Final static verification: source/test syntax `89/89`; all `23/23 validate_*` suites passed `2774/2774`, including phase `175/175`, terminology `36/36`, mobile UI `60/60`, run lifecycle `109/109`, launcher/settlement `54/54`, and scenarios `128/128`.
+- Required final order completed: all syntax checks -> every focused T1 -> scenarios + phase contracts -> T3 at 360×800, 390×844, 480×854 and 1440×900 -> generator-backed index review -> status-word scan -> `git diff --check` / clean Git closeout.
+- Final cross-batch T3 passed `32/32` at actual 360×800, 390×844, 480×854 and 1440×900, producing 12 PNG files plus JSON with zero unclassified issues and zero horizontal overflow. Exact classified issues were optional-local-audio `256` and controlled-navigation-image-abort `97` initial-navigation images. Evidence: `D:/claude/echo-alchemist-v2-1766564886/tmp/codex/REQ-20260717-ui-polish-integration/t3-final-20260722-r7/ui-polish-report.json`.
 
 ## Verification Log
+
+- 2026-07-22 Checkpoint 1 integration closeout complete:
+  - A-D delivery mappings are recorded above and all four child cards are `Integrated / Closed`.
+  - Integration fixes: `db5efa6`; optional clip-pack boot fix: `0767b3f`.
+  - Runtime-semantic `validate_phase_contracts.mjs`: `175/175`; `validate_ui_terminology.mjs`: `36/36`; mobile UI contract: `60/60`.
+  - Final syntax `89/89`; all validators `23/23`, `2774/2774`; four-viewport T3 `32/32`, 12 PNG + JSON, zero unclassified issues and zero horizontal overflow.
+  - The test adapter forces exact Google Fonts and Pixi 7.4.2 CDN responses so this UI T3 exercises the documented Canvas2D fallback; it does not claim WebGL coverage.
+  - Full index scan indexed `36` and skipped `27`, generating central `INDEX.md`, `_meta.json`, and the `src_ui_system` index.
+  - The umbrella remains `Active` because potion/assets/enemy/PixiJS/element follow-up checkpoints remain deferred; closing UI Checkpoint 1 does not close the umbrella request.
 
 - 2026-06-27 Checkpoint 0 baseline:
   - `git diff --check`: passed.
@@ -84,6 +147,11 @@ Deferred checkpoints remain tracked in the handoff document:
   - `node tests/validate_potion_spell_content.mjs`: 22/22 passed.
 
 ## Sync Gates
+
+- 2026-07-22 UI integration progress docs: `TODO.md`, `docs/p0_interaction_optimization_todo.md`, this umbrella card, and child cards A-D now carry the merge mappings and integrated/closed status; the integration card remains the sole owner of final evidence.
+- 2026-07-22 UI integration rules/tests: integration-owned rule/test/index changes are tracked by Goal E and must be generated/verified before its final commit; no generated auto index was manually edited by this documentation pass.
+- 2026-07-22 retained debt: language/version unification, formal bitmap replacement, and offline shell/CSS cleanup remain explicit P2 work; only reduced-motion coverage from the mobile batch is done.
+- 2026-07-22 verification/index closeout: syntax `89/89`, validators `2774/2774`, T3 `32/32`, and full index scan (`36` indexed / `27` skipped) passed; final code/test/index delivery belongs to the current implementation commit.
 
 - Auto index: updated for `src/ui/rune_launcher.js` and `src/ui_system.js` through `scripts/generate_index.py`.
 - Potion P0 slice auto index: updated for `src/ui/rune_launcher.js`, `src/combat_system.js`, and `src/game_phase.js` through `scripts/generate_index.py`.

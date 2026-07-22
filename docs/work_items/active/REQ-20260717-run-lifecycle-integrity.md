@@ -1,8 +1,8 @@
 # REQ-20260717-run-lifecycle-integrity: Run 生命周期完整性收口
 
-状态：Goal Complete
+状态：Integrated / Closed
 负责人：Codex
-最后更新：2026-07-20
+最后更新：2026-07-22
 当前里程碑：M5
 分支：`codex/REQ-20260717-run-lifecycle-integrity`
 Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
@@ -33,7 +33,7 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 
 - `index.html`、任何 CSS、`src/systems.js`、`src/ui/rune_launcher.js`、`src/ui/game_over.js`
 - 掉落概率、商品价格、经济倍率、战斗平衡
-- `TODO.md`、`docs/p0_interaction_optimization_todo.md`、umbrella 主卡、共享 runner；由最终 integration 批次统一同步
+- `TODO.md`、`docs/p0_interaction_optimization_todo.md`、umbrella 主卡、共享 runner；子分支当时不写，现已由 integration 批次统一同步
 - 根 checkout 的历史/并行 dirty 改动
 
 ## 必读入口
@@ -87,7 +87,7 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 
 - auto_index：是；仅改动源码对应索引，通过脚本生成
 - 模块规范：是；`game_phase.md`
-- TODO/进度大盘：本批不得修改，integration owner 统一同步
+- TODO/进度大盘：本子批未修改；integration owner 现已统一同步
 - process_insights：是；PI-006 / PI-007
 - 资产索引/manifest：否
 
@@ -145,7 +145,7 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 | `UX-P1-10` | 继续入口读取经校验 checkpoint 的真实 Round，坏档不暴露入口 | lifecycle T1 覆盖坏档；浏览器三类安全点均显示并恢复 `Round 1`，selection 双击 Continue 仍只恢复一次 |
 | `UX-P1-14` | pointer/touch 正常结束与 cancel 进入同一幂等输入清理 | lifecycle T1 覆盖 `pointercancel`、`touchcancel`、active pointer/drag/press 全清理，并验证下一次 pointer 输入仅拥有新 identity/press 状态 |
 
-浏览器验证使用的 `src/music_clip_packs.js` 是根 checkout 开始前已有的未跟踪依赖；因 `core.js` 当前存在静态 import，临时复制到验证 worktree 后才可启动模块。该文件不属于本 REQ、未进入提交，两轮浏览器验证结束后均按 SHA-256 `F74E95BDA4C8A635A59A3A88A3B2EA372B944D30090C74804693BD6114475563` 核对并删除。中央 TODO、P0 TODO 与 umbrella 主卡仍按冻结写集交给 integration owner 同步，本 REQ 只在本卡记录关闭证据。
+浏览器验证使用的 `src/music_clip_packs.js` 是根 checkout 开始前已有的未跟踪依赖；因 `core.js` 当前存在静态 import，临时复制到验证 worktree 后才可启动模块。该文件不属于本 REQ、未进入提交，两轮浏览器验证结束后均按 SHA-256 `F74E95BDA4C8A635A59A3A88A3B2EA372B944D30090C74804693BD6114475563` 核对并删除。中央 TODO、P0 TODO 与 umbrella 主卡已由 integration owner 在 2026-07-22 同步；可选依赖启动兼容由 `0767b3f` 收口。
 
 ## 最终验证（2026-07-20）
 
@@ -180,5 +180,13 @@ Worktree：`D:\\claude\\echo-alchemist-REQ-20260717-run-lifecycle-integrity`
 - [x] 模块规范与 PI 已同步
 - [x] 专项与回归 T1 证据已记录
 - [x] 浏览器证据、端口、PID 与服务关闭状态已记录
-- [x] 中央 TODO/umbrella 同步明确交给 integration 批次
+- [x] 中央 TODO/P0 TODO/umbrella 已由 integration 批次同步
 - [x] `git diff --check` 与 `git status --short --branch` 已记录
+
+## 集成关闭记录（2026-07-22）
+
+- 交付提交 `1146b4b` / `8461cfb` 已分别以 `7a97ce5` / `0dfb075` 合入 `codex/REQ-20260717-ui-polish-integration`。
+- 集成修复 `db5efa6` 收口 pause lease 同步续调重入、跨 overlay 焦点/关闭顺序、terminal 清理和术语冲突；可选音乐包启动兼容修复为 `0767b3f`。
+- 历史 `173/174` 或临时验证面的 `174/174` 仅是子分支记录；集成分支当前 phase contract 为运行时语义 `175/175`，术语校验为 `36/36`。
+- Goal E 最终验收通过：源码/测试语法 `89/89`；全部 `23/23 validate_*` 共 `2774/2774`，其中生命周期 `109/109`、phase `175/175`；四档真实视口 T3 `32/32`、12 PNG + JSON、零未分类问题、零横向溢出。报告：`D:/claude/echo-alchemist-v2-1766564886/tmp/codex/REQ-20260717-ui-polish-integration/t3-final-20260722-r7/ui-polish-report.json`。
+- 本子需求已完成集成并关闭；后续状态只在 `REQ-20260717-ui-polish-integration` 维护。

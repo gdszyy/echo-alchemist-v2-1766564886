@@ -1,8 +1,8 @@
 # REQ-20260717-mobile-ui-accessibility：移动端 UI 可达性收口
 
-状态：Goal Complete — Ready for Integration
+状态：Integrated / Closed
 负责人：Codex
-最后更新：2026-07-20
+最后更新：2026-07-22
 当前里程碑：M5 已完成
 
 ## 目标
@@ -26,7 +26,7 @@
 
 - `game_system.js`、`game_phase.js`、`ui_system.js`、`src/ui/shop.js`、rune launcher 等其它批次业务流程；本分支只负责 `index.html` / `bitmap_ui.css` 中商店移动壳层与列表滚动空间。
 - 任何数值、掉落概率、经济、战斗判定或存档语义变化。
-- `TODO.md`、`docs/p0_interaction_optimization_todo.md`、主需求卡和共享 runner；这些由 integration 批次统一同步。
+- `TODO.md`、`docs/p0_interaction_optimization_todo.md`、主需求卡和共享 runner；本子批当时不写，现已由 integration 批次统一同步。
 - 全局 `overflow:hidden` 或无边界新增 `!important` 作为遮盖性修复。
 
 ## 必读入口
@@ -55,7 +55,7 @@
 - 文档：`.cursor/rules/systems.md` 记录移动单轴滚动、阶段可见性与验收合同。
 - 测试：新增 `tests/validate_mobile_ui_contracts.mjs`；复跑场景与阶段合同。
 - auto index：预计更新 `src_systems_js_index.md` 与 `src_ui_hud_js_index.md`，必须由脚本生成；若某源文件未改则不更新其索引。
-- TODO/进度大盘：本分支不写，由 integration 统一同步。
+- TODO/进度大盘：本子分支未写；integration 现已统一同步。
 - process insights：默认不涉及；若发现可复用的隐蔽耦合，只在不越过写集的前提下记录为 integration handoff，不擅自扩写其它路径。
 - 资产/manifest：不涉及。
 
@@ -103,12 +103,19 @@
 | 2026-07-18 | Goal Active | 读取 Goal C、P0/P1 合同与模块/测试规范；盘点 dirty 根基线；从四批共同干净基线创建独立 worktree | M0 完成；worktree 干净 | 运行基线测试并审计六类根因 |
 | 2026-07-18 | M1–M2 | 审计暂停/商店/训练/真理之书/态势条/dock/禁用技能七类根因；在白名单内完成 DOM、响应式、生命周期与可访问性修复 | 专项测试覆盖 47 条合同；无业务流程或数值变更 | 四视口实机验证 |
 | 2026-07-19 | M3–M4 | 使用真实坐标完成 360/390/480/桌面点击、滚动、截图；补测商店与 10px 可读性；同步 `systems.md`，通过脚本生成 systems/hud 索引 | T1 全绿；35 条原始记录 + 5 条最终增量场景及 14 张截图归档 | M5 Git 收口与提交 |
-| 2026-07-20 | M5 | 消除最终层叠与生命周期盲区；使用严格源码 harness 重跑全部目标视口，不注入 HUD fixture；完成写集/业务语义/滚动 owner/索引审计 | 专项 `58/58`；最终浏览器证据 `PASS`、18 张截图、0 page error；临时 3013 已关闭 | 交由 integration 同步中央 TODO/主卡并合入 |
+| 2026-07-20 | M5 | 消除最终层叠与生命周期盲区；使用严格源码 harness 重跑全部目标视口，不注入 HUD fixture；完成写集/业务语义/滚动 owner/索引审计 | 专项 `58/58`；最终浏览器证据 `PASS`、18 张截图、0 page error；临时 3013 已关闭 | 已由 integration 同步中央 TODO/主卡并合入 |
 
 ## 收口清单
 
 - [x] 无未归属临时文件或本 REQ 遗留服务进程；浏览器原始证据位于已忽略的 REQ 临时目录。
 - [x] 专项测试、场景测试、阶段合同与四视口证据已记录。
 - [x] `systems.md` 与受影响 auto index 已同步；索引只由 `scripts/generate_index.py` 生成。
-- [x] 中央 TODO/主卡保留 integration owner，不在本分支越权修改。
+- [x] 中央 TODO/主卡当时保留给 integration owner；现已在集成分支同步。
 - [x] `git diff --check` 与 `git status --short --branch` 已记录，所有 dirty 路径均属于本 REQ。
+
+## 集成关闭记录（2026-07-22）
+
+- 交付提交 `50e8532` 已以 `f8d0055` 合入 `codex/REQ-20260717-ui-polish-integration`。
+- 集成分支的移动端专项合同现为 `60/60`；phase contract 已改为运行时语义并通过 `175/175`，术语校验通过 `36/36`。
+- 本卡保留的 18 张子分支截图是 Goal C 独立证据；Goal E 最终在真实 360×800、390×844、480×854、1440×900 通过 T3 `32/32`，12 PNG + JSON，零未分类问题、零横向溢出；移动静态合同 `60/60`，全部验证 `2774/2774`。报告：`D:/claude/echo-alchemist-v2-1766564886/tmp/codex/REQ-20260717-ui-polish-integration/t3-final-20260722-r7/ui-polish-report.json`。
+- 本子需求已完成集成并关闭；P2 的语言/版本统一、正式位图替换、offline shell/CSS 清理不在本卡冒充完成。

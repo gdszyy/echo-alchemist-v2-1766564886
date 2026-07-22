@@ -1,9 +1,9 @@
 # REQ-20260717-first-run-tutorial
 
-Status: Completed
+Status: Integrated / Closed
 Owner: Codex
 Started: 2026-07-18
-Last updated: 2026-07-18
+Last updated: 2026-07-22
 
 ## Outcome
 
@@ -79,13 +79,21 @@ Do not modify `game_system.js`, `game_phase.js`, `index.html`, central TODOs, th
 - 2026-07-18: Browser evidence is stored outside Git at `C:/Users/Administrator/.codex/visualizations/2026/07/17/019f70e6-ce1b-7892-a314-c67dc2d52612/REQ-20260717-first-run-tutorial/` (desktop/mobile welcome, unblocked start, relic/gathering/combat, and completion screenshots).
 - 2026-07-18: The committed worktree lacks integration-owned untracked `src/music_clip_packs.js` while committed `core.js` imports it. Browser verification therefore served that single dependency read-only from the dirty root checkout without copying or editing it; every tutorial/runtime file under test came from this isolated worktree.
 - 2026-07-18: Auto index regenerated through `scripts/generate_index.py`; `git diff --check` passed. Temporary server command was an in-memory Node static server on port 3002, PID 23300; it was stopped exactly, has no remaining child, and port 3002 is free.
-- 2026-07-18: Final status-word search found historical ordinary-`selection` tutorial claims in integration-owned `TODO.md:112` and `docs/p0_interaction_optimization_todo.md:113`. Goal A explicitly forbids this branch from editing central TODOs; Goal E must remove those stale claims when merging this delivery. No stale ordinary-selection claim remains in the owned tutorial rule or REQ card.
+- 2026-07-18: Final status-word search found historical ordinary-`selection` tutorial claims in integration-owned central TODOs. Goal A correctly left them for Goal E; the 2026-07-22 integration sync has now superseded those claims with the real `marble_pack -> gathering -> combat` flow.
 
 ## Sync gates
 
 - Auto index: required because `src/tutorial_system.js` is an indexed large file; generator only, never manual edits.
 - Module docs: `.cursor/rules/tutorial_system.md` is owned and must describe the final lifecycle/step contract.
-- Progress docs: only this REQ card is writable; central TODO/P0 TODO/umbrella status remains integration-owned.
+- Progress docs: this child branch only wrote its own card; central TODO/P0 TODO/umbrella were integration-owned and have now been synchronized on the integration branch.
 - Process insights: PI-008 read as context; no PI write is authorized in this batch.
 - Assets/performance: not applicable; no visual asset or rendering-budget change is planned.
 - Temporary evidence: screenshots stay outside the repository in the Codex visualization evidence directory and do not enter the commit.
+
+## Integration closure (2026-07-22)
+
+- Delivery commit `d7ea424` was integrated as `4d568c3` on `codex/REQ-20260717-ui-polish-integration`.
+- Goal E retained the real tutorial sequence `relic -> marble_pack -> gathering -> combat`; the old ordinary-`selection` wording in central progress documents is superseded.
+- The historical `173/174` phase-contract result above belongs to this isolated delivery's pre-integration baseline. The integration branch now passes the runtime-semantic phase contract at `175/175` and terminology validation at `36/36`.
+- Goal E final acceptance passed: source/test syntax `89/89`; all `23/23 validate_*` suites `2774/2774`; four actual viewports T3 `32/32` with 12 PNG + JSON, zero unclassified issues and zero horizontal overflow. Evidence: `D:/claude/echo-alchemist-v2-1766564886/tmp/codex/REQ-20260717-ui-polish-integration/t3-final-20260722-r7/ui-polish-report.json`.
+- This child request is closed as integrated; any remaining final evidence work belongs to `REQ-20260717-ui-polish-integration`.

@@ -1,8 +1,8 @@
 # REQ-20260717-launcher-settlement-ux：发射器与终局结算 UX 收口
 
-状态：Goal Done
+状态：Integrated / Closed
 负责人：Codex
-最后更新：2026-07-18
+最后更新：2026-07-22
 当前里程碑：M5
 
 ## 目标
@@ -31,7 +31,7 @@
 
 - `src/game_system.js`、`src/ui_system.js`、`src/ui/shop.js`、`index.html`、`src/styles/bitmap_ui.css`、`src/systems.js`。
 - 药剂合法性、嵌套矩阵、符文/词条公式、经济倍率、失败返还比例与 30% 结算公式。
-- 中央 `TODO.md`、P0 TODO、umbrella 卡与共享 runner；由串行 integration REQ 收口。
+- 中央 `TODO.md`、P0 TODO、umbrella 卡与共享 runner；本子批当时不写，现已由串行 integration REQ 收口。
 - pause lease 的系统实现和真实多 overlay 嵌套顺序；本 REQ 只申请、保存和释放 launcher 自己的 token，可用测试 stub 验证。
 
 ## 必读入口
@@ -64,7 +64,7 @@
 - 测试：新增专项 T1；复跑现有 potion、runeword、gameover、phase 合同。
 - auto index：需要；`rune_launcher.js` 与 `game_over.js` 均已索引，只能用生成脚本更新。
 - 模块规范：需要；同步 `.cursor/rules/ui_system.md`。
-- TODO/进度大盘：本分支禁止修改；交 integration REQ。
+- TODO/进度大盘：本子分支未修改；integration REQ 现已同步。
 - process insights：当前不涉及；若发现新的重复性跨模块陷阱再评估，但写权限不扩张。
 - 资产/manifest：不涉及。
 
@@ -75,7 +75,7 @@
 - [x] M2 实现完成：两个 UI 源码、专项 T1 与 UI 规范完成。
 - [x] M3 验证完成：源码检查、专项/相关 T1、触屏与鼠标浏览器实测完成。
 - [x] M4 索引同步：两个源码 auto index 由脚本更新；状态词与规则同步完成。
-- [x] M5 收口交付：临时证据清理，Git 路径逐项归属，提交可供 integration 审查。
+- [x] M5 收口交付：临时证据清理，Git 路径逐项归属，提交已被 integration 审查并合入。
 
 ## 验收与验证
 
@@ -93,8 +93,8 @@
 | :--- | :--- | :--- | :--- | :--- |
 | 2026-07-18 | Goal Active | 读取 Goal D、UI/符文/药剂/测试/PI-008 合同，盘点根 dirty baseline，创建独立分支/worktree | M0/M1 完成；尚未修改源码 | 审计当前实现并新增专项 T1 |
 | 2026-07-18 | Implementing | 修复 Launcher 触摸、焦点、lease、图鉴与炼金 CTA；终局在清零前取快照并展示真实写入 | M2 完成；未修改药剂/符文/经济规则 | 运行专项与回归验证 |
-| 2026-07-18 | Verifying | 专项 T1、相关机制 T1、390×844 浏览器与真实 `TouchEvent` Harness、终局 Harness 全部完成 | M3/M4 完成；phase 套件仅保留既知 1 项基线失败 | Git 收口并提交 integration 交付物 |
-| 2026-07-18 | Goal Done | 吸收三轮只读复核，补齐 PC/移动端双向切换、触摸位移取消、实时网格图鉴、真实双 CTA 与精确 30% 写入锁定；清理临时服务并核对全部 dirty 路径 | M5 完成；本 REQ 范围内无遗留项 | 交 integration REQ 更新中央 TODO / umbrella 状态 |
+| 2026-07-18 | Verifying | 专项 T1、相关机制 T1、390×844 浏览器与真实 `TouchEvent` Harness、终局 Harness 全部完成 | M3/M4 完成；phase 套件仅保留既知 1 项基线失败 | 后续已作为 integration 交付物合入 |
+| 2026-07-18 | Goal Done | 吸收三轮只读复核，补齐 PC/移动端双向切换、触摸位移取消、实时网格图鉴、真实双 CTA 与精确 30% 写入锁定；清理临时服务并核对全部 dirty 路径 | M5 完成；本 REQ 范围内无遗留项 | integration 已同步中央 TODO / umbrella 并关闭本卡 |
 
 ## 验证证据（2026-07-18）
 
@@ -125,7 +125,7 @@
 
 - `.cursor/rules/ui_system.md` 已同步移动端自有 pause lease / PC 非模态区域、双向 resize、触摸终态、dialog/focus、当前网格图鉴状态、双 CTA、碎片作用域与结算快照合同。
 - `src_ui_rune_launcher_js_index.md` 与 `src_ui_game_over_js_index.md` 均由 `scripts/generate_index.py --file ...` 生成，未手工编辑。
-- 中央 `TODO.md`、P0 TODO 与 umbrella 卡仍可能显示本 Goal 的旧 planning 状态；这是本 REQ 明确禁止写入的 integration-owned 状态，不在本分支越权修正，交后续串行 integration REQ 统一收口。
+- 中央 `TODO.md`、P0 TODO 与 umbrella 卡在子分支阶段由 integration owner 保留；2026-07-22 已同步为 Integrated / Closed，不再保留旧 planning 状态。
 
 ## 收口清单
 
@@ -135,5 +135,13 @@
 - [x] `.cursor/rules/ui_system.md` 与实现一致。
 - [x] 专项与相关 T1 证据完整；浏览器证据完整。
 - [x] Dev server 已精准关闭；收尾时 `:3002` / `:3003` / `:3004` 均空闲。
-- [x] 中央 TODO/P0 TODO/umbrella 状态同步明确交给 integration REQ。
+- [x] 中央 TODO/P0 TODO/umbrella 已由 integration REQ 同步。
 - [x] Git diff、`git diff --check` 与 `git status --short --branch` 已收口；仅包含本 REQ 允许的 7 条路径，根 checkout 的历史 dirty baseline 未改变。
+
+## 集成关闭记录（2026-07-22）
+
+- 交付提交 `4b27547` 已以 `56c1993` 合入 `codex/REQ-20260717-ui-polish-integration`。
+- 集成修复 `db5efa6` 将 launcher 自有 pause lease 与 Goal B 的真实 lease registry 对齐，并完成跨页术语、ARIA、CSS 状态和 terminal 清理冲突收口；可选音乐包启动兼容修复为 `0767b3f`。
+- 历史 `173/174` 只表示子分支合并前的已知红基线；集成分支当前 phase contract 为 `175/175`，术语校验为 `36/36`。
+- Goal E 最终验收通过：launcher/结算 `54/54`、全部 `23/23 validate_*` 共 `2774/2774`、源码/测试语法 `89/89`；四档真实视口 touch/codex/gameover T3 `32/32`，12 PNG + JSON，零未分类问题、零横向溢出。报告：`D:/claude/echo-alchemist-v2-1766564886/tmp/codex/REQ-20260717-ui-polish-integration/t3-final-20260722-r7/ui-polish-report.json`。
+- 本子需求已完成集成并关闭；正式位图与长期 CSS/offline shell 债务仍按 P2 保留。

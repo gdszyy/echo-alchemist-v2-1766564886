@@ -1,13 +1,31 @@
 # Echo Alchemist V2 改造工程 TODO 清单
 
-**最后更新：** 2026年7月1日
+**最后更新：** 2026年7月22日
 
-**状态词口径：** `done` / `placeholder` / `contract-only` / `debt`。
+**状态词口径：** `planning` / `verifying` / `integrated` / `closed` / `done` / `placeholder` / `contract-only` / `debt`。仅在满足持续阻塞判定时使用 `blocked`。
 **当前药剂线 done：** C1 中断与覆盖边界、C4 spellContent 解析、C6 多节点嵌套 UI、Root Orb carrier、Tower 基础系统（阻挡/承伤/范围/冷却/生命周期/互斥/非法树拒绝）、共享嵌套校验、C8 炼金台 runtime fallback 资产 polish。
 **当前药剂线 contract-only：** 静态药剂 metadata 与 VFX dispatcher。
 **当前药剂线 debt：** Tower 专用资产与长期平衡、正式 PNG/chroma 美术替换。
 
 > 当前完整优化 TODO、已完成项、下一轮 P0/P1/P2 优先级与验收清单见 [`docs/p0_interaction_optimization_todo.md`](docs/p0_interaction_optimization_todo.md)。该文档承接“先打磨现有机制、修 bug、再考虑减法”的最新执行优先级。
+
+---
+
+## 2026-07-22 UI / 交互硬化集成入口
+
+2026-07-17 巡检重开的四个独占实现批次已按 A -> B -> C -> D 合入干净集成 worktree；Goal E 已完成 pause lease、跨页术语、ARIA、CSS 状态与共享测试冲突修复，并完成最终全量证据、服务关闭与 Git 交付内容收口。完整合同与后续状态见 [`REQ-20260627-health-all-phases`](docs/work_items/active/REQ-20260627-health-all-phases.md) 的 Checkpoint 1 / Goal E，以及 [`REQ-20260717-ui-polish-integration`](docs/work_items/active/REQ-20260717-ui-polish-integration.md)。
+
+| 批次 | 目标 | 集成映射 | 当前状态 |
+| :--- | :--- | :--- | :--- |
+| `REQ-20260717-first-run-tutorial` | 首局按真实 `relic -> marble_pack -> gathering -> combat` 完成教程 | `d7ea424 -> 4d568c3` | Integrated / Closed |
+| `REQ-20260717-run-lifecycle-integrity` | stale callback、resolver 幂等、安全存档、overlay ARIA 与嵌套 pause lease | `1146b4b` / `8461cfb -> 7a97ce5` / `0dfb075` | Integrated / Closed |
+| `REQ-20260717-mobile-ui-accessibility` | 暂停/训练场/真理之书/商店滚动与战斗 HUD 移动可达性 | `50e8532 -> f8d0055` | Integrated / Closed |
+| `REQ-20260717-launcher-settlement-ux` | 触摸、焦点、图鉴状态、炼金 CTA 与真实结算表达 | `4b27547 -> 56c1993` | Integrated / Closed |
+| `REQ-20260717-ui-polish-integration` | 串行冲突修复、全量 T1/T3、四视口、索引/文档/Git 收口 | `db5efa6`；optional boot `0767b3f`；最终代码/测试/索引 `aecef4a` | Goal Complete / Closed |
+
+最终证据：源码与测试 JS/MJS 语法检查 `89/89`；全部 `23/23 validate_*` 共 `2774/2774`，其中 phase `175/175`、术语 `36/36`、移动 `60/60`、生命周期 `109/109`、launcher/结算 `54/54`、场景 `128/128`。UI T3 在真实 360×800、390×844、480×854、1440×900 四档视口通过 `32/32`，产出 12 张 PNG 与 JSON；零未分类问题、零横向溢出，仅分类记录 optional-local-audio `256` 次及首次导航图片 controlled-navigation-image-abort `97` 次。旧的 `173/174` 顺序敏感红基线已由运行时语义断言取代。
+
+明确保留的 P2 debt：`VIS-P2-01` 语言/版本单一来源，`VIS-P2-02` Emoji/fallback 到正式位图，`VIS-P2-03` offline shell 与 CSS cleanup；本轮只完成 reduced-motion 已落地部分，不把剩余债务标成 done。
 
 ---
 
@@ -101,8 +119,8 @@
 | :--- | :--- | :--- | :--- |
 | Task 4.1 命运时刻阶段语义抽象 | 目前 `selection` 仍同时承载常规选择与命运时刻，阶段语义不够单一，后续维护成本高 | 统一梳理 `phase`、标题、教程、暂停、overlay 返回、顶部栏标签中的命运时刻语义，明确哪些继续复用 `selection` overlay，哪些上升为 `fate_moment` 语义层 | ⏳ 待检查后拆分 |
 | Task 4.2 选择态与命运时刻状态模型收口 | 目前 `selectionMode`、`pendingSelectionMode`、`fateMomentContext`、`selectionPreviewState` 已可用，但职责边界仍需进一步收敛 | 明确“待触发上下文”“运行中上下文”“UI 预览态”“overlay 返回态”的边界，避免后续继续散落到多个模块各自判断 | ⏳ 待检查后收口 |
-| Task 4.3 round-start resolver 与阶段切换契约固化 | 当前主流程已通，但仍需确认所有恢复入口、关闭入口、失败回退入口都不会重新跳回旧固定流程 | 系统检查 `sys_startRoundStartResolver()`、`ui_closeRelicSelection()`、继续游戏、教程等待点、暂停限制、游戏结束清档等链路 | ⏳ 正在检查 |
-| Task 4.4 TODO / 文档 / 测试清单同步 | 旧 TODO 已显示“全部完成”，不再反映当前修复与抽象工作的真实状态 | 持续把新增闭环、抽象必要性、验证范围和待办项回写到 TODO 与规则文档，并补测试检查清单 | ⏳ 进行中 |
+| Task 4.3 round-start resolver 与阶段切换契约固化 | 当前主流程已通，但仍需确认所有恢复入口、关闭入口、失败回退入口都不会重新跳回旧固定流程 | 系统检查 `sys_startRoundStartResolver()`、`ui_closeRelicSelection()`、继续游戏、教程等待点、暂停限制、游戏结束清档等链路 | done；T1 `2774/2774`、四视口 T3 `32/32` |
+| Task 4.4 TODO / 文档 / 测试清单同步 | 旧 TODO 已显示“全部完成”，不再反映当前修复与抽象工作的真实状态 | 持续把新增闭环、抽象必要性、验证范围和待办项回写到 TODO 与规则文档，并补测试检查清单 | done；索引扫描 `36`、跳过 `27`，中央/子卡已同步 |
 
 ### 阶段四检查记录（持续更新）
 
@@ -112,6 +130,8 @@
 | 2026-04-18 | 教程系统与命运时刻兼容性 | 教程进入弹珠选择的等待条件已补上“非命运时刻”过滤，避免 `PHASE_CHANGED -> selection` 在命运时刻期间误推进旧教程 | 主要误触发风险已收口，但 `phase: 'selection'` / `targetId: 'phase-selection'` 仍是后续深化抽象时的关注点 |
 | 2026-04-18 | 遗物 overlay 返回 resolver 链路 | `ui_closeRelicSelection()` 已能在 `returnState.phase === 'round_start_resolver'` 时回到 `sys_continueRoundStartResolver()`，在 `returnState.phase === 'selection'` 时恢复当前命运时刻界面 | 该链路当前已基本闭环，属于已验证通过项 |
 | 2026-04-18 | 继续游戏 / 新开局 / 游戏结束入口 | `sys_loadRunState()` 会先判断存档是否来自 `selection` / 命运时刻；若是则恢复候选卡片、已选索引、注入符文和预览 UI，只有普通回合恢复才进入 `sys_startRoundStartResolver()`；`meta_startRun()` 与 `_gameover_triggerPhase()` 仍会先清除局内存档，再进入新局或结算 | 继续游戏不再把命运时刻误落回 resolver；静态契约已覆盖 |
+| 2026-07-22 | 首局教程真实阶段链 | 教程已从旧的普通 `selection` 等待改为首个遗物后跟随 `marble_pack -> gathering -> combat`，并由可取消启动与同步事件监听推进 | A 已集成关闭；旧普通-selection 教程口径作废 |
+| 2026-07-22 | 生命周期与阶段合同集成 | run/phase epoch、resolver 幂等、安全存档、嵌套 pause lease、terminal overlay 清理与 launcher 自有 lease 已在集成面收口 | 当前 phase contract `175/175`；最终全量证据由 Goal E 写入 |
 
 ## 改造工程总结
 
