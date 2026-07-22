@@ -4942,7 +4942,7 @@
              <div class="stat-pill border-purple-500/30 bg-slate-900/80 backdrop-blur-md text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.1)] px-4 py-2 rounded-full flex items-center">
                 <span class="text-lg filter drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]">🔮</span>
                 <span id="meta-currency-display" class="font-bold text-xl ml-2 font-[Cinzel]">0</span>
-                <span class="text-[10px] text-purple-200/60 ml-2 tracking-widest uppercase">符文碎片</span>
+                <span class="text-[10px] text-purple-200/60 ml-2 tracking-widest uppercase">局外符文碎片</span>
              </div>
         </div>
 
@@ -5008,7 +5008,7 @@
         </div>
     </div>
 
-    <!-- [RUNE] 符文发射器面板 -->
+    <!-- [RUNE] 炼金台面板（历史 DOM id 保留 rune-launcher） -->
     <div id="phase-rune-launcher" class="ui-overlay" style="display: none; background: rgba(2, 6, 23, 0.92); pointer-events: auto; z-index: 300;">
         <div class="rune-launcher-card w-full h-full flex flex-col p-6 overflow-y-auto">
             <!-- 顶部导航 -->
@@ -5021,15 +5021,16 @@
                 <div id="launcher-shard-display" class="flex items-center gap-1 bg-purple-900/40 border border-purple-500/30 rounded-full px-3 py-1 text-sm">
                     <span class="filter drop-shadow-[0_0_4px_rgba(168,85,247,0.8)]">🔮</span>
                     <span id="launcher-shard-count" class="font-bold text-purple-200 font-[Cinzel] text-sm">0</span>
+                    <span id="launcher-shard-scope-label" class="text-[9px] text-purple-200/70 ml-1 whitespace-nowrap">局外符文碎片</span>
                 </div>
             </div>
 
             <!-- Tab 导航 -->
             <div class="flex gap-2 mb-5 border-b border-slate-700/50 pb-3">
-                <button id="rune-tab-launcher" data-active="true" aria-selected="true" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 配置</button>
-                <button id="rune-tab-management" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('management')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">⚗️ 管理</button>
+                <button id="rune-tab-launcher" data-active="true" aria-selected="true" onclick="game.ui_switchRuneTab('launcher')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-purple-700/60 text-purple-100 border border-purple-500/60">⚡ 符文配置</button>
+                <button id="rune-tab-management" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('management')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">⚗️ 仓库管理</button>
                 <button id="rune-tab-potion" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('potion')" style="display:none;" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">🧪 药剂</button>
-                <button id="rune-tab-codex" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 圖鑑</button>
+                <button id="rune-tab-codex" data-active="false" aria-selected="false" onclick="game.ui_switchRuneTab('codex')" class="flex-1 py-2 px-2 rounded-lg text-[11px] font-bold tracking-wider transition-all duration-200 bg-slate-800/60 text-slate-400 border border-slate-700/40 hover:bg-slate-700/60 hover:text-slate-200">📖 图鉴</button>
             </div>
 
             <!-- 发射器内容区域 -->
@@ -5038,7 +5039,7 @@
             <!-- 符文网格区域 -->
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs text-purple-300/60 tracking-widest uppercase">Rune Grid — 3×3</div>
+                    <div class="text-xs text-purple-300/60 tracking-widest uppercase">符文配置 — 3×3</div>
                     <button onclick="game.ui_autoArrangeRunes()" class="flex items-center gap-1 px-2.5 py-1 bg-amber-900/30 border border-amber-600/40 rounded-lg hover:bg-amber-800/40 hover:border-amber-400/60 transition-all text-[10px] font-bold text-amber-300 hover:text-amber-100" title="自动将库存符文排布到网格以触发最多词条">
                         <span>⚡</span>
                         <span>一键排布</span>
@@ -5049,23 +5050,23 @@
                 </div>
             </div>
 
-            <!-- 符文库存区域 -->
+            <!-- 符文仓库区域 -->
             <div class="mb-4">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">符文庫存 <span id="rune-inventory-count" class="text-purple-300">(0)</span></div>
-                    <span id="rune-placement-hint" class="text-xs text-slate-500">點擊符文選中，再點空格放置</span>
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">符文仓库 <span id="rune-inventory-count" class="text-purple-300">(0)</span></div>
+                    <span id="rune-placement-hint" class="text-xs text-slate-500">点击符文选中，再点空格放置</span>
                 </div>
                 <div id="rune-inventory-container" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
                     <!-- 库存符文由 JS 动态生成，支持点击选中/取消 -->
-                    <div id="rune-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暫無符文</div>
+                    <div id="rune-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暂无符文</div>
                 </div>
             </div>
 
             <!-- 激活词条列表 -->
             <div class="mb-4">
-                <div class="text-xs text-amber-300/60 tracking-widest uppercase mb-3">已激活詞條</div>
+                <div class="text-xs text-amber-300/60 tracking-widest uppercase mb-3">已激活词条</div>
                 <div id="rune-active-runewords" class="space-y-2">
-                    <div id="rune-no-runewords" class="text-slate-600 text-xs text-center py-3">尚無激活詞條</div>
+                    <div id="rune-no-runewords" class="text-slate-600 text-xs text-center py-3">尚无激活词条</div>
                 </div>
             </div>
 
@@ -5085,8 +5086,8 @@
             <div id="rune-resonance-summary" class="hidden mb-4">
                 <div class="flex items-center gap-2 mb-3">
                     <span class="text-yellow-400">✨</span>
-                    <div class="text-xs text-yellow-300/80 tracking-widest uppercase font-bold">屬性共鳴</div>
-                    <div class="text-[10px] text-slate-500 ml-auto">同屬性符文累積層數激活</div>
+                    <div class="text-xs text-yellow-300/80 tracking-widest uppercase font-bold">属性共鸣</div>
+                    <div class="text-[10px] text-slate-500 ml-auto">同属性符文累积层数激活</div>
                 </div>
                 <div id="rune-resonance-list" class="space-y-2">
                     <!-- 由 JS 动态生成 -->
@@ -5095,7 +5096,7 @@
 
             <!-- 属性加成汇总 -->
             <div id="rune-stats-summary" class="hidden bg-purple-900/20 border border-purple-700/30 rounded-xl p-4">
-                <div class="text-xs text-purple-300/60 tracking-widest uppercase mb-2">屬性加成匯總</div>
+                <div class="text-xs text-purple-300/60 tracking-widest uppercase mb-2">属性加成汇总</div>
                 <div id="rune-stats-list" class="flex flex-wrap gap-2">
                     <!-- 由 JS 动态生成：包括基础属性（蓝色标签）和词条共鸣（金色标签） -->
                 </div>
@@ -5106,12 +5107,12 @@
             <!-- 符文管理面板（熔炼 / 重铸） -->
             <div id="rune-management-panel" class="hidden">
                 <div class="text-xs text-slate-400/70 mb-3 leading-relaxed">
-                    在此頁面選中 3 個符文後，可進行熔煉或重鑄操作。
+                    在此页面选中 3 个符文后，可进行熔炼或重铸操作。
                 </div>
 
                 <!-- 当前选中状态 -->
                 <div class="mb-4 px-3 py-2 bg-slate-900/40 border border-slate-700/40 rounded-lg flex items-center justify-between">
-                    <span class="text-[11px] text-slate-400">當前選中</span>
+                    <span class="text-[11px] text-slate-400">当前选中</span>
                     <div class="flex items-center gap-2">
                         <span id="rune-management-selected-count" class="text-xs text-purple-300 font-bold">0 / 3</span>
                         <button id="rune-management-clear-btn" onclick="game._selectedRuneIndices && game._selectedRuneIndices.clear(); game._ui_updateRuneInventoryDisplay && game._ui_updateRuneInventoryDisplay();" class="text-[10px] text-slate-400 hover:text-slate-200 underline">清除</button>
@@ -5120,9 +5121,9 @@
 
                 <!-- 符文仓库（管理页专属选择列表） -->
                 <div class="mb-4">
-                    <div class="text-xs text-slate-400/60 tracking-widest uppercase mb-2">符文倉庫 <span id="rune-management-inventory-count" class="text-purple-300">(0)</span></div>
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase mb-2">符文仓库 <span id="rune-management-inventory-count" class="text-purple-300">(0)</span></div>
                     <div id="rune-management-inventory" class="flex flex-wrap gap-2 min-h-[60px] p-3 bg-slate-900/40 border border-slate-700/30 rounded-xl">
-                        <div id="rune-management-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暫無符文</div>
+                        <div id="rune-management-inventory-empty" class="w-full text-center text-slate-600 text-xs py-2">暂无符文</div>
                     </div>
                 </div>
 
@@ -5131,13 +5132,13 @@
                     <div class="flex items-center gap-2 mb-3">
                         <span class="text-amber-400">⚗️</span>
                         <div class="text-xs text-amber-300/80 tracking-widest uppercase font-bold">合成爐</div>
-                        <div class="text-[10px] text-slate-500 ml-auto">選中 3 個同 ID 同等級符文</div>
+                        <div class="text-[10px] text-slate-500 ml-auto">选中 3 个同 ID 同等级符文</div>
                     </div>
                     <button id="rune-merge-btn"
                         onclick="game.ui_doRuneMerge()"
                         disabled
                         class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
-                        ⚗️ 合成（需選中 3 個同 ID 同等級）
+                        ⚗️ 合成（需选中 3 个同 ID 同等级）
                     </button>
                 </div>
 
@@ -5145,14 +5146,14 @@
                 <div class="mb-4 bg-purple-900/10 border border-purple-700/30 rounded-xl p-4">
                     <div class="flex items-center gap-2 mb-3">
                         <span class="text-purple-400">🔮</span>
-                        <div class="text-xs text-purple-300/80 tracking-widest uppercase font-bold">重鑄爐</div>
-                        <div class="text-[10px] text-slate-500 ml-auto">選中任意 3 個符文</div>
+                        <div class="text-xs text-purple-300/80 tracking-widest uppercase font-bold">重铸炉</div>
+                        <div class="text-[10px] text-slate-500 ml-auto">选中任意 3 个符文</div>
                     </div>
                     <button id="rune-reforge-btn"
                         onclick="game.ui_doRuneReforge()"
                         disabled
                         class="w-full py-2 px-3 rounded-xl text-sm font-bold bg-slate-800/60 text-slate-600 border border-slate-700/40 cursor-not-allowed transition-all duration-200">
-                        🔮 重鑄（消耗 3 個符文，獲得全新符文）
+                        🔮 重铸（消耗 3 个符文，获得全新符文）
                     </button>
                 </div>
 
@@ -5243,12 +5244,15 @@
             <!-- 词条图鉴面板 -->
             <div id="rune-codex-panel" class="hidden">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">詞條圖鑑</div>
-                    <div class="text-xs text-purple-300/70">已發現 <span id="rune-codex-discovered-count" class="font-bold text-purple-200">0</span> / <span id="rune-codex-total-count" class="text-slate-400">0</span></div>
+                    <div class="text-xs text-slate-400/60 tracking-widest uppercase">词条图鉴</div>
+                    <div class="flex items-center gap-2">
+                        <button id="alchemy-truth-entry-link" type="button" onclick="game.truthBook.openEntryFromAlchemyTable()" class="text-[10px] text-cyan-300 hover:text-cyan-100 underline">查看主解释</button>
+                        <div class="text-xs text-purple-300/70">已发现 <span id="rune-codex-discovered-count" class="font-bold text-purple-200">0</span> / <span id="rune-codex-total-count" class="text-slate-400">0</span></div>
+                    </div>
                 </div>
                 <!-- 按符文筛选 -->
                 <div class="mb-3">
-                    <div class="text-[10px] text-slate-500 mb-1.5">按符文篩選</div>
+                    <div class="text-[10px] text-slate-500 mb-1.5">按符文筛选</div>
                     <div id="rune-codex-filter-bar" class="flex flex-wrap gap-1.5">
                         <!-- 由 JS 动态生成 -->
                     </div>
@@ -5352,10 +5356,10 @@
                     <p class="selection-status-title"><span id="selection-mode-label">命運抉擇</span><span>已選 <span class="selection-count-pill"><span id="selected-count">0</span>/<span id="selected-required-count">3</span></span></span></p>
                     <p id="selection-mode-subtitle" class="hidden" style="display:none;"></p>
                 </div>
-                <!-- 符文发射器入口（选择阶段） -->
-                <button onclick="game.ui_openRuneLauncher()" class="selection-rune-entry group" title="打开符文发射器">
+                <!-- 炼金台入口（选择阶段） -->
+                <button onclick="game.ui_openRuneLauncher()" class="selection-rune-entry group" title="打开炼金台">
                     <span class="text-sm group-hover:scale-110 transition-transform inline-block">⚡</span>
-                    <span class="text-xs font-bold text-purple-300 tracking-wider group-hover:text-purple-100">符文發射器</span>
+                    <span class="text-xs font-bold text-purple-300 tracking-wider group-hover:text-purple-100">炼金台</span>
                 </button>
             </div>
             <div id="selection-choice-strip" class="selection-choice-strip" aria-live="polite"></div>
@@ -5417,8 +5421,8 @@
             <div id="session-charge-stack" class="session-charge-stack mt-2"></div>
         </div>
         
-        <!-- 研磨阶段符文发射器按钮 -->
-        <button onclick="game.ui_openRuneLauncher()" class="rune-launcher-float-btn absolute bottom-32 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
+        <!-- 研磨阶段炼金台按钮 -->
+        <button onclick="game.ui_openRuneLauncher()" class="rune-launcher-float-btn absolute bottom-32 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="炼金台">
             <span class="text-lg">⚡</span>
         </button>
 
@@ -5496,7 +5500,7 @@
         <div class="flex flex-col w-full h-full p-6">
             <!-- Header -->
             <div class="flex justify-between items-center mb-6 shrink-0">
-                <h2 id="truth-book-title" class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之書 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
+                <h2 id="truth-book-title" class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之书 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
                 <button type="button" onclick="game.ui_closeTruthBook()" aria-label="关闭真理之书" class="truth-book-close w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
             </div>
 
@@ -5530,6 +5534,7 @@
                 </div>
             </div>
             <p id="truth-item-desc" class="text-slate-400 text-xs leading-relaxed pl-1"></p>
+            <button id="truth-entry-action" type="button" hidden style="display:none;" class="mt-3 items-center justify-center self-start rounded-lg border border-cyan-500/40 bg-cyan-950/50 px-3 py-1.5 text-xs font-bold text-cyan-200 hover:bg-cyan-900/60"></button>
         </div>
 
         <div class="flex-1 relative bg-[#020617] overflow-hidden group">

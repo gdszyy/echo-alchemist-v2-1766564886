@@ -177,6 +177,7 @@ audio.muted = true;
 
 const { rune_launcher_system } = await import('../src/ui/rune_launcher.js');
 const { game_over_mixin } = await import('../src/ui/game_over.js');
+const { game_system } = await import('../src/game_system.js');
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const launcherSource = fs.readFileSync(path.join(repoRoot, 'src/ui/rune_launcher.js'), 'utf8');
 const gameoverSource = fs.readFileSync(path.join(repoRoot, 'src/ui/game_over.js'), 'utf8');
@@ -350,6 +351,54 @@ check(document.activeElement === opener, 'closing launcher restores focus to its
 launcherGame.ui_closeRuneLauncher();
 check(released.length === 1, 'repeated launcher close does not release another owner token');
 check(!/\bisPaused\s*=/.test(launcherSource), 'launcher never writes the shared isPaused flag directly');
+
+// Lease release may synchronously flush a continuation. The closing surface
+// must clear its old token first and must not steal focus from the new owner.
+resetDom();
+const staleLauncherOpener = new FakeElement('stale-launcher-opener', 'button');
+body.appendChild(staleLauncherOpener);
+staleLauncherOpener.focus();
+const reentrantPanel = register(new FakeElement('phase-rune-launcher'));
+reentrantPanel.style.display = 'flex';
+const reentrantClose = new FakeElement('reentrant-launcher-close', 'button');
+reentrantClose.classList.add('rune-launcher-close-btn');
+reentrantPanel.appendChild(reentrantClose);
+body.appendChild(reentrantPanel);
+const reentrantPicker = register(new FakeElement('rune-picker-overlay'));
+reentrantPicker.classList.add('hidden');
+const replacementModal = new FakeElement('replacement-modal', 'button');
+body.appendChild(replacementModal);
+const staleLauncherToken = { owner: 'stale-launcher' };
+const replacementLauncherToken = { owner: 'replacement-launcher' };
+let releaseObservedClearedToken = false;
+let forcedInterruptOptions = null;
+const reentrantLauncherGame = attachMethods({
+    phase: 'gathering',
+    _runeLauncherPauseToken: staleLauncherToken,
+    _runeLauncherReturnFocus: staleLauncherOpener,
+    _runeLauncherReturnPhase: 'gathering',
+    sys_releasePauseLease(token) {
+        releaseObservedClearedToken = token === staleLauncherToken
+            && this._runeLauncherPauseToken == null;
+        this._runeLauncherPauseToken = replacementLauncherToken;
+        reentrantPanel.style.display = 'flex';
+        replacementModal.focus();
+        return true;
+    },
+}, rune_launcher_system);
+reentrantLauncherGame.ui_handlePotionAlchemyInterrupt = (context, options) => {
+    forcedInterruptOptions = { context, ...options };
+    return true;
+};
+reentrantLauncherGame.ui_closeRuneLauncher({
+    force: true,
+    restoreFocus: false,
+    interruptContext: 'terminal:gameover',
+});
+check(releaseObservedClearedToken, 'launcher clears its local pause token before releasing the shared lease');
+check(reentrantLauncherGame._runeLauncherPauseToken === replacementLauncherToken, 'synchronous lease continuation keeps its replacement launcher token');
+check(document.activeElement === replacementModal && document.activeElement !== staleLauncherOpener, 'closing launcher never steals focus from a synchronously opened modal');
+check(forcedInterruptOptions?.context === 'terminal:gameover' && forcedInterruptOptions?.confirm === false, 'terminal launcher cleanup force-aborts an unfinished potion draft without a veto dialog');
 
 // PC uses a persistent non-modal region: opening it must not create a pause lease or steal focus.
 resetDom();
@@ -595,6 +644,35 @@ check(CONFIG.gameplay.runShopEndOfRunFragmentSettle === 0.3, 'end-of-run carry-o
 check(settlementWrites.length === 1 && settlementWrites[0] === 30, 'settlement writes floor(100 * 0.3) exactly once through meta_addCurrency');
 check(ratioLockSnapshot?.carryOutEligible === 30 && ratioLockSnapshot?.settledRuneFragments === 30, 'settlement snapshot records both eligible and actual 30-fragment write');
 check(ratioLockSnapshot?.metaRuneFragmentsAfter === 70 && ratioLockGame.saveData.resources.rune_fragments === 70, 'settlement snapshot and saved meta balance agree after the unified write');
+
+// A gameover callback captured by the old run must remain stale even if a fake
+// clock forces the cancelled native callback to execute after a new run starts.
+timers.clear();
+const staleGameover = attachMethods(attachMethods({
+    phase: 'combat',
+    round: 3,
+    runFragments: 0,
+    runRuneFragmentsGained: 0,
+    saveData: { resources: { rune_fragments: 0 }, runeFragments: 0, currency: 0 },
+    meta_getResourceCount() { return 0; },
+    meta_addCurrency() {},
+    ui_clearTransientOverlays() {},
+    phase_switchPhase(phase) { this.phase = phase; },
+}, game_system), game_over_mixin);
+staleGameover._gameover_collectSnapshot = () => ({ runFragmentsRemaining: 0 });
+staleGameover.sys_clearRunState = function clearWithoutStorage() {
+    this.sys_invalidateRunLifecycle('clear_run_state');
+};
+let staleGameoverShows = 0;
+staleGameover.gameover_show = () => { staleGameoverShows += 1; };
+staleGameover._gameover_triggerPhase();
+const forcedStaleGameoverCallbacks = [...timers.values()];
+check(forcedStaleGameoverCallbacks.length === 1, 'gameover transition is registered through the lifecycle scheduler');
+staleGameover.sys_invalidateRunLifecycle('new_run_started');
+staleGameover.phase = 'gathering';
+forcedStaleGameoverCallbacks.forEach(callback => callback());
+check(staleGameover.phase === 'gathering' && staleGameoverShows === 0, 'forced stale gameover callback cannot overwrite a new run');
+check(!/\bsetTimeout\s*\(/.test(gameoverSource), 'gameover transition contains no unguarded native timeout');
 
 const harvestHtml = game_over_mixin._gameover_renderHarvest.call(settlementGame, settlementSnapshot || {
     runeFragmentsGained: 20,

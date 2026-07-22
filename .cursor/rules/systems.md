@@ -93,7 +93,8 @@
         { type: 'wait', frames: 120 },
         { type: 'reset' }
     ],
-    trainingScenarioId: 'boss_ignis' // 可选：关联试炼场验收场景
+    trainingScenarioId: 'boss_ignis', // 可选：关联试炼场验收场景
+    action: { id: 'open_alchemy_table', label: '打开炼金台' } // 可选：受控跨入口动作
 }
 ```
 
@@ -111,7 +112,15 @@
 | `enemy_affix` | 普通/精英敌人词缀演示 |
 | `enemy_v2` | 多格敌人、V2 基底与专属形体 |
 | `attribute` | 弹药属性、元素反应与子弹演示 |
-| `core` | 技能充能、子弹替换、掉落保底、智能符文掉落 |
+| `core` | 炼金台主解释、技能充能、子弹替换、掉落保底、智能符文掉落 |
+
+#### 3.1.3 炼金台术语与知识入口合同
+
+- `UI_TERMINOLOGY` 是玩家可见术语的唯一映射，并通过 `TRUTH_BOOK_DATA.terminology` 暴露同一冻结对象：页面称“炼金台”，3×3 页签称“符文配置”，战场实际装置才称“符文发射器”。
+- 配置、管理与药剂页签读取同一套持久符文集合，统一称“符文仓库”；“库存”仅可用于与持久仓库明确不同的临时清单。
+- 两套货币必须带生命周期：局内使用“局内碎片（仅本局）”，持久资源使用“局外符文碎片（跨局保留）”。
+- `truth_core_alchemy_table` 是上述概念的主解释入口。炼金台图鉴页通过 `openEntryFromAlchemyTable()` 跳转到该条目；关闭炼金台若被药剂中断确认否决，必须取消跳转。
+- 主解释条目的 `action.id = open_alchemy_table` 通过 `openAlchemyTableFromTruthBook()` 返回来源阶段后再打开炼金台。跨入口不得并存两个模态面板，也不得把焦点恢复到即将隐藏的旧入口。
 
 ## 3.3 符文词条场景分类 (`categoryId: 'runeword'`)
 

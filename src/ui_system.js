@@ -917,6 +917,7 @@ export const ui_system = {
     ui_clearTransientOverlays(options = {}) {
         const keepRuneLauncher = !!options.keepRuneLauncher;
         const keepRelicOverlay = !!options.keepRelicOverlay;
+        const forceRuneLauncher = options.forceRuneLauncher === true;
 
         if (!keepRelicOverlay && this._relicOverlaySession?.active
             && typeof this.ui_closeRelicSelection === 'function') {
@@ -956,11 +957,32 @@ export const ui_system = {
 
         if (!keepRuneLauncher) {
             if (typeof this.ui_closeRunePicker === 'function') {
-                this.ui_closeRunePicker();
+                this.ui_closeRunePicker({ restoreFocus: false });
             } else {
                 const runePickerOverlay = document.getElementById('rune-picker-overlay');
                 if (runePickerOverlay) runePickerOverlay.classList.add('hidden');
                 this._pendingRuneGridIndex = null;
+            }
+            const launcherOpen = typeof this._isRuneLauncherOpen === 'function'
+                ? this._isRuneLauncherOpen()
+                : false;
+            if ((forceRuneLauncher || launcherOpen || this._runeLauncherPauseToken != null)
+                && typeof this.ui_closeRuneLauncher === 'function') {
+                this.ui_closeRuneLauncher({
+                    force: forceRuneLauncher,
+                    restoreFocus: false,
+                    interruptContext: options.reason || 'transient_cleanup',
+                });
+            } else if (forceRuneLauncher) {
+                const runeLauncher = document.getElementById('phase-rune-launcher');
+                if (runeLauncher && !document.body.classList.contains('pc-mode')) {
+                    runeLauncher.style.display = 'none';
+                    runeLauncher.style.pointerEvents = 'none';
+                    runeLauncher.setAttribute('aria-hidden', 'true');
+                }
+                this._runeLauncherPauseToken = null;
+                this._runeLauncherReturnFocus = null;
+                this._runeLauncherReturnPhase = null;
             }
         }
 
@@ -1974,11 +1996,16 @@ export const ui_system = {
     ui_updateUI() {
         // [BUGFIX] 使用 _isRuneLauncherOpen() 兼容 PC 模式和移动端模式
         const runeLauncherEl = document.getElementById('phase-rune-launcher');
-        const launcherVisible = this._isRuneLauncherOpen ? this._isRuneLauncherOpen()
+        let launcherVisible = this._isRuneLauncherOpen ? this._isRuneLauncherOpen()
             : (runeLauncherEl && runeLauncherEl.style.display !== 'none');
         const terminalPhase = ['meta', 'shop', 'truth_book', 'gameover'].includes(this.phase);
         if (terminalPhase) {
-            this.ui_clearTransientOverlays({ keepRuneLauncher: launcherVisible });
+            this.ui_clearTransientOverlays({
+                keepRuneLauncher: false,
+                forceRuneLauncher: true,
+                reason: `terminal:${this.phase}`,
+            });
+            launcherVisible = this._isRuneLauncherOpen ? this._isRuneLauncherOpen() : false;
         }
 
         // 1. 隐藏所有阶段的主容器 (.ui-overlay)
@@ -2509,14 +2536,12 @@ export const ui_system = {
         // abandoned run is still current.
         if (typeof this.sys_invalidateRunLifecycle === 'function') this.sys_invalidateRunLifecycle('abandon_begin');
         this.ui_closePause();
-        if (typeof this.ui_clearTransientOverlays === 'function') this.ui_clearTransientOverlays();
-        // Abandon owns the terminal transition. Cancel an unfinished alchemy
-        // draft without allowing a confirmation dialog to veto launcher cleanup
-        // after the run has already been discarded.
-        if (typeof this.ui_handlePotionAlchemyInterrupt === 'function') {
-            this.ui_handlePotionAlchemyInterrupt('abandon_run', { confirm: false });
+        if (typeof this.ui_clearTransientOverlays === 'function') {
+            this.ui_clearTransientOverlays({
+                forceRuneLauncher: true,
+                reason: 'abandon_run',
+            });
         }
-        if (typeof this.ui_closeRuneLauncher === 'function') this.ui_closeRuneLauncher();
         if (typeof this.sys_clearRunState === 'function') this.sys_clearRunState();
         if (typeof this.sys_resetGame === 'function') this.sys_resetGame();
         if (typeof this.phase_switchPhase === 'function') this.phase_switchPhase('meta');

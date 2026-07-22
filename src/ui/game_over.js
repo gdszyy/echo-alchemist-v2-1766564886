@@ -35,7 +35,7 @@ export const game_over_mixin = {
     /**
      * @method _gameover_triggerPhase
      * @description 触发游戏结束阶段切换，由 game_phase.js 中 gameOver 设为 true 后调用。
-     * 使用 setTimeout 延迟一帧，确保渲染循环安全退出后再切换阶段。
+     * 使用 run 生命周期调度器延迟切换，确保渲染循环安全退出，且旧局回调不能复活终局。
      */
     _gameover_triggerPhase() {
         // 在局内碎片清零前收集完整快照；结算完成后把真实写入值附加到同一对象，
@@ -87,11 +87,16 @@ export const game_over_mixin = {
         if (typeof this.ui_clearTransientOverlays === 'function') {
             this.ui_clearTransientOverlays();
         }
-        // 延迟一帧，确保当前渲染帧安全完成
-        setTimeout(() => {
+        // 延迟一帧，确保当前渲染帧安全完成；若期间 reset/new-run，生命周期 token 会拒绝旧回调。
+        const enterGameOver = () => {
             this.phase_switchPhase('gameover');
             this.gameover_show(snapshot);
-        }, 50);
+        };
+        if (typeof this.sys_scheduleLifecycleTimeout === 'function') {
+            this.sys_scheduleLifecycleTimeout(enterGameOver, 50);
+        } else {
+            enterGameOver();
+        }
     },
 
     /**
@@ -436,15 +441,15 @@ export const game_over_mixin = {
                 </div>
                 <div class="bg-slate-900/60 border border-amber-700/40 rounded-xl p-3">
                     <div class="flex items-center gap-2"><span aria-hidden="true">🧩</span><span class="text-lg font-bold text-amber-200 tabular-nums">${runFragmentsRemaining.toLocaleString()}</span></div>
-                    <div class="text-[10px] text-slate-400 mt-1">结算前剩余 · 局内碎片</div>
+                    <div class="text-[10px] text-slate-400 mt-1">结算前剩余 · 局内碎片（仅本局）</div>
                 </div>
                 <div class="bg-slate-900/60 border border-purple-700/40 rounded-xl p-3">
                     <div class="flex items-center gap-2"><span aria-hidden="true">🔮</span><span class="text-lg font-bold text-purple-300 tabular-nums">${carryOutEligible.toLocaleString()}</span></div>
-                    <div class="text-[10px] text-slate-400 mt-1">${carryOutPercent}% 可带出 · 局外符文碎片</div>
+                    <div class="text-[10px] text-slate-400 mt-1">${carryOutPercent}% 可带出 · 局外符文碎片（跨局保留）</div>
                 </div>
                 <div class="bg-slate-900/60 border border-emerald-700/40 rounded-xl p-3">
                     <div class="flex items-center gap-2"><span aria-hidden="true">🔮</span><span class="text-lg font-bold text-emerald-300 tabular-nums">+${settledRuneFragments.toLocaleString()}</span></div>
-                    <div class="text-[10px] text-slate-400 mt-1">已结算 · 局外符文碎片（跨局）</div>
+                    <div class="text-[10px] text-slate-400 mt-1">已结算 · 局外符文碎片（跨局保留）</div>
                     <div class="text-[9px] text-slate-600 mt-1">结算后持有 ${metaRuneFragmentsAfter.toLocaleString()}</div>
                 </div>
             </div>

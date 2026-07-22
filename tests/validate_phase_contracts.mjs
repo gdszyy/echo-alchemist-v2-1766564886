@@ -9,6 +9,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+globalThis.window ??= {};
+globalThis.document ??= { getElementById: () => null };
+const { hud_system } = await import('../src/ui/hud.js');
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function read(relPath) {
@@ -110,7 +114,7 @@ check(
 );
 check(
     has(runeLauncher, /ui_handlePotionAlchemyInterrupt\s*\(context\s*=\s*['"]manual['"][\s\S]*_ui_abortPotionAlchemyDraft\(context\)/) &&
-    has(runeLauncher, /ui_closeRuneLauncher\s*\(\)[\s\S]{0,260}ui_handlePotionAlchemyInterrupt\(['"]close_launcher['"]\)/) &&
+    has(runeLauncher, /ui_closeRuneLauncher\s*\(options\s*=\s*\{\}\)[\s\S]{0,420}options\.interruptContext\s*\|\|\s*['"]close_launcher['"][\s\S]{0,120}confirm:\s*options\.force\s*!==\s*true/) &&
     has(runeLauncher, /const\s+leavingPotion\s*=\s*tab\s*!==\s*['"]potion['"][\s\S]{0,260}ui_handlePotionAlchemyInterrupt\(['"]switch_tab['"]\)/) &&
     has(gamePhase, /phase_startCombatPhase\s*\(\)\s*\{[\s\S]{0,260}ui_handlePotionAlchemyInterrupt\(['"]enter_combat['"]\)/) &&
     has(gameSystem, /sys_showRoundStartBanner\s*\(\)[\s\S]*ui_handlePotionAlchemyInterrupt\(['"]enter_combat['"]\)[\s\S]*return\s+false/) &&
@@ -130,7 +134,7 @@ check(has(uiSystem, /ui_clearTransientOverlays\s*\(options\s*=\s*\{\}\)/), 'ui_c
 check(has(uiSystem, /ui_abandonRunToMeta\s*\(\)/), 'ui_abandonRunToMeta exists');
 check(has(uiSystem, /if\s*\(this\.phase\s*!==\s*['"]combat['"]\)\s*\{\s*this\.ui_resetCombatPhaseHud\(\{\s*preserveStatusPanel:\s*this\.phase\s*===\s*['"]training['"]\s*\}\)/s), 'ui_updateUI resets combat HUD outside combat and preserves training status panel');
 check(has(uiSystem, /const\s+terminalPhase\s*=\s*\[[^\]]*['"]meta['"][^\]]*['"]shop['"][^\]]*['"]truth_book['"][^\]]*['"]gameover['"][^\]]*\]\.includes\(this\.phase\)/s), 'terminal phases are centralized for transient overlay cleanup');
-check(has(uiSystem, /if\s*\(terminalPhase\)\s*\{\s*this\.ui_clearTransientOverlays\(\{\s*keepRuneLauncher:\s*launcherVisible\s*\}\)/s), 'terminal phases clear transient overlays while preserving visible launcher');
+check(has(uiSystem, /if\s*\(terminalPhase\)\s*\{\s*this\.ui_clearTransientOverlays\(\{[\s\S]{0,180}keepRuneLauncher:\s*false[\s\S]{0,120}forceRuneLauncher:\s*true/s), 'terminal phases force-close transient launcher ownership');
 check(has(uiSystem, /const\s+pcSidebarPhaseActive\s*=\s*\[[^\]]*['"]gathering['"][^\]]*['"]combat['"][^\]]*['"]selection['"][^\]]*['"]training['"][^\]]*\]\.includes\(this\.phase\)/s), 'PC sidebar whitelist includes only run phases and training');
 check(
     has(systems, /id:\s*['"]boss_ouroboros_attachment_slots['"]/) &&
@@ -682,7 +686,23 @@ check(has(gamePhase, /const\s+inheritedMulticast\s*=\s*Math\.max\(0,\s*Math\.flo
 check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD has a three-session charge stack container');
 check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack[\s\S]{0,900}(?:session-charge-row|gathering-ammo-panel)[\s\S]{0,420}session-charge-multicast/), 'gathering HUD renders per-marble charge and multicast rows');
 check(has(read('src/ui/hud.js'), /UI_HIT_PROGRESS[\s\S]{0,220}_hud_renderSessionChargeStack/), 'hit progress updates refresh the per-marble charge stack');
-check(has(read('src/ui/hud.js'), /ui_getCanvasPointForElement\s*\(el,\s*options\s*=\s*\{\}\)[\s\S]{0,900}canvasRect\.left[\s\S]{0,240}scaleX/), 'gathering HUD converts DOM target centers into canvas coordinates');
+const canvasRectFixture = { left: 100, top: 50, width: 400, height: 200 };
+const canvasPointFixture = hud_system.ui_getCanvasPointForElement.call({
+    canvas: { getBoundingClientRect: () => canvasRectFixture },
+    width: 800,
+    height: 400,
+}, {
+    getBoundingClientRect: () => ({ left: 140, top: 70, width: 40, height: 20 }),
+}, { anchorX: 0.25, anchorY: 0.75, clamp: false });
+check(canvasPointFixture?.x === 100 && canvasPointFixture?.y === 70, 'gathering HUD converts anchored DOM coordinates into canvas coordinates independent of declaration order');
+const clampedCanvasPointFixture = hud_system.ui_getCanvasPointForElement.call({
+    canvas: { getBoundingClientRect: () => canvasRectFixture },
+    width: 800,
+    height: 400,
+}, {
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }),
+});
+check(clampedCanvasPointFixture?.x === 0 && clampedCanvasPointFixture?.y === 0, 'gathering HUD clamps off-canvas DOM targets to the canvas bounds');
 check(has(spawnSystem, /gathering-ammo-panel\[data-marble-index="\$\{chargeSession\.marbleIndex\}"\][\s\S]{0,420}ui_getCanvasPointForElement\(targetPanel\)/), 'gathering hit feedback targets the matching per-marble ammo panel');
 check(has(runShop, /kind:\s*['"]starter_boost['"]/), 'first run-shop visit can generate a free starter boost item');
 check(has(runShop, /runShopStarterBoostDamageRounds/), 'starter boost item displays a temporary damage duration');

@@ -17,7 +17,7 @@ globs: ["src/game_phase.js"]
 - `sys_runOrDeferLifecycleContinuation()` 只允许两类暂存：当前 gameplay phase 被 pause lease 冻结，或当前处于 `truth_book` 且 `truthBookReturnState.phase` 明确等于回调的预期 phase。真实换阶段、返回目标不匹配或 run token 失效时必须取消，不得在新流程背后推进旧状态机。
 - 暂停是可嵌套所有权，不是布尔开关。每个 overlay 通过 `sys_acquirePauseLease(ownerId)` 获取不透明 token，只能用 `sys_releasePauseLease(token)` 释放自己的 lease；最后一个 lease 释放后才恢复模拟。
 - 阶段切换与 run 失效必须调用 `input_cancelActiveInteraction()`。`touchcancel` / `pointercancel` 与普通结束共用幂等清理，但取消路径绝不能提交待发射输入。
-- gameover 首次命中必须先写终局状态并 invalidate run；`phase_combat_update()` 在 `gameOver` 后立即返回，禁止后续帧重复排队终局 callback。
+- gameover 首次命中必须先写终局状态并 invalidate run；`phase_combat_update()` 在 `gameOver` 后立即返回，禁止后续帧重复排队终局 callback。结算页的 50ms 安全延迟必须通过 `sys_scheduleLifecycleTimeout()` 注册，reset/new-run 即使被 fake clock 强制执行旧 callback 也不得复活 gameover。
 - 若进入战斗被未完成药剂炼成拒绝，必须由 run-token 约束的单一 continuation 持有重试；替换子弹、混沌升级和 gathering 收尾不得先清上下文或写入 selection 存档。药剂处理后的保存边界只重试一次，abandon/reset 必须取消该 owner。
 
 ## 2. 各阶段职责与出入口条件
@@ -122,6 +122,7 @@ globs: ["src/game_phase.js"]
 - 重复打开同一 overlay/module editor 只能聚焦已有 session；card、购买、Escape 和 close handler 必须捕获 session ID，旧 session 的事件不得作用于后继 session。
 - 关闭路径必须先把 session 标记为 settled/closed，再释放自身 token；禁止直接写 `this.isPaused = false`。只有 pause registry 为空时 `sys_releasePauseLease()` 才恢复模拟。
 - abandon/gameover/reset 会让旧 lease 失效；旧 token 的重复或乱序释放必须返回 `false`，不能解除新局 owner。
+- launcher、pause、run-shop、module-editor 等 lease 可任意顺序关闭；各 overlay 必须先清本地 token 再释放共享 lease。terminal phase、abandon 与 reset 强制关闭移动端炼金台，且不把焦点还给被丢弃流程的 opener。
 - 仅允许在 `gathering`、`combat`、`training` 阶段暂停；其他阶段调用 `ui_openPause()` 无效。
 - `sys_resetGame()` 会清空 lease registry 与所有 overlay token 兼容字段。
 

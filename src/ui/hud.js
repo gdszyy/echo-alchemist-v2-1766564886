@@ -1015,10 +1015,10 @@ export const hud_system = {
             ? canvasEl.getBoundingClientRect()
             : null;
         if (!canvasRect || !canvasRect.width || !canvasRect.height) return null;
-        const canvasLeft = canvasRect.left;
-        const canvasTop = canvasRect.top;
         const scaleX = (this.width || canvasRect.width) / canvasRect.width;
         const scaleY = (this.height || canvasRect.height) / canvasRect.height;
+        const canvasLeft = canvasRect.left;
+        const canvasTop = canvasRect.top;
 
         const rect = el.getBoundingClientRect();
         if (!rect || (rect.width === 0 && rect.height === 0)) return null;

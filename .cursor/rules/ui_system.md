@@ -274,13 +274,13 @@ for (const subsystem of _subsystems) {
 - PC 侧栏只允许在 `gathering` / `combat` / `selection` / `training` 运行态显示；`meta`、`shop`、`gameover`、`truth_book`、`relic` 等全屏/局外阶段必须隐藏左右侧栏，避免常驻符文发射器或战斗 HUD 残留。
 - 局外商店中的 `debugOnly` 商品默认由 `CONFIG.debugShopDefaultEnabled` 控制显示；当前项目默认开启测试工具，`meta_buyUpgrade()` 也必须校验同一开关，且允许 `localStorage.echo_debug_shop = '0'` 临时隐藏/禁用测试商品。测试遗物任选项必须写入 `saveData.debugStartRelicIds` 多选数组并在下一次 `meta_startRun()` / `sys_initGameStart()` 中生效；旧的 `debugStartRelicId` 只能作为兼容字段同步首个选中项。
 
-### 6.4 src/ui/rune_launcher.js（符文发射器）
+### 6.4 src/ui/rune_launcher.js（炼金台；历史文件名保留）
 
 | 函数 | 描述 |
 |---|---|
 | `ui_openRuneBackpack()` / `ui_closeRuneBackpack()` | 符文背包面板开关 |
 | `_ui_renderRuneBackpackList()` | 渲染符文背包列表 |
-| `ui_openRuneLauncher()` / `ui_closeRuneLauncher()` | 符文发射器面板开关。`ui_openRuneLauncher` 在函数入口处包含 **[DEBUG-LOG]** 块，每次调用时通过 `console.group` 输出 `#phase-rune-launcher` 面板的完整状态快照（`game.phase`、`isPCMode`、`style.display`、computed display/visibility/opacity/z-index、classList、dataset、BoundingRect、parentElement、调用栈前 3 帧） |
+| `ui_openRuneLauncher()` / `ui_closeRuneLauncher(options)` | 炼金台面板开关。移动端持有独立 pause lease；`force/restoreFocus/interruptContext` 只供终局清理与安全跨入口跳转使用。历史方法名与 DOM id 保留 launcher。 |
 | `ui_closeRunePicker()` | 关闭符文选择弹出层 |
 | `ui_initRuneGrid()` | 初始化符文网格 |
 | `ui_openRunePicker(cellIndex)` | 打开符文选择弹出层 |
@@ -395,7 +395,10 @@ for (const subsystem of _subsystems) {
 
 ## 2026-07-18 Launcher And Settlement UX Contract
 
+- 玩家可见页面统一称“炼金台”，3×3 页签称“符文配置”，持久 `runeInventory` 统一称“符文仓库”；“符文发射器”只用于战场物理装置。局内/局外碎片必须分别显示“局内碎片（仅本局）”和“局外符文碎片（跨局保留）”。唯一主解释位于真理之书 `truth_core_alchemy_table`，炼金台图鉴与该条目提供双向跳转。
 - `ui_openRuneLauncher()` may pause an active run only on the mobile modal path, by acquiring `sys_acquirePauseLease('rune_launcher')` and storing the returned opaque token. `ui_closeRuneLauncher()` may release only that stored token through `sys_releasePauseLease(token)`; repeated close is idempotent, and launcher code must never write `isPaused` directly or release another surface's lease. The PC persistent sidebar is a non-modal named region and never acquires a launcher lease; mobile → PC releases the owned token, while PC → mobile hides the region until the next explicit open.
+- Launcher close must clear `_runeLauncherPauseToken` before calling `sys_releasePauseLease()`, because the last release synchronously flushes deferred continuations. A continuation may open a replacement launcher/modal; the old close path must preserve the replacement token and may restore its opener only when the owning phase is unchanged, the launcher has not reopened, and no newer modal owns focus.
+- `meta` / `shop` / `truth_book` / `gameover`, abandon and reset must force-close the mobile launcher and picker with `restoreFocus:false`. Lifecycle invalidation clears compatibility token/focus fields even when the underlying lease map was already discarded; terminal cleanup must never keep a visible launcher over the destination phase.
 - The launcher and rune picker are named dialogs on the mobile overlay path. Both must support Escape, a closed Tab / Shift+Tab focus loop, initial focus on the first actionable control, and focus restoration to the exact opener when closed. Grid cells remain keyboard-operable with Enter and Space. The PC persistent region must not focus its CSS-hidden close control.
 - Rune-picker touch handling distinguishes four terminal paths: a short stationary `touchend` selects, a completed long press previews without selecting, movement of at least 10px cancels while preserving native scrolling, and `touchcancel` / `pointercancel` never selects. Long-press and movement paths must suppress the following synthetic click so one physical gesture cannot both preview/scroll and place a rune.
 - The runeword codex exposes `undiscovered`, `active`, `activatable`, and `insufficient` as separate `data-codex-state` values. `active` comes only from the currently parsed 3×3 grid; `activatable` requires every formula material, including duplicate rune counts, across the current grid plus inventory. Visible copy must not leak internal runeword IDs.

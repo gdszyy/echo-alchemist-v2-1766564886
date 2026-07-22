@@ -169,13 +169,15 @@ console.log('===================================================\n');
 // Pause ownership: order-independent, duplicate-safe, stale-token safe.
 {
     const game = makeLifecycleGame();
-    const a = game.sys_acquirePauseLease('pause');
-    const b = game.sys_acquirePauseLease('shop');
-    check(a !== b && game.isPaused === true, 'pause leases return distinct opaque tokens');
-    check(game.sys_releasePauseLease(a) === true && game.isPaused === true, 'releasing one nested lease keeps simulation paused');
-    check(game.sys_releasePauseLease(a) === false && game.isPaused === true, 'duplicate lease release is harmless');
+    const a = game.sys_acquirePauseLease('rune_launcher');
+    const b = game.sys_acquirePauseLease('run_shop');
+    const c = game.sys_acquirePauseLease('module_editor');
+    check(a !== b && b !== c && game.isPaused === true, 'pause leases return distinct opaque tokens');
+    check(game.sys_releasePauseLease(b) === true && game.isPaused === true, 'non-LIFO nested lease release keeps simulation paused');
+    check(game.sys_releasePauseLease(b) === false && game.isPaused === true, 'duplicate lease release is harmless');
     check(game.sys_releasePauseLease({}) === false && game.isPaused === true, 'unknown lease release is harmless');
-    check(game.sys_releasePauseLease(b) === true && game.isPaused === false, 'last lease release resumes simulation');
+    check(game.sys_releasePauseLease(a) === true && game.isPaused === true, 'launcher release cannot resume while module editor still owns pause');
+    check(game.sys_releasePauseLease(c) === true && game.isPaused === false, 'last lease release resumes simulation');
     const stale = game.sys_acquirePauseLease('old-run');
     game.sys_invalidateRunLifecycle('test');
     const fresh = game.sys_acquirePauseLease('new-run');
@@ -195,6 +197,30 @@ console.log('===================================================\n');
     check(continuationRuns === 0, 'nested pause owner keeps deferred lifecycle work frozen');
     game.sys_releasePauseLease(inner);
     check(continuationRuns === 1, 'last pause owner release flushes deferred lifecycle work once');
+}
+
+// Terminal cleanup explicitly force-closes the mobile launcher and clears only
+// its compatibility token without restoring focus into a discarded run.
+{
+    const game = bind(makeLifecycleGame(), ui_system);
+    const staleLauncherToken = { owner: 'rune_launcher' };
+    let closeOptions = null;
+    let pickerOptions = null;
+    game._runeLauncherPauseToken = staleLauncherToken;
+    game._isRuneLauncherOpen = () => true;
+    game.ui_closeRunePicker = options => { pickerOptions = options; };
+    game.ui_closeRuneLauncher = options => {
+        closeOptions = options;
+        game._runeLauncherPauseToken = null;
+        return true;
+    };
+    game.ui_clearTransientOverlays({ forceRuneLauncher: true, reason: 'terminal:gameover' });
+    check(closeOptions?.force === true
+        && closeOptions?.restoreFocus === false
+        && closeOptions?.interruptContext === 'terminal:gameover'
+        && pickerOptions?.restoreFocus === false
+        && game._runeLauncherPauseToken == null,
+    'terminal cleanup force-closes launcher/picker without stale focus or token ownership');
 }
 
 // Native cancellation is not the only guard: force a cancelled callback to run.
@@ -968,24 +994,16 @@ console.log('===================================================\n');
 {
     const game = bind(makeLifecycleGame(), ui_system);
     const calls = [];
-    let draftInterrupted = false;
     game.ui_closePause = () => calls.push('pause');
-    game.ui_clearTransientOverlays = () => calls.push('transient');
-    game.ui_handlePotionAlchemyInterrupt = (context, options) => {
-        calls.push(`interrupt:${context}:${options?.confirm}`);
-        draftInterrupted = true;
-        return true;
-    };
-    game.ui_closeRuneLauncher = () => {
-        calls.push(`launcher:${draftInterrupted}`);
-        return draftInterrupted;
-    };
+    game.ui_clearTransientOverlays = options => calls.push(`transient:${options?.forceRuneLauncher}:${options?.reason}`);
     game.sys_clearRunState = () => calls.push('clear');
     game.sys_resetGame = () => calls.push('reset');
     game.phase_switchPhase = phase => calls.push(`phase:${phase}`);
     game.meta_updateContinueButton = () => calls.push('continue');
     game.ui_abandonRunToMeta();
-    check(calls.indexOf('interrupt:abandon_run:false') < calls.indexOf('launcher:true'), 'abandon force-cancels an alchemy draft before closing the launcher');
+    check(calls.includes('transient:true:abandon_run')
+        && calls.indexOf('transient:true:abandon_run') < calls.indexOf('clear'),
+    'abandon force-closes transient launcher ownership before clearing the run');
 
     const layer = new FakeElement('module-editor-layer');
     const focusTarget = new FakeElement('module-editor-focus');
@@ -1037,6 +1055,7 @@ check(/phase_combat_update\([^)]*\)\s*{\s*if \(this\.gameOver\) return/.test(pha
 check(/phase_switchPhase\(newPhase\)[\s\S]{0,500}_phaseLifecycleEpoch/.test(phaseSource), 'real phase transitions advance the phase epoch');
 check(/ui_openPause\(\)[\s\S]{0,700}sys_acquirePauseLease/.test(uiSource) && /ui_closePause\(\)[\s\S]{0,700}sys_releasePauseLease/.test(uiSource), 'pause overlay owns and releases only its lease');
 check(!/ui_closePause\(\)[\s\S]{0,360}isPaused\s*=\s*false/.test(uiSource), 'pause close never directly unpauses another owner');
+check(/terminalPhase[\s\S]{0,320}forceRuneLauncher:\s*true/.test(uiSource), 'terminal UI phases force-close the launcher instead of retaining its overlay');
 check(/ui_showChaosBulletSlotMachine[\s\S]{0,2200}sys_runOrDeferLifecycleContinuation/.test(uiSource), 'slot-machine animation defers and re-enters after a temporary phase interruption');
 check(/_runShopSession\?\.active/.test(runShopSource) && /invokeOnClose:\s*false/.test(runShopSource), 'run shop repeat-open and takeover use an idempotent session');
 check(/role',\s*'dialog'/.test(runShopSource) && /aria-modal/.test(runShopSource) && /aria-disabled/.test(runShopSource), 'run shop exposes dialog and disabled semantics');

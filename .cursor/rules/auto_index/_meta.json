@@ -10,16 +10,16 @@
     },
     {
       "file": "src\\systems.js",
-      "lines": 6209,
-      "funcs": 87,
-      "sections": 18,
+      "lines": 6743,
+      "funcs": 104,
+      "sections": 17,
       "mega_funcs": 3,
       "index_path": ".cursor\\rules\\auto_index\\src_systems_js_index.md"
     },
     {
       "file": "src\\combat_system.js",
-      "lines": 5917,
-      "funcs": 91,
+      "lines": 6381,
+      "funcs": 115,
       "sections": 24,
       "mega_funcs": 6,
       "index_path": ".cursor\\rules\\auto_index\\src_combat_system_js_index.md"
@@ -41,11 +41,19 @@
       "index_path": ".cursor\\rules\\auto_index\\src_effects_particles_js_index.md"
     },
     {
+      "file": "src\\game_system.js",
+      "lines": 4611,
+      "funcs": 89,
+      "sections": 33,
+      "mega_funcs": 5,
+      "index_path": ".cursor\\rules\\auto_index\\src_game_system_js_index.md"
+    },
+    {
       "file": "src\\game_phase.js",
-      "lines": 4347,
+      "lines": 4513,
       "funcs": 41,
-      "sections": 15,
-      "mega_funcs": 4,
+      "sections": 21,
+      "mega_funcs": 5,
       "index_path": ".cursor\\rules\\auto_index\\src_game_phase_js_index.md"
     },
     {
@@ -57,20 +65,20 @@
       "index_path": ".cursor\\rules\\auto_index\\src_spawn_system_js_index.md"
     },
     {
-      "file": "src\\game_system.js",
-      "lines": 3574,
-      "funcs": 62,
-      "sections": 7,
-      "mega_funcs": 4,
-      "index_path": ".cursor\\rules\\auto_index\\src_game_system_js_index.md"
-    },
-    {
       "file": "src\\ui_system.js",
-      "lines": 3416,
+      "lines": 3611,
       "funcs": 57,
       "sections": 5,
       "mega_funcs": 2,
       "index_path": ".cursor\\rules\\auto_index\\src_ui_system_js_index.md"
+    },
+    {
+      "file": "src\\ui\\rune_launcher.js",
+      "lines": 3516,
+      "funcs": 75,
+      "sections": 6,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_rune_launcher_js_index.md"
     },
     {
       "file": "src\\render\\pixi_effect_adapter.js",
@@ -87,14 +95,6 @@
       "sections": 0,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_config_js_index.md"
-    },
-    {
-      "file": "src\\ui\\rune_launcher.js",
-      "lines": 2703,
-      "funcs": 55,
-      "sections": 6,
-      "mega_funcs": 0,
-      "index_path": ".cursor\\rules\\auto_index\\src_ui_rune_launcher_js_index.md"
     },
     {
       "file": "src\\entities\\projectile.js",
@@ -114,7 +114,7 @@
     },
     {
       "file": "src\\ui\\hud.js",
-      "lines": 1634,
+      "lines": 1640,
       "funcs": 31,
       "sections": 4,
       "mega_funcs": 2,
@@ -127,6 +127,14 @@
       "sections": 4,
       "mega_funcs": 1,
       "index_path": ".cursor\\rules\\auto_index\\src_render_system_js_index.md"
+    },
+    {
+      "file": "src\\ui\\shop.js",
+      "lines": 1128,
+      "funcs": 19,
+      "sections": 4,
+      "mega_funcs": 1,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_shop_js_index.md"
     },
     {
       "file": "src\\music_engine.js",
@@ -143,14 +151,6 @@
       "sections": 10,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_audio_js_index.md"
-    },
-    {
-      "file": "src\\ui\\shop.js",
-      "lines": 973,
-      "funcs": 13,
-      "sections": 0,
-      "mega_funcs": 1,
-      "index_path": ".cursor\\rules\\auto_index\\src_ui_shop_js_index.md"
     },
     {
       "file": "src\\rune_config.js",
@@ -170,11 +170,19 @@
     },
     {
       "file": "src\\tutorial_system.js",
-      "lines": 811,
-      "funcs": 16,
+      "lines": 848,
+      "funcs": 19,
       "sections": 0,
       "mega_funcs": 0,
       "index_path": ".cursor\\rules\\auto_index\\src_tutorial_system_js_index.md"
+    },
+    {
+      "file": "src\\ui\\run_shop.js",
+      "lines": 712,
+      "funcs": 23,
+      "sections": 0,
+      "mega_funcs": 0,
+      "index_path": ".cursor\\rules\\auto_index\\src_ui_run_shop_js_index.md"
     },
     {
       "file": "src\\data\\enemy_visual_assets.js",
@@ -186,7 +194,7 @@
     },
     {
       "file": "src\\core.js",
-      "lines": 600,
+      "lines": 606,
       "funcs": 7,
       "sections": 0,
       "mega_funcs": 1,
@@ -225,16 +233,8 @@
       "index_path": ".cursor\\rules\\auto_index\\src_combat_damage_calc_js_index.md"
     },
     {
-      "file": "src\\ui\\run_shop.js",
-      "lines": 520,
-      "funcs": 18,
-      "sections": 0,
-      "mega_funcs": 0,
-      "index_path": ".cursor\\rules\\auto_index\\src_ui_run_shop_js_index.md"
-    },
-    {
       "file": "src\\ui\\game_over.js",
-      "lines": 477,
+      "lines": 527,
       "funcs": 12,
       "sections": 0,
       "mega_funcs": 0,
@@ -351,6 +351,12 @@
       "reason": "未达阈值(行数=230<500, 函数数=1<20)"
     },
     {
+      "file": "src\\potion_spell_content.js",
+      "lines": 203,
+      "funcs": 13,
+      "reason": "未达阈值(行数=203<500, 函数数=13<20)"
+    },
+    {
       "file": "src\\world_sim\\engine.js",
       "lines": 193,
       "funcs": 5,
@@ -367,6 +373,12 @@
       "lines": 170,
       "funcs": 1,
       "reason": "未达阈值(行数=170<500, 函数数=1<20)"
+    },
+    {
+      "file": "src\\potion_nesting.js",
+      "lines": 142,
+      "funcs": 10,
+      "reason": "未达阈值(行数=142<500, 函数数=10<20)"
     },
     {
       "file": "src\\world_sim\\cell.js",

@@ -1,6 +1,6 @@
 # src\ui\rune_launcher.js 函数索引
 
-> 自动生成于 2026-07-18 | 总行数: 3484 | 函数数: 74 | 语言: javascript
+> 自动生成于 2026-07-22 | 总行数: 3516 | 函数数: 75 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -18,10 +18,11 @@
 | _ui_trapDialogFocus | method | `_ui_trapDialogFocus(container, event)` |  |
 | _ui_focusFirstDialogControl | method | `_ui_focusFirstDialogControl(container)` |  |
 | _ui_releaseRuneLauncherPauseLease | method | `_ui_releaseRuneLauncherPauseLease()` |  |
+| _ui_restoreRuneLauncherFocus | method | `_ui_restoreRuneLauncherFocus(returnFocus, panel, options = {})` |  |
 | _ui_applyRuneLauncherSemantics | method | `_ui_applyRuneLauncherSemantics(panel, isPCMode)` |  |
 | ui_openRuneLauncher | method | `ui_openRuneLauncher()` |  |
 | _ui_updateLauncherShardCount | method | `_ui_updateLauncherShardCount()` |  |
-| ui_closeRuneLauncher | method | `ui_closeRuneLauncher()` |  |
+| ui_closeRuneLauncher | method | `ui_closeRuneLauncher(options = {})` |  |
 | ui_closeRunePicker | method | `ui_closeRunePicker(options = {})` |  |
 | ui_initRuneGrid | method | `ui_initRuneGrid()` |  |
 | ui_openRunePicker | method | `ui_openRunePicker(cellIndex)` | ⚠️ 巨型函数，见 @section 导航 |

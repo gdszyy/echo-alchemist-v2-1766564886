@@ -16,6 +16,7 @@
 > **[2026-06-30 新增]** PI-012：任务收尾与 Git 工作区清洁流程（每轮任务结束前必须检查 `git status --short --branch` / `git diff --check`，所有 modified / untracked 路径必须有归属，临时产物进入忽略目录或命名 stash）。
 > **[2026-06-26 新增]** PI-011：敌人基座词条与常规词条相性流程（基座专属词条不进普通随机池，预设 / 随机大型基座 / Boss 入场强化统一走 `normalizeEnemyAffixesForArchetype()`）。
 > **[2026-06-25 新增]** PI-010：PixiJS WebGL 渲染管线迁移流程与防坑指南（7 个坑位：compaction instanceof 遗漏、粒子模式特殊同步、blendMode 不一致、_pixi/_pixiSprite 区分、BladeStormRing 未实例化、SwordQi 无需迁移、预烘焙纹理形状准确性）。
+> **[2026-07-22 更新]** PI-006 升版至 v1.10：修正文档 API 名，稳定 reward ID 由 `sys_queueRoundStartReward()` 生成，安全点 API 为 `sys_getRunSavePoint()`。
 > **[2026-07-18 更新]** PI-006 升版至 v1.9：补充稳定 reward ID、原子消费、显式 round-start checkpoint、版本化安全恢复与局内商店 pack 顺序合同。
 > **[2026-07-18 更新]** PI-007 升版至 v1.4：补充 overlay session/pause lease、键盘焦点与 selection 完整恢复/回写守卫。
 > **[2026-06-23 更新]** PI-006 升版至 v1.8：纠正 v1.7 错误方向；精华奖励退出主循环，`marble_pack` 是开局与局内商店购买后的直接研磨入口。
@@ -36,7 +37,7 @@
 | PI-003 | 子系统扩展与组合模式注入流程 | v1.0 | core, game_system, combat_system, ui_system | 2026-04-16 | [PI-003_subsystem_composition_pattern.md](PI-003_subsystem_composition_pattern.md) |
 | PI-004 | 性能预算扩展与新特效接入流程 | v1.0 | performance, spawn_system, combat_system, entities | 2026-04-16 | [PI-004_performance_budget_extension.md](PI-004_performance_budget_extension.md) |
 | PI-005 | 性能自适应影响评估流程 | v1.0 | performance, combat_system, effects, entities, render_system, spawn_system | 2026-04-16 | [PI-005_perf_impact_assessment.md](PI-005_perf_impact_assessment.md) |
-| PI-006 | Round-Start 延迟奖励结算流程 | v1.9 | game_phase, game_system, core, ui/shop, ui/run_shop | 2026-07-18 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
+| PI-006 | Round-Start 延迟奖励结算流程 | v1.10 | game_phase, game_system, core, ui/shop, ui/run_shop | 2026-07-22 | [PI-006_round_start_reward_resolver.md](PI-006_round_start_reward_resolver.md) |
 | PI-007 | 命运时刻 Overlay 返回流与纯净精华选择模式 | v1.4 | ui/shop, game_system, ui_system, spawn_system, game_phase, entities, config, core | 2026-07-18 | [PI-007_destiny_overlay_return_and_selection_mode.md](PI-007_destiny_overlay_return_and_selection_mode.md) |
 | PI-008 | 符文发射器面板 Tab 被底层阶段面板遮挡的修复流程 | v1.1 | tutorial_system, ui/rune_launcher, ui_system | 2026-04-21 | [PI-008_tutorial_overlay_rune_launcher_tab_block.md](PI-008_tutorial_overlay_rune_launcher_tab_block.md) |
 | PI-009 | Sprite 贴图不显示类型错误排查 SOP | v1.1 | entities, render_system, core | 2026-06-21 | [PI-009_sprite_not_rendering_sop.md](PI-009_sprite_not_rendering_sop.md) |

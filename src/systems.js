@@ -30,6 +30,19 @@ import { pixiReleaseParticleSprite } from './render/pixi_bridge.js';
 // ==================== 真理之书数据 ====================
 
 /**
+ * 玩家可见术语的唯一映射。历史方法名与 DOM id 可以继续保留 launcher，
+ * 但产品文案必须通过这组概念区分页面、战斗装置、持久集合与两套货币。
+ */
+const UI_TERMINOLOGY = Object.freeze({
+    alchemyTable: '炼金台',
+    runeConfiguration: '符文配置',
+    combatRuneLauncher: '符文发射器',
+    runeWarehouse: '符文仓库',
+    runFragments: '局内碎片（仅本局）',
+    metaRuneFragments: '局外符文碎片（跨局保留）',
+});
+
+/**
  * [V2 资源协议] 由 ENEMY_V2_METADATA 构建图鉴条目，
  * 與試煉場 V2 矩陣共用同一份 metadata。
  */
@@ -79,6 +92,7 @@ function buildV2BestiaryEntries() {
 }
 
 const TRUTH_BOOK_DATA = {
+    terminology: UI_TERMINOLOGY,
     enemies: [
         {
             id: 'shield',
@@ -719,6 +733,22 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
 ];
 
 const TRUTH_BOOK_CORE_ENTRIES = [
+    {
+        id: 'truth_core_alchemy_table',
+        categoryId: 'core',
+        title: '炼金台与符文配置',
+        icon: '⚗️',
+        tags: ['主解释入口', UI_TERMINOLOGY.runeWarehouse, '双碎片经济'],
+        content: `${UI_TERMINOLOGY.alchemyTable}是符文构筑、仓库管理、药剂炼成与词条图鉴的统一页面；其中 3×3 网格页签统一称为${UI_TERMINOLOGY.runeConfiguration}。配置、管理和药剂页签读取同一套持久符文集合，统一称为${UI_TERMINOLOGY.runeWarehouse}，不再混用“库存”。“${UI_TERMINOLOGY.combatRuneLauncher}”只描述战场中实际发射弹药的装置，不作为页面名称。两套货币不能互换：${UI_TERMINOLOGY.runFragments}用于本局流程，${UI_TERMINOLOGY.metaRuneFragments}用于跨局成长。`,
+        action: { id: 'open_alchemy_table', label: '打开炼金台' },
+        loop: [
+            { type: 'log', text: '符文仓库 → 符文配置' },
+            { type: 'wait', frames: 90 },
+            { type: 'log', text: '局内碎片 ≠ 局外符文碎片' },
+            { type: 'wait', frames: 120 },
+            { type: 'reset' }
+        ]
+    },
     {
         id: 'truth_core_skill_charge',
         categoryId: 'core',
@@ -6131,6 +6161,46 @@ class TruthBook {
         return btn;
     }
 
+    getEntryById(entryId) {
+        return this.getEntries().find(entry => entry.id === entryId) || null;
+    }
+
+    selectEntryById(entryId) {
+        const entry = this.getEntryById(entryId);
+        if (!entry) return false;
+        this.selectedCategoryId = entry.categoryId;
+        this.renderCategoryTabs();
+        this.renderEntryList();
+        const btn = Array.from(document.querySelectorAll('.truth-list-btn'))
+            .find(candidate => candidate.dataset.entryId === entry.id) || null;
+        this.showEntry(entry, btn);
+        return true;
+    }
+
+    openEntryFromAlchemyTable(entryId = 'truth_core_alchemy_table') {
+        const game = this.mainGame;
+        if (!game || typeof game.ui_openTruthBook !== 'function') return false;
+        const returnState = {
+            phase: game.phase || 'meta',
+            selectionMode: game.selectionMode || null,
+            fateMomentContext: game.fateMomentContext ? { ...game.fateMomentContext } : null,
+        };
+        if (typeof game.ui_closeRuneLauncher === 'function') {
+            const didClose = game.ui_closeRuneLauncher({ restoreFocus: false });
+            if (didClose === false) return false;
+        }
+        game.ui_openTruthBook({ returnState });
+        return this.selectEntryById(entryId);
+    }
+
+    openAlchemyTableFromTruthBook() {
+        const game = this.mainGame;
+        if (!game || typeof game.ui_openRuneLauncher !== 'function') return false;
+        if (typeof game.ui_closeTruthBook === 'function') game.ui_closeTruthBook();
+        game.ui_openRuneLauncher();
+        return true;
+    }
+
     showEntry(entry, btnElement) {
         this.currentEntry = entry;
         const emptyState = document.getElementById('truth-empty-state');
@@ -6157,6 +6227,17 @@ class TruthBook {
         if (nameEl) nameEl.innerText = entry.title || entry.name;
         const descEl = document.getElementById('truth-item-desc');
         if (descEl) descEl.innerText = entry.content || entry.desc || '';
+        const actionButton = document.getElementById('truth-entry-action');
+        if (actionButton) {
+            const action = entry.action;
+            const canOpenAlchemyTable = action?.id === 'open_alchemy_table';
+            actionButton.hidden = !canOpenAlchemyTable;
+            actionButton.style.display = canOpenAlchemyTable ? 'inline-flex' : 'none';
+            actionButton.textContent = canOpenAlchemyTable ? action.label : '';
+            actionButton.onclick = canOpenAlchemyTable
+                ? () => this.openAlchemyTableFromTruthBook()
+                : null;
+        }
         const tagsCont = document.getElementById('truth-item-tags');
         if (tagsCont) {
             tagsCont.innerHTML = '';
@@ -6659,4 +6740,4 @@ function createCombatContext(mainGame, canvas) {
     return context;
 }
 
-export { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA };
+export { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA, UI_TERMINOLOGY };

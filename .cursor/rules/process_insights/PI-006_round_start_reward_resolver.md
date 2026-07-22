@@ -1,6 +1,6 @@
 ---
 id: "PI-006"
-version: "v1.9"
+version: "v1.10"
 last_updated: "2026-07-18"
 author: "Codex"
 related_modules: ["game_phase", "game_system", "core", "ui/shop", "ui/run_shop"]
@@ -73,6 +73,7 @@ status: "active"
 | v1.7 | 2026-06-23 | Pitfall 9 deprecated: active marble packs were removed; legacy `marble_pack` rewards must normalize to `run_resource_pack` and never enter selection / gathering. | Codex |
 | v1.8 | 2026-06-23 | Corrects v1.7: essence rewards are removed from the active loop; `marble_pack` is the run-start / run-shop grind entry and must go directly to gathering. | Codex |
 | v1.9 | 2026-07-18 | 收口稳定 reward ID、原子消费、round-start latch、安全点恢复、局内商店 pack 顺序及 run-token 异步所有权。 | Codex |
+| v1.10 | 2026-07-22 | 修正文档中的实际 API 名：稳定 ID 由 `sys_queueRoundStartReward()` 生成，安全点读取使用 `sys_getRunSavePoint()`。 | Codex |
 
 ## Pitfall 6: Normal Round-Start Banner Reuses Charge Sources
 
@@ -120,7 +121,7 @@ status: "active"
 
 **根因**：resolver 在打开 overlay/动画前就 `shift()`，并把数组位置当作奖励身份；回调没有 run token，也没有统一的原子完成入口。
 
-**正确做法**：resolver 只窥视队首。每项奖励先经 `sys_ensureRoundStartRewardId()` 获得稳定 ID，所有成功路径只通过 `sys_completeRoundStartReward(id)` 原子消费，重复回调返回 `false`。阶段推进回调必须绑定 run/phase token；被 pause 或 `truth_book` 暂停的必要 continuation 可暂存，真实换阶段或 abandon 后必须取消。terminal key 与 banner key 只能在横幅真正启动后提交，不能在药剂中断确认前抢占。
+**正确做法**：resolver 只窥视队首。每项奖励必须通过 `sys_queueRoundStartReward()` 规范化并获得稳定 ID，所有成功路径只通过 `sys_completeRoundStartReward(id)` 原子消费，重复回调返回 `false`。阶段推进回调必须绑定 run/phase token；被 pause 或 `truth_book` 暂停的必要 continuation 可暂存，真实换阶段或 abandon 后必须取消。terminal key 与 banner key 只能在横幅真正启动后提交，不能在药剂中断确认前抢占。
 
 **关键位置**：`src/game_system.js` → `sys_startRoundStartResolver()` / `sys_completeRoundStartReward()` / `sys_showRoundStartBanner()`。
 
@@ -132,7 +133,7 @@ status: "active"
 
 **正确做法**：使用显式 `_roundStartCheckpointReady` / `_combatCheckpointReady` latch 和固定 `resumePoint`。保存前拒绝 resolver、overlay、projectile、研磨动画等活动态；恢复前深度校验奖励 ID、selection/replace 上下文、敌人足迹/碰撞几何和队列。selection 保存完整 `MarbleDefinition` 与 `persistentThreshold`；gathering 保存确定性的 Peg/挡板/粉钉/special slot/奖励区几何；永久增益使用 `permanent` sentinel。hydration 全程启用 restore-write guard，任一异常必须二次 reset、清档并回到 meta；`combat_idle` 恢复不得重放 round 初始化。
 
-**关键位置**：`src/game_system.js` → `sys_getRunStateResumePoint()` / `sys_validateRunStatePayload()` / `sys_saveRunState()` / `sys_loadRunState()` / `sys_resumeCombatCheckpoint()`。
+**关键位置**：`src/game_system.js` → `sys_getRunSavePoint()` / `sys_validateRunStatePayload()` / `sys_saveRunState()` / `sys_loadRunState()` / `sys_resumeCombatCheckpoint()`。
 
 ## Pitfall 12: 商店弹珠包插队或生成第二份奖励
 

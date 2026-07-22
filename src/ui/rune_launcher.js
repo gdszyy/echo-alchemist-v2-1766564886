@@ -116,12 +116,25 @@ export const rune_launcher_system = {
     },
 
     _ui_releaseRuneLauncherPauseLease() {
-        if (this._runeLauncherPauseToken == null || typeof this.sys_releasePauseLease !== 'function') {
+        const token = this._runeLauncherPauseToken;
+        this._runeLauncherPauseToken = null;
+        if (token == null || typeof this.sys_releasePauseLease !== 'function') return false;
+        return this.sys_releasePauseLease(token) === true;
+    },
+
+    _ui_restoreRuneLauncherFocus(returnFocus, panel, options = {}) {
+        if (options.restoreFocus === false || returnFocus?.isConnected === false) return false;
+        if (options.returnPhase && this.phase !== options.returnPhase) return false;
+        if (!options.allowVisibleLauncher && typeof this._isRuneLauncherOpen === 'function'
+            && this._isRuneLauncherOpen()) {
             return false;
         }
-        const token = this._runeLauncherPauseToken;
-        this.sys_releasePauseLease(token);
-        this._runeLauncherPauseToken = null;
+        if (this._runShopSession?.active || this._relicOverlaySession?.active || this._moduleEditorActive) {
+            return false;
+        }
+        const active = document.activeElement;
+        if (active && active !== document.body && !panel?.contains?.(active)) return false;
+        returnFocus?.focus?.();
         return true;
     },
 
@@ -146,8 +159,14 @@ export const rune_launcher_system = {
         const panel = document.getElementById('phase-rune-launcher');
         const isPCMode = document.body.classList.contains('pc-mode')
             || (typeof window !== 'undefined' && window.innerWidth > 1024);
-        if (panel && !isPCMode && !panel.contains(document.activeElement)) {
-            this._runeLauncherReturnFocus = document.activeElement;
+        const launcherWasOpen = typeof this._isRuneLauncherOpen === 'function'
+            ? this._isRuneLauncherOpen()
+            : !!(panel && panel.style.display !== 'none');
+        if (panel && !isPCMode && (!launcherWasOpen || !panel.contains(document.activeElement))) {
+            this._runeLauncherReturnFocus = panel.contains(document.activeElement)
+                ? null
+                : document.activeElement;
+            this._runeLauncherReturnPhase = this.phase;
         }
         if (isPCMode) {
             this._ui_releaseRuneLauncherPauseLease();
@@ -217,11 +236,16 @@ export const rune_launcher_system = {
                         }
                         return;
                     }
+                    const returnFocus = owner._runeLauncherReturnFocus;
+                    const returnPhase = owner._runeLauncherReturnPhase;
+                    owner._runeLauncherReturnFocus = null;
+                    owner._runeLauncherReturnPhase = null;
                     owner._ui_releaseRuneLauncherPauseLease();
                     owner._ui_applyRuneLauncherSemantics(panel, true);
-                    const returnFocus = owner._runeLauncherReturnFocus;
-                    owner._runeLauncherReturnFocus = null;
-                    if (returnFocus?.isConnected !== false) returnFocus?.focus?.();
+                    owner._ui_restoreRuneLauncherFocus(returnFocus, panel, {
+                        returnPhase,
+                        allowVisibleLauncher: true,
+                    });
                 }, { passive: true });
                 panel._runeLauncherViewportBound = true;
             }
@@ -310,11 +334,14 @@ export const rune_launcher_system = {
     /**
      * 关闭符文发射器面板
      */
-    ui_closeRuneLauncher() {
+    ui_closeRuneLauncher(options = {}) {
         // [DEBUG-LOG] 记录关闭时的调用栈
         console.log('[ui_closeRuneLauncher] 关闭符文发射器，调用栈:', new Error().stack);
         if (typeof this.ui_handlePotionAlchemyInterrupt === 'function'
-            && !this.ui_handlePotionAlchemyInterrupt('close_launcher')) {
+            && !this.ui_handlePotionAlchemyInterrupt(
+                options.interruptContext || 'close_launcher',
+                { confirm: options.force !== true }
+            )) {
             return false;
         }
         // [BUGFIX] 关闭时先清理内部蒙层和教学层，防止残留
@@ -352,10 +379,15 @@ export const rune_launcher_system = {
             }
             // PC 模式：面板常驻在右侧边栏，不隐藏
         }
-        this._ui_releaseRuneLauncherPauseLease();
         const returnFocus = this._runeLauncherReturnFocus;
+        const returnPhase = this._runeLauncherReturnPhase;
         this._runeLauncherReturnFocus = null;
-        if (returnFocus?.isConnected !== false) returnFocus?.focus?.();
+        this._runeLauncherReturnPhase = null;
+        this._ui_releaseRuneLauncherPauseLease();
+        this._ui_restoreRuneLauncherFocus(returnFocus, panel, {
+            restoreFocus: options.restoreFocus,
+            returnPhase,
+        });
         return true;
     },
 
@@ -528,7 +560,7 @@ export const rune_launcher_system = {
                         <div class="text-[10px] text-slate-400 mt-1 leading-relaxed">${rw.effect_desc}</div>
                     </div>
                 `).join('')}</div>`
-                : '<div class="text-[11px] text-slate-500 mt-3">放入此格暫不會觸發新詞條。</div>';
+                : '<div class="text-[11px] text-slate-500 mt-3">放入此格暂不会触发新词条。</div>';
 
             detail.innerHTML = `
                 <div class="rune-picker-detail-header">
@@ -925,7 +957,7 @@ export const rune_launcher_system = {
         if (!this.runeInventory || this.runeInventory.length === 0) {
             if (emptyEl) emptyEl.classList.remove('hidden');
             if (hintEl) {
-                hintEl.textContent = '點擊符文選中，再點空格放置';
+                hintEl.textContent = '点击符文选中，再点空格放置';
                 hintEl.className = 'text-xs text-slate-500';
             }
             return;
@@ -938,10 +970,10 @@ export const rune_launcher_system = {
                 const pe = this.runeInventory[this._pendingPlacementRuneIdx];
                 const pid = getRuneId(pe);
                 const pdef = RUNE_DB.find(r => r.id === pid);
-                hintEl.textContent = pdef ? `已選中 ${pdef.name}，請點擊 3×3 空格放置` : '已選中符文，請點擊 3×3 空格放置';
+                hintEl.textContent = pdef ? `已选中 ${pdef.name}，请点击 3×3 空格放置` : '已选中符文，请点击 3×3 空格放置';
                 hintEl.className = 'text-xs text-amber-300 font-bold';
             } else {
-                hintEl.textContent = '點擊符文選中，再點空格放置';
+                hintEl.textContent = '点击符文选中，再点空格放置';
                 hintEl.className = 'text-xs text-slate-500';
             }
         }
@@ -1076,7 +1108,7 @@ export const rune_launcher_system = {
                 'rune-list-card rune-list-card--active',
                 'cursor-pointer hover:bg-purple-900/40 hover:border-purple-500/60 transition-all duration-150',
             ].join(' ');
-            card.title = '點擊查看詞條詳細效果';
+            card.title = '点击查看词条详细效果';
             card.onclick = () => {
                 if (typeof this.ui_showRunewordDetail === 'function') {
                     this.ui_showRunewordDetail(rw.id || rw.effectId, rw.level || 1);
@@ -2692,7 +2724,7 @@ export const rune_launcher_system = {
         if (filteredDB.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'text-center text-slate-500 text-xs py-6';
-            empty.textContent = '此符文暫無相關詞條';
+            empty.textContent = '此符文暂无相关词条';
             list.appendChild(empty);
             return;
         }

@@ -1,6 +1,6 @@
 # src\systems.js 函数索引
 
-> 自动生成于 2026-07-22 | 总行数: 6662 | 函数数: 100 | 语言: javascript
+> 自动生成于 2026-07-22 | 总行数: 6743 | 函数数: 104 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -102,6 +102,10 @@
 | renderCategoryTabs | method | `renderCategoryTabs()` |  |
 | renderEntryList | method | `renderEntryList()` |  |
 | createListButton | method | `createListButton(entry)` |  |
+| getEntryById | method | `getEntryById(entryId)` |  |
+| selectEntryById | method | `selectEntryById(entryId)` |  |
+| openEntryFromAlchemyTable | method | `openEntryFromAlchemyTable(entryId = 'truth_core_alchemy_table')` |  |
+| openAlchemyTableFromTruthBook | method | `openAlchemyTableFromTruthBook()` |  |
 | showEntry | method | `showEntry(entry, btnElement)` |  |
 | resetDemo | method | `resetDemo()` |  |
 | startDemo | method | `startDemo(entry)` |  |

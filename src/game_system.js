@@ -268,6 +268,9 @@ export const game_system = {
         this._pauseLeases = new Map();
         this.isPaused = false;
         this._pausedFromPhase = null;
+        this._runeLauncherPauseToken = null;
+        this._runeLauncherReturnFocus = null;
+        this._runeLauncherReturnPhase = null;
         this._roundStartResolverActive = false;
         this._roundStartResolverCurrentRewardId = null;
         this._roundStartBannerActive = false;
@@ -759,6 +762,12 @@ export const game_system = {
 
         // @section:reset_lifecycle_pause - 生命周期与暂停清理
         this.sys_invalidateRunLifecycle('reset');
+        if (typeof this.ui_clearTransientOverlays === 'function') {
+            this.ui_clearTransientOverlays({
+                forceRuneLauncher: true,
+                reason: 'reset',
+            });
+        }
         this.runCurrency = 0;
         this.gameOver = false;
         // 生命周期失效会释放所有暂停 owner；这里同步清理兼容字段与面板。
@@ -984,6 +993,9 @@ export const game_system = {
         this._relicOverlayPauseLeaseToken = null;
         this._pauseMenuLeaseToken = null;
         this._moduleEditorPauseLeaseToken = null;
+        this._runeLauncherPauseToken = null;
+        this._runeLauncherReturnFocus = null;
+        this._runeLauncherReturnPhase = null;
 
         // 输入状态必须与 run 生命周期同时清空，避免新局继承旧拖拽或待发射状态。
         this.input_cancelActiveInteraction(null, { reason: 'reset' });

@@ -1,6 +1,6 @@
 # src\data\enemy_visual_assets.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 638 | 函数数: 15 | 语言: javascript
+> 自动生成于 2026-07-22 | 总行数: 638 | 函数数: 15 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表

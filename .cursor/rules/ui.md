@@ -12,7 +12,7 @@ globs: ["src/ui/**/*", "src/ui_system.js"]
 | 文件 | 导出对象 | 职责 |
 |------|---------|------|
 | `src/ui/hud.js` | `hud_system` | 战斗/收集阶段 HUD（弹药槽、伤害统计、技能充能条） |
-| `src/ui/rune_launcher.js` | `rune_launcher_system` | 符文发射器面板（网格管理、符文选择、合成/重铸） |
+| `src/ui/rune_launcher.js` | `rune_launcher_system` | 炼金台页面（符文配置、仓库管理、合成/重铸、药剂与图鉴） |
 | `src/ui/shop.js` | `shop_system` | 局外商店与遗物选择界面 |
 | `src/ui/game_over.js` | `game_over_mixin` | 每局结束结算页面（回合节点图、统计、操作按钮） |
 
@@ -53,19 +53,21 @@ globs: ["src/ui/**/*", "src/ui_system.js"]
 | `UI_FLASH_EFFECT` | 全屏闪光 | 触发全屏颜色叠加层动画 |
 | `UI_CHROMATIC_ABERRATION` | CRT 色差特效 | 添加 CSS class 到 body |
 
-### 2.3 符文发射器核心 API（`rune_launcher_system`）
+### 2.3 炼金台核心 API（`rune_launcher_system`）
+
+玩家可见页面统一称“炼金台”，其中 3×3 网格页签称“符文配置”；`rune_launcher` 仅为兼容历史源码名。“符文发射器”只用于描述战斗场内实际发射弹药的装置。完整术语映射与 Truth Book 主解释入口见 [systems.md](systems.md#313-炼金台术语与知识入口合同)。
 
 | 方法 | 说明 |
 |------|------|
-| `ui_openRuneLauncher()` | 打开符文发射器面板（含 PC/移动端适配） |
-| `ui_closeRuneLauncher()` | 关闭面板 |
+| `ui_openRuneLauncher()` | 打开炼金台（含 PC/移动端适配） |
+| `ui_closeRuneLauncher()` | 关闭炼金台 |
 | `ui_initRuneGrid()` | 初始化符文网格（从 `this.runeGrid` 读取状态） |
 | `ui_updateRuneGrid()` | 更新网格（词条解析、高亮激活格子） |
-| `ui_openRunePicker(cellIndex)` | 打开符文选择弹出层（从库存选择符文放入指定格子） |
+| `ui_openRunePicker(cellIndex)` | 打开符文选择弹出层（从符文仓库选择符文放入指定格子） |
 | `ui_doRuneMerge()` | 执行符文合成（调用 `rune_merge()`） |
 | `ui_doRuneReforge()` | 执行符文重铸（调用 `rune_reforge()`） |
 | `ui_autoArrangeRunes()` | 自动排列符文（最优词条组合） |
-| `ui_switchRuneTab(tab)` | 切换符文面板标签（背包/图鉴） |
+| `ui_switchRuneTab(tab)` | 切换炼金台页签（符文配置/仓库管理/药剂/图鉴） |
 | `ui_renderRuneCodex()` | 渲染符文图鉴 |
 
 ### 2.4 符文图标构建辅助函数
@@ -145,7 +147,7 @@ this.hud_initEventListeners();
 ## 5. 详细设计文档索引
 
 - HUD 函数级索引：[auto_index/src_ui_hud_js_index.md](auto_index/src_ui_hud_js_index.md)
-- 符文发射器函数级索引：[auto_index/src_ui_rune_launcher_js_index.md](auto_index/src_ui_rune_launcher_js_index.md)
+- 炼金台函数级索引（历史文件名 `rune_launcher.js`）：[auto_index/src_ui_rune_launcher_js_index.md](auto_index/src_ui_rune_launcher_js_index.md)
 - UI 系统（Canvas 层）：[ui_system.md](ui_system.md)
 - 符文系统：[rune_system.md](rune_system.md)
 - 事件总线（EVENT_TYPES 完整列表）：`src/event_bus.js`
