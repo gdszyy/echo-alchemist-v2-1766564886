@@ -223,6 +223,7 @@
 - `#combat-status-panel` 是全局唯一节点。进入训练场时移动到 `#train-combat-status-mount`，退出时恢复到 `#combat-status-home`；禁止复制第二份态势条。
 - PC 模式使用可逆三栏挂载：配置面板进入 `#pc-left-training-controls-mount`，战场保持中央，场景侧栏进入 `#pc-right-training-scenes-mount`。左侧窄栏的弹珠编辑区必须纵向堆叠并使用两列属性网格，禁止套用整页宽屏五列布局。
 - `enter()` 必须捕获进入前布局状态并绑定具名 resize handler；`exit()` 必须解绑、恢复 home marker、隐藏训练专属左右栏并恢复符文挂载，不得遗留节点或内联显示状态。
+- `TrainingGround` 负责训练节点在 home 与 PC mount 之间的可逆迁移；`ui_system._ui_updateLeftSidebarContent(phase)` 是最终显隐协调器，必须按实时 phase 同步两侧训练 pane 与 `#pc-right-rune-mount`。不得只依赖 `exit()` 清理，因为终局、重置或中断路径也必须消除训练残留。
 
 ### 5.3 真理之书单轴合同与文案来源
 
@@ -248,7 +249,7 @@
 
 ### 5.6 验证闸门
 
-- 静态验证：`node tests/validate_mobile_ui_contracts.mjs`（当前 58 条），并回归 `validate_scenarios.js` 与 `validate_phase_contracts.mjs`。
+- 静态验证：`node tests/validate_mobile_ui_contracts.mjs`（当前 60 条），并回归 `validate_scenarios.js` 与 `validate_phase_contracts.mjs`。
 - 浏览器验证必须覆盖 360×800、390×844、480×854 和桌面视口；交互使用真实屏幕坐标，记录目标中心、`elementFromPoint` 命中、`scrollWidth/clientWidth`、`scrollHeight/clientHeight` 与截图。
 - 训练场退出必须同时验证移动→桌面→移动 resize 和退出后的 home marker 恢复；真理之书条目选择与商店列表滚动必须确认 `#game-container.scrollTop === 0`；移动 dock 必须确认逻辑 canvas 中 `dockTop = canvas.height - 120`。
 

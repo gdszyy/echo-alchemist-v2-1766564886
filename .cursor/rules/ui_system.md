@@ -90,6 +90,12 @@ for (const subsystem of _subsystems) {
 由于 UI 模块已通过 `bind(this)` 组合模式作为实例方法注入到 Game 实例中，**UI 模块直接读取 `this.xxx`（如 `this.ammoQueue`、`this.runeInventory`、`this.saveData`）是符合架构设计的正常用法**。
 这不属于强耦合，因为 UI 模块的方法在运行时绑定到了 Game 实例上。在 Task 3.2 中，之前误标的 `TODO[Task 3.2]` 注释已被清理或替换为说明性注释。
 
+### 4.3 PC 侧栏 phase 显隐所有权
+
+- `ui_updatePCLayout()` 负责 PC 模式、左右外层侧栏和面板挂载；`training` 与 `gathering` / `combat` / `selection` 同属 PC 侧栏有效阶段。
+- `_ui_updateLeftSidebarContent(phase)` 是各 phase 子面板的最终显隐协调器。它必须同步 `#pc-left-gathering`、`#pc-left-combat`、`#pc-left-training`、`#pc-right-training` 与 `#pc-right-rune-mount`，不能假设所有离开训练场的路径都会先完整执行 `TrainingGround.exit()`。
+- `TrainingGround` 仍拥有训练控件和场景节点的迁移/归位；中央协调器只消费 phase 并收口显隐，禁止在炼金台打开函数中强制显示挂载点来掩盖旧训练状态。
+
 ## 5. 已知问题与修复记录
 
 | 日期 | 文件 | 问题描述 | 修复方式 |

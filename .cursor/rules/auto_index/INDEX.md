@@ -15,7 +15,7 @@
 | `src\game_system.js` | 4611 | 89 | **5** | 33 | [src_game_system_js_index.md](src_game_system_js_index.md) |
 | `src\game_phase.js` | 4513 | 41 | **5** | 21 | [src_game_phase_js_index.md](src_game_phase_js_index.md) |
 | `src\spawn_system.js` | 3905 | 67 | **3** | 10 | [src_spawn_system_js_index.md](src_spawn_system_js_index.md) |
-| `src\ui_system.js` | 3611 | 57 | **2** | 5 | [src_ui_system_js_index.md](src_ui_system_js_index.md) |
+| `src\ui_system.js` | 3622 | 57 | **2** | 5 | [src_ui_system_js_index.md](src_ui_system_js_index.md) |
 | `src\ui\rune_launcher.js` | 3516 | 75 | **1** | 6 | [src_ui_rune_launcher_js_index.md](src_ui_rune_launcher_js_index.md) |
 | `src\render\pixi_effect_adapter.js` | 3006 | 93 | **1** | 0 | [src_render_pixi_effect_adapter_js_index.md](src_render_pixi_effect_adapter_js_index.md) |
 | `src\config.js` | 2754 | 1 | 0 | 0 | [src_config_js_index.md](src_config_js_index.md) |
@@ -31,7 +31,7 @@
 | `src\tutorial_system.js` | 848 | 19 | 0 | 0 | [src_tutorial_system_js_index.md](src_tutorial_system_js_index.md) |
 | `src\ui\run_shop.js` | 712 | 23 | 0 | 0 | [src_ui_run_shop_js_index.md](src_ui_run_shop_js_index.md) |
 | `src\data\enemy_visual_assets.js` | 638 | 15 | 0 | 0 | [src_data_enemy_visual_assets_js_index.md](src_data_enemy_visual_assets_js_index.md) |
-| `src\core.js` | 606 | 7 | **1** | 0 | [src_core_js_index.md](src_core_js_index.md) |
+| `src\core.js` | 614 | 8 | **1** | 0 | [src_core_js_index.md](src_core_js_index.md) |
 | `src\plinko_physics.js` | 597 | 15 | 0 | 0 | [src_plinko_physics_js_index.md](src_plinko_physics_js_index.md) |
 | `src\render\pixi_filter_manager.js` | 590 | 20 | 0 | 0 | [src_render_pixi_filter_manager_js_index.md](src_render_pixi_filter_manager_js_index.md) |
 | `src\rune_system.js` | 572 | 13 | 0 | 0 | [src_rune_system_js_index.md](src_rune_system_js_index.md) |

@@ -174,6 +174,17 @@ check('training exit restores mounts and layout state', containsAll(systemsJs, [
     'this._restoreTrainingResponsiveLayout();', 'this._restoreTrainingCombatStatus();',
     'this._restoreTrainingLayoutState();'
 ]));
+check('PC sidebar visibility includes the training phase',
+    uiSystemJs.includes("['gathering', 'combat', 'selection', 'training'].includes(this.phase)"));
+check('central phase coordinator clears stale training panes and restores the rune mount', containsAll(uiSystemJs, [
+    "document.getElementById('pc-left-training')",
+    "document.getElementById('pc-right-training')",
+    "document.getElementById('pc-right-rune-mount')",
+    "const trainingActive = isPC && phase === 'training';",
+    "leftTrainingPane.style.display = trainingActive ? 'flex' : 'none';",
+    "rightTrainingPane.style.display = trainingActive ? 'flex' : 'none';",
+    "runeLauncherMount.style.display = trainingActive ? 'none' : '';"
+]));
 
 console.log('\n[Combat status, dock, and disabled reasons]');
 check('phase logic still scopes status to combat/training', /this\.phase !== 'combat' && this\.phase !== 'training'/.test(uiSystemJs));

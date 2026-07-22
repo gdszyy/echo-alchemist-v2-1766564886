@@ -2127,7 +2127,7 @@ export const ui_system = {
         document.body.classList.toggle('pc-mode', isPC);
         const leftSidebar = document.getElementById('pc-left-sidebar');
         const rightSidebar = document.getElementById('pc-right-sidebar');
-        const sidebarPhaseActive = ['gathering', 'combat', 'selection'].includes(this.phase);
+        const sidebarPhaseActive = ['gathering', 'combat', 'selection', 'training'].includes(this.phase);
         if (leftSidebar) leftSidebar.style.display = (isPC && sidebarPhaseActive) ? 'flex' : 'none';
         if (rightSidebar) rightSidebar.style.display = (isPC && sidebarPhaseActive) ? 'flex' : 'none';
 
@@ -2142,7 +2142,18 @@ export const ui_system = {
     _ui_updateLeftSidebarContent(phase /* , wasPC */) {
         const gatheringPane = document.getElementById('pc-left-gathering');
         const combatPane = document.getElementById('pc-left-combat');
+        const leftTrainingPane = document.getElementById('pc-left-training');
+        const rightTrainingPane = document.getElementById('pc-right-training');
+        const runeLauncherMount = document.getElementById('pc-right-rune-mount');
         const isPC = document.body.classList.contains('pc-mode');
+
+        // TrainingGround owns node migration; this phase coordinator owns final
+        // visibility so an interrupted exit cannot strand the PC sidebars.
+        const trainingActive = isPC && phase === 'training';
+        if (leftTrainingPane) leftTrainingPane.style.display = trainingActive ? 'flex' : 'none';
+        if (rightTrainingPane) rightTrainingPane.style.display = trainingActive ? 'flex' : 'none';
+        if (runeLauncherMount) runeLauncherMount.style.display = trainingActive ? 'none' : '';
+
         if (!gatheringPane || !combatPane) return;
         if (!isPC) {
             gatheringPane.style.display = 'none';

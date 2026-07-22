@@ -8,15 +8,17 @@
  *   - 支持 --suite 参数指定运行特定套件，默认运行全部
  *
  * 用法：
- *   node tests/ai_test_runner.js [--url http://localhost:3000] [--suite relic|essence|runeword|enemy|smoke|overlay|pinboard]
+ *   node tests/ai_test_runner.js [--url http://localhost:3002] [--suite relic|essence|runeword|enemy|smoke|overlay|pinboard|ui-polish]
  *
  * 依赖：
- *   npm install puppeteer  （或 pnpm add puppeteer）
+ *   npm install puppeteer；也可通过 NODE_PATH 复用 Playwright + 本机 Chrome
  */
 
 'use strict';
 
-const puppeteer = require('puppeteer');
+const path = require('path');
+const { createBrowserSession } = require('./browser_automation.js');
+const { runUiPolishSuite } = require('./ui_polish_browser_suite.js');
 
 // ─── 配置 ────────────────────────────────────────────────────────────────────
 
@@ -26,9 +28,11 @@ const getArg = (name) => {
     return idx !== -1 ? args[idx + 1] : null;
 };
 
-const BASE_URL   = getArg('--url')   || 'http://localhost:3000';
+const BASE_URL   = getArg('--url')   || 'http://localhost:3002';
 const SUITE_FILTER = getArg('--suite') || 'all';
+const VIEWPORT_FILTER = getArg('--viewport');
 const HEADLESS   = args.includes('--headless');
+const ARTIFACT_DIR = path.resolve(getArg('--artifacts') || 'tmp/codex/REQ-20260717-ui-polish-integration/t3-ui-polish');
 const TIMEOUT_MS = 15000; // 单个测试超时
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
@@ -36,14 +40,61 @@ const TIMEOUT_MS = 15000; // 单个测试超时
 let passed = 0;
 let failed = 0;
 const failures = [];
+const consoleErrors = [];
+const browserIssues = [];
+const classifiedBrowserIssues = [];
+const expectedDialogs = [];
+let diagnosticContext = 'bootstrap';
+let controlledNavigation = false;
+let expectedDialogSequence = 0;
 
 function assert(condition, message) {
     if (!condition) throw new Error(`断言失败: ${message}`);
 }
 
+function setDiagnosticContext(context) {
+    diagnosticContext = context;
+}
+
+function setControlledNavigation(active) {
+    controlledNavigation = !!active;
+}
+
+function expectDialog(pattern, action = 'accept') {
+    const record = {
+        id: ++expectedDialogSequence,
+        pattern,
+        action,
+        context: diagnosticContext,
+        matched: false,
+        actualMessage: null,
+    };
+    expectedDialogs.push(record);
+    return record;
+}
+
+function verifyExpectedDialog(record) {
+    if (!record) return false;
+    const pendingIndex = expectedDialogs.indexOf(record);
+    if (pendingIndex !== -1) expectedDialogs.splice(pendingIndex, 1);
+    return record.matched === true;
+}
+
+function classifyKnownBrowserIssue(issue) {
+    const url = issue.url || '';
+    const isOptionalLocalAsset = /\/assets\/audio-local\/[^?#]+\.(?:wav|mp3|ogg|m4a)(?:[?#]|$)/i.test(url)
+        || /\/src\/music_clip_packs\.js(?:[?#]|$)/.test(url);
+    const isMissingResponse = issue.kind === 'http-error' && issue.status === 404;
+    const isExpectedAbort = issue.kind === 'request-failed' && issue.message === 'net::ERR_ABORTED';
+    if (isOptionalLocalAsset && (isMissingResponse || isExpectedAbort)) {
+        return 'optional-local-audio';
+    }
+    return null;
+}
+
 async function waitForPhase(page, phase, timeout = TIMEOUT_MS) {
     await page.waitForFunction(
-        (p) => typeof game !== 'undefined' && game.currentPhase === p,
+        (p) => typeof game !== 'undefined' && game.phase === p,
         { timeout },
         phase
     );
@@ -58,7 +109,7 @@ async function enterTrainingGround(page) {
     await page.waitForFunction(() => typeof game !== 'undefined' && game.trainingGround, { timeout: 20000 });
     await page.evaluate(() => {
         // 若当前不在 meta，先重置
-        if (game.currentPhase !== 'meta') {
+        if (game.phase !== 'meta') {
             game.sys_resetGame();
         }
         game.trainingGround.enter();
@@ -120,7 +171,7 @@ async function suiteSmoke(page) {
 
     await runTest('进入试炼场', async () => {
         await enterTrainingGround(page);
-        const phase = await page.evaluate(() => game.currentPhase);
+        const phase = await page.evaluate(() => game.phase);
         assert(phase === 'training', `当前阶段应为 training，实际为 ${phase}`);
     });
 
@@ -222,7 +273,7 @@ async function suiteEssence(page) {
         await triggerDemo(page, 'relic_chaos_essence');
         // 检查游戏阶段是否离开 training（进入命运抗决 UI）或奖励队列被消费
         await new Promise(r => setTimeout(r, 800));
-        const phase = await page.evaluate(() => game.currentPhase);
+        const phase = await page.evaluate(() => game.phase);
         const pending = await page.evaluate(() => (game.pendingRoundStartRewards || []).length);
         // 允许两种结果：阶段切换（UI 弹出）或队列为 0（立即处理）
         const valid = phase !== 'training' || pending === 0 || pending > 0;
@@ -241,7 +292,7 @@ async function suiteEssence(page) {
         });
         // 允许：fateMomentContext.active=true 或 selectionMode='pure_essence' 或阶段已切换
         const valid = ctx.fmcActive || ctx.selectionMode === 'pure_essence' ||
-                      await page.evaluate(() => game.currentPhase !== 'training');
+                      await page.evaluate(() => game.phase !== 'training');
         assert(valid, `纯净精华触发后 fateMomentContext 未激活: ${JSON.stringify(ctx)}`);
     });
 
@@ -388,7 +439,7 @@ async function suiteOverlay(page) {
         }, { timeout: 5000 });
         await page.evaluate(() => game.ui_closeRuneLauncher());
         const state = await page.evaluate(() => ({
-            phase: game.currentPhase,
+            phase: game.phase,
             selectionMode: game.selectionMode,
             fateActive: !!(game.fateMomentContext && game.fateMomentContext.active),
             launcherVisible: (() => {
@@ -416,7 +467,7 @@ async function suiteOverlay(page) {
         }, { timeout: 5000 });
         await page.evaluate(() => game.ui_closeRelicSelection());
         const state = await page.evaluate(() => ({
-            phase: game.currentPhase,
+            phase: game.phase,
             selectionMode: game.selectionMode,
             fateActive: !!(game.fateMomentContext && game.fateMomentContext.active),
             returnState: game.relicOverlayReturnState,
@@ -440,7 +491,7 @@ async function suiteOverlay(page) {
         }, { timeout: 5000 });
         await page.evaluate(() => game.ui_closeTruthBook());
         const state = await page.evaluate(() => ({
-            phase: game.currentPhase,
+            phase: game.phase,
             selectionMode: game.selectionMode,
             fateActive: !!(game.fateMomentContext && game.fateMomentContext.active),
             fateType: game.fateMomentContext && game.fateMomentContext.type,
@@ -464,7 +515,7 @@ async function suiteOverlay(page) {
         }, { timeout: 5000 });
         await page.evaluate(() => game.ui_closeRelicSelection());
         const state = await page.evaluate(() => ({
-            phase: game.currentPhase,
+            phase: game.phase,
             shopVisible: (() => {
                 const panel = document.getElementById('phase-shop');
                 return panel && window.getComputedStyle(panel).display !== 'none';
@@ -700,10 +751,27 @@ async function suitePinboard(page) {
         await page.waitForFunction(() => !document.getElementById('module-editor-layer'), { timeout: 5000 });
         const state = await page.evaluate(() => ({
             active: !!game._moduleEditorActive,
-            phase: game.currentPhase,
+            phase: game.phase,
         }));
         assert(!state.active, 'module editor should be inactive after valid start');
         assert(state.phase === 'gathering', `phase should stay gathering, got ${state.phase}`);
+    });
+}
+
+async function suiteUiPolish(page) {
+    await runUiPolishSuite({
+        page,
+        baseUrl: BASE_URL,
+        artifactDir: ARTIFACT_DIR,
+        viewportFilter: VIEWPORT_FILTER,
+        runTest,
+        assert,
+        browserIssues,
+        classifiedBrowserIssues,
+        expectDialog,
+        verifyExpectedDialog,
+        setDiagnosticContext,
+        setControlledNavigation,
     });
 }
 
@@ -715,29 +783,94 @@ async function suitePinboard(page) {
     console.log(`  模式: ${HEADLESS ? 'headless' : 'headed'}`);
     console.log('═══════════════════════════════════════════════════');
 
-    const browser = await puppeteer.launch({
-        headless: HEADLESS ? 'new' : false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security'],
-        defaultViewport: { width: 390, height: 844 } // 模拟移动端视口
+    const session = await createBrowserSession({
+        headless: HEADLESS,
+        defaultViewport: { width: 390, height: 844 },
     });
-
-    const page = await browser.newPage();
+    const page = session.page;
+    console.log(`  驱动: ${session.driverName}`);
 
     // 捕获控制台错误
-    const consoleErrors = [];
     page.on('console', msg => {
-        if (msg.type() === 'error') consoleErrors.push(msg.text());
+        if (msg.type() !== 'error') return;
+        const message = msg.text();
+        // Chromium 的通用资源报错不含 URL；由 response/requestfailed 监听器记录可归因详情。
+        if (/^Failed to load resource:/.test(message)) return;
+        consoleErrors.push(message);
+        browserIssues.push({ context: diagnosticContext, kind: 'console.error', message, location: msg.location?.() || null });
     });
-    page.on('pageerror', err => consoleErrors.push(`[PageError] ${err.message}`));
+    page.on('pageerror', err => {
+        const message = err.message;
+        consoleErrors.push(`[PageError] ${message}`);
+        browserIssues.push({ context: diagnosticContext, kind: 'pageerror', message, stack: err.stack || null });
+    });
+    page.on('response', response => {
+        if (response.status() < 400) return;
+        const issue = {
+            context: diagnosticContext,
+            kind: 'http-error',
+            status: response.status(),
+            url: response.url(),
+        };
+        const classification = classifyKnownBrowserIssue(issue);
+        if (classification) {
+            classifiedBrowserIssues.push({ ...issue, classification });
+        } else {
+            browserIssues.push(issue);
+        }
+    });
+    page.on('requestfailed', request => {
+        const issue = {
+            context: diagnosticContext,
+            kind: 'request-failed',
+            message: request.failure()?.errorText || 'unknown request failure',
+            url: request.url(),
+        };
+        if (controlledNavigation && issue.message === 'net::ERR_ABORTED') {
+            const base = new URL(BASE_URL);
+            const target = new URL(issue.url);
+            const sameOrigin = target.origin === base.origin;
+            const isStaticImage = /\.(?:png|webp|svg|jpe?g|gif)$/i.test(target.pathname);
+            const isBaseDocument = request.isNavigationRequest?.()
+                && target.pathname.replace(/\/$/, '') === base.pathname.replace(/\/$/, '');
+            if (sameOrigin && (isStaticImage || isBaseDocument)) {
+                classifiedBrowserIssues.push({
+                    ...issue,
+                    classification: isStaticImage ? 'controlled-navigation-image-abort' : 'controlled-navigation-document-abort',
+                });
+                return;
+            }
+        }
+        const classification = classifyKnownBrowserIssue(issue);
+        if (classification) {
+            classifiedBrowserIssues.push({ ...issue, classification });
+        } else {
+            browserIssues.push(issue);
+        }
+    });
+    page.on('dialog', async dialog => {
+        const expected = expectedDialogs.shift();
+        const message = dialog.message();
+        if (!expected || !expected.pattern.test(message)) {
+            browserIssues.push({ context: diagnosticContext, kind: 'unexpected-dialog', message });
+            await dialog.dismiss();
+            return;
+        }
+        expected.matched = true;
+        expected.actualMessage = message;
+        if (expected.action === 'dismiss') await dialog.dismiss();
+        else await dialog.accept();
+    });
 
     try {
-        // 导航到游戏页面
-        console.log(`\n正在加载游戏页面: ${BASE_URL}`);
-        await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 30000 });
-
-        // 等待游戏初始化
-        await page.waitForFunction(() => typeof game !== 'undefined', { timeout: 20000 });
-        console.log('游戏已加载 ✓');
+        await session.installOfflineExternalFallbacks();
+        if (SUITE_FILTER !== 'ui-polish') {
+            // 传统套件共享一个已初始化页面；ui-polish 自己按视口清空并重载上下文。
+            console.log(`\n正在加载游戏页面: ${BASE_URL}`);
+            await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 30000 });
+            await page.waitForFunction(() => typeof game !== 'undefined', { timeout: 20000 });
+            console.log('游戏已加载 ✓');
+        }
 
         // 运行各测试套件
         await runSuite('smoke',    suiteSmoke,    page);
@@ -747,13 +880,14 @@ async function suitePinboard(page) {
         await runSuite('enemy',    suiteEnemy,    page);
         await runSuite('overlay',  suiteOverlay,  page);
         await runSuite('pinboard', suitePinboard, page);
+        await runSuite('ui-polish', suiteUiPolish, page);
 
     } catch (e) {
         console.error(`\n[致命错误] ${e.message}`);
         failed++;
         failures.push({ name: '测试框架', error: e.message });
     } finally {
-        await browser.close();
+        await session.close();
     }
 
     // ─── 输出报告 ─────────────────────────────────────────────────────────────

@@ -1,229 +1,121 @@
-# Echo Alchemist v2 — AI 自动化测试套件
+# Echo Alchemist v2 — 自动化测试
 
-本目录包含两类测试工具，覆盖游戏核心机制的 AI 可执行验证流程。
+本目录包含两层验证：T1 是无需浏览器的 Node 静态/运行时合同，T3 是连接本地游戏服务的真实浏览器回归。默认本地地址统一为 `http://localhost:3002`。
 
----
+## T1：全量 Node 闸门
 
-## 文件结构
+先校验 `src/` 与 `tests/` 内全部 JavaScript 语法：
 
-| 文件 | 类型 | 依赖 | 说明 |
-|---|---|---|---|
-| `validate_scenarios.js` | 静态校验 | Node.js（无需浏览器） | 验证 `TRAINING_SCENARIOS` 数据结构完整性 |
-| `validate_boss_vulnerability.mjs` | 静态校验 | Node.js（无需浏览器） | 验证 Boss 破绽谱重设计与旧 `weak_spot` 机制移除 |
-| `validate_rune_spell_forms.mjs` | 静态校验 | Node.js（无需浏览器） | 验证符文词条 Spell Form V1 的中心法阵匹配契约 |
-| `validate_potion_vfx_contract.mjs` | 静态校验 | Node.js（无需浏览器） | 验证药剂法术的药瓶形态字段与战斗 VFX helper 契约 |
-| `validate_spell_vfx_design.mjs` | 静态校验 | Node.js（无需浏览器） | 验证法术形态特效设计文档覆盖所有形态与实现契约 |
-| `validate_potion_spell_content.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证 C4 从 `RUNEWORD_DB` 解析隐藏 spellContent 与黑箱 UI 不泄露 |
-| `validate_potion_nesting.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证药剂嵌套合法性共享函数的正向与反向规则 |
-| `validate_potion_c6_nesting_ui.mjs` | 运行时规则校验 | Node.js（无需浏览器） | 验证 C6 多节点炼成 UI 的合法接入、非法坍塌、不返符文与黑箱预览 |
-| `validate_potion_spell_tree_combat.mjs` | 运行时契约校验 | Node.js（无需浏览器） | 验证 Root Orb carrier、Tower active/death 与非法 spellTree 战斗行为 |
-| `ai_test_runner.js` | 运行时测试 | Puppeteer + 本地游戏服务 | 驱动浏览器进行实机行为验证 |
-
----
-
-## 快速开始
-
-### 1. 静态结构校验（无需启动游戏）
-
-```bash
-node tests/validate_scenarios.js
+```powershell
+$files = @(
+    Get-ChildItem src -Recurse -File
+    Get-ChildItem tests -Recurse -File
+) | Where-Object { $_.Extension -in '.js', '.mjs' }
+foreach ($file in $files) {
+    node --check $file.FullName
+    if ($LASTEXITCODE -ne 0) { throw "syntax failed: $($file.Name)" }
+}
 ```
 
-验证内容：
-- 所有分类（enemy / attribute / boss / runeword / **relic**）是否存在
-- 8 个遗物/精华专项场景是否完整
-- 每个场景的 `bulletConfig`、`name`、`desc` 字段是否齐全
-- 场景 ID 唯一性、`categoryId` 合法性
+再运行仓库内全部 `validate_*`：
 
-### 1.1 Boss 破绽契约校验（无需启动游戏）
-
-```bash
-node tests/validate_boss_vulnerability.mjs
+```powershell
+$validators = Get-ChildItem tests -File -Filter 'validate_*' | Sort-Object Name
+foreach ($validator in $validators) {
+    node $validator.FullName
+    if ($LASTEXITCODE -ne 0) { throw "validator failed: $($validator.Name)" }
+}
 ```
 
-验证内容：
-- 普通波次不再包含旧 `weak_spot` 低血量弱点怪
-- Boss 配置不再使用旧 `weakness` 字段
-- 8 个 Boss 都有 `vulnerability` 破绽谱
-- 战斗管线保留 Boss 破绽进度与易伤窗口入口
-- Boss 覆盖按实际命中次数和按实际伤害量两种累积方式
-- 回合缩放参数存在，后期破绽条件更苛刻
+这会自动覆盖当前所有验证器，避免 README 的手写清单随新增测试过期。本轮 UI 集成重点包括：
 
-### 1.2 符文法阵契约校验（无需启动游戏）
+- `validate_tutorial_flow.mjs`
+- `validate_run_lifecycle.mjs`
+- `validate_mobile_ui_contracts.mjs`
+- `validate_launcher_settlement_ux.mjs`
+- `validate_ui_terminology.mjs`
+- `validate_phase_contracts.mjs`
+- `validate_core_optional_clip_pack.mjs`
 
-```bash
-node tests/validate_rune_spell_forms.mjs
-```
+核心机制、Boss、敌人、药剂、符文、波次与 `world_sim` 的其余 `validate_*` 也必须一并通过；不能只跑 UI 专项。
 
-验证内容：
-- 词条默认必须组成穿过 3x3 中心的轴线法阵
-- `pattern[1]` 核心符文必须位于中心格
-- 外环试剂允许在同一轴线两端反向
-- 同一词条可通过多条穿心轴线提升等级
-- `spellFormula.shape = 'loose_line'` 保留旧式无序线匹配回退
+## T3：浏览器回归
 
-### 1.3 药剂药瓶 VFX 契约校验（无需启动游戏）
+### 1. 启动或复用服务
 
-```bash
-node tests/validate_potion_vfx_contract.mjs
-```
+Runner 不会启动服务。运行前先检查 3002；如已有本项目服务应直接复用，不得重复启动。
 
-验证内容：
-- 9 个 `POTION_SPELL_DB` 药剂都声明 `spellType`、`formId: 'bottle'`、`nestingMode: 'shatter'`
-- 每个药剂都声明 `vfxProfile` 的目标、碎裂样式与语义标签
-- 战斗层存在统一的 `combat_playPotionBottleVFX()` helper
-- 药瓶碎裂表现复用现有粒子、投射物爆破、同化脉冲、同化波与短电弧入口
-- `combat_playPotionShatterVFX()` 覆盖 `seal`、`mist_bloom`、`mark`、`shard_sigil`、`collapse_ring`、`overload_blast` 等具体碎裂样式
-
-### 1.4 法术形态特效设计覆盖校验（无需启动游戏）
-
-```bash
-node tests/validate_spell_vfx_design.mjs
-```
-
-验证内容：
-- `docs/rune_potion_spell_contract.md` 已链接到 `docs/spell_vfx_design.md`
-- 特效设计文档覆盖 `bottle`、`orb`、`mine`、`beam`、`orbit`、`slash`、`meteor`、`sweeping_laser`、`tower`
-- 文档包含表现矩阵、单形态规格、实现顺序和验收清单
-- 文档声明后续运行时入口、配置表、性能预算和 `@perf-impact` 约束
-
-### 1.5 药剂 C4 spellContent 解析校验（无需启动游戏）
-
-```bash
-node tests/validate_potion_spell_content.mjs
-```
-
-验证内容：
-- 合法 `RUNEWORD_DB` 公式可生成隐藏 `spellContentId` / `spellType`
-- 同符文集合但核心位不同的公式能稳定区分
-- 非法组合进入未成法路径，链式/禁用类词条进入明确排斥路径
-- `preparedPotionSpell` 仍可保留旧静态 `potionId`，同时保存 root `spellTree`
-- 封装前预览不拼出 `spellContentId`、`runewordId`、`spellType`、药剂名、品质或装药量
-
-### 1.6 药剂嵌套合法性校验（无需启动游戏）
-
-```bash
-node tests/validate_potion_nesting.mjs
-```
-
-验证内容：
-- Root Orb 无子节点也合法
-- Orb -> Orb、Beam 命中生成 Orb、纯扣血、链式反应、active/death 双槽混用均被共享规则拒绝
-- Tower active/death 与 construct 子节点禁用项走同一个 `src/potion_nesting.js` 入口
-
-### 1.7 药剂 spellTree 战斗运行时校验（无需启动游戏）
-
-```bash
-node tests/validate_potion_spell_tree_combat.mjs
-```
-
-验证内容：
-- Root Orb 在 `children: []` 时仍生成 `potion_orb_carrier`，飞行到点后才破裂结算
-- Active Tower 生成 `potion_tower` 正式实体并周期作用敌人
-- Death Tower 不提前 pulse，销毁时触发一次释放
-- 非法 Orb -> Orb 树不会生成 carrier 或 tower 运行时
-
-### 2. 运行时自动化测试（需要本地游戏服务）
-
-**安装依赖：**
-```bash
-pnpm add puppeteer
-# 或
-npm install puppeteer
-```
-
-**启动游戏服务：**
-```bash
+```powershell
+Get-NetTCPConnection -LocalPort 3002 -State Listen -ErrorAction SilentlyContinue
 npm start
-# 默认监听 http://localhost:3002
 ```
 
-**运行全部测试套件：**
-```bash
-node tests/ai_test_runner.js --url http://localhost:3000
+### 2. 浏览器驱动
+
+Runner 优先使用项目可解析的 Puppeteer；没有 Puppeteer 时回退到 Playwright，并自动尝试本机 Chrome/Edge。Codex bundled Playwright 可通过 `NODE_PATH` 暴露：
+
+```powershell
+$env:NODE_PATH='C:\Users\Administrator\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules;C:\Users\Administrator\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules\.pnpm\node_modules'
 ```
 
-**运行指定套件：**
-```bash
-node tests/ai_test_runner.js --suite smoke    # 冒烟测试
-node tests/ai_test_runner.js --suite relic    # 遗物系统
-node tests/ai_test_runner.js --suite essence  # 精华系统
-node tests/ai_test_runner.js --suite runeword # 符文词条
-node tests/ai_test_runner.js --suite enemy    # 敌人词条
-node tests/ai_test_runner.js --suite overlay  # Overlay 返回链路
-node tests/ai_test_runner.js --suite pinboard # 钉板编辑闭环
+为避免外网抖动污染本地 UI 证据，浏览器适配层只精确拦截 Google Fonts 和页面固定引用的 PixiJS 7.4.2 CDN URL：字体返回空 CSS，Pixi URL 返回空 JavaScript，让应用走其既有 Canvas 2D fallback。本套件因此验证 UI/交互与 Canvas fallback，不宣称覆盖 Pixi WebGL；本地资源、应用脚本和其他网络错误仍会失败。
+
+### 3. Goal E 四视口命令
+
+```powershell
+node tests/ai_test_runner.js `
+  --url http://localhost:3002 `
+  --suite ui-polish `
+  --headless `
+  --artifacts tmp/codex/REQ-20260717-ui-polish-integration/t3-final
 ```
 
-**无头模式（CI 环境）：**
-```bash
-node tests/ai_test_runner.js --headless
+默认逐档覆盖：
+
+- `mobile-360x800`
+- `mobile-390x844`
+- `mobile-480x854`
+- `desktop-1440x900`
+
+调试单档视口：
+
+```powershell
+node tests/ai_test_runner.js --suite ui-polish --headless --viewport mobile-360x800
 ```
 
----
+每档运行八个正式用例：
 
-## 测试套件说明
+1. 空存档首局教程：真实点击开始、选择遗物、resolver 进入研磨，并以受控 combat 事件完成末步。
+2. pause lease：父/子释放顺序、焦点语义及最后 lease 释放时的同步 launcher continuation 重入。
+3. save / Continue / abandon：真实跨页面重载、Round 4 恢复、确认放弃和延迟 callback 不复活。
+4. 商店 / round-start resolver：dialog、disabled/ARIA、关闭幂等和单次终点。
+5. 训练场 / 真理之书：响应式挂载、同会话移动→桌面→移动往返、返回链、桌面训练 pane 清理和符文挂载恢复。
+6. 炼金台：移动焦点陷阱、短按/长按/touchcancel、picker Escape、Codex 四态、术语与知识双向入口；桌面验证非模态 region 和真实可见尺寸。
+7. gameover：30% 结算、术语、滚动、存档与旧 overlay/lease 清理。
+8. 运行时零红线：未归类 `console.error`、`pageerror`、HTTP/请求失败和意外 dialog 均令测试失败。
 
-### `smoke` — 冒烟测试
-验证游戏基础加载、试炼场进入、DOM 渲染、新增 `relic` 分类是否存在。
+精确已知项会写入报告的 `classifiedIssues`，不与真实红线混淆：可选本地音频/clip pack 只接受缺失资源 `404` 与对应 `net::ERR_ABORTED`，受控导航只接受同源静态图片或主文档取消。任何服务端错误、连接异常或未命中规则的错误都会失败；JS/CSS 请求不会按导航取消放行。
 
-### `relic` — 遗物系统测试
+每个视口产出教程、Codex、gameover 三张截图，并生成 `ui-polish-report.json`。报告记录 surface 尺寸、滚动边界、ARIA、焦点、pause owner、触控结果、Codex 状态和分类诊断。
 
-| 测试用例 | 验证点 |
-|---|---|
-| 保底计数器初始化 | `game.dropPity.essence === 0` |
-| 模拟击杀后计数器递增 | `dropPity.essence` 增加或奖励队列有内容 |
-| 遗物选择界面弹出 | overlay 可见或 `pendingRoundStartRewards` 正确压入 |
-| 钉盘形态互斥 | `ownedRelics` 包含 `triangle_formation`，`boardLayout === 'triangle'` |
-| 存档持久化 | `localStorage` 中 `pendingRoundStartRewards.length === 2` |
+## 旧浏览器套件
 
-### `essence` — 精华系统测试
+以下套件仍可用于定向诊断：
 
-| 测试用例 | 验证点 |
-|---|---|
-| 混沌精华触发 | resolver 启动，阶段切换或队列被消费 |
-| 纯净精华激活 | `fateMomentContext.active === true` 或 `selectionMode === 'pure_essence'` |
-| 跳过研磨分支 | `_chargedAmmoQueue` 预设正确，`type === 'bounce'` |
-| 同化涌潮遗物 | `doubleAssimilationBoostRounds.bounce === 2`，`guaranteedNextRound` 包含 2 个 bounce |
+```powershell
+node tests/ai_test_runner.js --suite smoke
+node tests/ai_test_runner.js --suite relic
+node tests/ai_test_runner.js --suite essence
+node tests/ai_test_runner.js --suite runeword
+node tests/ai_test_runner.js --suite enemy
+node tests/ai_test_runner.js --suite overlay
+node tests/ai_test_runner.js --suite pinboard
+```
 
-### `runeword` — 符文词条测试
+这些套件不能替代 Goal E 的四视口 `ui-polish` 回归。
 
-| 测试用例 | 验证点 |
-|---|---|
-| focused_fire | `ammoQueue` 被消费，词条流程正常 |
-| mass_collapse | `scatter+multicast` 清空后爆炸属性生效 |
-| kinetic_decay | 子弹携带 `_kineticDecayBonus` 参数 |
-| echo_shot | 5 次发射流程正常，`roundDamage >= 0` |
+## 结果判定
 
-### `enemy` — 敌人词条测试
-
-| 测试用例 | 验证点 |
-|---|---|
-| 护盾魔像 | 敌人携带 `shield` 词条 |
-| 分身魔像 | 敌人携带 `clone` 词条 |
-| 伤害输出 | 发射子弹后 `roundDamage` 增加 |
-
----
-
-## 试炼场场景分类（`relic` 新增）
-
-| 场景 ID | 名称 | 测试重点 |
-|---|---|---|
-| `relic_pity_essence` | 精华保底验证 | DropPity V3 保底计数器递增与强制触发 |
-| `relic_selection_ui` | 遗物选择界面 | `pendingRoundStartRewards` 队列 + UI 弹出 |
-| `relic_chaos_essence` | 混沌精华命运 | chaos_essence resolver 触发链路 |
-| `relic_pure_essence` | 纯净精华全链路 | `fateMomentContext` 激活，选 1 弹珠 + 符文注入 |
-| `relic_pure_essence_skip_grind` | 精华跳过研磨 | `_chargedAmmoQueue` 继承，弹药充能不丢失 |
-| `relic_surge_bounce` | 弹性涌潮遗物 | `doubleAssimilationBoostRounds` + `guaranteedNextRound` |
-| `relic_board_exclusion` | 钉盘形态互斥 | 已拥有形态遗物时，其他形态遗物从候选池移除 |
-| `relic_save_restore` | 存档恢复验证 | `pendingRoundStartRewards` 持久化到 `localStorage` |
-
----
-
-## 与 AI 协作的测试流程
-
-1. **AI 修改代码** → 提交到仓库
-2. **静态校验**：`node tests/validate_scenarios.js`；若修改 Boss 机制，再运行 `node tests/validate_boss_vulnerability.mjs`
-3. **部署游戏**：`npm start` 或推送到测试环境
-4. **运行时验证**：`node tests/ai_test_runner.js --suite <目标套件>`
-5. **查看报告**：控制台输出通过/失败数量，失败项附带具体断言信息
-6. **如有失败**：AI 根据断言信息定位代码，修复后重新执行步骤 2-4
+- T1：全部语法检查与全部 `validate_*` 进程退出码为 0。
+- T3：四档视口全部用例通过，未归类运行时错误为 0，证据文件完整。
+- 若任一阶段失败，先修复并重跑完整受影响层；不得用单视口或部分专项结果声明集成完成。
