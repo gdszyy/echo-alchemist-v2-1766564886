@@ -3,8 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>回聲煉金師 (Echo Alchemist) - Ver 8.2 (Special Enemies)</title>
+    <title>回声炼金师 (Echo Alchemist) - Ver 8.2</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script>
+    // [美术模式] 首帧前给 <html> 加 art-pixel / art-bitmap 类（规则与 src/render/art_mode.js 一致：
+    // URL ?art=pixel|bitmap > localStorage ea_art_mode > 默认 pixel）。详见 docs/design/pixel_art_mode.md。
+    (function () {
+        var mode = 'pixel';
+        try {
+            var q = new URLSearchParams(location.search).get('art');
+            var s = localStorage.getItem('ea_art_mode');
+            if (q === 'pixel' || q === 'bitmap') mode = q;
+            else if (s === 'pixel' || s === 'bitmap') mode = s;
+        } catch (e) { /* storage blocked: keep default */ }
+        document.documentElement.classList.add('art-' + mode);
+    })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap');
@@ -391,11 +405,11 @@
             backdrop-filter: none !important;
             z-index: auto !important;
         }
-        /* PC 模式下隐藏 info-drawer 的关闭按鈕 */
+        /* PC 模式下隐藏 info-drawer 的关闭按钮 */
         body.pc-mode #pc-left-drawer-mount #info-drawer > button:first-child {
             display: none !important;
         }
-        /* PC 模式下隐藏战斗阶段的伤害统计浮动按鈕（drawer 已常驻在左侧边栏） */
+        /* PC 模式下隐藏战斗阶段的伤害统计浮动按钮（drawer 已常驻在左侧边栏） */
         body.pc-mode #damage-stats-btn {
             display: none !important;
         }
@@ -2484,7 +2498,7 @@
             pointer-events: none;
         }
 
-        /* --- 風 wind --- */
+        /* --- 风 wind --- */
         @keyframes wind-glow {
             0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 8px #34d399, 0 0 18px rgba(52,211,153,0.35); }
             50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 14px #6ee7b7, 0 0 28px rgba(110,231,183,0.5); }
@@ -2652,7 +2666,7 @@
             pointer-events: none;
         }
 
-        /* --- 共鳴 resonance --- */
+        /* --- 共鸣 resonance --- */
         @keyframes resonance-ripple {
             0%   { transform: scale(1);   opacity: 0.6; }
             100% { transform: scale(2.5); opacity: 0; }
@@ -2769,7 +2783,7 @@
             pointer-events: none;
         }
 
-        /* --- 純淨 white --- */
+        /* --- 纯净 white --- */
         @keyframes white-breathe {
             0%, 100% { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 6px rgba(248,250,252,0.5), 0 0 14px rgba(226,232,240,0.3); }
             50%       { box-shadow: inset -4px -4px 8px rgba(0,0,0,0.55), inset 3px 3px 6px rgba(255,255,255,0.25), 0 0 12px rgba(255,255,255,0.7), 0 0 24px rgba(248,250,252,0.4); }
@@ -2883,7 +2897,7 @@
             z-index: 40;
             align-items: flex-start; /* 改为向左对齐 */
         }
-        /* 當前彈藥卡片 */
+        /* 当前弹药卡片 */
         .recipe-card.current {
             background: rgba(30, 41, 59, 0.95);
             border: 1px solid #fbbf24;
@@ -2892,7 +2906,7 @@
             opacity: 1;
         }
 
-        /* 隊列中的彈藥卡片 */
+        /* 队列中的弹药卡片 */
         .recipe-card.queue {
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid #475569;
@@ -3135,14 +3149,14 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
             z-index: 10;
             
-            /* 默認隱藏 (縮小到0) */
+            /* 默认隐藏 (缩小到0) */
             transform: scale(0); 
             transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .recipe-multicast-badge.visible {
             transform: scale(1);
         }
-        /* --- [新增] 連射倍率特效 --- */
+        /* --- [新增] 连射倍率特效 --- */
         .flying-badge {
             position: fixed; /* 使用 fixed 以便跨容器定位 */
             z-index: 9999;
@@ -3159,19 +3173,19 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 0 15px #f97316;
-            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); /* 平滑飛行曲線 */
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); /* 平滑飞行曲线 */
         }
-        /* 激活狀態：顯示出來 */
+        /* 激活状态：显示出来 */
         .multicast-visible {
             opacity: 1 !important;
             transform: scale(1) !important;
         }
-        /* 到達目標時的消失狀態 */
+        /* 到达目标时的消失状态 */
         .flying-badge.arrived {
             transform: scale(0.5);
             opacity: 0;
         }
-        /* 獲得加成時的強力彈跳 */
+        /* 获得加成时的强力弹跳 */
         @keyframes multicastPopAnim {
             0% { transform: scale(1); }
             40% { transform: scale(1.8) rotate(10deg); filter: brightness(1.5); }
@@ -3182,7 +3196,7 @@
             animation: multicastPopAnim 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        /* 數值變化時的顏色閃光 */
+        /* 数值变化时的颜色闪光 */
         .multicast-flash {
             color: #fff !important;
             text-shadow: 0 0 10px #fff, 0 0 20px #fbbf24 !important;
@@ -4237,7 +4251,7 @@
             pointer-events: none; /* 关键：确保鼠标点击能穿透，不影响游戏操作 */
             z-index: 9999;        /* 确保覆盖在所有 UI 之上 */
             
-            /* 1. 扫描线 (Scanlines) - 使用线性渐变模拟 */
+            /* 1. 扫描线 - 使用线性渐变模拟 */
             background: linear-gradient(
                 to bottom,
                 rgba(255, 255, 255, 0),
@@ -4247,7 +4261,7 @@
             );
             background-size: 100% 4px; /* 每 4px 一条线 */
             
-            /* 2. 晕影 (Vignette) - 四周变暗，模拟老式显示器 */
+            /* 2. 晕影 - 四周变暗，模拟老式显示器 */
             box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
             
             /* 3. 混合模式 (可选，增加通透感) */
@@ -4375,7 +4389,7 @@
             text-shadow: 0 0 5px #fbbf24;
         }
         /* =====================================================
-         * 符文图标框架系统 (Rune Icon Frame System)
+         * 符文图标框架系统
          * 统一所有符文展示位置的视觉语言：
          *   - 黑底隔离 emoji，防止与背景融为一体
          *   - 稀有度边框颜色：common=灰 / rare=蓝 / epic=紫 / legendary=金
@@ -4742,7 +4756,7 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
-        /* Boss 节点悬停动画 */
+        /* 首领节点悬停动画 */
         .gameover-node-boss {
             animation: boss-node-pulse 2s ease-in-out infinite;
         }
@@ -4793,6 +4807,15 @@
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
     <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260626-skill-charge-right-panel">
+    <!-- 像素风：位图 url() → 程序化像素图变量（生成文件，仅像素模式由解析器同步插入，保证首帧不拉原图）
+         + Tailwind 颜色 → 像素调色板（生成文件）+ 像素主题层（均按 html.art-pixel 作用域，位图模式下不生效） -->
+    <script>
+    if (document.documentElement.classList.contains('art-pixel')) {
+        document.write('<link rel="stylesheet" id="pixel-assets-css" href="src/styles/pixel_assets.css?v=20261007-pixel-art">');
+        document.write('<link rel="stylesheet" id="pixel-palette-css" href="src/styles/pixel_palette.css?v=20261007-pixel-art">');
+    }
+    </script>
+    <link rel="stylesheet" href="src/styles/pixel_theme.css?v=20261007-pixel-art">
 </head>
 <body>
 <div id="app-wrapper">
@@ -4828,12 +4851,12 @@
     <!-- [tsk-f35c6d10] 回合开始大字提示横幅 -->
     <div id="round-start-banner" class="round-banner-hide">
         <div id="round-start-banner-card" class="round-start-banner-card">
-            <div id="round-start-banner-text">第 1 回合開始</div>
+            <div id="round-start-banner-text">第 1 回合开始</div>
             <div id="round-start-threat" class="round-start-threat is-hidden">
                 <span id="round-start-threat-icon" class="round-start-threat-icon is-silhouette" aria-hidden="true"></span>
                 <div class="round-start-threat-copy">
                     <span id="round-start-threat-kicker" class="round-start-threat-kicker">下一威胁</span>
-                    <span id="round-start-threat-label" class="round-start-threat-label">未知 Boss · 4 回合后</span>
+                    <span id="round-start-threat-label" class="round-start-threat-label">未知首领 · 4 回合后</span>
                     <span id="round-start-threat-meta" class="round-start-threat-meta">Round 5 · 剪影预告</span>
                 </div>
             </div>
@@ -4855,8 +4878,8 @@
 
     <!-- Phase Title Animation (中央淡入淡出，不再缩小到左上角) -->
     <div id="phase-title-container">
-        <div id="phase-title" class="phase-text">回聲煉金師</div>
-        <div id="phase-sub" class="phase-sub">點擊開始</div>
+        <div id="phase-title" class="phase-text">回声炼金师</div>
+        <div id="phase-sub" class="phase-sub">点击开始</div>
     </div>
 
     <!-- 统一顶部信息栏 -->
@@ -4881,7 +4904,7 @@
                         <b id="combat-next-threat-label">--</b>
                     </span>
                     <span class="combat-status-metric is-mobile-optional" title="敌方护盾层数">
-                        <img class="combat-status-icon" src="assets/ui/icons/enemy_affixes/affix_shield.png" alt="" aria-hidden="true">
+                        <img class="combat-status-icon" src="assets/ui/icons/enemy_affixes/affix_shield.png" alt="" aria-hidden="true" loading="lazy">
                         <b id="combat-shield-count">0</b>
                     </span>
                     <span class="combat-status-metric"><span class="combat-status-label">弹</span><b id="combat-ammo-count">0</b></span>
@@ -4953,7 +4976,7 @@
                     Echo Alchemist
                 </h1>
                 <p class="text-slate-400 text-sm tracking-[0.8em] opacity-60 font-serif border-t border-slate-800 pt-4 mt-2 mx-auto w-2/3">
-                    回聲煉金師
+                    回声炼金师
                 </p>
                 <div class="absolute -left-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
                 <div class="absolute -right-8 top-1/2 -translate-y-1/2 w-1 h-24 bg-gradient-to-b from-transparent via-amber-500/30 to-transparent"></div>
@@ -4961,15 +4984,15 @@
 
             <button onclick="game.meta_startRun()" class="btn-main w-72 py-5 mb-4 border border-indigo-400/30 shadow-[0_0_40px_rgba(79,70,229,0.2)] hover:scale-105 hover:shadow-[0_0_60px_rgba(79,70,229,0.4)] transition-all duration-300 group relative overflow-hidden bg-slate-900/80 rounded-xl">
                 <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-400/10 to-indigo-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                <span class="text-2xl font-[Cinzel] tracking-widest relative z-10 text-indigo-50 group-hover:text-white">開始煉成</span>
-                <div class="text-[10px] text-indigo-300/70 mt-1 font-sans tracking-wider uppercase">Initialize Sequence</div>
+                <span class="text-2xl font-[Cinzel] tracking-widest relative z-10 text-indigo-50 group-hover:text-white">开始炼成</span>
+                <div class="text-[10px] text-indigo-300/70 mt-1 font-sans tracking-wider uppercase">开始新的一局</div>
             </button>
-            <!-- [局内存档] 继续游戏按鈕，默认隐藏，有存档时由 JS 显示 -->
+            <!-- [局内存档] 继续游戏按钮，默认隐藏，有存档时由 JS 显示 -->
             <button id="meta-continue-btn" onclick="game.meta_continueRun()" style="display:none" class="w-72 py-3 mb-8 flex flex-col items-center justify-center border border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)] hover:scale-105 hover:shadow-[0_0_50px_rgba(16,185,129,0.3)] transition-all duration-300 group relative overflow-hidden bg-slate-900/70 rounded-xl cursor-pointer">
                 <div class="absolute inset-0 bg-gradient-to-r from-emerald-600/0 via-emerald-400/8 to-emerald-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                 <div class="flex items-center gap-2 relative z-10">
                     <span class="text-emerald-400 text-lg">▶</span>
-                    <span class="text-base font-bold tracking-widest text-emerald-100 group-hover:text-white">繼續上次游戲</span>
+                    <span class="text-base font-bold tracking-widest text-emerald-100 group-hover:text-white">继续上次游戏</span>
                 </div>
                 <div class="continue-round text-[10px] text-emerald-400/70 mt-0.5 font-sans tracking-wider">Round ?</div>
             </button>
@@ -4979,7 +5002,7 @@
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-900/20 group-hover:text-amber-400 transition-all shadow-inner">
                         <span class="text-2xl">⚒️</span>
                     </div>
-                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-amber-100">煉金工坊</span>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-amber-100">炼金工坊</span>
                 </button>
 
                 <button onclick="game.ui_openTruthBook()" class="flex flex-col items-center justify-center p-5 bg-slate-900/40 border border-slate-700/50 rounded-xl hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 group backdrop-blur-sm">
@@ -4993,7 +5016,7 @@
                     <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-red-900/20 group-hover:text-red-400 transition-all shadow-inner">
                         <span class="text-2xl">⚔️</span>
                     </div>
-                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-red-100">試煉場</span>
+                    <span class="text-xs text-slate-400 font-bold tracking-wider group-hover:text-red-100">试炼场</span>
                 </button>
             </div>
 
@@ -5004,7 +5027,7 @@
             <span class="text-sm">📖</span> 重新开始教程
         </button>
         <div class="absolute bottom-4 w-full text-center text-slate-700 text-[10px] font-[Cinzel] tracking-widest opacity-50">
-            Ver 9.2 (Meta Progression)
+            版本 9.2
         </div>
     </div>
 
@@ -5131,7 +5154,7 @@
                 <div class="mb-4 bg-amber-900/10 border border-amber-700/30 rounded-xl p-4">
                     <div class="flex items-center gap-2 mb-3">
                         <span class="text-amber-400">⚗️</span>
-                        <div class="text-xs text-amber-300/80 tracking-widest uppercase font-bold">合成爐</div>
+                        <div class="text-xs text-amber-300/80 tracking-widest uppercase font-bold">合成炉</div>
                         <div class="text-[10px] text-slate-500 ml-auto">选中 3 个同 ID 同等级符文</div>
                     </div>
                     <button id="rune-merge-btn"
@@ -5271,7 +5294,7 @@
                 <div id="runeword-preview-tooltip" class="hidden absolute left-1/2 -translate-x-1/2 bottom-full mb-4 w-[90%] bg-slate-800 border-2 border-amber-500/50 rounded-xl p-3 shadow-[0_0_30px_rgba(0,0,0,0.8)] z-[500] pointer-events-none">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-amber-400 text-sm">✨</span>
-                        <span class="text-amber-200 text-xs font-bold tracking-widest uppercase">預覽新觸發詞條</span>
+                        <span class="text-amber-200 text-xs font-bold tracking-widest uppercase">预览新触发词条</span>
                     </div>
                     <div id="runeword-preview-content" class="space-y-2">
                         <!-- 预览内容由 JS 动态生成 -->
@@ -5279,8 +5302,8 @@
                 </div>
 
                 <div class="flex justify-between items-center mb-4">
-                    <div class="text-sm text-purple-200 font-bold tracking-wider">選擇符文放入格子</div>
-                    <div class="text-[10px] text-slate-500 italic">長按可預覽詞条效果</div>
+                    <div class="text-sm text-purple-200 font-bold tracking-wider">选择符文放入格子</div>
+                    <div class="text-[10px] text-slate-500 italic">长按可预览词条效果</div>
                 </div>
                 
                 <div id="rune-picker-detail"></div>
@@ -5299,7 +5322,7 @@
                 <button type="button" onclick="game.phase_switchPhase('meta')" aria-label="返回主菜单" class="shop-back-button text-slate-400 hover:text-white transition-colors">
                     <span class="text-2xl">⬅️</span>
                 </button>
-                <h2 class="text-2xl font-[Cinzel] text-amber-100 tracking-widest">煉金工坊</h2>
+                <h2 class="text-2xl font-[Cinzel] text-amber-100 tracking-widest">炼金工坊</h2>
                 <div class="flex items-center gap-2">
                     <div class="flex items-center bg-slate-900/80 px-3 py-1 rounded-full border border-purple-500/30">
                         <span class="text-purple-400 mr-1">🔮</span>
@@ -5341,9 +5364,9 @@
                     </div>
                 </div>
                 <div class="preview-divider"></div>
-                <div class="preview-truth-label">真理之書</div>
+                <div class="preview-truth-label">真理之书</div>
                 <div id="preview-marble-desc"></div>
-                <div class="preview-peg-label">鉤釘 / 子彈效果</div>
+                <div class="preview-peg-label">钩钉 / 子弹效果</div>
                 <div id="preview-marble-peg"></div>
             </div>
             <div class="h-2 shrink-0"></div>
@@ -5353,7 +5376,7 @@
             
             <div class="selection-status-row">
                 <div class="min-w-0">
-                    <p class="selection-status-title"><span id="selection-mode-label">命運抉擇</span><span>已選 <span class="selection-count-pill"><span id="selected-count">0</span>/<span id="selected-required-count">3</span></span></span></p>
+                    <p class="selection-status-title"><span id="selection-mode-label">命运抉择</span><span>已选 <span class="selection-count-pill"><span id="selected-count">0</span>/<span id="selected-required-count">3</span></span></span></p>
                     <p id="selection-mode-subtitle" class="hidden" style="display:none;"></p>
                 </div>
                 <!-- 炼金台入口（选择阶段） -->
@@ -5364,13 +5387,13 @@
             </div>
             <div id="selection-choice-strip" class="selection-choice-strip" aria-live="polite"></div>
             <div id="selection-progress" class="selection-progress" aria-hidden="true"></div>
-            <button id="confirm-selection-btn" class="btn-main" disabled>開始煉金</button>
-            <!-- 跳过研磨按鈕（纯净精华命运时刻专用） -->
+            <button id="confirm-selection-btn" class="btn-main" disabled>开始炼金</button>
+            <!-- 跳过研磨按钮（纯净精华命运时刻专用） -->
             <button id="skip-grind-btn" onclick="game.sys_skipGrindGetRune()" style="display:none;" class="mt-2 flex items-center gap-1.5 px-4 py-2 bg-slate-800/80 border border-slate-600/60 rounded-lg text-xs text-slate-300 hover:bg-slate-700/80 hover:border-slate-400/80 hover:text-white transition-all duration-200">
                 <span>⏩</span>
-                <span>跳过研磨，隨機符文</span>
+                <span>跳过研磨，随机符文</span>
             </button>
-            <!-- 跳过混沌精华按鈕（混沌精华命运时刻专用：跳过 + 子弹老虎机升级） -->
+            <!-- 跳过混沌精华按钮（混沌精华命运时刻专用：跳过 + 子弹老虎机升级） -->
             <button id="skip-chaos-btn" onclick="game.sys_skipChaosEssenceUpgrade()" style="display:none;" class="mt-2 flex items-center gap-1.5 px-4 py-2 bg-purple-900/60 border border-purple-500/60 rounded-lg text-xs text-purple-200 hover:bg-purple-800/70 hover:border-purple-300/80 hover:text-white transition-all duration-200">
                 <span>🎰</span>
                 <span>跳过混沌，升级当前子弹</span>
@@ -5382,7 +5405,7 @@
     <!-- [chaos-skip-upgrade] 混沌精华跳过：子弹老虎机升级覆盖层 -->
     <div id="chaos-slot-machine-overlay" style="display:none; position: fixed; inset: 0; z-index: 500; background: rgba(2, 6, 23, 0.92); backdrop-filter: blur(8px); pointer-events: auto; align-items: center; justify-content: center; flex-direction: column;">
         <div style="text-align: center; margin-bottom: 18px;">
-            <div style="font-family: 'Cinzel', serif; font-size: 22px; color: #f0abfc; letter-spacing: 4px; text-shadow: 0 0 18px rgba(192, 132, 252, 0.7);">CHAOS UPGRADE</div>
+            <div style="font-family: 'Cinzel', serif; font-size: 22px; color: #f0abfc; letter-spacing: 4px; text-shadow: 0 0 18px rgba(192, 132, 252, 0.7);">混沌升级</div>
             <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">混沌精华：升级当前子弹</div>
         </div>
         <div id="chaos-slot-machine-slots" style="display: flex; gap: 18px; justify-content: center; align-items: center;"></div>
@@ -5393,7 +5416,7 @@
     <!-- Phase 1: Gathering -->
     <div id="phase-gathering" class="ui-overlay" style="display: none;">
         <div class="absolute top-24 w-full text-center pointer-events-none">
-            <p class="text-xs text-cyan-100/40">點擊上方區域釋放</p>
+            <p class="text-xs text-cyan-100/40">点击上方区域释放</p>
         </div>
 
         <div id="hero-gauge-container" class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
@@ -5500,7 +5523,7 @@
         <div class="flex flex-col w-full h-full p-6">
             <!-- Header -->
             <div class="flex justify-between items-center mb-6 shrink-0">
-                <h2 id="truth-book-title" class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之书 <span class="text-sm text-slate-500 ml-2">Liber Veritatis</span></h2>
+                <h2 id="truth-book-title" class="text-3xl font-[Cinzel] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">真理之书</h2>
                 <button type="button" onclick="game.ui_closeTruthBook()" aria-label="关闭真理之书" class="truth-book-close w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:bg-red-900/40 hover:text-red-400 transition-all">✕</button>
             </div>
 
@@ -5519,7 +5542,7 @@
                 <div id="truth-detail-panel" class="flex-1 flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden relative shadow-2xl">
     <div id="truth-empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-700">
         <span class="text-6xl mb-4 opacity-50">🔮</span>
-        <p class="font-[Cinzel] tracking-widest text-sm">SELECT AN ENTRY TO ANALYZE</p>
+        <p class="font-[Cinzel] tracking-widest text-sm">选择左侧条目查看详情</p>
     </div>
     
     <div id="truth-content" class="hidden flex flex-col h-full relative">
@@ -5540,7 +5563,7 @@
         <div class="flex-1 relative bg-[#020617] overflow-hidden group">
             <div class="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none">
                 <div class="bg-cyan-950/80 backdrop-blur-md px-3 py-1 rounded border-l-2 border-cyan-400 text-[10px] text-cyan-300 tracking-widest uppercase shadow-[0_0_15px_rgba(6,182,212,0.1)]">
-                    SIMULATION MATRIX
+                    演示模拟
                 </div>
                 <div class="text-[9px] text-cyan-700 font-mono" id="truth-sim-time">T: 000</div>
             </div>
@@ -5567,8 +5590,8 @@
         <div class="relic-shell flex flex-col items-center justify-center w-full h-full p-4">
             
             <div class="relic-title-block text-center mb-8">
-                <h2 class="text-4xl font-bold text-amber-400 font-[Cinzel] mb-2 drop-shadow-lg">古代遺物</h2>
-                <p class="text-slate-400 text-sm">命運的饋贈，選擇一種力量</p>
+                <h2 class="text-4xl font-bold text-amber-400 font-[Cinzel] mb-2 drop-shadow-lg">古代遗物</h2>
+                <p class="text-slate-400 text-sm">命运的馈赠，选择一种力量</p>
             </div>
 
             <div id="relic-container" class="flex flex-wrap justify-center gap-4 w-full max-w-4xl">
@@ -5577,7 +5600,7 @@
             <div id="relic-preview-panel"></div>
 
             <button onclick="game.ui_skipRelic()" id="relic-skip-to-shop-btn" class="mt-3 text-purple-400 hover:text-purple-200 text-sm underline cursor-pointer transition-colors">
-                放棄遺物 → 進入局內商店
+                放弃遗物：前往商人
             </button>
         </div>
     </div>
@@ -5593,10 +5616,10 @@
         <button onclick="game.ui.closeDrawer()" class="absolute top-2 right-2 text-slate-400 hover:text-white p-2">✕</button>
 
         <div class="flex border-b border-slate-700 bg-slate-900/50">
-            <button class="flex-1 py-3 text-sm font-bold text-amber-400 border-b-2 border-amber-400 tab-btn transition-colors" onclick="game.ui.switchTab('status')">敵人狀態</button>
-            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('affix')">特殊詞條</button>
-            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('recipe')">配方圖鑑</button>
-            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('damage')">傷害統計</button>
+            <button class="flex-1 py-3 text-sm font-bold text-amber-400 border-b-2 border-amber-400 tab-btn transition-colors" onclick="game.ui.switchTab('status')">敌人状态</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('affix')">特殊词条</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('recipe')">配方图鉴</button>
+            <button class="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-200 tab-btn transition-colors" onclick="game.ui.switchTab('damage')">伤害统计</button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 relative">
@@ -5610,7 +5633,7 @@
                 <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden relative mt-1">
                     <div id="info-temp-bar" class="h-full bg-orange-500 absolute transition-all" style="width: 0%; left: 50%;"></div>
                     <div class="absolute top-0 bottom-0 w-0.5 bg-white/50 left-1/2"></div> </div>
-                <p id="info-temp-text" class="text-xs text-center text-slate-400 mt-1">溫度: 0°C</p>
+                <p id="info-temp-text" class="text-xs text-center text-slate-400 mt-1">温度: 0°C</p>
 
                 <div id="info-status-list" class="space-y-2 text-xs text-slate-300 mt-2">
                     </div>
@@ -5618,39 +5641,39 @@
 
             <div id="tab-affix" class="tab-content hidden h-full space-y-2 overflow-y-auto">
                 <div id="info-affix-list" class="space-y-2">
-                    <p class="text-slate-500 text-center italic mt-4">該敵人無特殊詞條</p>
+                    <p class="text-slate-500 text-center italic mt-4">该敌人无特殊词条</p>
                 </div>
             </div>
 
             <div id="tab-recipe" class="tab-content hidden h-full overflow-y-auto text-xs space-y-3">
                 <div class="grid grid-cols-2 gap-2">
                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-green-400 font-bold mb-1">⤴️ 彈性 (Bounce)</div>
-                        <div class="text-slate-400">在敵人之間彈射，增加命中次數。</div>
+                        <div class="text-green-400 font-bold mb-1">⤴️ 弹性</div>
+                        <div class="text-slate-400">在敌人之间弹射，增加命中次数。</div>
                     </div>
                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-red-400 font-bold mb-1">↗️ 穿透 (Pierce)</div>
-                        <div class="text-slate-400">穿透敵人，對後排造成傷害。</div>
+                        <div class="text-red-400 font-bold mb-1">↗️ 穿透</div>
+                        <div class="text-slate-400">穿透敌人，对后排造成伤害。</div>
                     </div>
                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-yellow-400 font-bold mb-1">🔱 散射 (Scatter)</div>
-                        <div class="text-slate-400">分裂出額外子彈，擴大打擊面。</div>
+                        <div class="text-yellow-400 font-bold mb-1">🔱 散射</div>
+                        <div class="text-slate-400">分裂出额外子弹，扩大打击面。</div>
                     </div>
                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-cyan-400 font-bold mb-1">❄️ 冰霜 (Cryo)</div>
-                        <div class="text-slate-400">降低溫度。極寒可凍結敵人(無法行動)。</div>
+                        <div class="text-cyan-400 font-bold mb-1">❄️ 冰霜</div>
+                        <div class="text-slate-400">降低温度。极寒可冻结敌人(无法行动)。</div>
                     </div>
                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-orange-400 font-bold mb-1">🔥 火焰 (Pyro)</div>
-                        <div class="text-slate-400">升高溫度。過熱造成持續傷害與燃燒擴散。</div>
+                        <div class="text-orange-400 font-bold mb-1">🔥 火焰</div>
+                        <div class="text-slate-400">升高温度。过热造成持续伤害与燃烧扩散。</div>
                     </div>
                     <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-purple-400 font-bold mb-1">⚡ 閃電 (Lightning)</div>
-                        <div class="text-slate-400">對最近敵人造成連鎖傷害。</div>
+                        <div class="text-purple-400 font-bold mb-1">⚡ 闪电</div>
+                        <div class="text-slate-400">对最近敌人造成连锁伤害。</div>
                     </div>
                      <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                        <div class="text-sky-400 font-bold mb-1">🔦 光球 (Laser)</div>
-                        <div class="text-slate-400">瞬時射線，根據反射面進行折射。</div>
+                        <div class="text-sky-400 font-bold mb-1">🔦 光球</div>
+                        <div class="text-slate-400">瞬时射线，根据反射面进行折射。</div>
                     </div>
                 </div>
             </div>
@@ -5671,7 +5694,7 @@
             <div class="pause-dialog-header flex items-center justify-between px-5 mb-4">
                 <div>
                     <h2 id="pause-title" class="text-2xl font-bold text-slate-100 font-[Cinzel] tracking-wide">游戏暂停</h2>
-                    <p class="text-slate-500 text-xs mt-0.5">PAUSED</p>
+                    <p class="text-slate-500 text-xs mt-0.5">游戏已暂停</p>
                 </div>
                 <button type="button" onclick="game.ui_closePause()" aria-label="关闭暂停菜单并继续游戏" class="pause-close-button w-9 h-9 flex items-center justify-center rounded-full bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 transition-all text-lg">&#x2715;</button>
             </div>
@@ -5699,6 +5722,12 @@
                         <span class="ps-icon">📺</span>
                         <span class="ps-label">CRT 特效</span>
                         <span class="ps-badge" id="pause-crt-badge">关闭</span>
+                    </button>
+
+                    <button type="button" class="pause-setting-row" id="pause-art-mode-row" onclick="game.sys_toggleArtMode()">
+                        <span class="ps-icon">👾</span>
+                        <span class="ps-label">像素画风（切换后重新载入）</span>
+                        <span class="ps-badge" id="pause-art-mode-badge">开启</span>
                     </button>
 
                     <!-- 音量控制滑块 -->
@@ -5765,7 +5794,7 @@
 
 
 <script>
-const APP_ASSET_CACHE_VERSION = '20260626-pass12-elite-golem-combos';
+const APP_ASSET_CACHE_VERSION = '20261007-pixel-art';
 
 async function clearStaleAssetCaches() {
     if (!('caches' in window)) return;
@@ -5806,6 +5835,9 @@ async function clearStaleAssetCaches() {
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
 <script type="module">
 // ==================== 模块化导入 (v2 - EventBus 架构) ====================
+// [美术模式] 必须先于 core.js 求值：像素模式的图片路径兜底要在任何模块创建 Image 之前就位
+import './src/render/art_boot.js';
+import { getArtMode, setArtModeAndReload } from './src/render/art_mode.js';
 import { Game, audio, eventBus } from './src/core.js';
 
 // ==================== 创建全局游戏实例 ====================
@@ -5848,6 +5880,12 @@ game.sys_toggleCrt = () => {
     isCrtOn = !isCrtOn;
     localStorage.setItem('ea_crt_enabled', isCrtOn);
     updateCrtVisuals();
+};
+
+// --- 美术模式（像素风 / 位图）切换：持久化后重新载入（Pixi 与样式表在启动时决定） ---
+game.sys_toggleArtMode = () => {
+    try { if (typeof game.sys_saveRunState === 'function') game.sys_saveRunState(); } catch (e) { /* best effort */ }
+    setArtModeAndReload(getArtMode() === 'pixel' ? 'bitmap' : 'pixel');
 };
 
 // --- 静音切换 ---

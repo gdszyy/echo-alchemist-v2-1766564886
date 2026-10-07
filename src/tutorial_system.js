@@ -62,8 +62,8 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 1 步：开始游戏按鈕 ─────────────────────────────────────────────────────
-    // 高亮「開始練成」按鈕，卡片固定在屏幕底部，不遮挡按钮，教程等待事件自动前进
+    // ── 第 1 步：开始游戏按钮 ─────────────────────────────────────────────────────
+    // 高亮「开始练成」按钮，卡片固定在屏幕底部，不遮挡按钮，教程等待事件自动前进
     {
         id: 'start_run',
         phase: 'meta',
@@ -71,9 +71,9 @@ const TUTORIAL_STEPS = [
         highlightSelector: 'button[onclick="game.meta_startRun()"]',
         title: '开始一局游戏',
         content: `
-            <p>点击高亮的「<strong>開始練成</strong>」按鈕，开始新的一局冒险。</p>
+            <p>点击高亮的「<strong>开始练成</strong>」按钮，开始新的一局冒险。</p>
             <p class="mt-2">每一局都是独立的旅程，你需要收集弹珠、击败敌人。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方高亮按鈕，教程自动继续</p>
+            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方高亮按钮，教程自动继续</p>
         `,
         position: 'top',
         noOverlay: false,
@@ -583,7 +583,7 @@ export const tutorial_system = {
         const isLast = index === total - 1;
 
         const indicator = document.getElementById('tutorial-step-indicator');
-        if (indicator) indicator.textContent = `Step ${index + 1} / ${total}`;
+        if (indicator) indicator.textContent = `第 ${index + 1} / ${total} 步`;
 
         const progressBar = document.getElementById('tutorial-progress-bar');
         if (progressBar) progressBar.style.width = `${progress}%`;

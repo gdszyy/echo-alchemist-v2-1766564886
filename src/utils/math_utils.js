@@ -63,7 +63,7 @@ function lerpColor(a, b, amount) {
 }
 
 /**
- * 線性插值函數 (Linear Interpolation)
+ * 线性插值函数 (Linear Interpolation)
  */
 function lerp(start, end, t) {
     return start * (1 - t) + end * t;

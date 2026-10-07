@@ -7,7 +7,9 @@
  *   const src = AMMO_ICON_MAP['pyro'] ?? AMMO_ICON_MAP['default'];
  *
  * 路径约定：相对于 index.html 所在目录（项目根目录）
+ * 像素模式：versionBitmapSrc 经 resolveArtSrc 换成程序化像素图（src/pixel/art_registry.js，docs/design/pixel_art_mode.md）
  */
+import { resolveArtSrc } from './render/art_mode.js';
 
 // ============================================================
 // Task 5.A5 — 弹药法球图标映射（属性 32×32）
@@ -15,9 +17,12 @@
 // ============================================================
 const BITMAP_ASSET_VERSION = '20260625-enemy-affix-muted1';
 
+// 像素模式下换成程序化像素图的 data URL（src/pixel/art_registry.js；位图模式原样返回）。
+// 这里显式解析，是因为这些路径也会写进 CSS 变量 url(...)，不经过 img.src 兜底。
 function versionBitmapSrc(path) {
     if (!path) return path;
-    return path.includes('?') ? `${path}&v=${BITMAP_ASSET_VERSION}` : `${path}?v=${BITMAP_ASSET_VERSION}`;
+    const versioned = path.includes('?') ? `${path}&v=${BITMAP_ASSET_VERSION}` : `${path}?v=${BITMAP_ASSET_VERSION}`;
+    return resolveArtSrc(versioned);
 }
 
 export const AMMO_ICON_MAP = {
@@ -156,9 +161,9 @@ export const RELIC_ICON_MAP = {
 };
 
 // ============================================================
-// 敵人視覺 V2 — 基底圖標映射（圖鑒 / 試煉場 / 結算頁引用）
-// key 為 baseArchetype（與 Enemy.baseArchetype 對齊）
-// 來源 metadata：src/data/enemy_v2_metadata.js（單一資料源）
+// 敌人视觉 V2 — 基底图标映射（图鉴 / 试炼场 / 结算页引用）
+// key 为 baseArchetype（与 Enemy.baseArchetype 对齐）
+// 来源 metadata：src/data/enemy_v2_metadata.js（单一资料源）
 // ============================================================
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from './data/enemy_v2_metadata.js';
 
@@ -170,8 +175,8 @@ export const ENEMY_V2_ICON_MAP = ENEMY_V2_METADATA.reduce((acc, m) => {
 }, {});
 
 /**
- * 通过 baseArchetype / id / resourceId 获取 V2 敵人圖標路徑。
- * 找不到返回 null（UI 應 fallback 到 emoji 或文字標籤）。
+ * 通过 baseArchetype / id / resourceId 获取 V2 敌人图标路径。
+ * 找不到返回 null（UI 应 fallback 到 emoji 或文字标签）。
  * @param {string} key
  * @returns {string|null}
  */

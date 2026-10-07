@@ -133,10 +133,10 @@ export const calc_utils = {
 
 /**
      * @method isAreaOccupied
-     * @description 檢查指定區域是否被其他敵人佔用 (修正版：基于逻辑目标位置判断)
+     * @description 检查指定区域是否被其他敌人占用 (修正版：基于逻辑目标位置判断)
      */
     calc_isAreaOccupied(x, y, w, h, excludeEnemy = null) {
-        // 定義检测区域的邊界
+        // 定义检测区域的边界
         const l1 = x - w / 2;
         const r1 = x + w / 2;
         const t1 = y - h / 2;
@@ -183,7 +183,7 @@ export const calc_utils = {
             const eTop = enemyY - e.height / 2;
             const eBottom = enemyY + e.height / 2;
 
-            // AABB 碰撞檢測 (保留 margin 防止边缘误触)
+            // AABB 碰撞检测 (保留 margin 防止边缘误触)
             if (l1 < eRight - margin &&
                 r1 > eLeft + margin &&
                 t1 < eBottom - margin &&
@@ -194,7 +194,7 @@ export const calc_utils = {
         return false;
     },
 
-//  計算波浪的動態速度
+//  计算波浪的动态速度
     // [修正] 计算波浪的动态速度
     /**
      */

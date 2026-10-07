@@ -1,0 +1,424 @@
+/*
+ * pixel_theme.css — 像素风主题层（只在 html.art-pixel 下生效；位图模式完全不受影响）
+ *
+ * 职责：DOM 界面跟随像素画风——像素字体、最近邻放大、去掉模糊光晕与毛玻璃、方角、硬边投影。
+ * 位图资源本身的替换由生成文件 pixel_assets.css 负责（tools/pixel_art/gen_pixel_css.py）。
+ * 规格：docs/design/pixel_art_mode.md
+ */
+
+@font-face {
+    font-family: 'Fusion Pixel 12px Proportional SC';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    /* OFL-1.1, TakWolf — assets/fonts/FUSION-PIXEL-OFL-LICENSE.txt */
+    src: url('../../assets/fonts/fusion-pixel-12px-proportional-sc.woff2') format('woff2');
+}
+
+html.art-pixel {
+    --px-font: 'Fusion Pixel 12px Proportional SC', 'Noto Serif TC', monospace;
+    --px-ink: #0c0a14;
+    --px-shadow: 0 2px 0 rgba(6, 4, 12, 0.85);
+}
+
+/* ---- 最近邻：主画布、图片、背景图、9 宫格边框 ---- */
+html.art-pixel #gameCanvas,
+html.art-pixel #truth-demo-canvas,
+html.art-pixel img,
+html.art-pixel * {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+/* ---- 像素字体（emoji 等缺字仍由系统字体兜底） ---- */
+html.art-pixel body,
+html.art-pixel body *:not(svg):not(svg *) {
+    font-family: var(--px-font) !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
+}
+
+/* ---- 去模糊：文字光晕 → 硬边投影；盒阴影光晕 → 无；毛玻璃 → 无 ---- */
+html.art-pixel body * {
+    text-shadow: none !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 面板、卡片、按钮、胶囊改方角；真正的「球 / 点」（弹珠、法球、进度点）保留圆形，
+   伪元素（弹珠特效层）不受影响 */
+/* 注意：:not() 之间不能换行——空白会变成后代选择器 */
+html.art-pixel body *:not(.rounded-full,.gathering-ammo-orb,.ammo-icon,.ammo-indicator,.select-icon,.select-icon-shine,#preview-marble-ball,.queue-dot,.combat-status-dot,.selection-progress-dot,.potion-orbit-dot,.potion-furnace-core,.potion-furnace-orbit,.potion-draft-rune__empty-dot,.pause-volume-slider) {
+    border-radius: 0 !important;
+}
+
+/* 标题与按钮文字保留一层 1 像素硬边投影，深色背景上依旧可读 */
+html.art-pixel h1,
+html.art-pixel h2,
+html.art-pixel h3,
+html.art-pixel button,
+html.art-pixel .btn-main,
+html.art-pixel .relic-card,
+html.art-pixel .round-start-banner-card,
+html.art-pixel #phase-title-container * {
+    text-shadow: 1px 1px 0 var(--px-ink), 0 2px 0 rgba(6, 4, 12, 0.7) !important;
+}
+
+/* 渐变裁切文字（标题金字）：投影会盖住裁切出来的渐变，必须去掉 */
+html.art-pixel .bg-clip-text,
+html.art-pixel [class*="bg-clip-text"] {
+    text-shadow: none !important;
+}
+
+/* 主按钮/卡片：用 2 像素实线边 + 底部硬阴影代替柔光 */
+html.art-pixel .btn-main,
+html.art-pixel .relic-card,
+html.art-pixel .settings-item,
+html.art-pixel .pause-setting-row {
+    box-shadow: var(--px-shadow) !important;
+}
+
+/* ---- 局内 HUD 改由画布即时绘制（src/pixel/hud_combat.js），旧 DOM HUD 在像素模式下隐藏 ---- */
+html.art-pixel #unified-top-bar,
+html.art-pixel #run-shop-status-dock,
+html.art-pixel #combat-bottom-dock,
+html.art-pixel #combat-message,
+html.art-pixel #hero-gauge-container,
+html.art-pixel #phase-gathering > .bottom-panel,
+html.art-pixel #phase-gathering > .absolute.top-24 {
+    display: none !important;
+}
+
+/* 透明热区：外观在画布上，这里只负责点击 / 焦点 / 读屏 */
+#px-hud-hotspots {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+}
+html.art-bitmap #px-hud-hotspots {
+    display: none;
+}
+#px-hud-hotspots .px-hotspot {
+    position: absolute;
+    pointer-events: auto;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+#px-hud-hotspots .px-hotspot[aria-disabled="true"] {
+    cursor: not-allowed;
+}
+#px-hud-hotspots .px-hotspot:focus-visible {
+    outline: 2px dashed #86ecea;
+    outline-offset: 0;
+}
+
+/* ---- 钉盘倾斜：CSS 3D 透视会把像素网格重采样成梯形，像素模式下关闭 ---- */
+html.art-pixel #game-container {
+    transform: none !important;
+}
+
+/* 容器背景的径向渐变换成纯色，避免缓冲留边处出现平滑渐变 */
+html.art-pixel #game-container {
+    background: #07070c !important;
+}
+
+/* =====================================================================
+ * 组件换装（菜单与弹层）：与画布 HUD 同一套像素组件（src/pixel/dom_kit.js 生成九宫格 → CSS 变量）
+ * 外框宽 = 3 个美术像素 = calc(3 * var(--px))，与画布同一像素尺度。
+ * ===================================================================== */
+
+/* 弹层底：去掉旧位图底图，半透明压暗，让画布上的像素场景透出来 */
+html.art-pixel.px-kit-ready #phase-meta,
+html.art-pixel.px-kit-ready #phase-relic,
+html.art-pixel.px-kit-ready #phase-shop,
+html.art-pixel.px-kit-ready #phase-selection,
+html.art-pixel.px-kit-ready #phase-truth-book,
+html.art-pixel.px-kit-ready #phase-gameover,
+html.art-pixel.px-kit-ready #phase-pause {
+    background-image: none !important;
+    background-color: rgba(7, 6, 12, 0.9) !important;
+}
+html.art-pixel.px-kit-ready #phase-meta {
+    background-color: rgba(7, 6, 12, 0.35) !important;
+}
+
+/* 面板：磨石面板九宫格 */
+html.art-pixel.px-kit-ready :is(.rune-launcher-card, .skill-editor-modal, .round-start-banner-card,
+    .potion-status-card, .potion-notes-card, .potion-inventory-card, .potion-furnace-card,
+    #info-drawer, #toast, .pause-setting-row, .pause-volume-row, .pause-perf-row, #settings-panel),
+html.art-pixel.px-kit-ready :is(#phase-meta, #phase-relic, #phase-shop, #phase-selection, #phase-truth-book,
+    #phase-gameover, #phase-pause, #run-shop-overlay, #run-shop-offer-overlay, #phase-rune-launcher)
+    :is(.border, .border-2):not(button):not(.relic-card) {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-panel) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+}
+html.art-pixel.px-kit-ready .round-start-banner-card {
+    border-image: var(--px-frame-panel-trim) 4 fill / calc(4 * var(--px)) stretch !important;
+}
+/* 不挂 px-kit-ready：横幅在页面加载时就已存在（透明），等组件就绪再关会先把旧位图下载一遍 */
+html.art-pixel .round-start-banner-card::before,
+html.art-pixel #round-start-banner-card::before,
+html.art-pixel .round-start-threat {
+    background-image: none !important;
+    animation: none !important; /* 旧横幅动画在关键帧里切位图，像素模式不用 */
+}
+
+/* 按钮：唯一可点外观——黄铜框 */
+html.art-pixel.px-kit-ready button:not(.px-hotspot):not(.tab-btn):not(.relic-card) {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-button) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+    color: #f0f3f5;
+}
+html.art-pixel.px-kit-ready button:not(.px-hotspot):not(.tab-btn):not(.relic-card):active {
+    border-image-source: var(--px-frame-button-pressed) !important;
+    transform: translateY(var(--px)) !important;
+}
+html.art-pixel.px-kit-ready button:not(.px-hotspot):is(:disabled, [aria-disabled="true"]) {
+    border-image-source: var(--px-frame-button-disabled) !important;
+    color: #606b79 !important;
+}
+/* 页签：未选为内凹槽，选中为带黄铜角扣的面板 */
+html.art-pixel.px-kit-ready .tab-btn {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-inset) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+}
+html.art-pixel.px-kit-ready .tab-btn:is(.active, [aria-selected="true"], .text-amber-400) {
+    border-image: var(--px-frame-panel-trim) 4 fill / calc(4 * var(--px)) stretch !important;
+}
+
+/* 稀有度：一条刻度贯穿遗物 / 符文（docs/design/pixel_art_mode.md §3.4） */
+html.art-pixel.px-kit-ready .relic-card,
+html.art-pixel.px-kit-ready .rune-icon-frame.rarity-common {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-common) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+}
+html.art-pixel.px-kit-ready :is(.relic-card.rare, .rune-icon-frame.rarity-rare) {
+    border-image-source: var(--px-frame-rare) !important;
+}
+html.art-pixel.px-kit-ready :is(.relic-card.epic, .rune-icon-frame.rarity-epic) {
+    border-image-source: var(--px-frame-epic) !important;
+}
+html.art-pixel.px-kit-ready :is(.relic-card.legendary, .rune-icon-frame.rarity-legendary) {
+    border-image-source: var(--px-frame-legendary) !important;
+}
+html.art-pixel.px-kit-ready .relic-card.cursed {
+    border-image-source: var(--px-frame-cursed) !important;
+}
+html.art-pixel.px-kit-ready .relic-card:is(.previewing, .selected) {
+    outline: var(--px) solid #fde9a6;
+    outline-offset: var(--px);
+}
+
+/* ---- 稀有度框的统一入口：C/B/A/S（子弹、弹珠卡）= 普通/稀有/史诗/传说（遗物、符文） ---- */
+html.art-pixel.px-kit-ready :is(#phase-selection .select-card, .px-ammo-card) {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-common) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+}
+html.art-pixel.px-kit-ready :is(#phase-selection .select-card, .px-ammo-card)[data-tier="B"] { border-image-source: var(--px-frame-rare) !important; }
+html.art-pixel.px-kit-ready :is(#phase-selection .select-card, .px-ammo-card)[data-tier="A"] { border-image-source: var(--px-frame-epic) !important; }
+html.art-pixel.px-kit-ready :is(#phase-selection .select-card, .px-ammo-card)[data-tier="S"] { border-image-source: var(--px-frame-legendary) !important; }
+html.art-pixel.px-kit-ready :is(#phase-selection .select-card.selected, .px-ammo-card.is-selected) {
+    outline: var(--px) solid #fde9a6 !important;
+    outline-offset: calc(-1 * var(--px));
+}
+
+/* 选弹珠卡：CSS 渐变球换成程序化像素弹珠（.select-icon-emoji 里的图标即是） */
+html.art-pixel #phase-selection .select-card::before { display: none !important; }
+html.art-pixel :is(.select-icon, .select-icon-shine) { display: none !important; }
+html.art-pixel :is(#phase-selection, body) .select-icon-wrap {
+    width: auto !important; height: auto !important;
+    background: none !important; filter: none !important; border-radius: 0 !important;
+}
+html.art-pixel :is(#phase-selection, body) .select-icon-emoji {
+    position: static !important; filter: none !important;
+    width: auto !important; height: auto !important; background: none !important;
+}
+/* 弹珠 16 美术像素 × 2 整数倍，填满卡片上半部（74px 卡高：48 + 名称） */
+html.art-pixel :is(#phase-selection, body) .select-icon-emoji img {
+    width: calc(32 * var(--px)) !important;
+    height: calc(32 * var(--px)) !important;
+    filter: none !important;
+    image-rendering: pixelated;
+}
+html.art-pixel .select-card.selected::after {
+    content: '已选' !important;
+    border-radius: 0 !important;
+    background: #d29c2a !important;
+    color: #07060c !important;
+    font-size: 10px !important;
+    letter-spacing: 0 !important;
+    padding: 0 3px !important;
+}
+html.art-pixel #preview-marble-ball.px-marble-ball,
+html.art-pixel .px-marble-ball {
+    border-radius: 0 !important;
+    image-rendering: pixelated;
+}
+html.art-pixel .px-marble-ball::after { display: none !important; }
+
+/* 子弹卡（替换弹药）：src/pixel/dom_cards.js */
+html.art-pixel .px-ammo-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: calc(2 * var(--px));
+    align-self: start;
+    padding: calc(2 * var(--px));
+    color: #f0f3f5;
+    cursor: pointer;
+    user-select: none;
+    min-width: 0;
+}
+html.art-pixel .px-ammo-card__head { display: flex; align-items: center; gap: calc(2 * var(--px)); min-width: 0; }
+html.art-pixel .px-ammo-card__marble { width: calc(16 * var(--px)); height: calc(16 * var(--px)); flex: none; }
+html.art-pixel .px-ammo-card__title { min-width: 0; line-height: 1.15; }
+html.art-pixel .px-ammo-card__name { font-size: 12px; color: #f0f3f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.art-pixel .px-ammo-card__tier { font-size: 10px; color: #a9b2bc; }
+html.art-pixel .px-ammo-card__tier.tier-B { color: #8fcbff; }
+html.art-pixel .px-ammo-card__tier.tier-A { color: #cf9cf2; }
+html.art-pixel .px-ammo-card__tier.tier-S { color: #efc75a; }
+html.art-pixel .px-ammo-card__dmg {
+    display: flex; align-items: center; gap: calc(2 * var(--px));
+    padding: var(--px) calc(2 * var(--px));
+    border-style: solid; border-width: calc(3 * var(--px));
+    border-image: var(--px-frame-inset) 3 fill / calc(3 * var(--px)) stretch;
+    font-size: 12px;
+}
+html.art-pixel .px-ammo-card__dmg b { color: #f0f3f5; }
+html.art-pixel .px-ammo-card__dim { color: #606b79; font-size: 10px; }
+html.art-pixel .px-ammo-card__mc { margin-left: auto; color: #f8e34a; }
+html.art-pixel .px-ammo-card__icon { width: calc(9 * var(--px)); height: calc(9 * var(--px)); flex: none; }
+html.art-pixel .px-ammo-card__attrs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--px); }
+html.art-pixel .px-ammo-card__attr { display: flex; align-items: center; gap: calc(2 * var(--px)); font-size: 11px; color: #a9b2bc; }
+html.art-pixel .px-ammo-card__attr b { margin-left: auto; color: #f0f3f5; }
+html.art-pixel .px-ammo-card__empty { font-size: 11px; color: #606b79; }
+html.art-pixel .px-ammo-card__badge {
+    position: absolute; top: calc(-3 * var(--px)); right: calc(2 * var(--px));
+    background: #d29c2a; color: #07060c; font-size: 10px; padding: 0 3px;
+}
+
+/* ---- 炼金台（#phase-rune-launcher）：旧位图框 → 像素组件 ---- */
+html.art-pixel.px-kit-ready :is(#rune-launcher-content > div, #rune-management-panel > div:not(#rune-action-result),
+    #rune-potion-panel > div, #rune-codex-panel > div:not(:first-child), #rune-stats-summary, #rune-resonance-summary, .rune-list-card) {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-panel) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+}
+html.art-pixel.px-kit-ready :is(#rune-inventory-container, #rune-management-inventory, #potion-rune-inventory) {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-inset) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+}
+html.art-pixel.px-kit-ready #rune-grid-container {
+    border-style: solid !important;
+    border-width: calc(4 * var(--px)) !important;
+    border-image: var(--px-frame-panel-trim) 4 fill / calc(4 * var(--px)) stretch !important;
+    background: none !important;
+    gap: calc(3 * var(--px)) !important;
+    padding: calc(3 * var(--px)) !important;
+}
+html.art-pixel.px-kit-ready .rune-grid-cell {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-inset) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+    filter: none !important;
+}
+html.art-pixel.px-kit-ready .rune-grid-cell:hover,
+html.art-pixel.px-kit-ready .rune-grid-cell[data-active="1"] {
+    border-image-source: var(--px-frame-button) !important;
+}
+html.art-pixel.px-kit-ready .rune-grid-cell[data-state="filled"] {
+    border-image-source: var(--px-frame-panel) !important;
+}
+html.art-pixel .rune-grid-cell.rune-slot-place::after { display: none !important; }
+html.art-pixel.px-kit-ready :is(#rune-tab-launcher, #rune-tab-management, #rune-tab-potion, #rune-tab-codex) {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-inset) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+    filter: none !important;
+}
+html.art-pixel.px-kit-ready :is(#rune-tab-launcher, #rune-tab-management, #rune-tab-potion, #rune-tab-codex)[data-active="true"] {
+    border-image: var(--px-frame-panel-trim) 4 fill / calc(4 * var(--px)) stretch !important;
+    border-width: calc(4 * var(--px)) !important;
+    color: #fde9a6 !important;
+}
+html.art-pixel #phase-rune-launcher .rune-launcher-card > .flex.gap-2 {
+    border: 0 !important;
+    background: none !important;
+}
+
+/* ---- 技能装配 ---- */
+html.art-pixel.px-kit-ready .skill-editor-card {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-panel) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+}
+html.art-pixel.px-kit-ready .skill-editor-card.is-equipped {
+    border-image: var(--px-frame-panel-trim) 4 fill / calc(4 * var(--px)) stretch !important;
+    border-width: calc(4 * var(--px)) !important;
+}
+html.art-pixel.px-kit-ready .skill-editor-card-toggle {
+    border-style: solid !important;
+    border-width: calc(3 * var(--px)) !important;
+    border-image: var(--px-frame-inset) 3 fill / calc(3 * var(--px)) stretch !important;
+    background: none !important;
+    color: #a9b2bc !important;
+    border-radius: 0 !important;
+}
+html.art-pixel.px-kit-ready .skill-editor-card.is-equipped .skill-editor-card-toggle {
+    border-image-source: var(--px-frame-button-active) !important;
+    color: #fde9a6 !important;
+}
+html.art-pixel img.px-item-icon {
+    width: calc(16 * var(--px));
+    height: calc(16 * var(--px));
+    image-rendering: pixelated;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* 文字里的 emoji → 像素点阵图标（src/pixel/emoji_icons.js）；随字号缩放，最近邻 */
+html.art-pixel img.px-emoji {
+    display: inline-block;
+    width: 1.1em;
+    height: 1.1em;
+    vertical-align: -0.18em;
+    margin: 0 0.08em;
+    image-rendering: pixelated;
+    pointer-events: none;
+}
+
+/* 滑块：像素方块拇指 */
+html.art-pixel .pause-volume-slider::-webkit-slider-thumb {
+    border-radius: 0 !important;
+    background: #d29c2a !important;
+    box-shadow: none !important;
+}

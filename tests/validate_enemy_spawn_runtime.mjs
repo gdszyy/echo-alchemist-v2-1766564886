@@ -84,7 +84,8 @@ function installBrowserStubs() {
     };
     globalThis.window = globalThis;
     globalThis.localStorage = {
-        getItem() { return null; },
+        // 本文件校验位图精灵接线：显式走位图模式（像素模式不创建 SpriteRenderer，见 docs/design/pixel_art_mode.md）
+        getItem(key) { return key === 'ea_art_mode' ? 'bitmap' : null; },
         setItem() {},
         removeItem() {},
     };

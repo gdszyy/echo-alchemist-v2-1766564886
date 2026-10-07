@@ -409,7 +409,7 @@ check(has(projectile, /leftBound\s*=\s*combatBounds\.left\s*\+\s*this\.radius[\s
 check(!has(projectile, /ownedRelics\.includes\(['"]energy_shield['"]\)[\s\S]{0,360}destroy\s*\(/), 'energy shield wall collision does not destroy bullets after bounce/pierce are exhausted');
 check(has(projectile, /let\s+shieldWallDurabilityConsumed\s*=\s*false/), 'energy shield wall collision tracks per-step durability consumption');
 check(has(projectile, /ownedRelics\.includes\(['"]energy_shield['"]\)\s*&&\s*!\s*shieldWallDurabilityConsumed[\s\S]{0,180}this\.bouncesLeft--[\s\S]{0,120}shieldWallDurabilityConsumed\s*=\s*true[\s\S]{0,180}this\.piercesLeft--[\s\S]{0,120}shieldWallDurabilityConsumed\s*=\s*true/), 'energy shield wall collision consumes at most one durability layer per movement step');
-check(has(config, /energy_shield[\s\S]{0,280}最多消耗一層[\s\S]{0,120}不會被墻吞沒/), 'energy shield relic copy states one-layer wall durability consumption and no bullet swallowing');
+check(has(config, /energy_shield[\s\S]{0,280}最多消耗一层[\s\S]{0,120}不会被墙吞没/), 'energy shield relic copy states one-layer wall durability consumption and no bullet swallowing');
 check(has(enemy, /_tryResolveDefenseBarrierMove\s*\(game,\s*moveAmount\)/), 'enemies resolve guardian barrier movement before normal advance');
 check(has(enemy, /this\.dropTargetY\s*=\s*barrierY[\s\S]{0,180}_defenseBarrierArrivedThisTurn\s*=\s*true/), 'guardian barrier first contact clamps enemy at the defense line without spending a layer');
 check(has(enemy, /const\s+barrierDamage\s*=\s*this\._getDefenseBarrierDamage\(game\)[\s\S]{0,120}game\.playerShield\s*=\s*Math\.max\(0,\s*\(game\.playerShield\s*\|\|\s*0\)\s*-\s*barrierDamage\)[\s\S]{0,120}_defenseBarrierHitThisTurn\s*=\s*true/), 'guardian barrier later movement collision spends footprint-scaled shield layers');
@@ -456,7 +456,7 @@ check(
 check(!has(gameSystem, /playerShield[\s\S]{0,220}e\.active\s*=\s*false/), 'guardian barrier no longer deletes enemies during defeat checks');
 check(has(enemy, /blockedPierce:\s*isPierce/), 'deflectionWard damage result reports pierce blocking on absorbed pierce hits');
 check(has(projectile, /const\s+blockedPierce\s*=\s*!!\(damageResult\s*&&\s*damageResult\.blockedPierce\)/), 'projectile collision reads blockedPierce from damage result');
-check(has(projectile, /blockedPierce\s*&&\s*this\.piercesLeft\s*>\s*0[\s\S]{0,120}this\.piercesLeft--[\s\S]{0,180}NO PIERCE/), 'blocked pierce consumes a pierce layer and does not pass through the deflection ward');
+check(has(projectile, /blockedPierce\s*&&\s*this\.piercesLeft\s*>\s*0[\s\S]{0,120}this\.piercesLeft--[\s\S]{0,180}穿透无效/), 'blocked pierce consumes a pierce layer and does not pass through the deflection ward');
 check(has(projectile, /affixes\s*&&\s*e\.affixes\.includes\(['"]deflectShell['"]\)[\s\S]{0,520}deflectShellNormalRotateAmp[\s\S]{0,420}normal\s*=\s*new\s+Vec2/), 'deflectShell rotates the collision normal for 1x1 enemy bounce targeting');
 check(has(read('src/combat_system.js'), /return\s+damageResult/), 'combat damage returns enemy takeDamage result to projectile collision');
 check(has(config, /guardian_barrier[\s\S]{0,260}防线屏障[\s\S]{0,220}移动撞击消耗 1 层屏障/), 'guardian barrier relic copy describes defense-line collision layers');

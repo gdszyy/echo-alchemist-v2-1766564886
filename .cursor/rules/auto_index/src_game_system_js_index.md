@@ -1,9 +1,9 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-07-22 | 总行数: 4611 | 函数数: 89 | 语言: javascript
+> 自动生成于 2026-10-07 | 总行数: 4639 | 函数数: 89 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 6 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -29,7 +29,7 @@
 | sys_hasPendingPotionAlchemyDraft | method | `sys_hasPendingPotionAlchemyDraft()` |  |
 | sys_deferPotionBlockedContinuation | method | `sys_deferPotionBlockedContinuation(key, callback, options = {})` |  |
 | sys_retryPotionBlockedContinuation | method | `sys_retryPotionBlockedContinuation()` |  |
-| sys_loop | method | `sys_loop()` |  |
+| sys_loop | method | `sys_loop()` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_setupVisibilityHandling | method | `sys_setupVisibilityHandling()` |  |
 | sys_resize | method | `sys_resize()` |  |
 | sys_getCombatBounds | method | `sys_getCombatBounds()` |  |
@@ -102,6 +102,10 @@
 | _calcDesperationMult | method | `_calcDesperationMult()` |  |
 
 ## 巨型函数内部节点 (@section 标记)
+
+### sys_loop
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### sys_resetGame
 

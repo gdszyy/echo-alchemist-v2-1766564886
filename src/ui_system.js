@@ -3,6 +3,8 @@ import { audio } from './audio.js';
 import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
 import { CONFIG, META_SHOP_CONFIG, RELIC_DB, BOSS_DB, ENEMY_CURVE_CONFIG, setDeepValue } from './config.js';
 import { getAmmoIconSrcByKey, getBossPreviewIconSrc, getRelicIconSrc, getLootCapsuleSrc } from './bitmap_icons.js';
+import { buildPixelAmmoCard } from './pixel/dom_cards.js';
+import { pxIconHtml } from './pixel/icon_html.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
 import { getBossDisplayName, getBossPreviewInfo, getBossShortName, normalizeBossKey } from './utils/boss_schedule_utils.js';
 import {
@@ -76,7 +78,7 @@ function _getNextBossThreatInfo(game) {
         : `${known ? shortName : '未知'} ${turnsUntil}`;
     const title = known
         ? `下一威胁：${getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB)} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`
-        : `下一威胁：未知 Boss 将在 Round ${nextRound} 出现（${turnsUntil} 回合后，未遭遇前仅显示剪影）`;
+        : `下一威胁：未知首领将在 Round ${nextRound} 出现（${turnsUntil} 回合后，未遭遇前仅显示剪影）`;
 
     return {
         state: turnsUntil <= 1 ? 'soon' : 'countdown',
@@ -538,17 +540,17 @@ export const ui_system = {
         let glow = 'rgba(250, 204, 21, 0.85)';
         let cardBg = 'linear-gradient(160deg,#78350f 0%,#3b1f05 60%,#150b01 100%)';
         let cardBorder = '#fbbf24';
-        let title = '遺物';
+        let title = '遗物';
         if (type === 'chaos_essence') {
             icon = '🔮'; glow = 'rgba(168, 85, 247, 0.85)';
             cardBg = 'linear-gradient(160deg,#4a1d96 0%,#2e1065 60%,#0f0528 100%)';
             cardBorder = '#c084fc';
-            title = '混沌精華';
+            title = '混沌精华';
         } else if (type === 'pure_essence') {
             icon = '💎'; glow = 'rgba(56, 189, 248, 0.85)';
             cardBg = 'linear-gradient(160deg,#0c4a6e 0%,#082f49 60%,#020f1a 100%)';
             cardBorder = '#38bdf8';
-            title = '純淨精華';
+            title = '纯净精华';
         } else if (type === 'run_resource_pack') {
             icon = '💰'; glow = 'rgba(251, 191, 36, 0.9)';
             cardBg = 'linear-gradient(160deg,#854d0e 0%,#422006 60%,#120a02 100%)';
@@ -805,7 +807,7 @@ export const ui_system = {
             threatLabel = 'Clear';
         } else if (bossCount > 0) {
             threatClass = 'is-danger';
-            threatLabel = 'Boss';
+            threatLabel = '首领';
         } else if (eliteCount >= 2) {
             threatClass = 'is-watch';
             threatLabel = 'Elite';
@@ -844,7 +846,7 @@ export const ui_system = {
             const shieldMetric = shieldCountEl.closest('.combat-status-metric');
             if (shieldMetric) {
                 shieldMetric.title = enemyShieldLayers > 0
-                    ? `敌方护盾：${shieldedCount} 个目标，共 ${enemyShieldLayers} 层。Boss 护盾也计入。`
+                    ? `敌方护盾：${shieldedCount} 个目标，共 ${enemyShieldLayers} 层。首领护盾也计入。`
                     : '敌方护盾：当前没有可消耗护盾层。防线屏障在顶部结界胶囊显示。';
                 shieldMetric.setAttribute('aria-label', shieldMetric.title);
             }
@@ -1095,7 +1097,7 @@ export const ui_system = {
 
     ui_fuseRuneIntoMarble(selectionIndex, inventoryIndex) {
         if (!(this.selectedMarbles || []).includes(selectionIndex)) {
-            if (typeof showToast === 'function') showToast('Select this marble first.');
+            if (typeof showToast === 'function') showToast('请先选中这枚弹珠，再融合符文');
             return;
         }
         const marbleDef = this.marblesPool?.[selectionIndex];
@@ -1103,12 +1105,12 @@ export const ui_system = {
         if (!Array.isArray(marbleDef.runeSlots)) marbleDef.runeSlots = [];
         marbleDef.maxRuneSlots = marbleDef.maxRuneSlots || 3;
         if (marbleDef.runeSlots.length >= marbleDef.maxRuneSlots) {
-            if (typeof showToast === 'function') showToast('Rune slots full.');
+            if (typeof showToast === 'function') showToast('符文槽已满');
             return;
         }
         const option = this.ui_getPureEssenceRuneOptions(marbleDef).find(item => item.inventoryIndex === inventoryIndex);
         if (!option) {
-            if (typeof showToast === 'function') showToast('Rune not found.');
+            if (typeof showToast === 'function') showToast('找不到该符文');
             return;
         }
         const level = Math.max(1, option.rune.level || 1);
@@ -1131,7 +1133,7 @@ export const ui_system = {
         this.ui_updateRuneCountDisplay();
         this.ui_refreshSelectionModeUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        if (typeof showToast === 'function') showToast(`Fused ${option.runeDef.name} into marble.`);
+        if (typeof showToast === 'function') showToast(`已将 ${option.runeDef.name} 融入弹珠`);
     },
 
     ui_selectPureEssenceRune(selectionIndex, inventoryIndex) {
@@ -1139,7 +1141,7 @@ export const ui_system = {
         return;
         if (this.selectionMode !== 'pure_essence') return;
         if (!(this.selectedMarbles || []).includes(selectionIndex)) {
-            if (typeof showToast === 'function') showToast('請先選中這枚彈珠，再注入符文。');
+            if (typeof showToast === 'function') showToast('请先选中这枚弹珠，再注入符文。');
             return;
         }
         const marbleDef = this.marblesPool?.[selectionIndex];
@@ -1172,7 +1174,7 @@ export const ui_system = {
         const slotHtml = Array.from({ length: marbleDef.maxRuneSlots }, (_, idx) => {
             const slot = slots[idx];
             if (!slot) {
-                return `<span class="inline-flex min-w-[46px] items-center justify-center rounded-md border border-dashed border-slate-500/70 bg-slate-900/50 px-2 py-1 text-[11px] text-slate-500">EMPTY</span>`;
+                return `<span class="inline-flex min-w-[46px] items-center justify-center rounded-md border border-dashed border-slate-500/70 bg-slate-900/50 px-2 py-1 text-[11px] text-slate-500">空槽</span>`;
             }
             const attr = attrDisplay[slot.element] || {};
             return `<span class="inline-flex min-w-[46px] items-center justify-center gap-1 rounded-md border border-amber-300/70 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-100" title="${_escapeHtml(slot.name || slot.runeId)}">${_escapeHtml(slot.icon || attr.icon || '✦')} ${_escapeHtml(attr.name || slot.element)} +${slot.statAmount || slot.level || 1}</span>`;
@@ -1180,11 +1182,11 @@ export const ui_system = {
         const options = this.ui_getPureEssenceRuneOptions(marbleDef);
         let optionsHtml = '';
         if (!isSelected) {
-            optionsHtml = '<div class="text-xs text-slate-400">Select this marble to fuse runes.</div>';
+            optionsHtml = '<div class="text-xs text-slate-400">选中这枚弹珠后可融合符文。</div>';
         } else if (slots.length >= marbleDef.maxRuneSlots) {
-            optionsHtml = '<div class="text-xs text-amber-200">Rune slots full.</div>';
+            optionsHtml = '<div class="text-xs text-amber-200">符文槽已满</div>';
         } else if (options.length === 0) {
-            optionsHtml = '<div class="text-xs text-slate-400">Rune inventory empty.</div>';
+            optionsHtml = '<div class="text-xs text-slate-400">符文仓库为空。</div>';
         } else {
             optionsHtml = options.map(item => {
                 const attr = attrDisplay[item.runeDef.element] || {};
@@ -1195,8 +1197,8 @@ export const ui_system = {
         host.style.display = 'block';
         host.innerHTML = `
             <div class="preview-divider"></div>
-            <div class="preview-peg-label">MARBLE RUNE SLOTS</div>
-            <div class="text-xs text-slate-300 mb-2">Each marble can hold up to 3 fused runes. Fusing consumes the rune immediately and adds its attribute to this marble.</div>
+            <div class="preview-peg-label">弹珠符文槽</div>
+            <div class="text-xs text-slate-300 mb-2">每颗弹珠最多融合 3 枚符文；融合会立即消耗符文，并把它的属性加到这颗弹珠上。</div>
             <div class="flex flex-wrap gap-2 mb-2">${slotHtml}</div>
             <div class="flex flex-wrap gap-2">${optionsHtml}</div>
         `;
@@ -1241,9 +1243,9 @@ export const ui_system = {
         const currentAttrHtml = `<span class="inline-flex items-center gap-1 rounded-full border border-slate-200/45 bg-slate-100/10 px-2 py-0.5 text-[11px] text-slate-100">${currentDisplay.icon || '\u2726'} ${currentDisplay.name || marbleDef.type}</span>`;
         let optionsHtml = '';
         if (!isSelected) {
-            optionsHtml = '<div class="text-xs text-slate-400">\u5148\u9078\u4e2d\u9019\u679a\u5f48\u73e0\uff0c\u518d\u5f9e\u4e0b\u65b9\u7b26\u6587\u4e2d\u6ce8\u5165\u3002</div>';
+            optionsHtml = '<div class="text-xs text-slate-400">先选中这枚弹珠，再从下方符文中注入。</div>';
         } else if (options.length === 0) {
-            optionsHtml = '<div class="text-xs text-rose-300">\u7576\u524d\u7b26\u6587\u5eab\u70ba\u7a7a\u3002\u53ef\u76f4\u63a5\u4ee5\u539f\u5c6c\u6027\u9032\u5165\u7814\u78e8\uff0c\u6216\u9ede\u300c\u8df3\u904e\u7814\u78e8\u300d\u7372\u5f97\u96a8\u6a5f\u7b26\u6587\u3002</div>';
+            optionsHtml = '<div class="text-xs text-rose-300">当前符文库为空。可直接以原属性进入研磨，或点「跳过研磨」获得随机符文。</div>';
         } else {
             optionsHtml = options.map(item => {
                 const active = selectedRune && selectedRune.inventoryIndex === item.inventoryIndex;
@@ -1251,13 +1253,13 @@ export const ui_system = {
             }).join('');
         }
         const selectedRuneText = selectedRune
-            ? `\u5df2\u9078\u4e2d\u5408\u6210\u7b26\u6587\uff1a${selectedRune.icon || '\u2726'} ${selectedRune.name} \u2192 \u5c07\u70ba\u5f48\u73e0\u984d\u5916\u6dfb\u52a0 ${attrDisplay[selectedRune.element]?.name || selectedRune.element} +${Math.max(1, selectedRune.level || 1) * Math.max(1, selectedRune.baseStatPerLevel || 1)}`
-            : '\u672a\u9078\u4e2d\u7b26\u6587\uff1a\u5c07\u4ee5\u539f\u5c6c\u6027\u9032\u5165\u7814\u78e8\u3002';
+            ? `已选中合成符文：${selectedRune.icon || '\u2726'} ${selectedRune.name} \u2192 将为弹珠额外添加 ${attrDisplay[selectedRune.element]?.name || selectedRune.element} +${Math.max(1, selectedRune.level || 1) * Math.max(1, selectedRune.baseStatPerLevel || 1)}`
+            : '未选中符文：将以原属性进入研磨。';
         host.innerHTML = `
             <div class="preview-divider"></div>
-            <div class="preview-peg-label">\u7d14\u6de8\u7cbe\u83ef / \u7b26\u6587\u5408\u6210</div>
-            <div class="text-xs text-slate-300 mb-2">\u53ef\u9078\u64c7\u4efb\u610f\u7b26\u6587\u8207\u5f48\u73e0\u5408\u6210\uff0c\u70ba\u672c\u8f2a\u5b50\u5f48\u6dfb\u52a0\u5c0d\u61c9\u5c6c\u6027\uff1b\u4e5f\u53ef\u4e0d\u5408\u6210\u4ee5\u539f\u5c6c\u6027\u9032\u5165\u7814\u78e8\u3002</div>
-            <div class="flex flex-wrap gap-2 mb-2">\u5f48\u73e0\u539f\u5c6c\u6027\uff1a${currentAttrHtml}</div>
+            <div class="preview-peg-label">纯净精华 / 符文合成</div>
+            <div class="text-xs text-slate-300 mb-2">可选择任意符文与弹珠合成，为本轮子弹添加对应属性；也可不合成以原属性进入研磨。</div>
+            <div class="flex flex-wrap gap-2 mb-2">弹珠原属性：${currentAttrHtml}</div>
             <div class="flex flex-wrap gap-2">${optionsHtml}</div>
             <div class="text-xs ${selectedRune ? 'text-amber-200' : 'text-slate-500'} mt-2">${selectedRuneText}</div>
         `;
@@ -1401,7 +1403,7 @@ export const ui_system = {
                 const attr = finalPicks[0];
                 resultEl.innerText = `🎉 三连同款【${ATTR_LABEL[attr] || attr}】：每枚子弹 ${ATTR_LABEL[attr] || attr} +5`;
             } else {
-                const summary = finalPicks.map((p, i) => `子弹${i+1} ${ATTR_LABEL[p] || p} +2`).join(' ｜ ');
+                const summary = finalPicks.map((p, i) => `子弹${i+1} ${ATTR_LABEL[p] || p} +1`).join(' ｜ ');
                 resultEl.innerText = summary;
             }
             continueBtn.style.display = 'inline-flex';
@@ -1618,6 +1620,10 @@ export const ui_system = {
                 else if (recipe.type === 'echo' || recipe._marbleType === 'echo') mainAttrKey = 'echo';
                 else if (dominant) mainAttrKey = dominant.key;
                 else mainAttrKey = recipe.pyro > 0 ? 'pyro' : recipe.cryo > 0 ? 'cryo' : recipe.lightning > 0 ? 'lightning' : 'damage';
+                if (this.pixelArtMode) {
+                    // 像素模式：重做的子弹卡（形态 + 稀有度 + 基础伤害 + 连射 + 全部属性），见 src/pixel/dom_cards.js
+                    return buildPixelAmmoCard({ recipe, selected: isSelected, tier, mainAttrKey, onToggle: () => this.ui_toggleReplaceAmmoCard(globalIdx) });
+                }
                 const mainAttrInfo = attrIcons[mainAttrKey] || { icon: '🔮', color: '#94a3b8' };
                 const _iconBorderColor = (mainAttrInfo.color && mainAttrInfo.color.indexOf('gradient') === -1) ? mainAttrInfo.color : '#facc15';
 
@@ -1708,12 +1714,12 @@ export const ui_system = {
                 return row;
             };
 
-            if (newRecipes.length > 0) wrapper.appendChild(makeRow(newRecipes, 0, '✨ NEW GRIND', '#38bdf8'));
-            if (chargedRecipes.length > 0) wrapper.appendChild(makeRow(chargedRecipes, newRecipes.length, '⚡ CHARGED', '#fbbf24'));
+            if (newRecipes.length > 0) wrapper.appendChild(makeRow(newRecipes, 0, '✨ 本回合研磨', '#38bdf8'));
+            if (chargedRecipes.length > 0) wrapper.appendChild(makeRow(chargedRecipes, newRecipes.length, '⚡ 上回合充能', '#fbbf24'));
             gridEl.appendChild(wrapper);
         }
 
-        // @section:replace_ammo_confirm_btn - 确认按鈕与跳过按鈕状态同步
+        // @section:replace_ammo_confirm_btn - 确认按钮与跳过按钮状态同步
         if (confirmBtn) {
             confirmBtn.disabled = maxSelect <= 0 || selectedIndices.length !== maxSelect;
             confirmBtn.innerText = '确认（已选 ' + selectedIndices.length + '/' + maxSelect + '）';
@@ -1789,7 +1795,7 @@ export const ui_system = {
         if (this.phase !== 'selection' || (this.replaceAmmoContext && this.replaceAmmoContext.active)) return;
         const isFateSelection = this.selectionMode === 'chaos_essence' || this.selectionMode === 'pure_essence';
         if (!isFateSelection) {
-            if (window.showToast) showToast('\u80da\u73e0\u5305\u4e0d\u80fd\u4f7f\u7528\u547d\u8fd0\u91cd\u94f8\u3002');
+            if (window.showToast) showToast('胚珠包不能使用命运重铸。');
             return;
         }
         if (!(this.ownedRelics || []).includes('fate_reroll_token')) {
@@ -1815,7 +1821,7 @@ export const ui_system = {
     },
 
     ui_refreshSelectionModeUI() {
-        // [ammo-replace] \u5982\u679c\u5f53\u524d\u5904\u4e8e\u66ff\u6362\u9636\u6bb5\uff0c\u8df3\u8fc7\u666e\u901a\u9009\u62e9 UI \u5237\u65b0\uff0c\u6539\u7531 ui_renderReplaceAmmoUI \u63a7\u5236
+        // [ammo-replace] 如果当前处于替换阶段，跳过普通选择 UI 刷新，改由 ui_renderReplaceAmmoUI 控制
         if (this.replaceAmmoContext && this.replaceAmmoContext.active) {
             const rerollBtn = document.getElementById('selection-reroll-btn');
             if (rerollBtn) rerollBtn.style.display = 'none';
@@ -1830,7 +1836,7 @@ export const ui_system = {
         const confirmBtn = document.getElementById('confirm-selection-btn');
         const selectedCount = (this.selectedMarbles || []).length;
         const required = this.ui_getSelectionRequirement();
-        // [pure_essence \u4fee\u590d] \u7eaf\u51c0\u7cbe\u534e\u6a21\u5f0f\u4e0b\u5c55\u793a\u5355\u5361\u5c45\u4e2d\u5e03\u5c40
+        // [pure_essence 修复] 纯净精华模式下展示单卡居中布局
         const gridEl = document.getElementById('marble-selection-grid');
         if (gridEl) {
             if (this.selectionMode === 'pure_essence') {
@@ -1841,18 +1847,18 @@ export const ui_system = {
                 gridEl.style.maxWidth = '';
             }
         }
-        // [pure_essence] \u63a7\u5236\u300c\u8df3\u8fc7\u7814\u78e8\u300d\u6309\u9215\u7684\u663e\u793a/\u9690\u85cf
+        // [pure_essence] 控制「跳过研磨」按钮的显示/隐藏
         const skipGrindBtn = document.getElementById('skip-grind-btn');
         if (skipGrindBtn) {
             skipGrindBtn.style.display = (this.selectionMode === 'pure_essence') ? 'flex' : 'none';
         }
-        // [chaos-skip-upgrade] \u6df7\u6c8c\u7cbe\u534e\u8df3\u8fc7\u6309\u94ae\uff1a\u4ec5\u5728\u6df7\u6c8c\u7cbe\u534e\u6a21\u5f0f\u4e0b\uff0c\u4e14\u5b58\u5728\u53ef\u5347\u7ea7\u7684\u5145\u80fd\u5b50\u5f39\u65f6\u663e\u793a
+        // [chaos-skip-upgrade] 混沌精华跳过按钮：仅在混沌精华模式下，且存在可升级的充能子弹时显示
         const skipChaosBtn = document.getElementById('skip-chaos-btn');
         if (skipChaosBtn) {
             const hasChargedAmmo = Array.isArray(this._chargedAmmoQueue) && this._chargedAmmoQueue.length > 0;
             skipChaosBtn.style.display = (this.selectionMode === 'chaos_essence' && hasChargedAmmo) ? 'flex' : 'none';
         }
-        // [tsk-668f3dba] \u8fdb\u5165\u6b63\u5e38\u9009\u62e9\u9636\u6bb5\u65f6\u9690\u85cf\u66ff\u6362\u8df3\u8fc7\u6309\u9215
+        // [tsk-668f3dba] 进入正常选择阶段时隐藏替换跳过按钮
         const replaceSkipBtn = document.getElementById('replace-ammo-skip-btn');
         if (replaceSkipBtn) replaceSkipBtn.style.display = 'none';
         const actionHint = document.getElementById('selection-action-hint');
@@ -1865,23 +1871,23 @@ export const ui_system = {
         this.ui_updateSelectionChoiceStrip();
         if (labelEl) {
             labelEl.innerText = this.selectionMode === 'pure_essence'
-                ? '\u7d14\u6de8\u7cbe\u83ef'
+                ? '纯净精华'
                 : this.selectionMode === 'chaos_essence'
-                    ? '\u6df7\u6c8c\u7cbe\u83ef'
-                    : '\u80da\u73e0\u5305';
+                    ? '混沌精华'
+                    : '胚珠包';
         }
         if (subtitleEl) {
             if (this.selectionMode === 'pure_essence') {
                 const injected = this.selectionInjectedRune
-                    ? `\u5df2\u9078\uff1a${this.selectionInjectedRune.icon || '\u2726'} ${this.selectionInjectedRune.name}`
-                    : '\u5c1a\u672a\u6ce8\u5165\u7b26\u6587';
+                    ? `已选：${this.selectionInjectedRune.icon || '\u2726'} ${this.selectionInjectedRune.name}`
+                    : '尚未注入符文';
                 subtitleEl.style.display = 'block';
                 subtitleEl.classList.remove('hidden');
-                subtitleEl.innerText = `\u9078\u64c7 1 \u679a\u5f48\u73e0\u4e26\u6ce8\u5165 1 \u500b\u5408\u6cd5\u7b26\u6587\u3002${injected}`;
+                subtitleEl.innerText = `选择 1 枚弹珠并注入 1 个合法符文。${injected}`;
             } else if (this.selectionMode === 'chaos_essence') {
                 subtitleEl.style.display = 'block';
                 subtitleEl.classList.remove('hidden');
-                subtitleEl.innerText = `\u547d\u904b\u6642\u523b\u5df2\u958b\u555f\uff0c\u8acb\u9078\u64c7 ${required} \u679a\u5f48\u73e0\u5f8c\u9032\u5165\u7df4\u91d1\u3002`;
+                subtitleEl.innerText = `命运时刻已开启，请选择 ${required} 枚弹珠后进入练金。`;
             } else {
                 subtitleEl.style.display = 'block';
                 subtitleEl.classList.remove('hidden');
@@ -1891,10 +1897,10 @@ export const ui_system = {
         if (confirmBtn) {
             confirmBtn.disabled = !this.ui_isSelectionConfirmReady();
             confirmBtn.innerText = this.selectionMode === 'pure_essence'
-                ? '\u6ce8\u5165\u5f8c\u958b\u59cb\u7df4\u91d1'
+                ? '注入后开始练金'
                 : this.selectionMode === 'chaos_essence'
-                    ? '\u63a5\u53d7\u547d\u904b\u5f8c\u958b\u59cb\u7df4\u91d1'
-                    : '\u4fdd\u7559\u80da\u73e0\u5e76\u5f00\u59cb\u70bc\u91d1';
+                    ? '接受命运后开始练金'
+                    : '保留胚珠并开始炼金';
         }
         let rerollBtn = document.getElementById('selection-reroll-btn');
         if (!rerollBtn && confirmBtn && confirmBtn.parentNode) {
@@ -2027,7 +2033,7 @@ export const ui_system = {
                 activeEl.style.display = (this.phase === 'gameover') ? 'block' : 'flex';
                 // [BUGFIX] 将 'selection' 加入 needsAuto 列表：
                 // phase-selection 的父容器 pointer-events 必须为 auto，
-                // 否则底部「開始煉金」按钮无法响应点击（父容器 none 会阻断事件传递）。
+                // 否则底部「开始炼金」按钮无法响应点击（父容器 none 会阻断事件传递）。
                 // [BUGFIX] 将 'training' 加入 needsAuto 列表：
                 // 试炼场 #phase-training 是 DOM 驱动的（场景列表/属性 +/- 按钮/退出按钮等），
                 // 默认 pointer-events:none 会让所有按钮失效（点击穿透到底层 canvas）。
@@ -2249,7 +2255,7 @@ export const ui_system = {
             if (injected) {
                 // Combine the rune with the selected marble: keep the marble type and add rune stats.
                 if (injected.marbleIndex !== selectedIndex) {
-                    if (typeof showToast === 'function') showToast('純淨精華尚未完成符文注入。');
+                    if (typeof showToast === 'function') showToast('纯净精华尚未完成符文注入。');
                     return;
                 }
                 if (!Array.isArray(marble.collected)) marble.collected = [];
@@ -2267,11 +2273,11 @@ export const ui_system = {
                 }
                 this.ui_updateRuneCountDisplay();
                 const multiplier = (typeof CONFIG !== 'undefined' && CONFIG.gameplay.assimilationDoubleMultiplier) || 2;
-                if (typeof showToast === 'function') showToast(`已為 ${marble.getName()} 合成 ${injected.icon || '✦'} ${injected.name}，本輪子彈獲得 ${injected.element} +${injectCount}，同化率 x${multiplier}。`);
+                if (typeof showToast === 'function') showToast(`已为 ${marble.getName()} 合成 ${injected.icon || '✦'} ${injected.name}，本轮子弹获得 ${injected.element} +${injectCount}，同化率 x${multiplier}。`);
             } else {
                 // [feat] 无符文注入时直接进入研磨（纯净精华单弹珠，无同化加成）
                 marble.source = 'pure_essence';
-                if (typeof showToast === 'function') showToast(`純淨精華：未注入符文，直接進入研磨。`);
+                if (typeof showToast === 'function') showToast(`纯净精华：未注入符文，直接进入研磨。`);
             }
         }
 
@@ -2508,7 +2514,7 @@ export const ui_system = {
 
     ui_openPause() {
         // [BUGFIX #5] 暂停/设置面板的 DOM id 是 `phase-pause`，原代码错把它当成 `pause-overlay` 处理，
-        // 导致点击「⚙️」按鈕没有任何反应。这里改为正确的 id，并补上 hidden-phase / display 切换。
+        // 导致点击「⚙️」按钮没有任何反应。这里改为正确的 id，并补上 hidden-phase / display 切换。
         const pause = document.getElementById('phase-pause');
         if (!pause) return;
         if (!this._pauseMenuLeaseToken && typeof this.input_cancelActiveInteraction === 'function') {
@@ -2593,6 +2599,16 @@ export const ui_system = {
             isCrtOn ? crtBadge.classList.add('active') : crtBadge.classList.remove('active');
         }
         if (crtRow) isCrtOn ? crtRow.classList.add('active') : crtRow.classList.remove('active');
+
+        // 同步美术模式（像素风 / 位图）
+        const isPixelArt = this.pixelArtMode === true;
+        const artBadge = document.getElementById('pause-art-mode-badge');
+        const artRow = document.getElementById('pause-art-mode-row');
+        if (artBadge) {
+            artBadge.textContent = isPixelArt ? '开启' : '关闭';
+            artBadge.classList.toggle('active', isPixelArt);
+        }
+        if (artRow) artRow.classList.toggle('active', isPixelArt);
 
         // 同步渲染品质按钮高亮
         const activeLevel = this.perfQualityLevel;
@@ -2797,7 +2813,7 @@ export const ui_system = {
                 if (!def) return '';
                 const selected = component.uid === this._moduleEditorSelectedComponentUid ? ' is-selected' : '';
                 return `<button type="button" class="me-inventory-item${selected}" data-inventory-uid="${_escapeHtml(component.uid)}" data-module-id="${_escapeHtml(id)}" title="${_escapeHtml(getModuleMetaSummary(id) || def.desc || '')}">
-                    <span class="me-inventory-icon">${def.icon || '▦'}</span>
+                    <span class="me-inventory-icon">${pxIconHtml({ kind: 'module', id, rarity: def.rarity }, def.icon || '▦')}</span>
                     <span class="me-inventory-name">${_escapeHtml(def.name || id)}</span>
                 </button>`;
             }).join('')}</div>`
@@ -3245,7 +3261,7 @@ export const ui_system = {
             const meta = getModuleMetaSummary(id);
             const metaHtml = meta ? `<div class="me-picker-desc">${escapeHtml(meta)}</div>` : '';
             return `<button type="button" class="me-picker-item${disabled}" data-pick-component="${escapeHtml(component.uid)}" data-module-id="${escapeHtml(id)}"${disabledAttr}>
-                <div class="me-picker-icon">${def.icon || '▦'}</div>
+                <div class="me-picker-icon">${pxIconHtml({ kind: 'module', id, rarity: def.rarity }, def.icon || '▦')}</div>
                 <div class="me-picker-name">${escapeHtml(def.name || id)}${spanTag}</div>
                 ${metaHtml}
                 <div class="me-picker-desc">${escapeHtml(desc)}</div>

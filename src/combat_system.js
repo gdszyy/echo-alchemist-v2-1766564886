@@ -1382,7 +1382,7 @@ export const combat_system = {
             ammo._potionEchoCopyChance = Math.max(ammo._potionEchoCopyChance || 0, p.copyChance || 0.45);
             playReleaseVfx([], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 56 });
             this.ui_updateAmmoUI();
-            this.spawn_createFloatingText(this.width / 2, this.height - 120, 'ECHO POTION', color);
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, '回响药剂', color);
             try { audio.playPowerup(3); } catch (e2) {}
         } else if (potionDef.id === 'potion_venom_mist') {
             if (!requireEnemies()) return false;
@@ -1405,7 +1405,7 @@ export const combat_system = {
             ammo._potionPrismFocus = true;
             playReleaseVfx([], { targetMode: 'ammo_socket', point: { x: this.width / 2, y: this.height - 80 }, radius: 62 });
             this.ui_updateAmmoUI();
-            this.spawn_createFloatingText(this.width / 2, this.height - 120, 'PRISM POTION', color);
+            this.spawn_createFloatingText(this.width / 2, this.height - 120, '棱镜药剂', color);
             try { audio.playPowerup(4); } catch (e2) {}
         } else if (potionDef.id === 'potion_overload_vial') {
             if (!requireEnemies()) return false;
@@ -1430,18 +1430,18 @@ export const combat_system = {
         return true;
     },
 
-// --- [新增] 更新連射倍率 UI ---
+// --- [新增] 更新连射倍率 UI ---
     /**
      * @param {any} bonusAmount - TODO: Describe this parameter.
      */
     combat_updateMulticastDisplay(bonusAmount = 0) {
-        // 基礎是 1，加上當前累積的 multicast
+        // 基础是 1，加上当前累积的 multicast
         const total = 1 + (this.currentSession ? this.currentSession.multicast : 0);
         // [Task 3.2] 改为 EventBus 事件，由 hud.js 监听并更新 DOM
         eventBus.emit(EVENT_TYPES.UI_MULTICAST_UPDATE, { total, bonusAmount });
     },
 
-// --- [新增] 播放倍率轉移飛行特效 ---
+// --- [新增] 播放倍率转移飞行特效 ---
     /**
      * @param {any} multicastValue - TODO: Describe this parameter.
      */
@@ -1542,7 +1542,7 @@ export const combat_system = {
         }
         
         audio.playPowerup(5); 
-        showToast(`釋放: ${skill.name}!`);
+        showToast(`释放: ${skill.name}!`);
         this.combat_playSkillCastVFX(skill);
 
         const p = skill.params;
@@ -1647,7 +1647,7 @@ export const combat_system = {
                 this.skillPoints += skill.cost;
                 this.ui.updateSkillPoints(this.skillPoints);
                 this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast("無彈藥可強化");
+                showToast("无弹药可强化");
             }
         }
 
@@ -1720,12 +1720,12 @@ export const combat_system = {
                 this.skillPoints += skill.cost;
                 this.ui.updateSkillPoints(this.skillPoints);
                 this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast('無彈藥可強化');
+                showToast('无弹药可强化');
             }
         }
 
         else if (method === 'skill_meltdown_nova') {
-            // 熔毀新星：对所有敢人施加过热状态
+            // 熔毁新星：对所有敢人施加过热状态
             const overheatThreshold = 100; // 爆炸阈值
             const targetTemp = Math.round(overheatThreshold * p.tempRatio);
             eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
@@ -1757,7 +1757,7 @@ export const combat_system = {
                 this.skillPoints += skill.cost;
                 this.ui.updateSkillPoints(this.skillPoints);
                 this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast('沒有敢人可攻擊');
+                showToast('没有敢人可攻击');
                 return;
             }
             for (let i = 0; i < p.swordCount; i++) {
@@ -1797,7 +1797,7 @@ export const combat_system = {
                 this.skillPoints += skill.cost;
                 this.ui.updateSkillPoints(this.skillPoints);
                 this.ui.updateSkillBar(this.skillPoints, this.activeSkills);
-                showToast('無彈藥可強化');
+                showToast('无弹药可强化');
             }
         }
 
@@ -1971,7 +1971,7 @@ export const combat_system = {
         // ---------- 基础技能 ----------
         if (method === 'skill_arcane_missiles') {
             const targets = activeEnemies().sort((a, b) => b.pos.y - a.pos.y).slice(0, p.targetCount);
-            if (targets.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (targets.length === 0) { refund('没有敌人可攻击'); return; }
             const dmg = (p.flatDamage || 0) + this.round * p.roundMult;
             targets.forEach((e, i) => {
                 const startX = e.pos.x + (Math.random() - 0.5) * 40;
@@ -1979,12 +1979,12 @@ export const combat_system = {
                 dealTo(e, dmg, p.particleColor);
             });
             playImpact(targets, { color: p.particleColor, limit: p.targetCount });
-            this.spawn_createFloatingText(this.width / 2, this.height / 2, '奧術飛彈!', p.particleColor);
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, '奥术飞弹!', p.particleColor);
             try { audio.playPowerup(2); } catch (e2) {}
         }
 
         else if (method === 'skill_kinetic_charge') {
-            if (this.ammoQueue.length === 0) { refund('無彈藥可強化'); return; }
+            if (this.ammoQueue.length === 0) { refund('无弹药可强化'); return; }
             const a = this.ammoQueue[0];
             a.damage = (a.damage || 0) + p.flatDamage;
             a.bounce = (a.bounce || 0) + p.bounceBonus;
@@ -1998,7 +1998,7 @@ export const combat_system = {
         // ---------- 词条解锁技能 ----------
         else if (method === 'skill_frost_nova_burst') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
             this.ui_triggerScreenShake(140);
             const dmg = this.round * p.roundMult;
@@ -2014,7 +2014,7 @@ export const combat_system = {
 
         else if (method === 'skill_irradiate_field') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 250 });
             const dmg = this.round * p.roundMult;
             list.forEach(e => {
@@ -2029,7 +2029,7 @@ export const combat_system = {
 
         else if (method === 'skill_flame_sword_dance') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             const swordDmg = Math.round(this.round * p.roundMult);
             for (let i = 0; i < p.swordCount; i++) {
                 const target = list[Math.floor(Math.random() * list.length)];
@@ -2042,13 +2042,13 @@ export const combat_system = {
                 target.applyTemp(p.tempUp);
             }
             playImpact(list, { color: p.particleColor, limit: p.swordCount });
-            this.spawn_createFloatingText(this.width / 2, this.height / 2, '炎光劍舞!', p.particleColor);
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, '炎光剑舞!', p.particleColor);
             try { audio.playEffect('split'); } catch (e2) {}
         }
 
         else if (method === 'skill_static_field') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 200 });
             this.ui_triggerScreenShake(120);
             list.forEach(e => {
@@ -2069,7 +2069,7 @@ export const combat_system = {
         }
 
         else if (method === 'skill_precision_volley') {
-            if (this.ammoQueue.length === 0) { refund('無彈藥可強化'); return; }
+            if (this.ammoQueue.length === 0) { refund('无弹药可强化'); return; }
             const a = this.ammoQueue[0];
             a.damage = (a.damage || 0) + p.flatDamage;
             a._critChance = Math.max(a._critChance || 0, p.critChance);
@@ -2083,7 +2083,7 @@ export const combat_system = {
         // ---------- 遗物解锁技能 ----------
         else if (method === 'skill_gravity_well') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             const pushDistance = this.enemyHeight * p.pushRows;
             const dmg = this.round * p.roundMult;
             list.forEach(e => {
@@ -2137,7 +2137,7 @@ export const combat_system = {
         // ---------- 局内商店购买技能 ----------
         else if (method === 'skill_meteor_strike') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             eventBus.emit(EVENT_TYPES.UI_FLASH_EFFECT, { color: p.flashColor, duration: 300 });
             this.ui_triggerScreenShake(220);
             const dmg = this.round * p.roundMult;
@@ -2149,12 +2149,12 @@ export const combat_system = {
             });
             playImpact(list, { color: p.particleColor });
             this.spawn_createShockwave(this.width / 2, this.height / 2, p.particleColor);
-            this.spawn_createFloatingText(this.width / 2, this.height / 2, '隕石轟擊!', p.particleColor);
+            this.spawn_createFloatingText(this.width / 2, this.height / 2, '陨石轰击!', p.particleColor);
             try { audio.playEffect('explosion'); } catch (e2) {}
         }
 
         else if (method === 'skill_prism_overload') {
-            if (this.ammoQueue.length === 0) { refund('無彈藥可強化'); return; }
+            if (this.ammoQueue.length === 0) { refund('无弹药可强化'); return; }
             const a = this.ammoQueue[0];
             a.pyro = (a.pyro || 0) + p.elemStacks;
             a.cryo = (a.cryo || 0) + p.elemStacks;
@@ -2170,7 +2170,7 @@ export const combat_system = {
 
         else if (method === 'skill_fortune_strike') {
             const list = activeEnemies();
-            if (list.length === 0) { refund('沒有敵人可攻擊'); return; }
+            if (list.length === 0) { refund('没有敌人可攻击'); return; }
             const dmg = this.round * p.roundMult;
             let kills = 0;
             list.forEach(e => {
@@ -2615,7 +2615,7 @@ export const combat_system = {
                         }
 
                         p.life = 1.0;
-                        const distance = isHorizontal ? this.canvas.width : this.canvas.height;
+                        const distance = isHorizontal ? this.width : this.height;
                         const framesNeeded = (distance + 100) / speed;
                         p.decay = 1.0 / (framesNeeded * 1.2);
                     }
@@ -2788,8 +2788,8 @@ export const combat_system = {
                 const rayDir = dir;
                 // [优化] 发射起点（使用配置参数）
                 const cfg = CONFIG.wind_system.butterfly;
-                const tX = rayDir.x > 0 ? (this.canvas.width + cfg.launchOffset - center.x) / rayDir.x : (-cfg.launchOffset - center.x) / rayDir.x;
-                const tY = rayDir.y > 0 ? (this.canvas.height + cfg.launchOffset - center.y) / rayDir.y : (-cfg.launchOffset - center.y) / rayDir.y;
+                const tX = rayDir.x > 0 ? (this.width + cfg.launchOffset - center.x) / rayDir.x : (-cfg.launchOffset - center.x) / rayDir.x;
+                const tY = rayDir.y > 0 ? (this.height + cfg.launchOffset - center.y) / rayDir.y : (-cfg.launchOffset - center.y) / rayDir.y;
                 const t = Math.min(tX, tY);
                 startPos = center.add(rayDir.mult(t));
 
@@ -2831,8 +2831,8 @@ export const combat_system = {
             
             // [优化] 检查是否飞出屏幕（使用配置参数）
             const cfg = CONFIG.wind_system.butterfly;
-            if (blade.pos.x < -cfg.deleteOffset || blade.pos.x > this.canvas.width + cfg.deleteOffset ||
-                blade.pos.y < -cfg.deleteOffset || blade.pos.y > this.canvas.height + cfg.deleteOffset) {
+            if (blade.pos.x < -cfg.deleteOffset || blade.pos.x > this.width + cfg.deleteOffset ||
+                blade.pos.y < -cfg.deleteOffset || blade.pos.y > this.height + cfg.deleteOffset) {
                 this.butterflyBlades.splice(i, 1);
                 continue;
             }
@@ -2926,7 +2926,7 @@ export const combat_system = {
                 const pOffset = (i / particleCount) * Math.PI * 2 + blade.angle * 1.5;
                 const pScale = Math.cos(pOffset);
                 const pY = pScale * blade.size * 1.2;
-                const pAlpha = (0.2 + Math.abs(pScale) * 0.4) * (1 - blade.pos.dist(new Vec2(this.canvas.width/2, this.height/2)) / 1000);
+                const pAlpha = (0.2 + Math.abs(pScale) * 0.4) * (1 - blade.pos.dist(new Vec2(this.width/2, this.height/2)) / 1000);
                 
                 ctx.save();
                 ctx.translate(blade.pos.x, blade.pos.y);
@@ -3409,7 +3409,7 @@ export const combat_system = {
 
         return makeProfile(
             vulnCfg.attrs || [],
-            vulnCfg.label || 'Boss破绽',
+            vulnCfg.label || '首领破绽',
             vulnCfg.mode,
             vulnCfg.hitThreshold,
             vulnCfg.damageRatio
@@ -3557,7 +3557,7 @@ export const combat_system = {
     // @section:damage_pre_calc - 伤害前置计算：基础值、暴击、穿透
     combat_damageEnemy(enemy, projectile, damageOverride = null) {
         if (!enemy || !enemy.active) return null;
-        // --- [修復]：如果是光球/偽造子彈，補齊 chainHistory 防止報措 ---
+        // --- [修复]：如果是光球/伪造子弹，补齐 chainHistory 防止报措 ---
         if (!projectile.chainHistory) projectile.chainHistory = [];
 
 		const shotId = projectile.shotId !== undefined ? projectile.shotId : null;
@@ -3737,7 +3737,7 @@ export const combat_system = {
                     enemy._teslaGrantedHaste = false;
                     if (typeof enemy._syncAffixOverlayImages === 'function') enemy._syncAffixOverlayImages();
                 }
-                if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 22, 'DISCHARGE', '#67e8f9', 12);
+                if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 22, '放电', '#67e8f9', 12);
             }
             // 标记本回合被冰属性命中（供元素聚变使用）
             enemy._cryoHitThisRound = true;
@@ -3906,7 +3906,7 @@ export const combat_system = {
                         }
                     }
                     if (this.spawn_createFloatingText) {
-                        this.spawn_createFloatingText(hitX, hitY - 28, 'TOXIC BLOOM', '#86efac', 13);
+                        this.spawn_createFloatingText(hitX, hitY - 28, '毒爆', '#86efac', 13);
                     }
                 }
             }
@@ -3967,7 +3967,7 @@ export const combat_system = {
                 enemy._teslaGroundedTurns || 0,
                 Math.max(1, Math.floor(teslaCfg?.teslaGroundedTurns || 1))
             );
-            if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 30, 'GROUNDED', '#fbbf24', 12);
+            if (this.spawn_createFloatingText) this.spawn_createFloatingText(hitX, hitY - 30, '接地', '#fbbf24', 12);
         }
 
         if (isBounceHit) {
@@ -4203,7 +4203,7 @@ export const combat_system = {
                         `狂暴! +${runeName}`,
                         '#f59e0b'
                     );
-                    showToast(`Boss 狂暴！获得符文：${runeName}`);
+                    showToast(`首领狂暴！获得符文：${runeName}`);
                 }
             }
         }
@@ -4246,7 +4246,7 @@ export const combat_system = {
         const isIgnisFurnaceTarget = enemy.type === 'boss' && enemy.bossType === 'ignis';
 
         if (config.pyro > 0 && enemy.temp >= burnTempThreshold && !isIgnisFurnaceTarget) {
-            // [Agent D] 熱毁词条 Hook：计算火焰伤害倍率
+            // [Agent D] 热毁词条 Hook：计算火焰伤害倍率
             let meltdownMult = 1.0;
             const meltdownFx = this.activeRunewordEffects && this.activeRunewordEffects['meltdown'];
             if (meltdownFx) {
@@ -4255,7 +4255,7 @@ export const combat_system = {
             }
             // Step 1: 计算当前的基础额外火伤（应用共鸣加成后的 effectivePyro）
             const baseFireDmg = (effectivePyro * enemy.temp) / 200;
-            // Step 2: 造成基础燃烧伤害（应用熱毁倍率 × 共鸣倍率）
+            // Step 2: 造成基础燃烧伤害（应用热毁倍率 × 共鸣倍率）
             if (baseFireDmg >= 1) {
                 const fireResult = enemy.takeDamage(baseFireDmg * meltdownMult * pyroResMult);
                 const fireHpDamage = fireResult.hpDamage ?? fireResult.actualDamage ?? 0;
@@ -4274,7 +4274,7 @@ export const combat_system = {
                 : pyroCfg.explodeThreshold;
             let explodeChance = 0;
             if (enemy.temp > EXPLODE_THRESHOLD) {
-                // 线性插値计算概率
+                // 线性插值计算概率
                 const range = pyroCfg.tempForMaxChance - EXPLODE_THRESHOLD;
                 const chanceRange = pyroCfg.maxExplodeChance - pyroCfg.baseExplodeChance;
                 explodeChance = pyroCfg.baseExplodeChance + (enemy.temp - EXPLODE_THRESHOLD) * (chanceRange / range);
@@ -4289,7 +4289,7 @@ export const combat_system = {
                 // B. 执行消耗：先扣除
                 enemy.temp -= consumedHeat;
 
-                // C. 计算爆炸伤害（应用熱毁倍率 × 共鸣倍率）
+                // C. 计算爆炸伤害（应用热毁倍率 × 共鸣倍率）
                 const explodeDmg = baseFireDmg * pyroCfg.damageMult * meltdownMult * pyroResMult;
                 
                 if (explodeDmg >= 1) {
@@ -4310,7 +4310,7 @@ export const combat_system = {
                             intensity: 1.15,
                         });
                     }
-                    if (expHpDamage > 0) this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `BOOM! ${Math.ceil(expHpDamage)}`, '#dc2626');
+                    if (expHpDamage > 0) this.spawn_createFloatingText(enemy.pos.x, enemy.pos.y - 50, `爆炸 ${Math.ceil(expHpDamage)}`, '#dc2626');
                     
                     // --- 3. 范围伤害 (AOE) ---
                     const EXPLODE_RADIUS = pyroCfg.radius; // 爆炸半径
@@ -5453,7 +5453,7 @@ export const combat_system = {
         });
 
         if (typeof this.spawn_createFloatingText === 'function') {
-            this.spawn_createFloatingText(centerPos.x, centerPos.y - 20, '❄️ FROST NOVA!', '#a5f3fc');
+            this.spawn_createFloatingText(centerPos.x, centerPos.y - 20, '❄️ 冰霜新星', '#a5f3fc');
         }
 
         // 链式触发（每次概率减半），独立 sourceConfig，伤害基数沿用原始 baseDmg
@@ -5702,7 +5702,7 @@ export const combat_system = {
 
                     if (typeof this.spawn_createFloatingText === 'function') {
                         setTimeout(() => {
-                            if (this.spawn_createFloatingText) this.spawn_createFloatingText(cx, cy - 64, chainIndex > 0 ? 'ECHO T-00' : 'T-00', '#facc15', 16);
+                            if (this.spawn_createFloatingText) this.spawn_createFloatingText(cx, cy - 64, chainIndex > 0 ? '回响 T-00' : 'T-00', '#facc15', 16);
                         }, 180);
                     }
                     if (typeof this.triggerScreenShakeAdvanced === 'function') {
@@ -6036,8 +6036,8 @@ export const combat_system = {
         for (let i = 0; i < 15; i++) {
             this.spawn_createParticle(boss.pos.x, boss.pos.y, '#ff4444', 'spark');
         }
-        this.spawn_createFloatingText(boss.pos.x, boss.pos.y - 40, '❗ENRAGE!', '#ff0000');
-        showToast(`☠️ ${boss.bossName || 'Boss'} 进入狂暴阶段！`);
+        this.spawn_createFloatingText(boss.pos.x, boss.pos.y - 40, '❗狂暴', '#ff0000');
+        showToast(`☠️ ${boss.bossName || '首领'} 进入狂暴阶段！`);
 
         if (!bossCfg) return;
 
@@ -6181,7 +6181,7 @@ export const combat_system = {
             }
             // 冰冻音效
             audio.playEffect('shatter');
-            this.spawn_createFloatingText(x, y - 24, '❄️SHATTER!', '#7dd3fc');
+            this.spawn_createFloatingText(x, y - 24, '❄️碎冰', '#7dd3fc');
         }
 
         // --- 2. 燃烧状态死亡：火焰爆炸扩散 ---
@@ -6211,7 +6211,7 @@ export const combat_system = {
             }
             // 燃烧扩散伤害
             audio.playExplosion();
-            this.spawn_createFloatingText(x, y - 24, '🔥SPREAD!', '#f97316');
+            this.spawn_createFloatingText(x, y - 24, '🔥蔓延', '#f97316');
             const fireSpreadTargets = [];
             this.enemies.forEach(other => {
                 if (other.active && other !== enemy && enemy.pos.dist(other.pos) < CONFIG.gameplay.fireSpreadRadius) {

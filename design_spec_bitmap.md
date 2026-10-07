@@ -1,5 +1,7 @@
 # Echo Alchemist V2 - UI 与敌人位图化设计规格文档
 
+> 2026-10-06：默认美术已改为像素风（[`docs/design/pixel_art_mode.md`](docs/design/pixel_art_mode.md)），本文档描述的位图资产只在位图模式（`?art=bitmap`）下使用；像素模式不复刻这些位图，题材与设计意图（如敌人"几何磨石块"母题）由像素规范继承。
+
 本文档基于对 `echo-alchemist-v2` 现有代码库的深入分析，为后续的 UI 自动生成切图与敌人 Sprite 序列化提供精确的设计规格与实施指南。
 
 > 生成具体资产时，还必须读取 [`docs/art_asset_generation_guidelines.md`](docs/art_asset_generation_guidelines.md)。该文档把本规格的总体风格拆成可直接引用的场景化要求、prompt 模板、透明管线和验收清单。

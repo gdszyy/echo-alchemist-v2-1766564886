@@ -24,6 +24,8 @@ import { eventBus } from '../event_bus.js';
 import { createSpriteRenderer } from '../render/sprite_renderer.js'; // [Phase 5B Task 5.B3] Sprite 动画渲染器
 import { resolveDynamicEnemyOverlayPaths, resolveEnemyVisualAsset } from '../data/enemy_visual_assets.js';
 import { getBossVulnerabilityOverlayPath, resolveBossVulnerabilityStateId } from '../data/boss_vulnerability_assets.js';
+import { isPixelArtMode } from '../render/art_mode.js';
+import { pxDrawEnemy } from '../pixel/enemy_render.js';
 
 const TELEGRAPH_ICON_AFFIX_BY_KEY = {
     devourer_maw: 'devour',
@@ -87,6 +89,8 @@ const _DEFENSE_FLOW_SHIELD_LAYER_PROFILES = [
 
 function _getAffixOverlayImage(src) {
     if (!src || typeof Image === 'undefined') return null;
+    // 像素模式下敌人由 enemy_render.js 程序化绘制，所有敌人位图（框体/词缀叠层/弱点/护盾膜/防御图标）都不下载
+    if (isPixelArtMode()) return null;
     const cached = _affixOverlayImageCache.get(src);
     if (cached) return cached;
 
@@ -108,6 +112,7 @@ function _getEnemyFrameImage(src) {
 
 function _preloadDefenseShieldMembranes() {
     if (typeof Image === 'undefined') return;
+    if (isPixelArtMode()) return; // 像素模式的护盾读数由 enemy_render.js 绘制，不用位图护盾膜
     [..._DEFENSE_FLOW_SHIELD_MEMBRANE_SRCS, ..._DEFENSE_GLASS_SHIELD_MEMBRANE_SRCS, ..._DEFENSE_TREE_SHIELD_MEMBRANE_SRCS]
         .forEach(src => _getAffixOverlayImage(src));
 }
@@ -598,6 +603,7 @@ class Enemy {
         this._usesEliteGolemAffixComboSprite = !!(
             resolved?.assetKey && String(resolved.assetKey).startsWith('eliteGolemAffixCombo:')
         );
+        if (isPixelArtMode()) return; // 像素模式不创建位图 SpriteRenderer（不加载敌人/首领精灵表）
         const spriteKey = `${this.type || 'normal'}|${this.bossType || ''}|${resolved?.assetKey || ''}`;
         if (this._spriteRenderer && this._spriteVisualKey === spriteKey) return;
 
@@ -1320,7 +1326,7 @@ class Enemy {
         }
         if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
         if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
-            gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 36, `RUNE:${chosen}`, '#c084fc', 12);
+            gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 36, `符文：${(CONFIG.ui.attributeDisplay[chosen] || {}).name || chosen}`, '#c084fc', 12);
         }
     }
 
@@ -1367,7 +1373,7 @@ class Enemy {
         this._adaptiveRuneLastReason = reason;
         if (typeof this._syncAffixOverlayImages === 'function') this._syncAffixOverlayImages();
         if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
-            gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 48, `RUNE:${element}`, '#a78bfa', 12);
+            gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 48, `符文：${(CONFIG.ui.attributeDisplay[element] || {}).name || element}`, '#a78bfa', 12);
         }
         return true;
     }
@@ -1553,7 +1559,7 @@ class Enemy {
                 other !== this && other.active && other.hp < other.maxHp && this.pos.dist(other.pos) < range
             );
             if (targets.length > 0) {
-                return { key: 'healer', icon: '💖', name: '治癒', label: `治疗x${targets.length}`, color: '#f472b6', tone: 240, severity: 2 };
+                return { key: 'healer', icon: '💖', name: '治愈', label: `治疗x${targets.length}`, color: '#f472b6', tone: 240, severity: 2 };
             }
         }
 
@@ -1584,7 +1590,7 @@ class Enemy {
                 effectiveJumpRows = this._berserkedJumpRows || effectiveJumpRows;
             }
             if (!this._isMoveBlocked(game, effectiveJumpRows)) {
-                return { key: 'jump', icon: '🦘', name: '跳躍', label: `跳跃${effectiveJumpRows}`, color: '#38bdf8', tone: 260, severity: 2 };
+                return { key: 'jump', icon: '🦘', name: '跳跃', label: `跳跃${effectiveJumpRows}`, color: '#38bdf8', tone: 260, severity: 2 };
             }
         }
 
@@ -1842,7 +1848,7 @@ class Enemy {
             boss._addTeslaFieldPower(gain, game, 'FIELD');
         }
         if (game && typeof game.spawn_createFloatingText === 'function') {
-            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 18, 'CHARGED', '#c084fc', 12);
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 18, '蓄能', '#c084fc', 12);
         }
         return true;
     }
@@ -1933,7 +1939,7 @@ class Enemy {
             spawned++;
 
             if (typeof game.spawn_createShockwave === 'function') game.spawn_createShockwave(pos.x, pos.y, '#c084fc');
-            if (typeof game.spawn_createFloatingText === 'function') game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, 'CONDUCTOR', '#c084fc', 12);
+            if (typeof game.spawn_createFloatingText === 'function') game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, '导体', '#c084fc', 12);
             if (typeof game.spawn_createParticle === 'function') {
                 for (let i = 0; i < 4; i++) game.spawn_createParticle(pos.x, pos.y, '#c084fc', 'spark');
             }
@@ -2329,7 +2335,7 @@ class Enemy {
                 target._viridisSporePulseTimer = Math.max(target._viridisSporePulseTimer || 0, 22);
                 granted++;
                 if (typeof game.spawn_createFloatingText === 'function') {
-                    game.spawn_createFloatingText(target.pos.x, target.pos.y - target.height / 2 - 14, 'SPORE ARMOR', '#bef264', 11);
+                    game.spawn_createFloatingText(target.pos.x, target.pos.y - target.height / 2 - 14, '孢子护甲', '#bef264', 11);
                 }
                 if (typeof game.spawn_createParticle === 'function') {
                     game.spawn_createParticle(target.pos.x, target.pos.y, '#bef264', 'spark');
@@ -2365,7 +2371,7 @@ class Enemy {
             this._livingArmorHitTimer = Math.max(this._livingArmorHitTimer || 0, 18);
             this._triggerDefenseImpactFx('livingArmor', source, 18, { absorbed: armorDamage });
             if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
-                gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 34, `SPORE-${Math.ceil(armorDamage)}`, isVenom ? '#86efac' : '#fdba74', 12);
+                gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - 34, `孢子-${Math.ceil(armorDamage)}`, isVenom ? '#86efac' : '#fdba74', 12);
             }
             if (this.livingArmorHp <= 0) {
                 this.livingArmorHp = 0;
@@ -2394,7 +2400,7 @@ class Enemy {
             }
             this._viridisSporeCorrodedTurns = Math.max(this._viridisSporeCorrodedTurns || 0, Math.max(1, Math.floor(cfg.sporeArmorCorrodeTurns || 2)));
             if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
-                gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 26, 'SPORE CLEANSE', '#86efac', 12);
+                gameRef.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 26, '孢子净化', '#86efac', 12);
             }
             return;
         }
@@ -2407,7 +2413,7 @@ class Enemy {
             target._grantLivingArmor(boss.maxHp, Math.max(0.5, (cfg.sporeArmorStackMult || 1.1) * 0.5));
             target._viridisSporePulseTimer = Math.max(target._viridisSporePulseTimer || 0, 18);
             if (gameRef && typeof gameRef.spawn_createFloatingText === 'function') {
-                gameRef.spawn_createFloatingText(target.pos.x, target.pos.y - target.height / 2 - 12, 'SPORE BURST', '#bef264', 11);
+                gameRef.spawn_createFloatingText(target.pos.x, target.pos.y - target.height / 2 - 12, '孢子爆发', '#bef264', 11);
             }
         }
         if (gameRef && typeof gameRef.spawn_createParticle === 'function') {
@@ -2473,7 +2479,7 @@ class Enemy {
             target._chimeraPulledTimer = Math.max(target._chimeraPulledTimer || 0, 18);
             pulled++;
             if (typeof game.spawn_createFloatingText === 'function') {
-                game.spawn_createFloatingText(cell.x, cell.y - target.height / 2 - 12, 'PULL', '#ef4444', 11);
+                game.spawn_createFloatingText(cell.x, cell.y - target.height / 2 - 12, '牵引', '#ef4444', 11);
             }
         }
 
@@ -2668,7 +2674,7 @@ class Enemy {
             spawned++;
 
             if (typeof game.spawn_createShockwave === 'function') game.spawn_createShockwave(pos.x, pos.y, '#ef4444');
-            if (typeof game.spawn_createFloatingText === 'function') game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, 'MAW FEED', '#fca5a5', 12);
+            if (typeof game.spawn_createFloatingText === 'function') game.spawn_createFloatingText(pos.x, pos.y - h / 2 - 14, '吞食', '#fca5a5', 12);
             if (typeof game.spawn_createParticle === 'function') {
                 game.spawn_createParticle(pos.x, pos.y, '#ef4444', 'mist');
                 game.spawn_createParticle(pos.x, pos.y, '#f87171', 'spark');
@@ -2700,7 +2706,7 @@ class Enemy {
         }
 
         if ((pulled > 0 || spawned > 0) && typeof game?.spawn_createFloatingText === 'function') {
-            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 24, `ABYSS ${pulled}/${spawned}`, '#fca5a5', 12);
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 24, `深渊 ${pulled}/${spawned}`, '#fca5a5', 12);
         }
         return { pulled, spawned };
     }
@@ -2919,7 +2925,7 @@ class Enemy {
             const color = temp > 0 ? '#fdba74' : '#67e8f9';
             game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 54, label, color, 12);
             if (normalized.paired > 0) {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 70, `RADIANT+${normalized.shieldAmount}`, '#f0abfc', 12);
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - this.height / 2 - 70, `流彩+${normalized.shieldAmount}`, '#f0abfc', 12);
             }
         }
         return { statusCount: stacks, tempGain: temp, heatGain, frostGain, paired: normalized.paired, shieldAmount: normalized.shieldAmount };
@@ -3441,7 +3447,7 @@ class Enemy {
                      victim.affixes.forEach(af => { if (!this.affixes.includes(af)) this.affixes.push(af); });
                      const damageResult = victim.takeDamage(99999);
                      if (damageResult.killed) game.spawn_addScore(absorbMax);
-                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, 'DEVOUR!', '#ef4444');
+                     game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, '吞噬', '#ef4444');
                      game.spawn_createParticle(victim.pos.x, victim.pos.y, '#ef4444', 'mist');
                      game.spawn_createShockwave(this.pos.x, this.pos.y, '#ef4444');
                      game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'devour', {
@@ -3480,7 +3486,7 @@ class Enemy {
             }
 
             if (isSecondAction) {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "😡RAGE!", "#ef4444");
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "😡狂暴", "#ef4444");
             }
         }
 
@@ -3535,7 +3541,7 @@ class Enemy {
                         this._startJumpFx(effectiveJumpRows, jumpStartY, jumpTargetY);
                         this.advance(moveAmount * effectiveJumpRows);
                         this.bumpOffsetY = -30;
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y, '跳跃', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
                         game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'jump', {
                             isBoss: this.type === 'boss', isElite: this.isElite
@@ -3547,11 +3553,11 @@ class Enemy {
                         }
                     } else {
                         this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
+                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, '受阻', '#ef4444');
                     }
                 } else {
                     this.bumpOffsetY = -10;
-                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
+                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, '受阻', '#ef4444');
                 }
             }
         };
@@ -3561,7 +3567,7 @@ class Enemy {
             }
             // [改动] haste 词条：仅额外触发一次移动，不重复结算其他词条
             if (this.affixes.includes('haste') && this.type !== 'boss') {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡冲刺", "#facc15");
                 game.spawn_createAffixSkillVFX(this.pos.x, this.pos.y, 'haste', {
                     isBoss: this.type === 'boss', isElite: this.isElite
                 });
@@ -3643,7 +3649,7 @@ class Enemy {
                 }
             }
 
-            // --- 2. 範圍治療 (Healer) ---
+            // --- 2. 范围治疗 (Healer) ---
             if (this.affixes.includes('healer')) {
                 let effectiveHealerRange = afx.healerRange;
                 if (this.type === 'boss' && this.bossType === 'viridis' && this.berserked) {
@@ -3802,7 +3808,7 @@ class Enemy {
                         this._startJumpFx(effectiveJumpRows, jumpStartY, jumpTargetY);
                         this.advance(moveAmount * effectiveJumpRows);
                         this.bumpOffsetY = -30;
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y, 'JUMP!', '#38bdf8');
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y, '跳跃', '#38bdf8');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#38bdf8', 'mist');
                         // [Glacies] 落地后在战斗场内追加霜缝，不再影响钉盘 Peg
                         if (this._isGlaciesBoss && this._isGlaciesBoss()) {
@@ -3810,11 +3816,11 @@ class Enemy {
                         }
                     } else {
                         this.bumpOffsetY = -10;
-                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
+                        if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, '受阻', '#ef4444');
                     }
                 } else {
                     this.bumpOffsetY = -10;
-                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'BLOCKED', '#ef4444');
+                    if (Math.random() < 0.3) game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, '受阻', '#ef4444');
                 }
             }
         };
@@ -3838,7 +3844,7 @@ class Enemy {
                 _doMoveP();
             }
             if (this.affixes.includes('haste') && this.type !== 'boss') {
-                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡DASH!", "#facc15");
+                game.spawn_createFloatingText(this.pos.x, this.pos.y - 50, "⚡冲刺", "#facc15");
                 _doMoveP();
             }
         } else if (!this.isFrozenCurrentTurn && !_heavyArmorCanMove) {
@@ -3967,7 +3973,7 @@ class Enemy {
             }
             this._ouroborosOrbitPulseTimer = Math.max(this._ouroborosOrbitPulseTimer || 0, 24);
             if (options.feedback && game) {
-                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 54, `${slot.icon || '附'} ${slot.name || 'ORBIT'}`, slot.color || '#a855f7', 13);
+                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 54, `${slot.icon || '附'} ${slot.name || '附环'}`, slot.color || '#a855f7', 13);
                 game.spawn_createShockwave?.(this.pos.x, this.pos.y, slot.color || '#a855f7');
             }
             eventBus.emit('boss:rotation', {
@@ -4084,7 +4090,7 @@ class Enemy {
             case 'shield': {
                 const gain = Math.max(1, Math.floor(cfg.orbitShieldGain || 2));
                 this._grantShieldLayer(gain);
-                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `ORB盾+${gain}`, color, 12);
+                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `附环盾+${gain}`, color, 12);
                 return { action, shield: gain };
             }
             case 'heal': {
@@ -4092,7 +4098,7 @@ class Enemy {
                 this.hp = Math.min(this.maxHp, this.hp + heal);
                 const wounded = this._getOuroborosEchoes(game).filter(e => e.hp < e.maxHp).sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
                 if (wounded) wounded.hp = Math.min(wounded.maxHp, wounded.hp + Math.ceil(wounded.maxHp * 0.18));
-                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `ORB愈+${heal}`, color, 12);
+                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `附环愈+${heal}`, color, 12);
                 return { action, heal, healedEcho: !!wounded };
             }
             case 'summon': {
@@ -4104,7 +4110,7 @@ class Enemy {
                 const target = echoes[Math.floor(Math.random() * Math.max(1, echoes.length))];
                 if (target && !target.affixes.includes('haste')) target.affixes.push('haste');
                 this._moveCooldown = 0;
-                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, 'ORB疾行', color, 12);
+                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, '附环疾行', color, 12);
                 return { action, hasted: !!target };
             }
             case 'devour': {
@@ -4116,7 +4122,7 @@ class Enemy {
                     victim.takeDamage(99999);
                     this.hp = Math.min(this.maxHp, this.hp + heal);
                     this._grantShieldLayer(shieldGain);
-                    game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `ORB噬+${shieldGain}`, color, 12);
+                    game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `附环噬+${shieldGain}`, color, 12);
                     game.spawn_createShockwave?.(this.pos.x, this.pos.y, color);
                     return { action, devoured: true, shieldGain };
                 }
@@ -4130,7 +4136,7 @@ class Enemy {
                     e.shieldCharges = Math.max(e.shieldCharges || 0, 1);
                 });
                 this._grantShieldLayer(1);
-                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `ORB雷${echoes.length}`, color, 12);
+                game.spawn_createFloatingText?.(this.pos.x, this.pos.y - 42, `附环雷${echoes.length}`, color, 12);
                 return { action, charged: echoes.length };
             }
             default:
@@ -4190,7 +4196,7 @@ class Enemy {
             disabledTurns: disableTurns
         };
 
-        gameRef?.spawn_createFloatingText?.(this.pos.x, this.pos.y - 72, `ORBIT ${slot.icon || '附'} -${disableTurns}T`, slot.color || '#facc15', 13);
+        gameRef?.spawn_createFloatingText?.(this.pos.x, this.pos.y - 72, `附环${slot.icon || ''} 停 ${disableTurns} 回合`, slot.color || '#facc15', 13);
         gameRef?.spawn_createShockwave?.(this.pos.x, this.pos.y, slot.color || '#facc15');
         const nextIdx = this._getOuroborosNextActiveIndex(idx + 1);
         this._applyOuroborosAttachment(nextIdx, gameRef, { feedback: true, preserveExposure: true });
@@ -4280,7 +4286,7 @@ class Enemy {
 
     playFreezeBlockEffect(game) {
         this.bumpOffsetY = 6; 
-        game.spawn_createFloatingText(this.pos.x, this.pos.y, "❄️FROZEN", "#06b6d4");
+        game.spawn_createFloatingText(this.pos.x, this.pos.y, "❄️冻结", "#06b6d4");
         
         const mistCount = 4 + Math.floor(this.width / 15); 
         for(let i=0; i<mistCount; i++) {
@@ -5402,7 +5408,12 @@ class Enemy {
     // @section:draw_entry_and_perf_check - 绘制入口与性能等级检查
     draw(ctx) {
         if (!this.active) return;
-        ctx.save(); 
+        // [像素风] 程序化磨石精灵 + 固定四角读数（src/pixel/enemy_render.js）
+        if (isPixelArtMode()) {
+            pxDrawEnemy(ctx, this);
+            return;
+        }
+        ctx.save();
         ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
 
         // === D1 & D2: 待机生动感（呼吸缩放 + 微浮动）===
@@ -6927,7 +6938,7 @@ class Enemy {
 
         // === D3: 边框脉冲光晕（Border Pulse Glow）===
         // 仅在 idle 状态下生效，为边框叠加一层缓慢脉冲的 shadowBlur 光晕
-        // 升级：使用非线性缓动曲线 + elite/boss 差异化强度 + 峰値过曝高光叠加
+        // 升级：使用非线性缓动曲线 + elite/boss 差异化强度 + 峰值过曝高光叠加
         if (this.actionPhase === 'idle') {
             const now = Date.now();
             // boss 脉冲周期缩短（乘以 borderPulseBossPeriodMult），体现威压感
@@ -6935,7 +6946,7 @@ class Enemy {
                 ? CONFIG.enemyRender.borderPulsePeriod * CONFIG.enemyRender.borderPulseBossPeriodMult
                 : CONFIG.enemyRender.borderPulsePeriod;
             const pulsePhase = (now / pulsePeriod + this.visualSeed * 0.7) * Math.PI * 2;
-            // 升级：使用 Math.pow 非线性缓动曲线，增强极大値停留感
+            // 升级：使用 Math.pow 非线性缓动曲线，增强极大值停留感
             const pulseIntensity = Math.pow((Math.sin(pulsePhase) + 1) * 0.5, CONFIG.enemyRender.breatheEasingPower);
             // 根据词条数分级应用差异化光晕强度倍率
             let blurMultiplier = 1.0;
@@ -6994,7 +7005,7 @@ class Enemy {
             } else {
                 ctx.strokeRect(-w/2, -h/2, w, h);
             }
-            // 在 pulseBlur 达到峰値时额外叠加一层 lighter 模式的高光描边，模拟 brightness 过曝效果
+            // 在 pulseBlur 达到峰值时额外叠加一层 lighter 模式的高光描边，模拟 brightness 过曝效果
             const overglowAlpha = pulseIntensity * CONFIG.enemyRender.borderPulseOverglowAlpha;
             if (overglowAlpha > 0.01) {
                 ctx.save();
@@ -7232,7 +7243,7 @@ class Enemy {
             const flickerT = Date.now() / 1000;
             // 高频闪烁：使用 sin 高频振荡模拟闪烁
             const flickerRaw = Math.sin(flickerT * flickerCfg.bossBerserkFlickerHz * Math.PI * 2 + this.visualSeed * 10);
-            const flickerIntensity = Math.pow(Math.max(0, flickerRaw), 3); // 仅保留峰値阶段
+            const flickerIntensity = Math.pow(Math.max(0, flickerRaw), 3); // 仅保留峰值阶段
             if (flickerIntensity > 0.05) {
                 ctx.save();
                 ctx.translate(this.pos.x + (this._blastOffsetX || 0), this.pos.y + this.bumpOffsetY + (this._blastOffsetY || 0));
@@ -8332,8 +8343,11 @@ class Enemy {
                     const flashAlpha = (this._rotationFlashTimer / 8) * 0.3; // 从 0.3 快速衰减
                     ctx.save();
                     // 在本地坐标系中绘制全屏盖盖（使用 ctx.canvas 尺寸）
-                    const cw = ctx.canvas ? ctx.canvas.width : 400;
-                    const ch = ctx.canvas ? ctx.canvas.height : 700;
+                    // 后备缓冲尺寸换算回当前用户坐标（像素模式下缓冲是低分辨率的）
+                    const _ft = ctx.getTransform();
+                    const _fs = Math.hypot(_ft.a, _ft.b) || 1;
+                    const cw = (ctx.canvas ? ctx.canvas.width : 400) / _fs;
+                    const ch = (ctx.canvas ? ctx.canvas.height : 700) / _fs;
                     ctx.globalCompositeOperation = 'lighter';
                     ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
                     ctx.fillRect(-this.pos.x, -(this.pos.y + this.bumpOffsetY), cw, ch);
@@ -8647,7 +8661,7 @@ class Enemy {
                     this._triggerDefenseImpactFx('ward', source, 24, { break: true, absorbed });
                     if (typeof game !== 'undefined') {
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#67e8f9', 'spark');
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 36, '🔷BREAK', '#22d3ee');
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 36, '🔷破盾', '#22d3ee');
                     }
                 }
                 if (isPierce) this._blockedPierceThisHit = true;
@@ -8736,7 +8750,7 @@ class Enemy {
                     this._radiantAegisBreakTimer = 28;
                     this._triggerDefenseImpactFx('radiantAegis', source, 28, { break: true, absorbed });
                     if (typeof game !== 'undefined') {
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 48, '✦SHATTER', '#f0abfc');
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 48, '✦破碎', '#f0abfc');
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#f0abfc', 'spark');
                     }
                 }
@@ -8798,7 +8812,7 @@ class Enemy {
                     }
                     if (typeof game !== 'undefined') {
                         const breakIcon = getUiBitmap(DEFENSE_ICON_MAP[isPhaseShieldBlock ? 'phaseShield' : 'shield']);
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "BROKEN!", "#ef4444", 14, breakIcon);
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 40, "击破", "#ef4444", 14, breakIcon);
                         game.spawn_createParticle(this.pos.x, this.pos.y, '#93c5fd', 'spark');
                         // 播放破碎音效 (如果支持)
                         // audio.playEffect('shatter'); 
@@ -8807,7 +8821,7 @@ class Enemy {
             } else if (isBackAttack) {
                 // 绕后攻击反馈
                 if (typeof game !== 'undefined') {
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "🗡️BACKSTAB!", "#facc15");
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, "🗡️背刺", "#facc15");
                 }
             }
         }
@@ -9871,7 +9885,7 @@ class Enemy {
         const badges = [];
         const affixes = this.affixes || [];
         if (affixes.includes('runeBearer')) {
-            badges.push({ text: this._runeBearerTempAffix ? `R:${this._runeBearerTempAffix.slice(0, 2)}` : 'RUNE', color: '#c084fc' });
+            badges.push({ text: this._runeBearerTempAffix ? `R:${this._runeBearerTempAffix.slice(0, 2)}` : '符文', color: '#c084fc' });
         }
         if (affixes.includes('adaptiveRune')) {
             const element = this._getAdaptiveRuneDropElement?.();
@@ -9966,7 +9980,7 @@ class Enemy {
 
     /**
      * 绘制精英专属装饰（Layer 3.9）——晶化变异设计
-     * 通过虚空晶核、晶化切面和流光金边强化精英輨达度
+     * 通过虚空晶核、晶化切面和流光金边强化精英辨识度
      * @param {CanvasRenderingContext2D} ctx - 画布上下文（已 translate 到精英中心）
      * @param {number} w - 精英宽度（已减去边距）
      * @param {number} h - 精英高度（已减去边距）
@@ -10500,9 +10514,9 @@ class Enemy {
                 // === Viridis: 能量藤蔓 + 生命光晕 ===
                 ctx.save();
                 ctx.globalCompositeOperation = 'screen';
-                // 中心生命光晕（[T2] 呼吸峰値时内圈颜色向白色过渡）
+                // 中心生命光晕（[T2] 呼吸峰值时内圈颜色向白色过渡）
                 const viridisBreath = (Math.sin(t * 2) + 1) * 0.5; // 0~1 呼吸周期
-                // 内圈颜色：呼吸峰値时向白色过渡
+                // 内圈颜色：呼吸峰值时向白色过渡
                 const viridisInnerR = Math.floor(74 + viridisBreath * (255 - 74));
                 const viridisInnerG = Math.floor(222 + viridisBreath * (255 - 222));
                 const viridisInnerB = Math.floor(128 + viridisBreath * (255 - 128));
@@ -10566,7 +10580,7 @@ class Enemy {
                 // 闪烁电光核心
                 const teslaFlash = Math.random() < 0.3 ? 1 : (Math.sin(t * 8) * 0.5 + 0.5);
                 const teslaGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(w, h) * 0.35);
-                // [T2] teslaFlash 峰値时中心颜色叠加白色高光
+                // [T2] teslaFlash 峰值时中心颜色叠加白色高光
                 const teslaCenterR = Math.floor(250 + teslaFlash * (255 - 250));
                 const teslaCenterG = Math.floor(204 + teslaFlash * (255 - 204));
                 const teslaCenterB = Math.floor(21 + teslaFlash * (255 - 21));
@@ -11949,7 +11963,7 @@ class Enemy {
             if (typeof larva.initSprite === 'function') larva.initSprite();
             game.enemies.push(larva);
             game.spawn_createParticle(p.x, p.y, '#a3e635', 'mist');
-            game.spawn_createFloatingText(host.pos.x, host.pos.y - 50, '🥚HATCH', '#a3e635');
+            game.spawn_createFloatingText(host.pos.x, host.pos.y - 50, '🥚孵化', '#a3e635');
             return;
         }
     }
@@ -12072,7 +12086,7 @@ class Enemy {
                     drone.advance(moveAmount * jumpRows);
                     drone.bumpOffsetY = -30;
                     if (typeof game.spawn_createFloatingText === 'function') {
-                        game.spawn_createFloatingText(drone.pos.x, drone.pos.y, 'JUMP!', '#38bdf8');
+                        game.spawn_createFloatingText(drone.pos.x, drone.pos.y, '跳跃', '#38bdf8');
                     }
                     if (typeof game.spawn_createParticle === 'function') {
                         game.spawn_createParticle(drone.pos.x, drone.pos.y, '#38bdf8', 'mist');
@@ -12083,7 +12097,7 @@ class Enemy {
             }
             drone.bumpOffsetY = -10;
             if (typeof game.spawn_createFloatingText === 'function') {
-                game.spawn_createFloatingText(drone.pos.x, drone.pos.y - 20, 'BLOCKED', '#ef4444');
+                game.spawn_createFloatingText(drone.pos.x, drone.pos.y - 20, '受阻', '#ef4444');
             }
             return false;
         };
@@ -12135,7 +12149,7 @@ class Enemy {
             if (typeof drone.initSprite === 'function') drone.initSprite();
             game.enemies.push(drone);
             game.spawn_createParticle(p.x, p.y, '#38bdf8', 'spark');
-            game.spawn_createFloatingText(host.pos.x, host.pos.y - 50, 'DRONE', '#38bdf8', 12);
+            game.spawn_createFloatingText(host.pos.x, host.pos.y - 50, '投放', '#38bdf8', 12);
             Enemy._carrierLaunchDroneMovement(drone, game, afx);
             return;
         }
@@ -12194,7 +12208,7 @@ class Enemy {
                 const isBlocked = game.calc_isAreaOccupied(other.pos.x, targetY, other.width * 0.8, other.height * 0.8, other);
                 if (!isBlocked) {
                     other.advance(moveAmount);
-                    game.spawn_createFloatingText(other.pos.x, other.pos.y - 50, '⚡ECHO!', '#f0abfc');
+                    game.spawn_createFloatingText(other.pos.x, other.pos.y - 50, '⚡回响', '#f0abfc');
                     didEcho = true;
                 }
             }
@@ -12207,7 +12221,7 @@ class Enemy {
 
         if (triggered > 0) {
             game.spawn_createShockwave(spire.pos.x, spire.pos.y, '#f0abfc');
-            game.spawn_createFloatingText(spire.pos.x, spire.pos.y - 30, `🔮ECHO ×${triggered}`, '#f0abfc');
+            game.spawn_createFloatingText(spire.pos.x, spire.pos.y - 30, `🔮回响 ×${triggered}`, '#f0abfc');
         }
     }
 }

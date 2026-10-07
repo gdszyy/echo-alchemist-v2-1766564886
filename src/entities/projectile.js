@@ -21,6 +21,8 @@
 import { CONFIG } from '../config.js';
 import { Vec2 } from '../utils/math_utils.js';
 import { Particle, SlashEffect } from '../effects/particles.js';
+import { isPixelArtMode } from '../render/art_mode.js';
+import { pxDrawProjectile } from '../pixel/launcher_render.js';
 import { sb as _sb } from '../utils/perf.js';
 import { pixiIsActive, pixiAcquireParticleSprite, pixiReleaseParticleSprite, pixiCssColor, pixiGetEffectTexture, pixiGetEffectContainer } from '../render/pixi_bridge.js';
 
@@ -340,7 +342,7 @@ class Projectile {
                     
                     // 视觉反馈
                     if (game.spawn_createFloatingText) {
-                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, 'ECHO!', '#facc15');
+                        game.spawn_createFloatingText(this.pos.x, this.pos.y - 20, '回响', '#facc15');
                     }
                 }
             }
@@ -351,7 +353,7 @@ class Projectile {
             if (blockedPierce && this.piercesLeft > 0) {
                 this.piercesLeft--;
                 if (typeof game !== 'undefined' && game.spawn_createFloatingText) {
-                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 18, 'NO PIERCE', '#67e8f9', 12);
+                    game.spawn_createFloatingText(this.pos.x, this.pos.y - 18, '穿透无效', '#67e8f9', 12);
                 }
             } else if (this.piercesLeft > 0) {
                 if (this.config.flying_sword) {
@@ -838,7 +840,7 @@ class Projectile {
             });
         }
         if (game.spawn_createFloatingText) {
-            game.spawn_createFloatingText(this.pos.x, this.pos.y - 16, '🔁ECHO', '#a78bfa');
+            game.spawn_createFloatingText(this.pos.x, this.pos.y - 16, '🔁回响', '#a78bfa');
         }
     }
 
@@ -993,7 +995,7 @@ class Projectile {
                     else if (pegLevel === 2) {
                         s.attacksLeft = s.maxAttacks; 
                         s.isAutoHunting = true;       
-                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "RESET", "#6366f1");
+                        game.spawn_createFloatingText(s.pos.x, s.pos.y, "重置", "#6366f1");
                     } 
                     else if (pegLevel >= 3) {
                         // [修复-targeting] 与 handleFlyingSwordFinish 行为一致：lv3 子剑脱离母剑独立猎杀，
@@ -1024,7 +1026,7 @@ class Projectile {
                     s.state = 'flying'; 
                     s.isAutoHunting = true; 
                     s.mother = null; 
-                    game.spawn_createFloatingText(s.pos.x, s.pos.y, "HUNT", "#f43f5e");
+                    game.spawn_createFloatingText(s.pos.x, s.pos.y, "追猎", "#f43f5e");
                 } else if (level === 2) {
                     s.triggerRecall(targetPos);
                 } else {
@@ -1043,6 +1045,11 @@ class Projectile {
         // 孤立残留在场上（即「拖尾/光晕有时滞留」）。原 `!active && !destroyed` 守卫只挡住
         // 被吞噬的 limbo 子弹，挡不住已 destroyed 的子弹。
         if (this.destroyed || !this.active) return;
+        // [像素风] 主属性色像素球 + 阶梯拖尾（src/pixel/launcher_render.js）
+        if (isPixelArtMode()) {
+            pxDrawProjectile(ctx, this);
+            return;
+        }
         const integrity = (this.bouncesLeft + this.piercesLeft) / (this.maxDurability || 1);
 
         // [Bullet Glow V2] 弹道环境光照 — PixiJS 激活时在子弹下方绘制柔和发光精灵
@@ -1535,68 +1542,68 @@ class Projectile {
         // [fix] 重构为 if-else 结构，确保每条执行路径只有一个顶层 restore
         if (config.type === 'flying_sword') {
             // @section:draw_flying_sword - 飞剑完整绘制：剑身/剑格/剑柄/剑首/剑穗（独立 restore+return）
-            // 修正角度：假設畫筆是朝右(0度)畫的，如果原圖是朝上則需旋轉
-            // 這裡我們直接畫朝右的劍，與 velocity 方向一致
-            const scale = radius / 6; // 根據半徑動態調整大小 (基礎半徑約7~10)
-            // 1. 劍身發光 (Spirit Aura) - 隨耐久度減弱
+            // 修正角度：假设画笔是朝右(0度)画的，如果原图是朝上则需旋转
+            // 这里我们直接画朝右的剑，与 velocity 方向一致
+            const scale = radius / 6; // 根据半径动态调整大小 (基础半径约7~10)
+            // 1. 剑身发光 (Spirit Aura) - 随耐久度减弱
             ctx.shadowBlur = isLowQuality ? 0 : _sb(15 * intensity * integrity);
-            ctx.shadowColor = '#0ea5e9'; // 青色光暈
-            // 2. 劍身 (Blade) - 雙刃劍，指向右側
+            ctx.shadowColor = '#0ea5e9'; // 青色光晕
+            // 2. 剑身 (Blade) - 双刃剑，指向右侧
             ctx.beginPath();
-            ctx.moveTo(32 * scale, 0);       // 劍尖 (最右)
+            ctx.moveTo(32 * scale, 0);       // 剑尖 (最右)
             ctx.lineTo(8 * scale, -4 * scale); // 上刃
-            ctx.lineTo(-12 * scale, -4 * scale); // 劍身後段
-            ctx.lineTo(-12 * scale, 4 * scale);  // 劍身後段
+            ctx.lineTo(-12 * scale, -4 * scale); // 剑身后段
+            ctx.lineTo(-12 * scale, 4 * scale);  // 剑身后段
             ctx.lineTo(8 * scale, 4 * scale);  // 下刃
             ctx.closePath();
-            // 劍刃金屬漸變 (橫向)
+            // 剑刃金属渐变 (横向)
             const bladeGrad = ctx.createLinearGradient(-10 * scale, -5*scale, -10 * scale, 5*scale);
-            bladeGrad.addColorStop(0, '#e0f2fe');   // 亮白邊緣
-            bladeGrad.addColorStop(0.5, '#0284c7'); // 深青中脊 (立體感)
-            bladeGrad.addColorStop(1, '#e0f2fe');   // 亮白邊緣
+            bladeGrad.addColorStop(0, '#e0f2fe');   // 亮白边缘
+            bladeGrad.addColorStop(0.5, '#0284c7'); // 深青中脊 (立体感)
+            bladeGrad.addColorStop(1, '#e0f2fe');   // 亮白边缘
             ctx.fillStyle = bladeGrad;
             ctx.fill();
-            // 劍脊線 (Ridge)
+            // 剑脊线 (Ridge)
             ctx.beginPath();
             ctx.moveTo(30 * scale, 0);
             ctx.lineTo(-12 * scale, 0);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            // 3. 劍格 (Guard) - 祥雲/蝙蝠紋飾
+            // 3. 剑格 (Guard) - 祥云/蝙蝠纹饰
             ctx.shadowBlur = isLowQuality ? 0 : _sb(5);
             ctx.shadowColor = '#f59e0b';
             ctx.fillStyle = '#fbbf24'; // 金色
             ctx.beginPath();
-            // 畫一個橫向的菱形或雲紋
+            // 画一个横向的菱形或云纹
             ctx.moveTo(-10 * scale, 0);
             ctx.quadraticCurveTo(-10 * scale, -10 * scale, -14 * scale, -8 * scale); // 上翼
             ctx.lineTo(-14 * scale, 8 * scale); // 下翼
             ctx.quadraticCurveTo(-10 * scale, 10 * scale, -10 * scale, 0);
             ctx.fill();
-            // 4. 劍柄 (Hilt)
+            // 4. 剑柄 (Hilt)
             ctx.fillStyle = '#451a03'; // 深褐色木柄
             ctx.fillRect(-22 * scale, -2 * scale, 10 * scale, 4 * scale);
-            // 5. 劍首 (Pommel)
+            // 5. 剑首 (Pommel)
             ctx.beginPath();
             ctx.arc(-24 * scale, 0, 3 * scale, 0, Math.PI * 2);
             ctx.fillStyle = '#fbbf24';
             ctx.fill();
-            // 6. 劍穗 (Tassel) - 隨時間飄動的紅穗
-            // 使用 Math.sin 模擬風吹效果
+            // 6. 剑穗 (Tassel) - 随时间飘动的红穗
+            // 使用 Math.sin 模拟风吹效果
             const time = Date.now() / 100;
             const swing = Math.sin(time) * 3 * scale;
             ctx.beginPath();
-            ctx.moveTo(-26 * scale, 0); // 連接劍首
-            // 貝塞爾曲線模擬向後飄動 (向左)
+            ctx.moveTo(-26 * scale, 0); // 连接剑首
+            // 贝塞尔曲线模拟向后飘动 (向左)
             ctx.bezierCurveTo(
-                -35 * scale, swing,           // 控制點1
-                -40 * scale, -swing,          // 控制點2
-                -50 * scale, swing * 0.5      // 終點
+                -35 * scale, swing,           // 控制点1
+                -40 * scale, -swing,          // 控制点2
+                -50 * scale, swing * 0.5      // 终点
             );
             ctx.shadowColor = '#ef4444';
             ctx.shadowBlur = isLowQuality ? 0 : _sb(5);
-            ctx.strokeStyle = '#ef4444'; // 紅色
+            ctx.strokeStyle = '#ef4444'; // 红色
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             ctx.stroke();

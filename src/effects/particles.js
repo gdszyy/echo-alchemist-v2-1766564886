@@ -1409,7 +1409,7 @@ class FloatingText {
      */
     constructor(x, y, text, color = '#fbbf24', fontSize = 16, iconImg = null, options = {}) {
         this.pos = new Vec2(x, y); 
-        this.vel = new Vec2(0, -1); // 向上飄
+        this.vel = new Vec2(0, -1); // 向上飘
         this.life = 1.0; 
         this.text = text; 
         this.color = color;
@@ -1481,12 +1481,12 @@ class FloatingText {
         ctx.translate(drawX, this.pos.y);
         ctx.scale(renderScale, renderScale);
 
-        // 繪製描邊讓文字更清楚
+        // 绘制描边让文字更清楚
         ctx.strokeStyle = this.isDamageNumber ? 'rgba(8, 12, 18, 0.72)' : 'rgba(0, 0, 0, 0.8)';
         ctx.lineWidth = this.isDamageNumber ? Math.max(2, this.fontSize / 6) : Math.max(3, this.fontSize / 5);
         ctx.strokeText(this.text, 0, 0);
         
-        // 繪製填充
+        // 绘制填充
         ctx.fillStyle = this.color; 
         ctx.fillText(this.text, 0, 0);
         ctx.restore();
@@ -1654,25 +1654,25 @@ class LightningBolt {
 
     generateSegments() {
         const dist = this.start.dist(this.end);
-        const steps = Math.floor(dist / 10); // 每10像素一個節點
+        const steps = Math.floor(dist / 10); // 每10像素一个节点
         let current = this.start;
         const tangent = this.end.sub(this.start).norm();
         const normal = new Vec2(-tangent.y, tangent.x); // 法向量
 
         for (let i = 0; i < steps; i++) {
             const t = (i + 1) / steps;
-            // 線性插值位置
+            // 线性插值位置
             const basePos = this.start.add(this.end.sub(this.start).mult(t));
-            // 隨機偏移 (中間偏移大，兩端小)
+            // 随机偏移 (中间偏移大，两端小)
             const offsetAmount = Math.sin(t * Math.PI) * 30; 
             const jitter = normal.mult((Math.random() - 0.5) * offsetAmount);
             
             const nextPos = (i === steps - 1) ? this.end : basePos.add(jitter);
             
-            // 主幹
+            // 主干
             this.segments.push({ p1: current, p2: nextPos, width: 3, alpha: 1.0 });
 
-            // 隨機生成分支
+            // 随机生成分支
             if (Math.random() < 0.3) {
                 const branchEnd = nextPos.add(new Vec2((Math.random()-0.5)*40, (Math.random()-0.5)*40));
                 this.segments.push({ p1: nextPos, p2: branchEnd, width: 1, alpha: 0.6 });
@@ -1700,7 +1700,7 @@ class LightningBolt {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
-        // 閃爍效果
+        // 闪烁效果
         const flicker = Math.random() > 0.5 ? 1 : 0.5;
         const opacity = this.life * flicker;
 
@@ -1714,14 +1714,14 @@ class LightningBolt {
             ctx.moveTo(seg.p1.x, seg.p1.y);
             ctx.lineTo(seg.p2.x, seg.p2.y);
 
-            // 1. 繪製紫色光暈 (寬線條)
+            // 1. 绘制紫色光晕 (宽线条)
             ctx.strokeStyle = `rgba(192, 132, 252, ${opacity * seg.alpha * 0.5})`; // Purple-400
             ctx.lineWidth = seg.width * 4;
             ctx.shadowBlur = _sb(15);
             ctx.shadowColor = '#c084fc';
             ctx.stroke();
 
-            // 2. 繪製白色核心 (細線條)
+            // 2. 绘制白色核心 (细线条)
             ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * seg.alpha})`;
             ctx.lineWidth = seg.width;
             ctx.shadowBlur = 0;
@@ -1747,7 +1747,7 @@ class FireWave {
         this.x = x;
         this.y = y;
         this.radius = 10;
-        this.maxRadius = 80; // 擴散範圍
+        this.maxRadius = 80; // 扩散范围
         this.life = 1.0;
         this.seed = Math.random() * Math.PI * 2;
         this.flameArcs = Array.from({ length: 9 }, (_, i) => ({
@@ -1759,7 +1759,7 @@ class FireWave {
     }
 
     update(timeScale) {
-        this.radius += 5 * timeScale; // 擴散速度
+        this.radius += 5 * timeScale; // 扩散速度
         this.life -= 0.05 * timeScale;
     }
 

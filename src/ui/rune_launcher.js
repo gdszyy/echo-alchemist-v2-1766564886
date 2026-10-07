@@ -20,6 +20,7 @@ import { audio } from '../audio.js';
 import { showToast } from '../entities.js';
 import { SKILL_DB, CONFIG, POTION_SPELL_DB } from '../config.js'; // [技能系统迭代] 用于符文解锁技能派生 + 技能装配上限
 import { getRuneIconSrc } from '../bitmap_icons.js'; // [Phase 5A Task 5.A6] 位图符文图标
+import { pxIconHtml } from '../pixel/icon_html.js';
 import { POTION_FORM_OPTIONS, getPotionFormOption, validatePotionNesting, validatePotionSpellTree } from '../potion_nesting.js';
 import { POTION_SPELL_CONTENT_RUNE_COUNT, resolvePotionSpellContent } from '../potion_spell_content.js';
 
@@ -574,7 +575,7 @@ export const rune_launcher_system = {
                         </div>
                     </div>
                 </div>
-                <div class="rune-picker-detail-desc">放入格子後提供 ${elementMeta.name || runeDef.baseStat || runeDef.element} +${statAmount}。</div>
+                <div class="rune-picker-detail-desc">放入格子后提供 ${elementMeta.name || runeDef.baseStat || runeDef.element} +${statAmount}。</div>
                 ${runewordHtml}
             `;
         };
@@ -1070,7 +1071,7 @@ export const rune_launcher_system = {
                     this._selectedRuneIndices.delete(idx);
                 } else {
                     if (this._selectedRuneIndices.size >= 3) {
-                        if (window.showToast) showToast('最多選中 3 個符文');
+                        if (window.showToast) showToast('最多选中 3 个符文');
                         return;
                     }
                     this._selectedRuneIndices.add(idx);
@@ -1254,7 +1255,7 @@ export const rune_launcher_system = {
             const statInfo = STAT_DISPLAY[element] || { name: element, icon: '' };
             const tierLabel = TIER_LABELS[res.threshold] || `${res.threshold}层`;
 
-            // 计算进度条：当前层数 / 下一阶阈値（三阶已满则显示满格）
+            // 计算进度条：当前层数 / 下一阶阈值（三阶已满则显示满格）
             const nextThreshold = res.threshold === 9 ? 9 : res.threshold + 3;
             const progressPct = res.threshold === 9
                 ? 100
@@ -1285,7 +1286,7 @@ export const rune_launcher_system = {
     },
 
     /**
-     * 更新合成/重铸按鈕状态
+     * 更新合成/重铸按钮状态
      * @private
      */
     _ui_updateRuneActionButtons() {
@@ -1384,7 +1385,7 @@ export const rune_launcher_system = {
             const shardReward = MERGE_SHARD_REWARDS[Math.min(mergedLevel, 3)] || 1;
             this.meta_addCurrency(shardReward);
 
-            // 合成动画：符文碎片从合成按鈕飞向局外货币显示区
+            // 合成动画：符文碎片从合成按钮飞向局外货币显示区
             const mergeBtn = document.getElementById('rune-merge-btn');
             if (mergeBtn) {
                 const rect = mergeBtn.getBoundingClientRect();
@@ -2166,7 +2167,7 @@ export const rune_launcher_system = {
         Array.from(container.children).forEach(child => {
             if (child.id !== 'potion-rune-empty') child.remove();
         });
-        if (countEl) countEl.textContent = `${(draft.pendingRunes || []).length} / ${POTION_SPELL_CONTENT_RUNE_COUNT} current node · ${(draft.consumedRunes || []).length} in furnace`;
+        if (countEl) countEl.textContent = `本节点 ${(draft.pendingRunes || []).length} / ${POTION_SPELL_CONTENT_RUNE_COUNT} · 炉中 ${(draft.consumedRunes || []).length}`;
         if (!this.runeInventory || this.runeInventory.length === 0) {
             if (emptyEl) emptyEl.classList.remove('hidden');
             return;
@@ -2648,11 +2649,11 @@ export const rune_launcher_system = {
                 </div>
                 <button id="runeword-detail-close" style="width:28px;height:28px;border-radius:50%;background:#1e293b;color:#cbd5e1;border:1px solid #334155;cursor:pointer;font-size:14px;">✕</button>
             </div>
-            <div style="font-size:11px;color:#cbd5e1;margin-bottom:8px;">符文組合：<span style="font-size:16px;">${patternIcons}</span></div>
+            <div style="font-size:11px;color:#cbd5e1;margin-bottom:8px;">符文组合：<span style="font-size:16px;">${patternIcons}</span></div>
             <div style="font-size:12px;color:#e2e8f0;line-height:1.6;margin-bottom:10px;">${rw.effect_desc}</div>
             <div id="runeword-detail-dynamic" style="font-size:12px;color:#34d399;font-weight:bold;min-height:18px;margin-bottom:12px;">${dynamicDesc}</div>
             <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:11px;color:#94a3b8;">等級：</span>
+                <span style="font-size:11px;color:#94a3b8;">等级：</span>
                 <div id="runeword-detail-tabs" style="display:flex;gap:6px;">${tabs}</div>
             </div>
         `;
@@ -2786,7 +2787,7 @@ export const rune_launcher_system = {
 
                 const dynamicDesc = this._ui_calcRunewordDynamicDesc(rw, defaultLevel);
 
-                // 构建等级 Tab 按鈕区域
+                // 构建等级 Tab 按钮区域
                 const maxLevel = 3;
                 const tabBtns = Array.from({ length: maxLevel }, (_, i) => {
                     const lv = i + 1;
@@ -2891,7 +2892,7 @@ export const rune_launcher_system = {
             descEl.textContent = this._ui_calcRunewordDynamicDesc(rw, level);
         }
 
-        // 更新 Tab 按鈕样式
+        // 更新 Tab 按钮样式
         const allTabs = document.querySelectorAll(`.codex-lv-tab[data-runeword-id="${runewordId}"]`);
         allTabs.forEach(btn => {
             const btnLevel = parseInt(btn.dataset.level);
@@ -3054,11 +3055,11 @@ export const rune_launcher_system = {
      * @private
      */
     _ui_showRunewordBubble(formableRunewords) {
-        // 寻找所有符文发射器按鈕（可能在多个阶段）
+        // 寻找所有符文发射器按钮（可能在多个阶段）
         const launcherBtns = document.querySelectorAll('[onclick="game.ui_openRuneLauncher()"]');
         if (launcherBtns.length === 0) return;
 
-        // 找到当前可见的按鈕
+        // 找到当前可见的按钮
         let targetBtn = null;
         for (const btn of launcherBtns) {
             const rect = btn.getBoundingClientRect();
@@ -3099,7 +3100,7 @@ export const rune_launcher_system = {
             'animation: runeword-bubble-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;',
         ].join(' ');
 
-        // 定位到按鈕附近
+        // 定位到按钮附近
         document.body.appendChild(bubble);
         const btnRect = targetBtn.getBoundingClientRect();
         bubble.style.bottom = (window.innerHeight - btnRect.top + 8) + 'px';
@@ -3111,7 +3112,7 @@ export const rune_launcher_system = {
             this.ui_openRuneLauncher();
         });
 
-        // 关闭按鈕
+        // 关闭按钮
         const closeBtn = document.getElementById('runeword-bubble-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', (e) => {
@@ -3223,7 +3224,7 @@ export const rune_launcher_system = {
     /*
      * [ARCHIVED] ui_showRuneLauncherTour
      * 展示符文发射器内部引导教学
-     * 首次打开发射器时自动调用，也可通过帮助按鈕手动触发
+     * 首次打开发射器时自动调用，也可通过帮助按钮手动触发
      */
     // ui_showRuneLauncherTour() {
         // 如果发射器面板不在显示状态则不展示
@@ -3491,7 +3492,7 @@ export const rune_launcher_system = {
             card.style.setProperty('--skill-color', sk.color || '#94a3b8');
             const cost = Math.max(0, Number(sk.cost) || 0);
             card.innerHTML = `
-                <span class="skill-editor-card-icon">${sk.icon || '✦'}</span>
+                <span class="skill-editor-card-icon">${pxIconHtml({ kind: 'skill', id: sk.id }, sk.icon || '✦')}</span>
                 <span class="skill-editor-card-main">
                     <span class="skill-editor-card-title">
                         <b>${sk.name}</b>

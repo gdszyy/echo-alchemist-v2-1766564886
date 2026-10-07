@@ -784,7 +784,7 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 3,
                 label: '毒素共鸣·一阶',
-                desc: '毒素 DoT 倍率 ×1.2，基础毒素属性 +5',
+                desc: '毒素持续伤害倍率 ×1.2，基础毒素属性 +5',
                 params: {
                     dotMultiplier: 1.2,
                     baseVenomBonus: 5,
@@ -795,7 +795,7 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 6,
                 label: '毒素共鸣·二阶',
-                desc: '毒素 DoT 倍率 ×1.4，基础毒素属性 +10，每次命中额外 +1 毒层',
+                desc: '毒素持续伤害倍率 ×1.4，基础毒素属性 +10，每次命中额外 +1 毒层',
                 params: {
                     dotMultiplier: 1.4,
                     baseVenomBonus: 10,
@@ -806,7 +806,7 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 9,
                 label: '毒素共鸣·三阶',
-                desc: '毒素 DoT 倍率 ×1.7，基础毒素属性 +25，对护盾敌人造成双倍 DoT',
+                desc: '毒素持续伤害倍率 ×1.7，基础毒素属性 +25，对护盾敌人造成双倍持续伤害',
                 params: {
                     dotMultiplier: 1.7,
                     baseVenomBonus: 25,
@@ -823,7 +823,7 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 3,
                 label: '超载共鸣·一阶',
-                desc: '爆炸伤害倍率 ×1.2，基础超载属性 +5，bounce/pierce 削减改为 30%',
+                desc: '爆炸伤害倍率 ×1.2，基础超载属性 +5，弹跳 / 穿透削减改为 30%',
                 params: {
                     explosionMultiplier: 1.2,
                     baseOverchargeBonus: 5,
@@ -847,7 +847,7 @@ const ELEMENT_RESONANCE_DB = {
             {
                 threshold: 9,
                 label: '超载共鸣·三阶',
-                desc: '爆炸伤害倍率 ×2.0，基础超载属性 +25，不再削减 bounce/pierce，AoE 半径加成',
+                desc: '爆炸伤害倍率 ×2.0，基础超载属性 +25，不再削减弹跳 / 穿透，范围半径加成',
                 params: {
                     explosionMultiplier: 2.0,
                     baseOverchargeBonus: 25,

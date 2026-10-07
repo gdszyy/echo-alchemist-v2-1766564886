@@ -31,7 +31,7 @@ const META_SHOP_CONFIG = {
             id: 'defense_line',
             category: 'defense',
             name: '防线加固',
-            desc: '減少初始生成的敌人行数。',
+            desc: '减少初始生成的敌人行数。',
             icon: '🛡️',
             maxLevel: 2,
             cost: { resourceId: 'rune_fragments', values: [3, 8], type: 'fixed' },
@@ -83,7 +83,7 @@ const META_SHOP_CONFIG = {
             id: 'pyro_efficiency',
             category: 'attribute',
             name: '纯净燃油',
-            desc: '提升 [火焰] 属性单层提供的热量値。',
+            desc: '提升 [火焰] 属性单层提供的热量值。',
             icon: '🔥',
             maxLevel: 5,
             cost: { resourceId: 'rune_pyro', base: 2, growth: 1.5, type: 'exponential' },
@@ -105,7 +105,7 @@ const META_SHOP_CONFIG = {
             id: 'cryo_efficiency',
             category: 'attribute',
             name: '极寒晶核',
-            desc: '提升 [冰霜] 属性单层提供的冷冻値。',
+            desc: '提升 [冰霜] 属性单层提供的冷冻值。',
             icon: '❄️',
             maxLevel: 5,
             cost: { resourceId: 'rune_cryo', base: 2, growth: 1.5, type: 'exponential' },
@@ -128,7 +128,7 @@ const META_SHOP_CONFIG = {
         {
             id: 'init_weight_pierce',
             category: 'attribute',
-            name: '穿透解鎖',
+            name: '穿透解锁',
             desc: '解锁并增加初始 [穿透] 属性的权重。',
             icon: '↗️',
             maxLevel: 10,
@@ -163,7 +163,7 @@ const META_SHOP_CONFIG = {
         {
             id: 'init_sword_peg',
             category: 'temporary',
-            name: '剑塚',
+            name: '剑冢',
             desc: '下一次游戏：收集阶段初始将 1 个普通钉子替换为 [飞剑] 属性钉子。(每局可购买一次)',
             icon: '🗡️',
             maxLevel: 1,
@@ -175,7 +175,7 @@ const META_SHOP_CONFIG = {
             id: 'combo_mastery',
             category: 'resource',
             name: '充能加速',
-            desc: '降低充能条的衰减速度，让充能持续更久。',
+            desc: '每级使研磨阶段首次「多发射 1 发」所需命中数 -1。',
             icon: '🔋',
             maxLevel: 3,
             cost: { resourceId: 'rune_lightning', base: 3, growth: 2.0, type: 'exponential' },
@@ -195,7 +195,7 @@ const META_SHOP_CONFIG = {
     ],
     categories: {
         attribute: { name: '属性炼金', icon: '🧪' },
-        defense: { name: '陣地防御', icon: '🏰' },
+        defense: { name: '阵地防御', icon: '🏰' },
         resource: { name: '资源调度', icon: '📦' },
         temporary: { name: '临时增强', icon: '⏳' },
         debug: { name: '测试工具', icon: '🧰' }
@@ -291,21 +291,21 @@ const CONFIG = {
             default: '#cbd5e1'
         },
         attributeDisplay: {
-            'resonance': { name: '共鳴', icon: '🔔', color: '#f59e0b' },
-            'white': { name: '純淨', icon: '⚪', color: '#f8fafc' },
+            'resonance': { name: '共鸣', icon: '🔔', color: '#f59e0b' },
+            'white': { name: '纯净', icon: '⚪', color: '#f8fafc' },
             'explosive': { name: '爆破', icon: '🧨', color: '#fca5a5' },
             'rainbow': { name: '七彩', icon: '🌈', color: 'linear-gradient(135deg, #fca5a5, #facc15, #4ade80, #60a5fa)' },
             'matryoshka': { name: '套娃', icon: '🪆', color: '#d946ef' },
-            'flying_sword': { name: '飛劍', icon: '🗡🗡', color: '#0ea5e9' },
-            'bounce': { name: '彈性', icon: '⤴️', color: '#22c55e' },
+            'flying_sword': { name: '飞剑', icon: '🗡🗡', color: '#0ea5e9' },
+            'bounce': { name: '弹性', icon: '⤴️', color: '#22c55e' },
             'pierce': { name: '穿透', icon: '↗️', color: '#ef4444' },
             'scatter': { name: '散射', icon: '🔱', color: '#facc15' },
             'damage': { name: '增幅', icon: '⚔️', color: '#a855f7' },
             'cryo': { name: '冰霜', icon: '❄️', color: '#06b6d4' },
             'pyro': { name: '火焰', icon: '🔥', color: '#f97316' },
-            'lightning': { name: '閃電', icon: '⚡', color: '#c084fc' },
-            'laser': { name: '光', icon: '☄️', color: '#0ea5e9' },
-            'wind': { name: '風', icon: '🌪️', color: '#34d399' },
+            'lightning': { name: '闪电', icon: '⚡', color: '#c084fc' },
+            'laser': { name: '激光', icon: '☄️', color: '#0ea5e9' },
+            'wind': { name: '风', icon: '🌪️', color: '#34d399' },
             'multicast': { name: '连射', icon: '🔗', color: '#AAAAAA' },
             'echo': { name: '回响', icon: '🔊', color: '#60a5fa' },
             'overcharge': { name: '超载', icon: '⚡', color: '#f59e0b' },
@@ -354,8 +354,8 @@ const CONFIG = {
          slotLauncher: '#22d3ee',
          slotEnergyWheel: '#fde047',
         // [新增]
-        slotGiant: '#ef4444', // 紅色 (變大)
-        slotSkill: '#10b981', // 綠色 (技能點)
+        slotGiant: '#ef4444', // 红色 (变大)
+        slotSkill: '#10b981', // 绿色 (技能点)
     },
     evolutionRules: {
         'pierce': {
@@ -669,7 +669,7 @@ const CONFIG = {
             earlyFloorMultiplier: 0.45,  // 前期保底倍率（降低保底，避免卡死新手）
             // ── Boss 倍率梯度调整（Mult Gradient）──
             // 前期区间内，根据玩家实时战力动态缩放 bossMult，使前几个 Boss 血量更贴近玩家实际战力
-            // 缩放比値下限：即使玩家战力极弱， bossMult 也不低于原始倍率的该比例
+            // 缩放比值下限：即使玩家战力极弱， bossMult 也不低于原始倍率的该比例
             bossMultGradientMin: 0.5     // Boss 倍率梯度下限（即最少为原始倍率的 50%）
         },
 
@@ -1125,7 +1125,7 @@ const CONFIG = {
         glossBottomAlpha: 0.12,
 
         // A2: Layer 4 战损裂纹（血量联动）
-        // 血量比例低于此阈値时显示战损裂纹
+        // 血量比例低于此阈值时显示战损裂纹
         battleDamageFissureThreshold: 0.3,
         // 裂纹最大 alpha（血量为 0 时达到）
         battleDamageFissureMaxAlpha: 0.6,
@@ -1192,7 +1192,7 @@ const CONFIG = {
         borderPulseBossPeriodMult: 0.75,
 
         // D3: 边框脉冲光晕（Border Pulse Glow）
-        // 光晕最大 shadowBlur 値
+        // 光晕最大 shadowBlur 值
         borderPulseBlurMax: 8,
         // 脉冲周期（毫秒）
         borderPulsePeriod: 2800,
@@ -1670,15 +1670,15 @@ const RELIC_DB = [
     recommendTip: '弹珠变大后更容易命中钉子，大幅提升每回合伤害输出！'
 },
     // [v2 模块化] 旧 dimension_shard / dimension_crystal 行数遗物已移除，迁移为
-    // pinboard_modules.js 中的 dim_shard_module / dim_crystal_module（高密度釘板模块），
+    // pinboard_modules.js 中的 dim_shard_module / dim_crystal_module（高密度钉板模块），
     // 通过商店购买后挂载到模块槽位。
     { id: 'stars_shines', name: '群星闪烁', icon: '✨', desc: '提高 [回响弹珠] 出现权重，并立即获得一包回响倾向胚珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'resonance', boost: 8, maxStacks: 1 },
-    { id: 'optical_lens', name: '聚焦透鏡', icon: '🔭', desc: '提高 [激光弹珠] 出现权重，并立即获得一包激光倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
+    { id: 'optical_lens', name: '聚焦透镜', icon: '🔭', desc: '提高 [激光弹珠] 出现权重，并立即获得一包激光倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'laser', boost: 10, maxStacks: 1 },
     //  1. 粉色钉子遗物
-    { id: 'pink_slime', name: '粉紅凝膠', icon: '💗', desc: '收集階段：出現 3 個高彈性粉色釘子 (可疊加)。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
+    { id: 'pink_slime', name: '粉红凝胶', icon: '💗', desc: '收集阶段：出现 3 个高弹性粉色钉子 (可叠加)。', rarity: 'common', effect: 'pink_peg_up', maxStacks: 5},
 
     //  2. 战斗底部反弹墙（诅咒：每次墙体接触最多消耗 1 层反弹/穿透，但不吞子弹）
-    { id: 'energy_shield', name: '力場護盾', icon: '🛡️', desc: '戰鬥階段：底部邊界可反彈子彈。但子彈每次觸碰墻體（左/右/頂/底）最多消耗一層反彈或穿透；若已無耐久，仍按普通墻體反彈，不會被墻吞沒。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
+    { id: 'energy_shield', name: '力场护盾', icon: '🛡️', desc: '战斗阶段：底部边界可反弹子弹。但子弹每次触碰墙体（左/右/顶/底）最多消耗一层反弹或穿透；若已无耐久，仍按普通墙体反弹，不会被墙吞没。', rarity: 'cursed', effect: 'combat_wall' ,maxStacks: 1},
 
     {
         id: 'pinboard_second_row',
@@ -1697,19 +1697,19 @@ const RELIC_DB = [
     // [v2 模块化] 特殊槽解锁 (unlock_recall / unlock_multicast / unlock_split) 和
     // 槽数 +1 (slot_expander) 已从遗物池移除，迁移到局内商店出售
     // （详见 src/ui/run_shop.js 中 slot_unlock / slot_count 商品）。
-    //  獨立元素遺物
-    { id: 'cryo_stone', name: '永恆凍土', icon: '❄️', desc: '提高 [冰霜弹珠] 出现权重，并立即获得一包冰霜倾向胚珠；冰霜弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'cryo', boost: 15, maxStacks: 1 },
-    { id: 'pyro_stone', name: '不滅火種', icon: '🔥', desc: '提高 [火焰弹珠] 出现权重，并立即获得一包火焰倾向胚珠；火焰弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'pyro', boost: 15, maxStacks: 1 },
-    // { id: 'lightning_stone', name: '雷霆之怒', icon: '⚡', desc: '解鎖 [閃電] 屬性 (彈珠與釘子)。', rarity: 'rare', unlocks: 'lightning', boost: 15 },
+    //  独立元素遗物
+    { id: 'cryo_stone', name: '永恒冻土', icon: '❄️', desc: '提高 [冰霜弹珠] 出现权重，并立即获得一包冰霜倾向胚珠；冰霜弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'cryo', boost: 15, maxStacks: 1 },
+    { id: 'pyro_stone', name: '不灭火种', icon: '🔥', desc: '提高 [火焰弹珠] 出现权重，并立即获得一包火焰倾向胚珠；火焰弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'pyro', boost: 15, maxStacks: 1 },
+    // { id: 'lightning_stone', name: '雷霆之怒', icon: '⚡', desc: '解锁 [闪电] 属性 (弹珠与钉子)。', rarity: 'rare', unlocks: 'lightning', boost: 15 },
 
-    //  物理套裝遺物
-    { id: 'tactical_kit_pierce', name: '穿透補給', icon: '↗', desc: '提高 [穿透弹珠] 出现权重，并立即获得一包穿透倾向胚珠；穿透弹珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'pierce', boost: 5, maxStacks: 1 },
-    { id: 'tactical_kit_scatter', name: '散射補給', icon: '🔱', desc: '提高 [散射弹珠] 出现权重，并立即获得一包散射倾向胚珠；散射弹珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'scatter', boost: 5, maxStacks: 1 },
-    { id: 'tactical_kit_damage', name: '增幅補給', icon: '⚔️', desc: '提高 [增幅弹珠] 出现权重，并立即获得一包增幅倾向胚珠；增幅弹珠同化概率永久翻倍。', rarity: 'common', effect: 'unlock_marble', marbleType: 'damage', boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '提高增幅弹珠概率并立即获得一包增幅倾向胚珠！' },
+    //  物理套装遗物
+    { id: 'tactical_kit_pierce', name: '穿透补给', icon: '↗', desc: '提高 [穿透弹珠] 出现权重，并立即获得一包穿透倾向胚珠；穿透弹珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'pierce', boost: 5, maxStacks: 1 },
+    { id: 'tactical_kit_scatter', name: '散射补给', icon: '🔱', desc: '提高 [散射弹珠] 出现权重，并立即获得一包散射倾向胚珠；散射弹珠同化概率永久翻倍。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'scatter', boost: 5, maxStacks: 1 },
+    { id: 'tactical_kit_damage', name: '增幅补给', icon: '⚔️', desc: '提高 [增幅弹珠] 出现权重，并立即获得一包增幅倾向胚珠；增幅弹珠同化概率永久翻倍。', rarity: 'common', effect: 'unlock_marble', marbleType: 'damage', boost: 5, maxStacks: 1, recommended: true, tags: ['伤害核心', '新手友好'], recommendTip: '提高增幅弹珠概率并立即获得一包增幅倾向胚珠！' },
 
-    { id: 'explosive_ammo', name: '高爆火藥', icon: '🧨', desc: '提高 [爆破弹珠] 出现权重，并立即获得一包爆破倾向胚珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'explosive', boost: 10, maxStacks: 1 },
-    { id: 'prism_shard', name: '七彩稜鏡', icon: '🌈', desc: '提高 [彩虹弹珠] 出现权重，并立即获得一包彩虹倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'rainbow', boost: 5, maxStacks: 1 },
-    { id: 'russian_doll', name: '俄羅斯套娃', icon: '🪆', desc: '提高 [套娃弹珠] 出现权重，并立即获得一包套娃倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'matryoshka', boost: 5, maxStacks: 1 },
+    { id: 'explosive_ammo', name: '高爆火药', icon: '🧨', desc: '提高 [爆破弹珠] 出现权重，并立即获得一包爆破倾向胚珠。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'explosive', boost: 10, maxStacks: 1 },
+    { id: 'prism_shard', name: '七彩棱镜', icon: '🌈', desc: '提高 [彩虹弹珠] 出现权重，并立即获得一包彩虹倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'rainbow', boost: 5, maxStacks: 1 },
+    { id: 'russian_doll', name: '俄罗斯套娃', icon: '🪆', desc: '提高 [套娃弹珠] 出现权重，并立即获得一包套娃倾向胚珠。', rarity: 'legendary', effect: 'unlock_marble', marbleType: 'matryoshka', boost: 5, maxStacks: 1 },
 
     // [v2 模块化] 旧的钉盘布局遗物（triangle_formation / diamond_formation /
     // sparse_interval / mirror_sync / wide_narrow）已从遗物池移除，迁移为
@@ -1717,9 +1717,9 @@ const RELIC_DB = [
     // mirror_module / wide_narrow_module，通过商店购买后挂载到模块槽位。
     // ==================== 属性弹珠解锁遗物 ====================
     // 效果：提高该属性弹珠概率，立即提供一包对应倾向胚珠；同化概率永久翻倍
-    { id: 'surge_bounce', name: '彈性潮涌', icon: '🔵', desc: '提高 [弹性弹珠] 出现权重，并立即获得一包弹性倾向胚珠；弹性弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'bounce', boost: 10, maxStacks: 1 },
+    { id: 'surge_bounce', name: '弹性潮涌', icon: '🔵', desc: '提高 [弹性弹珠] 出现权重，并立即获得一包弹性倾向胚珠；弹性弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'bounce', boost: 10, maxStacks: 1 },
     { id: 'surge_echo',   name: '回响潮涌', icon: '🔊', desc: '提高 [回响弹珠] 出现权重，并立即获得一包回响倾向胚珠；回响弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'echo',   boost: 10, maxStacks: 1 },
-    { id: 'surge_venom',  name: '劇毒潮涌', icon: '☠️', desc: '提高 [剧毒弹珠] 出现权重，并立即获得一包剧毒倾向胚珠；剧毒弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'venom',  boost: 10, maxStacks: 1 },
+    { id: 'surge_venom',  name: '剧毒潮涌', icon: '☠️', desc: '提高 [剧毒弹珠] 出现权重，并立即获得一包剧毒倾向胚珠；剧毒弹珠同化概率永久翻倍。', rarity: 'rare', effect: 'unlock_marble', marbleType: 'venom',  boost: 10, maxStacks: 1 },
 
     // ==================== 新手前期过渡遗物 ====================
     // 炼金火药管：所有弹珠基础伤害 +2（可叠加3次），后期自然稀释
@@ -1727,7 +1727,7 @@ const RELIC_DB = [
         id: 'alchemist_powder_tube',
         name: '炼金火药管',
         icon: '⚗️',
-        desc: '你的所有弹珠基础伤害 +2。（最多疊加 3 次）',
+        desc: '你的所有弹珠基础伤害 +2。（最多叠加 3 次）',
         rarity: 'common',
         effect: 'flat_damage_up',
         flatDamageValue: 2,
@@ -1790,7 +1790,7 @@ const RELIC_DB = [
     },
     {
         id: 'relic_chrono_shard',
-        name: '時滯結晶',
+        name: '时滞结晶',
         icon: '⏳',
         desc: '解锁主动技能【时滞冻结】：消耗 SP 冻结全场并返还 1 点 SP。',
         rarity: 'legendary',
@@ -1802,7 +1802,7 @@ const RELIC_DB = [
     },
     {
         id: 'relic_phoenix_feather',
-        name: '不死鳥之羽',
+        name: '不死鸟之羽',
         icon: '🔥',
         desc: '解锁主动技能【不死鸟祝福】：消耗 SP 获得防线屏障并灼烧全场。',
         rarity: 'epic',
@@ -2052,7 +2052,7 @@ const RELIC_DB = [
         id: 'greedy_wheel',
         name: '贪婪轮盘',
         icon: '🎲',
-        desc: '【诅咒】子弹发射时，所有连射 (multicast) 层数清零并按每层 +(基础伤害 × 0.5) 折算为固定伤害。【收益】每次发射后有 75% 概率自动再发射一次；再发射也会继续以相同概率续转。',
+        desc: '【诅咒】子弹发射时，所有连射层数清零并按每层 +(基础伤害 × 0.5) 折算为固定伤害。【收益】每次发射后有 75% 概率自动再发射一次；再发射也会继续以相同概率续转。',
         rarity: 'cursed',
         effect: 'greedy_wheel',
         maxStacks: 1
@@ -2084,7 +2084,7 @@ const SKILL_DB = [
         methodId: 'skill_thunder_call',
         source: 'runeword',
         unlockRuneword: 'runeword_thunderstorm', // 解锁词条：雷暴之语
-        name: '雷神降臨',
+        name: '雷神降临',
         icon: '🌩️',
         cost: 3,
         color: '#a78bfa',
@@ -2102,7 +2102,7 @@ const SKILL_DB = [
         methodId: 'skill_kinetic_burst',
         source: 'runeword',
         unlockRuneword: 'runeword_kinetic_surge', // 解锁词条：动能激增
-        name: '動能爆發',
+        name: '动能爆发',
         icon: '🔄',
         cost: 2,
         color: '#34d399',
@@ -2119,7 +2119,7 @@ const SKILL_DB = [
         methodId: 'skill_meltdown_nova',
         source: 'runeword',
         unlockRuneword: 'runeword_meltdown', // 解锁词条：熔毁
-        name: '熔毀新星',
+        name: '熔毁新星',
         icon: '🌋',
         cost: 2,
         color: '#fb923c',
@@ -2135,7 +2135,7 @@ const SKILL_DB = [
         methodId: 'skill_blade_rain',
         source: 'runeword',
         unlockRuneword: 'runeword_blade_storm', // 解锁词条：剑刃风暴
-        name: '劍刃雨',
+        name: '剑刃雨',
         icon: '⚔️',
         cost: 2,
         color: '#e2e8f0',
@@ -2172,7 +2172,7 @@ const SKILL_DB = [
         id: 'skill_arcane_missiles',
         methodId: 'skill_arcane_missiles',
         source: 'base',
-        name: '奧術飛彈',
+        name: '奥术飞弹',
         icon: '✨',
         cost: 1,
         color: '#c4b5fd',
@@ -2188,7 +2188,7 @@ const SKILL_DB = [
         id: 'skill_kinetic_charge',
         methodId: 'skill_kinetic_charge',
         source: 'base',
-        name: '蓄能填裝',
+        name: '蓄能填装',
         icon: '🔋',
         cost: 1,
         color: '#fcd34d',
@@ -2225,7 +2225,7 @@ const SKILL_DB = [
         methodId: 'skill_irradiate_field',
         source: 'runeword',
         unlockRuneword: 'runeword_irradiation', // 解锁词条：照射
-        name: '輻照領域',
+        name: '辐照领域',
         icon: '☢️',
         cost: 2,
         color: '#a3e635',
@@ -2242,7 +2242,7 @@ const SKILL_DB = [
         methodId: 'skill_flame_sword_dance',
         source: 'runeword',
         unlockRuneword: 'runeword_flame_sword', // 解锁词条：炎光剑影
-        name: '炎光劍舞',
+        name: '炎光剑舞',
         icon: '🗡️',
         cost: 2,
         color: '#fb7185',
@@ -2259,7 +2259,7 @@ const SKILL_DB = [
         methodId: 'skill_static_field',
         source: 'runeword',
         unlockRuneword: 'runeword_lightning_shield', // 解锁词条：雷电护盾
-        name: '靜電力場',
+        name: '静电力场',
         icon: '⚡',
         cost: 2,
         color: '#38bdf8',
@@ -2277,7 +2277,7 @@ const SKILL_DB = [
         methodId: 'skill_precision_volley',
         source: 'runeword',
         unlockRuneword: 'runeword_focused_fire', // 解锁词条：专注射击
-        name: '精準齊射',
+        name: '精准齐射',
         icon: '🎯',
         cost: 2,
         color: '#f87171',
@@ -2297,7 +2297,7 @@ const SKILL_DB = [
         methodId: 'skill_gravity_well',
         source: 'relic',
         unlockRelic: 'relic_gravity_core', // 解锁遗物：引力核心
-        name: '引力坍縮',
+        name: '引力坍缩',
         icon: '🕳️',
         cost: 2,
         color: '#818cf8',
@@ -2314,7 +2314,7 @@ const SKILL_DB = [
         methodId: 'skill_chrono_freeze',
         source: 'relic',
         unlockRelic: 'relic_chrono_shard', // 解锁遗物：时滞结晶
-        name: '時滯凍結',
+        name: '时滞冻结',
         icon: '⏳',
         cost: 3,
         color: '#5eead4',
@@ -2331,7 +2331,7 @@ const SKILL_DB = [
         methodId: 'skill_phoenix_blessing',
         source: 'relic',
         unlockRelic: 'relic_phoenix_feather', // 解锁遗物：不死鸟之羽
-        name: '不死鳥祝福',
+        name: '不死鸟祝福',
         icon: '🔥',
         cost: 2,
         color: '#fdba74',
@@ -2350,7 +2350,7 @@ const SKILL_DB = [
         methodId: 'skill_meteor_strike',
         source: 'shop',
         shopPrice: 90,
-        name: '隕石轟擊',
+        name: '陨石轰击',
         icon: '☄️',
         cost: 3,
         color: '#f97316',
@@ -2367,7 +2367,7 @@ const SKILL_DB = [
         methodId: 'skill_prism_overload',
         source: 'shop',
         shopPrice: 80,
-        name: '稜鏡超載',
+        name: '棱镜超载',
         icon: '🌟',
         cost: 2,
         color: '#e879f9',
@@ -2384,7 +2384,7 @@ const SKILL_DB = [
         methodId: 'skill_fortune_strike',
         source: 'shop',
         shopPrice: 70,
-        name: '財富打擊',
+        name: '财富打击',
         icon: '💰',
         cost: 2,
         color: '#fde047',
@@ -2556,7 +2556,7 @@ const POTION_SPELL_DB = [
 const BOSS_DB = [
     {
         id: 'boss_ignis',
-        name: '燕炉守卫·伊格尼斯',
+        name: '熔炉守卫·伊格尼斯',
         affixes: ['shield', 'haste', 'radiantAegis'],
         // 破绽谱：穿透 (Pierce) 与 火焰 (Pyro) —— 克制护盾
         themeWeights: { pierce: 3.0, pyro: 3.0 }

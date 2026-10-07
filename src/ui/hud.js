@@ -20,6 +20,7 @@ import { eventBus, EVENT_TYPES } from '../event_bus.js';
 import { RUNE_DB, RARITY_DISPLAY, STAT_DISPLAY } from '../rune_config.js';
 import { getAmmoIconSrc, getAttributeIconSrcByKey } from '../bitmap_icons.js';
 import { getAmmoReadabilityProfile } from '../utils/ammo_readability.js';
+import { resolveArtSrc } from '../render/art_mode.js';
 
 /**
  * 构建符文图标 DOM 元素（hud.js 内部辅助函数）
@@ -47,7 +48,7 @@ function _safeAttributeKey(key) {
 }
 
 function _attributeChipAssetUrl(key) {
-    return `url("/assets/ui/sprites/attribute_chips/attribute_chip_${_safeAttributeKey(key)}.png")`;
+    return `url("${resolveArtSrc(`/assets/ui/sprites/attribute_chips/attribute_chip_${_safeAttributeKey(key)}.png`)}")`;
 }
 
 function _attributeIconAssetUrl(key) {
@@ -266,7 +267,7 @@ export const hud_system = {
             el.parentNode && el.parentNode.appendChild(dpsEl);
         }
         const dps = Math.floor(this._dps || 0);
-        dpsEl.innerText = dps > 0 ? `(${dps.toLocaleString()} DPS)` : '';
+        dpsEl.innerText = dps > 0 ? `(秒伤 ${dps.toLocaleString()})` : '';
 
         if (targetValue > 0) {
             container.classList.remove('opacity-0');
@@ -380,11 +381,11 @@ export const hud_system = {
             dot.title = '实时';
             roundLabel.appendChild(dot);
             const liveText = document.createElement('span');
-            liveText.textContent = `Round ${roundNumber} · LIVE`;
+            liveText.textContent = `第 ${roundNumber} 回合 · 进行中`;
             roundLabel.appendChild(liveText);
             const dpsBadge = document.createElement('span');
             dpsBadge.className = 'text-[10px] font-normal text-amber-200 bg-slate-900/60 px-1.5 py-0.5 rounded';
-            dpsBadge.textContent = `${Math.floor(this._dps || 0).toLocaleString()} DPS`;
+            dpsBadge.textContent = `秒伤 ${Math.floor(this._dps || 0).toLocaleString()}`;
             roundLabel.appendChild(dpsBadge);
         } else {
             roundLabel.textContent = `Round ${roundNumber}`;
@@ -630,7 +631,7 @@ export const hud_system = {
                 if (upcomingRecipes.length === 0) {
                     const empty = document.createElement('div');
                     empty.className = 'combat-ammo-empty-state';
-                    empty.textContent = 'NO QUEUE';
+                    empty.textContent = '无后续';
                     combatHud.appendChild(empty);
                 } else {
                     const nextRecipe = upcomingRecipes[0];
@@ -652,7 +653,7 @@ export const hud_system = {
                     copy.className = 'combat-ammo-copy';
                     const label = document.createElement('span');
                     label.className = 'combat-ammo-label';
-                    label.textContent = 'NEXT';
+                    label.textContent = '下一发';
                     const name = document.createElement('span');
                     name.className = 'combat-ammo-name';
                     name.textContent = nextProfile.shapeLabel || '基础弹';
@@ -707,7 +708,7 @@ export const hud_system = {
                     if (upcomingRecipes.length <= 1) {
                         const emptyQueue = document.createElement('span');
                         emptyQueue.className = 'combat-ammo-queue-empty';
-                        emptyQueue.textContent = 'QUEUE EMPTY';
+                        emptyQueue.textContent = '队列已空';
                         queueStrip.appendChild(emptyQueue);
                     }
                     const hiddenCount = Math.max(0, recipes.length - 3);
@@ -785,17 +786,17 @@ export const hud_system = {
         }
 
         const colors = {
-            'flying_sword': { c: CONFIG.colors.flying_sword, l: CONFIG.ui.attributeDisplay.flying_sword.icon, n: '劍' },
-            'bounce': { c: CONFIG.colors.matBounce, l: CONFIG.ui.attributeDisplay.bounce.icon, n: '彈' },
+            'flying_sword': { c: CONFIG.colors.flying_sword, l: CONFIG.ui.attributeDisplay.flying_sword.icon, n: '剑' },
+            'bounce': { c: CONFIG.colors.matBounce, l: CONFIG.ui.attributeDisplay.bounce.icon, n: '弹' },
             'pierce': { c: CONFIG.colors.matPierce, l: CONFIG.ui.attributeDisplay.pierce.icon, n: '穿' },
             'scatter': { c: CONFIG.colors.matScatter, l: CONFIG.ui.attributeDisplay.scatter.icon, n: '散' },
-            'damage': { c: CONFIG.colors.matDamage, l: CONFIG.ui.attributeDisplay.damage.icon, n: '強' },
+            'damage': { c: CONFIG.colors.matDamage, l: CONFIG.ui.attributeDisplay.damage.icon, n: '强' },
             'cryo': { c: CONFIG.colors.matCryo, l: CONFIG.ui.attributeDisplay.cryo.icon, n: '冷' },
-            'pyro': { c: CONFIG.colors.matPyro, l: CONFIG.ui.attributeDisplay.pyro.icon, n: '熱' },
+            'pyro': { c: CONFIG.colors.matPyro, l: CONFIG.ui.attributeDisplay.pyro.icon, n: '热' },
             'lightning': { c: CONFIG.colors.matLightning, l: CONFIG.ui.attributeDisplay.lightning.icon, n: '雷' },
             'laser': { c: CONFIG.colors.laser, l: CONFIG.ui.attributeDisplay.laser.icon, n: '光' },
-            'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '風' },
-            'resonance': { c: CONFIG.colors.resonance, l: CONFIG.ui.attributeDisplay.resonance.icon, n: '鳴' },
+            'wind': { c: CONFIG.colors.matWind, l: CONFIG.ui.attributeDisplay.wind.icon, n: '风' },
+            'resonance': { c: CONFIG.colors.resonance, l: CONFIG.ui.attributeDisplay.resonance.icon, n: '鸣' },
             'venom': { c: CONFIG.colors.matVenom, l: CONFIG.ui.attributeDisplay.venom.icon, n: '毒' },
             'overcharge': { c: CONFIG.colors.matOvercharge, l: CONFIG.ui.attributeDisplay.overcharge.icon, n: '载' },
             'echo': { c: CONFIG.colors.matEcho, l: CONFIG.ui.attributeDisplay.echo.icon, n: '响' }
@@ -814,13 +815,13 @@ export const hud_system = {
         if (item.lightning > 0) {
              const lightningBadge = document.createElement('div');
              lightningBadge.className = 'mat-row text-purple-300 font-bold';
-             lightningBadge.innerHTML = `<span style="font-size:0.8em;">⚡</span> <span class="ml-0.5">反應: ${item.lightning}</span>`;
+             lightningBadge.innerHTML = `<span style="font-size:0.8em;">⚡</span> <span class="ml-0.5">反应: ${item.lightning}</span>`;
              mats.appendChild(lightningBadge);
         }
         
         if (Object.keys(counts).length === 0) { 
             mats.className = 'text-slate-500 text-[9px] mt-0.5'; // 无材料时也紧凑点
-            mats.innerHTML = '<span>無材料</span>'; 
+            mats.innerHTML = '<span>无材料</span>';
         } 
         
         if (item.multicast > 0) {
@@ -1128,7 +1129,7 @@ export const hud_system = {
             // 移除发射动画类（如果是重新渲染）
             currentContainer.classList.remove('shoot-anim');
         } else {
-            currentContainer.innerHTML = '<span class="text-slate-600 text-xs">EMPTY</span>';
+            currentContainer.innerHTML = '<span class="text-slate-600 text-xs">空</span>';
             statsContainer.innerHTML = '<span class="text-slate-600">-- 弹药耗尽 --</span>';
         }
 
@@ -1516,8 +1517,9 @@ export const hud_system = {
                         const canvas = document.getElementById('gameCanvas');
                         if (canvas && lootX != null && lootY != null) {
                             const canvasRect = canvas.getBoundingClientRect();
-                            const scaleX = canvasRect.width  / (canvas.width  || canvasRect.width);
-                            const scaleY = canvasRect.height / (canvas.height || canvasRect.height);
+                            // 逻辑坐标 → 屏幕坐标：用逻辑尺寸（像素模式下 canvas.width 是低分辨率缓冲）
+                            const scaleX = canvasRect.width  / (this.width  || canvas.width  || canvasRect.width);
+                            const scaleY = canvasRect.height / (this.height || canvas.height || canvasRect.height);
                             startX = canvasRect.left + lootX * scaleX;
                             startY = canvasRect.top  + lootY * scaleY;
                         } else {

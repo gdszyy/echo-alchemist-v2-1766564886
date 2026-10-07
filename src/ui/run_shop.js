@@ -20,6 +20,10 @@
 import { CONFIG, SKILL_DB } from '../config.js';
 import { RUNE_DB } from '../rune_config.js';
 import { MODULE_DEFS, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
+import { pxIconHtml, runShopItemIconSpec } from '../pixel/icon_html.js';
+
+// 局内碎片的图标：像素模式与战斗顶栏同一个（火色碎晶，见 emoji_icons 的 data-px-icon），位图模式保持原 emoji
+const RUN_FRAGMENT_ICON = '<span data-px-icon="shard:fire">🔮</span>';
 
 const RUNE_PRICE_BY_RARITY = {
     common: 18,
@@ -35,9 +39,9 @@ const SLOT_UNLOCK_PRICE = 60;
 const SLOT_COUNT_PRICE = 50;
 const STARTER_BOOST_ID = 'starter_aid_bundle';
 const SLOT_TYPE_META = {
-    recall:    { name: '解鎖回溯槽',  icon: '⏳', desc: '加入「回溯」特殊槽到鑒池。' },
-    multicast: { name: '解鎖連射槽',  icon: '♊', desc: '加入「連射」特殊槽到鑒池。' },
-    split:     { name: '解鎖分裂槽',  icon: '☢️', desc: '加入「分裂」特殊槽到鑒池。' },
+    recall:    { name: '解锁回溯槽',  icon: '⏳', desc: '加入「回溯」特殊槽到鉴池。' },
+    multicast: { name: '解锁连射槽',  icon: '♊', desc: '加入「连射」特殊槽到鉴池。' },
+    split:     { name: '解锁分裂槽',  icon: '☢️', desc: '加入「分裂」特殊槽到鉴池。' },
 };
 
 const MODULE_SHOWCASE_TAG = 'showcase';
@@ -159,7 +163,7 @@ function generateInventory(game, count) {
         }
     }
     if ((game.slotCount || 0) < 3) {
-        utilityItems.push({ kind: 'slot_count', name: '特殊槽數量 +1', icon: '🔨', desc: `當前 ${game.slotCount || 0}/3`, price: SLOT_COUNT_PRICE });
+        utilityItems.push({ kind: 'slot_count', name: '特殊槽数量 +1', icon: '🔨', desc: `当前 ${game.slotCount || 0}/3`, price: SLOT_COUNT_PRICE });
     }
     const utility = takeRandom(utilityItems);
     if (utility && items.length < count) items.push(utility);
@@ -169,7 +173,7 @@ function generateInventory(game, count) {
     while (items.length < count && allRunes.length > 0) {
         const r = allRunes[Math.floor(Math.random() * allRunes.length)];
         const price = RUNE_PRICE_BY_RARITY[r.rarity] || 25;
-        items.push({ kind: 'rune', runeId: r.id, name: r.name || r.id, icon: r.icon || '🔮', desc: r.desc || `${r.element} 符文`, price, rarity: r.rarity });
+        items.push({ kind: 'rune', runeId: r.id, element: r.element, name: r.name || r.id, icon: r.icon || '🔮', desc: r.desc || `${(CONFIG.ui.attributeDisplay[r.element] || {}).name || r.element}符文`, price, rarity: r.rarity });
     }
     while (items.length < count && addModuleItem()) {}
 
@@ -364,7 +368,7 @@ export const run_shop = {
             `;
             document.body.appendChild(overlay);
         }
-        const reasonText = reason === 'boss' ? 'Boss 余波后，商人带来了稀有货架。' : '商人到访，可在下一轮研磨前调整构筑。';
+        const reasonText = reason === 'boss' ? '首领余波后，商人带来了稀有货架。' : '商人到访，可在下一轮研磨前调整构筑。';
         const openDisabled = affordableCount <= 0;
         const openDisabledReason = openDisabled ? '当前没有买得起的商品' : '';
         overlay.setAttribute('role', 'dialog');
@@ -376,7 +380,7 @@ export const run_shop = {
                 <div id="run-shop-offer-title" style="font-size:18px;font-weight:bold;color:#c084fc;margin-bottom:6px;">局内商人</div>
                 <div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:12px;">${reasonText}</div>
                 <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-bottom:14px;">
-                    <span>持有 <b style="color:#fbbf24;">${fragments} 🔮</b></span>
+                    <span>持有 <b style="color:#fbbf24;">${fragments} ${RUN_FRAGMENT_ICON}</b></span>
                     <span>可购买 <b style="color:${affordableCount > 0 ? '#86efac' : '#f87171'};">${affordableCount}</b> 件</span>
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -476,12 +480,14 @@ export const run_shop = {
                 it.rarity === 'epic' ? '#a855f7' :
                     it.rarity === 'rare' ? '#3b82f6' : '#94a3b8';
             const metaHtml = it.meta ? `<div style="font-size:9px;color:${rarityColor};line-height:1.35;text-transform:uppercase;">${it.meta}</div>` : '';
-            const priceLabel = (it.price || 0) <= 0 ? '免费' : `${it.price} 🔮`;
+            // 读屏用文字（emoji 会被念成「水晶球」）；画面上的价格带局内碎片图标
+            const priceLabel = (it.price || 0) <= 0 ? '免费' : `${it.price} 局内碎片`;
+            const priceHtml = (it.price || 0) <= 0 ? '免费' : `${it.price} ${RUN_FRAGMENT_ICON}`;
             const disabledReason = canAfford ? '' : `还差 ${Math.max(0, it.price - fragments)} 碎片`;
             return `<button type="button" data-item-id="${it.itemId}" data-item-idx="${i}" class="run-shop-item" ${canAfford ? '' : 'disabled'} aria-disabled="${canAfford ? 'false' : 'true'}" title="${canAfford ? `购买 ${it.name}` : disabledReason}" aria-label="${it.name}，${priceLabel}${disabledReason ? `，${disabledReason}` : ''}" style="width:100%;text-align:left;color:inherit;cursor:${cursor};opacity:${opacity};background:rgba(30, 41, 59, 0.7);border:1px solid ${rarityColor};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:all 0.15s;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
-                    <div style="font-size:22px;">${it.icon}</div>
-                    <div style="font-size:12px;font-weight:bold;color:${rarityColor};">${priceLabel}</div>
+                    <div style="font-size:22px;">${pxIconHtml(runShopItemIconSpec(it), it.icon)}</div>
+                    <div style="font-size:12px;font-weight:bold;color:${rarityColor};">${priceHtml}</div>
                 </div>
                 <div style="font-size:13px;font-weight:bold;">${it.name}</div>
                 ${metaHtml}
@@ -497,7 +503,7 @@ export const run_shop = {
             <div style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 12px; padding: 18px; max-width: 760px; width: 100%; max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 14px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(168, 85, 247, 0.3);padding-bottom:10px;">
                     <div id="run-shop-dialog-title" style="font-size:18px;font-weight:bold;color:#c084fc;">局内商店</div>
-                    <div style="font-size:13px;">持有: <span style="color:#fbbf24;font-weight:bold;">${fragments} 🔮</span></div>
+                    <div style="font-size:13px;">持有: <span style="color:#fbbf24;font-weight:bold;">${fragments} ${RUN_FRAGMENT_ICON}</span></div>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:10px;">
                     ${itemsHtml || '<div style="color:#64748b;font-size:12px;">商店为空</div>'}
@@ -588,7 +594,7 @@ export const run_shop = {
             if (window.showToast) window.showToast(`已解锁特殊槽: ${it.name}`);
         } else if (it.kind === 'slot_count') {
             this.slotCount = Math.min(3, (this.slotCount || 0) + 1);
-            if (window.showToast) window.showToast(`特殊槽數量 +1（當前 ${this.slotCount}/3）`);
+            if (window.showToast) window.showToast(`特殊槽数量 +1（当前 ${this.slotCount}/3）`);
         } else if (it.kind === 'rune') {
             if (!Array.isArray(this.runeInventory)) this.runeInventory = [];
             this.runeInventory.push({ id: it.runeId, level: 1 });

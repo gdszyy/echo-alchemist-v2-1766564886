@@ -29,6 +29,9 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { RUNE_DB } from './rune_config.js';
 import { pixiTick, pixiResize, pixiSetVisibility } from './render/pixi_bridge.js';
+import { computePixelLayout, readPixelTargetWidth, beginPixelFrame, snapToArtPixel } from './render/pixel_canvas.js';
+import { drawPixelHud, PIXEL_HUD_TOP_CSS } from './pixel/hud_combat.js';
+import { installDomKit } from './pixel/dom_kit.js';
 import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDestroy, doomsdayClock_pixiDestroy } from './render/pixi_effect_adapter.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
@@ -76,20 +79,20 @@ function _getRoundStartBossThreat(game) {
 
     const { bossId, known, nextRound, turnsUntil } = preview;
     const isNow = turnsUntil <= 0;
-    const shortName = known ? getBossShortName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知 Boss';
-    const fullName = known ? getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知 Boss';
+    const shortName = known ? getBossShortName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知首领';
+    const fullName = known ? getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知首领';
 
     return {
         bossId,
         known,
         stateClass: isNow ? 'is-now' : (turnsUntil <= 1 ? 'is-soon' : 'is-countdown'),
-        kicker: isNow ? '本回合威胁' : '下一威胁',
+        kicker: isNow ? '本回合首领' : '下一首领',
         label: isNow ? `${shortName} 登场` : `${shortName} · ${turnsUntil} 回合后`,
-        meta: known ? `Round ${nextRound}` : `Round ${nextRound} · 剪影预告`,
+        meta: known ? `第 ${nextRound} 回合` : `第 ${nextRound} 回合 · 尚未遭遇`,
         iconSrc: getBossPreviewIconSrc(bossId, { known }),
         title: isNow
             ? `${fullName} 将在本回合登场`
-            : `${fullName} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`,
+            : `${fullName} 将在第 ${nextRound} 回合出现（${turnsUntil} 回合后）`,
     };
 }
 
@@ -485,6 +488,13 @@ export const game_system = {
             if (hf.duration <= 0) this._shakeHighFreq = null;
         }
 
+        // [像素风] 每帧把逻辑坐标映射到美术像素缓冲；震动位移吸附到整美术像素，避免整屏亚像素抖糊
+        if (this.pixelLayout) {
+            beginPixelFrame(this.ctx, this.pixelLayout);
+            shakeX = snapToArtPixel(shakeX, this.pixelLayout.sx);
+            shakeY = snapToArtPixel(shakeY, this.pixelLayout.sy);
+        }
+
         this.ctx.save();
 
         // 应用震动偏移
@@ -551,6 +561,9 @@ export const game_system = {
             }
         }
 
+        // 8.5 [像素风] 局内 HUD：画布即时绘制，每帧直读状态（docs/design/pixel_art_mode.md §4）
+        if (this.pixelArtMode) drawPixelHud(this, this.ctx);
+
         // 9. [自适应性能] FPS 和性能等级指示层
         this.render_perfOverlay();
 
@@ -612,8 +625,20 @@ export const game_system = {
         // [BUGFIX] 若 rect.width/height 为 0（CSS 布局未完成），跳过本次 resize，
         // 等待下一帧由 ResizeObserver 或 window.resize 重新触发。
         if (!rect.width || !rect.height) return;
-        this.width = this.canvas.width = Math.round(rect.width);
-        this.height = this.canvas.height = Math.round(rect.height);
+        if (this.pixelArtMode) {
+            // [像素风] 逻辑坐标保持 CSS 像素；后备缓冲 = 美术像素网格（每美术像素整数个设备像素）
+            this.width = Math.round(rect.width);
+            this.height = Math.round(rect.height);
+            this.pixelLayout = computePixelLayout(this.width, this.height, window.devicePixelRatio || 1, readPixelTargetWidth());
+            this.canvas.width = this.pixelLayout.bufW;
+            this.canvas.height = this.pixelLayout.bufH;
+            beginPixelFrame(this.ctx, this.pixelLayout);
+            // DOM 菜单与画布同一像素尺度（--px）与同一套组件外观
+            installDomKit(Math.round(this.pixelLayout.cssPerArtPx * 1000) / 1000);
+        } else {
+            this.width = this.canvas.width = Math.round(rect.width);
+            this.height = this.canvas.height = Math.round(rect.height);
+        }
 
         // [PixiJS 迁移] 同步 WebGL canvas 尺寸
         if (this._pixiReady) {
@@ -647,7 +672,10 @@ export const game_system = {
         // 计算：顶部栏高度 + 8px 安全间距 + 半个敌人高度（中心点偏移）
         // 这样第一行上边界 = topBarH + 8，恰好在顶部栏下方，且与后续行网格完全对齐
         const topBarEl = document.getElementById('unified-top-bar');
-        const topBarH = topBarEl ? topBarEl.getBoundingClientRect().height : 64;
+        // 像素模式的顶栏由画布绘制（DOM 顶栏隐藏），高度取固定常量与 HUD 保持一致
+        const topBarH = this.pixelArtMode
+            ? PIXEL_HUD_TOP_CSS
+            : (topBarEl ? topBarEl.getBoundingClientRect().height : 64);
         this.combatGridTopY = topBarH + 8 + this.enemyHeight / 2;
 
         this.ui_updateUICache();
@@ -1533,7 +1561,7 @@ export const game_system = {
             confirmBtn.disabled = true;
             // [tsk-668f3dba 修复] 从替换阶段跳过后，confirmBtn.onclick 被 ui_renderReplaceAmmoUI
             // 覆盖为 sys_confirmReplaceAmmo，必须在此处恢复为 ui_confirmSelection，
-            // 否则玩家点击「注入後開始煉金」时会触发错误的处理函数，导致 marbleQueue 为空、
+            // 否则玩家点击「注入后开始炼金」时会触发错误的处理函数，导致 marbleQueue 为空、
             // 无法进入研磨阶段，直接循环敌人回合。
             confirmBtn.onclick = () => {
                 if (typeof this.ui_confirmSelection === 'function') this.ui_confirmSelection();
@@ -1650,8 +1678,8 @@ export const game_system = {
 
         const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','overcharge','flying_sword','wind'];
         const ATTR_LABEL = {
-            damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
-            multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
+            damage: '增幅', bounce: '弹性', pierce: '穿透', scatter: '散射',
+            multicast: '连射', cryo: '冰霜', pyro: '火焰', lightning: '闪电',
             laser: '激光', overcharge: '超载', flying_sword: '飞剑', wind: '风',
         };
 
@@ -1747,8 +1775,8 @@ export const game_system = {
     sys_runInWallClearLottery(chargedSnapshot, bonusCount = 0, onComplete) {
         const STAT_KEYS = ['damage','bounce','pierce','scatter','multicast','cryo','pyro','lightning','laser','overcharge','flying_sword','wind'];
         const ATTR_LABEL = {
-            damage: '伤害', bounce: '反弹', pierce: '穿透', scatter: '散射',
-            multicast: '连射', cryo: '冰', pyro: '火', lightning: '雷',
+            damage: '增幅', bounce: '弹性', pierce: '穿透', scatter: '散射',
+            multicast: '连射', cryo: '冰霜', pyro: '火焰', lightning: '闪电',
             laser: '激光', overcharge: '超载', flying_sword: '飞剑', wind: '风',
         };
 
@@ -2254,7 +2282,7 @@ export const game_system = {
             queuedReward.lootItemId = lootItem.id; // FieldLootItem 构造时已生成唯一 id
         }
 
-        showToast('✨ 敌人掉落了遗物線索，將在下回合開始結算');
+        showToast('✨ 敌人掉落了遗物线索，将在下回合开始结算');
 
         return queuedReward;
     },
@@ -2577,7 +2605,7 @@ export const game_system = {
                 }
                 this._roundStartResolverTotalCount = 0;
                 const progressPrefix = totalRewards > 1 ? `(${currentRewardIndex}/${totalRewards}) ` : '';
-                showToast(progressPrefix + (rewardType === 'pure_essence' ? '🕊️ 命運時刻：純淨精華' : '🎡 命運時刻：混沌精华'));
+                showToast(progressPrefix + (rewardType === 'pure_essence' ? '🕊️ 命运时刻：纯净精华' : '🎡 命运时刻：混沌精华'));
                 this._roundStartCheckpointReady = false;
                 this.sys_initSelectionPhase();
                 return true;
@@ -2673,7 +2701,7 @@ export const game_system = {
         }
 
         // 更新文本
-        if (bannerText) bannerText.textContent = `第 ${round} 回合開始`;
+        if (bannerText) bannerText.textContent = `第 ${round} 回合`;
         if (threatEl) {
             threatEl.classList.remove('is-hidden', 'is-known', 'is-unknown', 'is-now', 'is-soon', 'is-countdown');
             if (bossThreat) {
@@ -2798,7 +2826,7 @@ export const game_system = {
         if (this.selectedMarbles.includes(idx)) {
             const marble = this.marblesPool?.[idx];
             if (marble && Array.isArray(marble.runeSlots) && marble.runeSlots.length > 0) {
-                showToast('Fused marble is locked for this charge.');
+                showToast('已融合符文的弹珠在本次充能中不能取消');
                 return;
             }
             this.selectedMarbles = this.selectedMarbles.filter(i => i !== idx);
@@ -2813,7 +2841,7 @@ export const game_system = {
                     return marble && Array.isArray(marble.runeSlots) && marble.runeSlots.length > 0;
                 });
                 if (lockedSelected !== undefined && lockedSelected !== idx) {
-                    showToast('Fused marble is locked for this charge.');
+                    showToast('已融合符文的弹珠在本次充能中不能取消');
                     return;
                 }
                 document.querySelectorAll('#marble-selection-grid .select-card.selected').forEach(el => el.classList.remove('selected'));
@@ -2947,8 +2975,8 @@ export const game_system = {
         this.ctx.save();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         this.ctx.lineWidth = 2;
-        const canvasW = this.canvas.width;
-        const canvasH = this.canvas.height;
+        const canvasW = this.width;
+        const canvasH = this.height;
         if (isHorizontal) {
             for (let x = -80; x < canvasW + 80; x += 40) {
                 this.ctx.beginPath();
@@ -4533,8 +4561,8 @@ export const game_system = {
             if (resumePoint === 'selection' || resumePoint === 'gathering_idle') {
                 this.sys_saveRunState();
             }
-            showToast(`✅ 已恢復 Round ${this.round} 的進度！`);
-            console.log(`[RunSave] 成功恢復回合 ${this.round} 的存档`);
+            showToast(`✅ 已恢复第 ${this.round} 回合的进度`);
+            console.log(`[RunSave] 成功恢复回合 ${this.round} 的存档`);
             return true;
         } catch (e) {
             // @section:load_failure_recovery - 失败后二次重置清档

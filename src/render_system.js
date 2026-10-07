@@ -41,12 +41,20 @@ import {
     getAttributeIconSrcByKey,
 } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
+import { pxDrawBackground, pxDrawCombatWalls, pxDrawDefeatLine } from './pixel/world_render.js';
+import { drawPixelText } from './pixel/pixel_font.js';
+import { pxDrawLauncher } from './pixel/launcher_render.js';
 
 export const render_system = {
 /**
      * [RENDER] 清理画布并绘制背景色。
      */
     render_clearCanvas() {
+        // [像素风] 场景层整体换成程序化像素场景（docs/design/pixel_art_mode.md）
+        if (this.pixelArtMode) {
+            pxDrawBackground(this, this.ctx);
+            return;
+        }
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.fillStyle = CONFIG.colors.bg;
         this.ctx.fillRect(0, 0, this.width, this.height);
@@ -83,6 +91,7 @@ export const render_system = {
      * [RENDER] 绘制背景网格。
      */
     render_background() {
+        if (this.pixelArtMode) return; // 像素背景已含石板网格
         this.ctx.save();
         const gridSpacing = 40;
         const tiltX = -this.boardTilt.current.x * 15; 
@@ -105,6 +114,10 @@ export const render_system = {
      * 位图未加载时保留旧渐变线条 fallback，避免资产加载失败时丢失碰撞边界提示。
      */
     render_combat_walls(ctx, wallLeftX, wallRightX, wallTopY) {
+        if (this.pixelArtMode) {
+            pxDrawCombatWalls(this, ctx, wallLeftX, wallRightX, wallTopY);
+            return;
+        }
         const wallH = Math.max(0, this.height - wallTopY);
         const leftImg = getUiBitmap(COMBAT_WALL_LEFT_SRC);
         const rightImg = getUiBitmap(COMBAT_WALL_RIGHT_SRC);
@@ -180,6 +193,10 @@ export const render_system = {
      * @perf-impact: Combat defeat line uses one static bitmap strip plus fixed-count line/text draws; high/medium keep small gated glow and low uses flat strokes only.
      */
     render_combat_defeatLine(ctx) {
+        if (this.pixelArtMode) {
+            pxDrawDefeatLine(this, ctx);
+            return;
+        }
         if (!Number.isFinite(this.defeatLineY)) return;
         const lineY = this.defeatLineY - 2;
         const shield = this.playerShield || 0;
@@ -539,6 +556,22 @@ export const render_system = {
      * @perf-impact: Aim guide nodes are fixed-size generated bitmap sprites; no particles, gradients, or new performance budgets.
      */
     render_combat_aimGuideNode(ctx, x, y, kind = 'wall', size = 18, alpha = 0.9) {
+        if (this.pixelArtMode) {
+            // 像素标记：起点青、反弹白、命中敌人黄、终点黄铜；3×3 + 1px 墨线
+            const color = kind === 'origin' ? '#3ec6cc' : (kind === 'enemy' ? '#f8e34a' : (kind === 'endpoint' ? '#d29c2a' : '#d4dae0'));
+            const m = ctx.getTransform();
+            const bx = Math.round(m.a * x + m.c * y + m.e);
+            const by = Math.round(m.b * x + m.d * y + m.f);
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#07060c';
+            ctx.fillRect(bx - 2, by - 2, 5, 5);
+            ctx.fillStyle = color;
+            ctx.fillRect(bx - 1, by - 1, 3, 3);
+            ctx.restore();
+            return;
+        }
         const src = AIM_GUIDE_NODE_SRCS[kind] || AIM_GUIDE_NODE_SRCS.wall;
         const img = getUiBitmap(src);
         ctx.save();
@@ -559,6 +592,8 @@ export const render_system = {
      */
     render_combat_launcherSignal(ctx, cx, cy, portX, portY, recipe, visual = {}) {
         if (!recipe) return;
+        // 像素模式：本发读数统一放在底部"本发"面板（src/pixel/hud_combat.js），发射器上不重复
+        if (this.pixelArtMode) return;
         // Current-ammo readout lives on the launcher; the left wing starts at ammoQueue[1].
         const profile = getAmmoReadabilityProfile(recipe);
         const quality = this.perfQualityLevel || 'high';
@@ -795,6 +830,11 @@ export const render_system = {
      * @param {number} reloadProgress  0~1
      */
     render_combat_launcherEmitterBase(ctx, cx, cy, isCharging, chargeProgress, reloadProgress = 0, aimRotation = -Math.PI / 2) {
+        if (this.pixelArtMode) {
+            const loaded = (!this.isEnemyTurn && Array.isArray(this.ammoQueue)) ? this.ammoQueue[0] : null;
+            pxDrawLauncher(ctx, cx, cy, isCharging, chargeProgress, reloadProgress, aimRotation, loaded || null);
+            return;
+        }
         const baseImg = getUiBitmap(EMITTER_BASE_SRC);
         const barrelImg = getUiBitmap(EMITTER_BARREL_SRC);
         const ringImg = getUiBitmap(EMITTER_RING_SRC);
@@ -1228,6 +1268,15 @@ export const render_system = {
         // 仅在非 HIGH 等级时显示（提示玩家性能已降级）
         if (this.perfQualityLevel === 'high') return;
         const ctx = this.ctx;
+        if (this.pixelArtMode) {
+            // 像素模式：顶栏下方一行小字，不压 HUD
+            const label = this.perfQualityLevel === 'medium' ? 'FPS ' : 'LOW FPS ';
+            drawPixelText(ctx, `${label}${this.avgFps || 0}`, 4, 33, {
+                font: '3x5',
+                color: this.perfQualityLevel === 'medium' ? '#efc75a' : '#e8685c',
+            });
+            return;
+        }
         const level = this.perfQualityLevel;
         const fps = this.avgFps;
         const levelColor = level === 'medium' ? '#facc15' : '#f87171'; // 黄色=均衡，红色=省电

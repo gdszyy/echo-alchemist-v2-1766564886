@@ -425,9 +425,9 @@ function buildGuideFin(ox, oy, w, h, mirror = false) {
 export const MODULE_DEFS = {
     std_stagger: {
         id: 'std_stagger',
-        name: '標準交錯',
+        name: '标准交错',
         icon: '▦',
-        desc: '3×3 普通釘子，標準交錯排列。',
+        desc: '3×3 普通钉子，标准交错排列。',
         rarity: 'common',
         price: 0,
         build(ox, oy, w, h) {
@@ -437,9 +437,9 @@ export const MODULE_DEFS = {
     },
     dense_stagger: {
         id: 'dense_stagger',
-        name: '密集交錯',
+        name: '密集交错',
         icon: '▩',
-        desc: '4×3 密集普通釘子，弹珠碰撞次數多。',
+        desc: '4×3 密集普通钉子，弹珠碰撞次数多。',
         rarity: 'common',
         price: 0,
         build(ox, oy, w, h) {
@@ -449,9 +449,9 @@ export const MODULE_DEFS = {
     },
     rune_lattice: {
         id: 'rune_lattice',
-        name: 'Rune Lattice',
+        name: '符文晶格',
         icon: 'R',
-        desc: '4x4 fusion-ready peg lattice. Rune fusion prefers its center pegs.',
+        desc: '4×4 钉阵，适合符文融合；融合时优先选中央钉子。',
         rarity: 'common',
         price: 0,
         build(ox, oy, w, h) {
@@ -462,9 +462,9 @@ export const MODULE_DEFS = {
     },
     bouncer: {
         id: 'bouncer',
-        name: '反彈室',
+        name: '反弹室',
         icon: '✦',
-        desc: '中央 1 顆高彈性粉色釘子，弹珠在此區域劇烈反彈。',
+        desc: '中央 1 颗高弹性粉色钉子，弹珠在此区域剧烈反弹。',
         rarity: 'common',
         price: 0,
         build(ox, oy, w, h) {
@@ -489,7 +489,7 @@ export const MODULE_DEFS = {
         id: 'funnel',
         name: '漏斗',
         icon: '▽',
-        desc: '頂寬底窄的三角形交錯，弹珠向中央匯集。占用 2×1 槽。',
+        desc: '顶宽底窄的三角形交错，弹珠向中央汇集。占用 2×1 槽。',
         rarity: 'common',
         price: 0,
         span: { cols: 2, rows: 1 },
@@ -500,9 +500,9 @@ export const MODULE_DEFS = {
     },
     wheel_module: {
         id: 'wheel_module',
-        name: '幸運轉盤',
+        name: '幸运转盘',
         icon: '🎰',
-        desc: '單槽內上下疊放兩個 [輪盤槽]，弹珠下落時有機會連續觸發兩次；導向釘較少，回報更跳。占用 1×1 槽。',
+        desc: '单槽内上下叠放两个 [轮盘槽]，弹珠下落时有机会连续触发两次；导向钉较少，回报更跳。占用 1×1 槽。',
         rarity: 'rare',
         price: 70,
         shape: { footprint: 'stack', entry: 'top', exit: 'wheel' },
@@ -527,9 +527,9 @@ export const MODULE_DEFS = {
     },
     baffle: {
         id: 'baffle',
-        name: '斜擋板',
+        name: '斜挡板',
         icon: '⫽',
-        desc: '一排傾斜的粉色高彈性釘子，將弹珠導向側方。',
+        desc: '一排倾斜的粉色高弹性钉子，将弹珠导向侧方。',
         rarity: 'rare',
         price: 50,
         build(ox, oy, w, h) {
@@ -550,9 +550,9 @@ export const MODULE_DEFS = {
     },
     fixed_slot: {
         id: 'fixed_slot',
-        name: '固定機關',
+        name: '固定机关',
         icon: '◈',
-        desc: '在固定位置生成一個特殊槽（連射/回溯/分裂依槽位輪換）。',
+        desc: '在固定位置生成一个特殊槽（连射/回溯/分裂依槽位轮换）。',
         rarity: 'epic',
         price: 80,
         build(ox, oy, w, h, ctx, slotIdx) {
@@ -579,9 +579,9 @@ export const MODULE_DEFS = {
     },
     cryo_pyro_pair: {
         id: 'cryo_pyro_pair',
-        name: '冰火元素對',
+        name: '冰火元素对',
         icon: '❄🔥',
-        desc: '左 cryo + 右 pyro 固定釘子對，搭配普通釘子。無需融合。',
+        desc: '左冰霜 + 右火焰固定钉子对，搭配普通钉子。无需融合。',
         rarity: 'rare',
         price: 70,
         build(ox, oy, w, h) {
@@ -900,9 +900,9 @@ export const MODULE_DEFS = {
 // 通过 boardLayout / currentRows 整体改写钉盘，而是改造为可在单个模块槽位内放置的模块。
 MODULE_DEFS.triangle_module = {
     id: 'triangle_module',
-    name: '三角陣形',
+    name: '三角阵形',
     icon: '🔺',
-    desc: '頂寬底窄的三角交錯，弹珠向中心聚焦。',
+    desc: '顶宽底窄的三角交错，弹珠向中心聚焦。',
     rarity: 'rare',
     price: 60,
     build(ox, oy, w, h) {
@@ -912,9 +912,9 @@ MODULE_DEFS.triangle_module = {
 };
 MODULE_DEFS.diamond_module = {
     id: 'diamond_module',
-    name: '菱形陣形',
+    name: '菱形阵形',
     icon: '🔷',
-    desc: '上下窄、中段寬的菱形排布，中段碰撞密集。',
+    desc: '上下窄、中段宽的菱形排布，中段碰撞密集。',
     rarity: 'epic',
     price: 80,
     build(ox, oy, w, h) {
@@ -940,9 +940,9 @@ MODULE_DEFS.diamond_module = {
 };
 MODULE_DEFS.sparse_module = {
     id: 'sparse_module',
-    name: '稀疏間隔',
+    name: '稀疏间隔',
     icon: '〰️',
-    desc: '寬窄行交替形成通道；底部一排粉色高彈性釘子。',
+    desc: '宽窄行交替形成通道；底部一排粉色高弹性钉子。',
     rarity: 'rare',
     price: 60,
     build(ox, oy, w, h) {
@@ -968,9 +968,9 @@ MODULE_DEFS.sparse_module = {
 };
 MODULE_DEFS.mirror_module = {
     id: 'mirror_module',
-    name: '鏡像同步',
+    name: '镜像同步',
     icon: '🪞',
-    desc: '左右對稱排列。中軸高彈釘子使弹珠頻繁鏡像反彈。',
+    desc: '左右对称排列。中轴高弹钉子使弹珠频繁镜像反弹。',
     rarity: 'epic',
     price: 80,
     build(ox, oy, w, h) {
@@ -984,9 +984,9 @@ MODULE_DEFS.mirror_module = {
 };
 MODULE_DEFS.wide_narrow_module = {
     id: 'wide_narrow_module',
-    name: '寬窄交替',
+    name: '宽窄交替',
     icon: '📐',
-    desc: '偶數行寬、奇數行窄，邊緣捕獲偏離弹珠。',
+    desc: '偶数行宽、奇数行窄，边缘捕获偏离弹珠。',
     rarity: 'common',
     price: 40,
     build(ox, oy, w, h) {
@@ -1011,9 +1011,9 @@ MODULE_DEFS.wide_narrow_module = {
 };
 MODULE_DEFS.dim_shard_module = {
     id: 'dim_shard_module',
-    name: '維度碎片',
+    name: '维度碎片',
     icon: '🌌',
-    desc: '更高密度的 4×4 交錯釘子，碰撞次數倍增。',
+    desc: '更高密度的 4×4 交错钉子，碰撞次数倍增。',
     rarity: 'rare',
     price: 60,
     build(ox, oy, w, h) {
@@ -1023,9 +1023,9 @@ MODULE_DEFS.dim_shard_module = {
 };
 MODULE_DEFS.dim_crystal_module = {
     id: 'dim_crystal_module',
-    name: '維度結晶',
+    name: '维度结晶',
     icon: '💠',
-    desc: '極高密度 5×5 交錯釘子，弹珠路徑充滿碰撞。',
+    desc: '极高密度 5×5 交错钉子，弹珠路径充满碰撞。',
     rarity: 'legendary',
     price: 120,
     build(ox, oy, w, h) {
@@ -1036,9 +1036,9 @@ MODULE_DEFS.dim_crystal_module = {
 
 MODULE_DEFS.rune_focus_module = {
     id: 'rune_focus_module',
-    name: 'Rune Focus',
+    name: '符文聚焦室',
     icon: 'F',
-    desc: 'A compact fusion chamber. Consumed runes strongly prefer the inner ring.',
+    desc: '紧凑的融合室；被消耗的符文优先落在内圈。',
     rarity: 'rare',
     price: 70,
     build(ox, oy, w, h) {
@@ -1053,9 +1053,9 @@ MODULE_DEFS.rune_focus_module = {
 
 MODULE_DEFS.cascade_bank_module = {
     id: 'cascade_bank_module',
-    name: 'Cascade Bank',
+    name: '阶梯回廊',
     icon: 'K',
-    desc: 'Alternating pink rails create a stair-step ricochet path.',
+    desc: '交错的粉色钉轨形成阶梯式反弹路线。',
     rarity: 'rare',
     price: 65,
     build(ox, oy, w, h) {
@@ -1081,9 +1081,9 @@ MODULE_DEFS.cascade_bank_module = {
 
 MODULE_DEFS.crucible_core_module = {
     id: 'crucible_core_module',
-    name: 'Crucible Core',
+    name: '坩埚核心',
     icon: 'C',
-    desc: 'A fixed cryo/pyro/damage triangle with fusion-friendly center pegs.',
+    desc: '固定的冰霜 / 火焰 / 增幅三角，中央钉子适合融合。',
     rarity: 'epic',
     price: 95,
     build(ox, oy, w, h) {
@@ -1099,9 +1099,9 @@ MODULE_DEFS.crucible_core_module = {
 
 MODULE_DEFS.double_wheel_module = {
     id: 'double_wheel_module',
-    name: 'Twin Wheel',
+    name: '双轮室',
     icon: 'W',
-    desc: 'Two wheel slots across a 2x1 chamber for swingy reward routing.',
+    desc: '2×1 室内的两个转盘槽，奖励路线起伏更大。',
     rarity: 'legendary',
     price: 130,
     span: { cols: 2, rows: 1 },
@@ -1129,9 +1129,9 @@ MODULE_DEFS.double_wheel_module = {
 
 MODULE_DEFS.fusion_garden_module = {
     id: 'fusion_garden_module',
-    name: 'Fusion Garden',
+    name: '融合花园',
     icon: 'G',
-    desc: 'A broad 2x1 lattice that gives rune fusion many high-value targets.',
+    desc: '宽幅 2×1 钉阵，为符文融合提供大量高价值目标。',
     rarity: 'rare',
     price: 85,
     span: { cols: 2, rows: 1 },
@@ -1650,18 +1650,26 @@ export function getModuleSpan(moduleId) {
     return { cols: 1, rows: 1 };
 }
 
+// 模块摘要的显示用词（shape.entry / shape.exit / rarity 是数据 id，界面显示中文）
+const MODULE_ENTRY_LABEL = { side: '侧面', top: '顶部', 'top-center': '顶部中央', 'top-left': '左上', 'top-right': '右上' };
+const MODULE_EXIT_LABEL = {
+    bottom: '底部', 'bottom-center': '底部中央', 'loop-shot': '回环发射', multicast: '连射', recall: '回溯',
+    'rotating-shot': '旋转发射', split: '分裂', 'up-right': '右上', wheel: '转盘',
+};
+const MODULE_RARITY_LABEL = { common: '普通', rare: '稀有', epic: '史诗', legendary: '传说' };
+
 export function getModuleMetaSummary(moduleId) {
     const def = MODULE_DEFS[moduleId];
     if (!def) return '';
     const span = getModuleSpan(moduleId);
     const parts = [];
-    if (span.cols > 1 || span.rows > 1) parts.push(`${span.cols}x${span.rows}`);
+    if (span.cols > 1 || span.rows > 1) parts.push(`${span.cols}×${span.rows}`);
     if (def.shape) {
-        const entry = def.shape.entry ? `入口:${def.shape.entry}` : '';
-        const exit = def.shape.exit ? `出口:${def.shape.exit}` : '';
+        const entry = def.shape.entry ? `入口：${MODULE_ENTRY_LABEL[def.shape.entry] || def.shape.entry}` : '';
+        const exit = def.shape.exit ? `出口：${MODULE_EXIT_LABEL[def.shape.exit] || def.shape.exit}` : '';
         if (entry || exit) parts.push([entry, exit].filter(Boolean).join(' / '));
     }
-    if (def.rarity) parts.push(def.rarity);
+    if (def.rarity) parts.push(MODULE_RARITY_LABEL[def.rarity] || def.rarity);
     return parts.join(' · ');
 }
 

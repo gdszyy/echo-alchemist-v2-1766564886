@@ -312,7 +312,7 @@ import { BOSS_SPRITE_BOSS_IDS, getBossSpriteSheetPath } from '../data/boss_sprit
 const SPRITE_REGISTRY = {
     'golem_normal': 'assets/sprites/enemies/golem_normal.png',
     'golem_elite':  'assets/sprites/enemies/golem_elite.png',
-    // V2 基底敵人 Sprite（占位资源，命名/manifest 与正式资源一致）
+    // V2 基底敌人 Sprite（占位资源，命名/manifest 与正式资源一致）
     ...ENEMY_V2_METADATA.reduce((acc, m) => {
         acc[m.resourceId] = m.spritePath;
         return acc;

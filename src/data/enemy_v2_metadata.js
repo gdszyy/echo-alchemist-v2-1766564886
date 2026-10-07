@@ -182,7 +182,7 @@ export const ENEMY_V2_METADATA = [
         baseArchetype: 'gravityWell',
         affixes: ['gravityWell'],
         priority: 'P3',
-        stage: '末段 / Boss 前压力位（第 9 回合起）',
+        stage: '末段 / 首领前压力位（第 9 回合起）',
         role: '场控大型敌人，扭曲弹道',
         targeting: '近距离贴脸或使用直线高速弹减少偏折影响。',
         spritePath: 'assets/sprites/enemies/v2/enemy_gravity_core_3x3.png',

@@ -1,10 +1,10 @@
 const POTION_FORM_OPTION_DATA = [
-    { formId: 'bottle', nestingMode: 'shatter', slotType: null, label: 'Bottle', spellTypes: ['burst', 'status', 'delay', 'construct', 'ammo_enchant'] },
-    { formId: 'orb', nestingMode: 'rupture', slotType: null, label: 'Root Orb', spellTypes: ['burst', 'status', 'delay', 'construct'] },
-    { formId: 'beam', nestingMode: 'hit', slotType: null, label: 'Beam', spellTypes: ['status', 'delay'] },
-    { formId: 'meteor', nestingMode: 'impact', slotType: null, label: 'Meteor', spellTypes: ['burst', 'status', 'delay', 'construct'] },
-    { formId: 'tower', nestingMode: 'tower_active', slotType: 'active', label: 'Active Tower', spellTypes: ['burst', 'status', 'delay'] },
-    { formId: 'tower', nestingMode: 'tower_death', slotType: 'death', label: 'Death Tower', spellTypes: ['burst', 'status', 'delay'] },
+    { formId: 'bottle', nestingMode: 'shatter', slotType: null, label: '瓶', spellTypes: ['burst', 'status', 'delay', 'construct', 'ammo_enchant'] },
+    { formId: 'orb', nestingMode: 'rupture', slotType: null, label: '根球', spellTypes: ['burst', 'status', 'delay', 'construct'] },
+    { formId: 'beam', nestingMode: 'hit', slotType: null, label: '光束', spellTypes: ['status', 'delay'] },
+    { formId: 'meteor', nestingMode: 'impact', slotType: null, label: '陨石', spellTypes: ['burst', 'status', 'delay', 'construct'] },
+    { formId: 'tower', nestingMode: 'tower_active', slotType: 'active', label: '主动塔', spellTypes: ['burst', 'status', 'delay'] },
+    { formId: 'tower', nestingMode: 'tower_death', slotType: 'death', label: '亡语塔', spellTypes: ['burst', 'status', 'delay'] },
 ];
 
 const FORM_RULES = {

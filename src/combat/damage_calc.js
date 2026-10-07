@@ -301,7 +301,7 @@ export const DamageCalc = {
                 const thunderstormEffect = this.activeRunewordEffects && this.activeRunewordEffects['thunderstorm'];
                 if (thunderstormEffect) {
                     // decayBonus 增加衰减系数（越接近 1.0 衰减越少）
-                    // 限制最大値为 0.95，防止无限伤害
+                    // 限制最大值为 0.95，防止无限伤害
                     decayFactor = Math.min(0.95, decayFactor + (thunderstormEffect.params.decayBonus || 0));
                 }
                 // --- [属性共鸣] 雷霆共鸣：读取 chainDecayReduction，降低闪电链伤害衰减 ---
@@ -540,7 +540,7 @@ export const DamageCalc = {
         this.combat_recordDamage(fusionHpDamage, 'lightning', 'main', shotId);
 
         // 8. 超大浮动文字（字号 28px，三行：标题 + 伤害数值）
-        this.spawn_createFloatingText(ex, ey - 60, `⚗️ ELEMENTAL FUSION!`, '#f0abfc', 22);
+        this.spawn_createFloatingText(ex, ey - 60, `⚗️ 元素聚变`, '#f0abfc', 22);
         this.spawn_createFloatingText(ex, ey - 30, `${Math.ceil(fusionHpDamage)}`, '#ffffff', 28);
 
         if (fusionResult.killed) this.spawn_addScore(enemy.maxHp);

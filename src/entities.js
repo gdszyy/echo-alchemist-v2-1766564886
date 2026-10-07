@@ -56,6 +56,8 @@ import {
     getUiBitmap,
 } from './bitmap_icons.js';
 import { sb as _sb } from './utils/perf.js';
+import { isPixelArtMode } from './render/art_mode.js';
+import { pxDrawPeg, pxDrawBall } from './pixel/board_render.js';
 
 // ==================== 音频依赖注入 (重构 v2) ====================
 // 移除 Proxy 方案和 window.audio 依赖
@@ -142,9 +144,9 @@ class MarbleDefinition {
 
     getName() {
         const display = CONFIG.ui.attributeDisplay[this.type];
-        if (display) return `${display.name}彈珠`;
+        if (display) return `${display.name}弹珠`;
 
-        return '未知彈珠';
+        return '未知弹珠';
     }
 
     getColor() {
@@ -342,7 +344,7 @@ class FortuneWheel {
         this._deactivateTimer = null; // [fix] 保存定时器引用以便清理
         
         this.pos = new Vec2(0, 0);
-        this.radius = 120; // [修改] 加大半徑，讓它在屏幕中間更氣派
+        this.radius = 120; // [修改] 加大半径，让它在屏幕中间更气派
         this.angle = 0;
         this.velocity = 0;
         this.friction = 0.977;
@@ -366,7 +368,7 @@ class FortuneWheel {
         this.velocity = 0.4 + Math.random() * 0.2;
         this.angle = 0;
 
-        // 構建扇區
+        // 构建扇区
         this.slices = [];
         
         // [修改] 1. 过滤不可叠加属性 (如 pierce, bounce, scatter, flying_sword 等通常不适合转盘直接翻倍)
@@ -470,24 +472,24 @@ class FortuneWheel {
         this._deactivateTimer = setTimeout(() => { 
             this.active = false;
             this._deactivateTimer = null;
-        }, 1500); // 稍微延長展示時間
+        }, 1500); // 稍微延长展示时间
     }
 
     draw(ctx) {
         if (!this.active) return;
         
-        // 繪製半透明黑色背景遮罩，突出輪盤
+        // 绘制半透明黑色背景遮罩，突出轮盘
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, this.game.width, this.game.height);
 
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
         
-        // --- 0. 繪製外發光 ---
+        // --- 0. 绘制外发光 ---
         ctx.shadowBlur = _sb(30);
-        ctx.shadowColor = '#fbbf24'; // 金色光暈
+        ctx.shadowColor = '#fbbf24'; // 金色光晕
 
-        // --- 1. 繪製豪華外框 (Rim) ---
+        // --- 1. 绘制豪华外框 (Rim) ---
         ctx.beginPath();
         ctx.arc(0, 0, this.radius + 12, 0, Math.PI * 2);
         const rimGrad = ctx.createLinearGradient(-this.radius, -this.radius, this.radius, this.radius);
@@ -496,15 +498,15 @@ class FortuneWheel {
         rimGrad.addColorStop(1, '#b45309'); // Amber-700
         ctx.fillStyle = rimGrad;
         ctx.fill();
-        ctx.shadowBlur = 0; // 關閉光暈繪製細節
+        ctx.shadowBlur = 0; // 关闭光晕绘制细节
 
-        // 外框內圈描邊
+        // 外框内圈描边
         ctx.beginPath();
         ctx.arc(0, 0, this.radius + 2, 0, Math.PI * 2);
         ctx.fillStyle = '#451a03'; // 深褐色底
         ctx.fill();
 
-        // --- 2. 跑馬燈燈泡 (Lights) ---
+        // --- 2. 跑马灯灯泡 (Lights) ---
         const lightCount = 12;
         const time = Date.now();
         for(let i=0; i<lightCount; i++) {
@@ -512,7 +514,7 @@ class FortuneWheel {
             const lx = Math.cos(la) * (this.radius + 7);
             const ly = Math.sin(la) * (this.radius + 7);
             
-            // 燈泡閃爍邏輯 (跑馬燈效果)
+            // 灯泡闪烁逻辑 (跑马灯效果)
             const isOn = Math.floor(time / 100) % lightCount === i;
             
             ctx.beginPath();
@@ -527,7 +529,7 @@ class FortuneWheel {
         }
         ctx.shadowBlur = 0;
 
-        // --- 3. 繪製盤面 (旋轉部分) ---
+        // --- 3. 绘制盘面 (旋转部分) ---
         ctx.save();
         ctx.rotate(this.angle);
         
@@ -541,22 +543,22 @@ class FortuneWheel {
             ctx.arc(0, 0, this.radius, s.startAngle, s.endAngle);
             ctx.closePath();
             
-            // 顏色處理
+            // 颜色处理
             ctx.fillStyle = s.color;
             ctx.fill();
             
-            // 高亮疊加層
+            // 高亮叠加层
             if (isHighlighted && this.velocity < 0.1) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
                 ctx.fill();
             }
 
-            // 分割線
+            // 分割线
             ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // 繪製 ICON 和 文字
+            // 绘制 ICON 和 文字
             const midAngle = s.startAngle + (s.endAngle - s.startAngle) / 2;
             const iconDist = this.radius * 0.65;
             const ix = Math.cos(midAngle) * iconDist;
@@ -575,7 +577,7 @@ class FortuneWheel {
             ctx.textBaseline = 'bottom';
             ctx.fillText(s.icon, 0, 5); // Icon
             
-            // 如果該區域佔比很小，就不顯示文字
+            // 如果该区域占比很小，就不显示文字
             if ((s.endAngle - s.startAngle) > 0.4) {
                  ctx.font = 'bold 12px sans-serif';
                  ctx.textBaseline = 'top';
@@ -585,15 +587,15 @@ class FortuneWheel {
             ctx.restore();
         });
 
-        ctx.restore(); // 結束盤面旋轉
+        ctx.restore(); // 结束盘面旋转
 
-        // --- 4. 繪製中心裝飾 (Center Hub) ---
+        // --- 4. 绘制中心装饰 (Center Hub) ---
         // 外圈
         ctx.beginPath();
         ctx.arc(0, 0, 18, 0, Math.PI * 2);
         ctx.fillStyle = rimGrad;
         ctx.fill();
-        // 內圈
+        // 内圈
         ctx.beginPath();
         ctx.arc(0, 0, 12, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
@@ -605,13 +607,13 @@ class FortuneWheel {
         ctx.textBaseline = 'middle';
         ctx.fillText('★', 0, 1);
 
-        // --- 5. 繪製指針 (Pointer) ---
-        ctx.restore(); // 回到無旋轉狀態
+        // --- 5. 绘制指针 (Pointer) ---
+        ctx.restore(); // 回到无旋转状态
         
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y - this.radius - 5);
         
-        // 指針陰影
+        // 指针阴影
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = _sb(5);
         
@@ -620,10 +622,10 @@ class FortuneWheel {
         ctx.lineTo(10, -5);
         ctx.lineTo(0, 15); // 向下指
         ctx.closePath();
-        ctx.fillStyle = '#ef4444'; // 紅色指針
+        ctx.fillStyle = '#ef4444'; // 红色指针
         ctx.fill();
         
-        // 指針鉚釘
+        // 指针铆钉
         ctx.beginPath();
         ctx.arc(0, -2, 4, 0, Math.PI*2);
         ctx.fillStyle = '#7f1d1d';
@@ -736,7 +738,7 @@ class TriangleSideWheel {
     /**
      * @param {number} x - 转盘中心 x
      * @param {number} y - 转盘中心 y
-     * @param {'left'|'right'} side - 左側还是右側
+     * @param {'left'|'right'} side - 左侧还是右侧
      * @param {object} game - Game 实例
      */
     constructor(x, y, side, game) {
@@ -1015,6 +1017,7 @@ class Peg {
     // --- 在 Peg 类中替换此方法 ---
     // --- 在 Peg 类中替换此方法 ---
     drawShadow(ctx, lightPos, lightRadius) {
+        if (isPixelArtMode()) return; // 像素钉自带明暗，不叠软阴影
         const dx = this.pos.x - lightPos.x;
         const dy = this.pos.y - lightPos.y;
         const distSq = dx * dx + dy * dy;
@@ -1211,6 +1214,8 @@ class Peg {
     // --- 替换 Peg 类的 draw 方法 ---
     // @section:peg_shadow_and_transform - 软阴影与碰撞旋转变换初始化
     draw(ctx, baseRadius, tilt = {x:0, y:0}) {
+        // [像素风] 菱形石钉 + 属性核心（src/pixel/board_render.js）；线段障碍钉仍走原路径
+        if (isPixelArtMode() && pxDrawPeg(ctx, this, baseRadius)) return;
         const currentRadius = baseRadius * this.scale;
         const isSpecial = this.type !== 'normal';
         const isLit = this.lit;
@@ -1236,7 +1241,7 @@ class Peg {
         }
 
         // --- [物理增强] 被击中旋转变换 ---
-        // 弹珠碰击鑉子时，鑉子会轻微旋转（切向摩擦力的视觉表现）
+        // 弹珠碰击钉子时，钉子会轻微旋转（切向摩擦力的视觉表现）
         if (this.impactAngle !== 0) {
             ctx.save();
             ctx.translate(this.pos.x, this.pos.y);
@@ -1244,7 +1249,7 @@ class Peg {
             ctx.translate(-this.pos.x, -this.pos.y);
         }
 
-        // 1. 绘制基础圆形鑉子
+        // 1. 绘制基础圆形钉子
         const pegCapRadius = currentRadius * 1.14;
         const pegInnerRadius = currentRadius * 0.58;
         const drawPegPlate = (radius) => {
@@ -1497,7 +1502,7 @@ class Peg {
         }
 
         // 2. [新增] 绘制等级指示器 (Level Indicator)
-        // 只有特殊且等级>1的鑉子才显示
+        // 只有特殊且等级>1的钉子才显示
         if (this.level > 1 && this.type !== 'normal') {
             this.drawLevelPips(ctx, currentRadius);
         }
@@ -1507,7 +1512,7 @@ class Peg {
             ctx.restore();
         }
     }
-    // [新增] 绘制剑形鑉子
+    // [新增] 绘制剑形钉子
     drawSwordPeg(ctx, r, isLit) {
         const time = Date.now() / 1000;
         ctx.save();
@@ -2341,7 +2346,7 @@ class DropBall {
                             // 强化变异瞬间特效：汇聚脉冲 + 高亮浮动文字
                             const mutColor = CONFIG.colors[rule.result] || '#ffffff';
                             game.spawn_createAssimilationPulse(peg.pos.x, peg.pos.y, mutColor, {isMutation: true});
-                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 30, '✨ MUTATION!', mutColor);
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 30, '✨ 变异', mutColor);
                             audio.playMagic();
 
                             // [镜像同步]
@@ -2382,7 +2387,7 @@ class DropBall {
                             }
                         } else {
                             // 已满级特效 (可选)
-                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, "MAX!", '#ef4444');
+                            game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 15, "满级", '#ef4444');
                         }
                     }
                 }
@@ -2725,10 +2730,10 @@ class DropBall {
                         if (typeof slot.tryActivate !== 'function') slot.hit = true;
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
-                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
+                            this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("时空回溯！");
                         } else if (slot.type === 'multicast') {
                             if (this.session.multicastAdded.indexOf(slot) === -1) { 
-                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
+                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("连续发射+2！");
                                     game.combat_updateMulticastDisplay(2);
                             }
                         } else if (slot.type === 'split') {
@@ -2745,56 +2750,56 @@ class DropBall {
                             game.spawn_createSlotBurst(slot.x, slot.y, '#facc15', {intensity: 1.3});
                             return { type: 'slot', slotType: 'relic', pos: this.pos };
                         } else if (slot.type === 'skill_point') {
-                            // 1. 標記槽位被擊中 (立即消失)
+                            // 1. 标记槽位被击中 (立即消失)
                             slot.hit = true;
 
-                            // 2. 播放原地音效與爆炸 (立即反饋)
+                            // 2. 播放原地音效与爆炸 (立即反馈)
                             audio.playPowerup();
                             game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotSkill);
-                            showToast("技能點獲取!");
+                            showToast("技能点获取!");
 
-                            // --- [新增] 引導動畫邏輯 ---
+                            // --- [新增] 引导动画逻辑 ---
                             
-                            // A. 計算 UI 目標位置 (下一個空的技能槽)
-                            // 獲取所有槽位 DOM
+                            // A. 计算 UI 目标位置 (下一个空的技能槽)
+                            // 获取所有槽位 DOM
                             const uiSlots = document.querySelectorAll('.sp-slot');
-                            // 當前點數即為下一個空槽的索引 (例如有0點，下一個是第0個)
+                            // 当前点数即为下一个空槽的索引 (例如有0点，下一个是第0个)
                             const targetIndex = game.skillPoints; 
                             
-                            let targetX = game.width / 2; // 默認兜底位置
+                            let targetX = game.width / 2; // 默认兜底位置
                             let targetY = 80;
 
-                            // 如果能找到對應的 DOM 元素，計算其中心坐標
+                            // 如果能找到对应的 DOM 元素，计算其中心坐标
                             if (uiSlots && uiSlots[targetIndex]) {
                                 const rect = uiSlots[targetIndex].getBoundingClientRect();
                                 targetX = rect.left + rect.width / 2;
                                 targetY = rect.top + rect.height / 2;
                             }
 
-                            // B. 創建飛行能量球
+                            // B. 创建飞行能量球
                             const orb = new EnergyOrb(
-                                slot.x, slot.y,   // 起點：槽位位置
-                                targetX, targetY, // 終點：UI 位置
-                                CONFIG.colors.slotSkill, // 顏色：綠色
-                                new Vec2(0, -8),  // 初速度：向上噴出
+                                slot.x, slot.y,   // 起点：槽位位置
+                                targetX, targetY, // 终点：UI 位置
+                                CONFIG.colors.slotSkill, // 颜色：绿色
+                                new Vec2(0, -8),  // 初速度：向上喷出
                                 () => {
-                                    // --- C. 到達回調 (On Arrive) ---
-                                    // 只有當球飛到時，才真正增加點數
+                                    // --- C. 到达回调 (On Arrive) ---
+                                    // 只有当球飞到时，才真正增加点数
                                     game.spawn_addSkillPoint(1);
 
-                                    // 觸發 UI 閃光特效
-                                    // 重新獲取一次 DOM，因為 addSkillPoint 可能重繪了它們
+                                    // 触发 UI 闪光特效
+                                    // 重新获取一次 DOM，因为 addSkillPoint 可能重绘了它们
                                     const updatedSlots = document.querySelectorAll('.sp-slot');
-                                    // 剛剛加了1點，所以現在要閃爍的是 (總點數 - 1) 的位置
+                                    // 刚刚加了1点，所以现在要闪烁的是 (总点数 - 1) 的位置
                                     const filledSlot = updatedSlots[game.skillPoints - 1];
                                     
                                     if (filledSlot) {
                                         filledSlot.classList.remove('flash');
-                                        void filledSlot.offsetWidth; // 強制重繪
+                                        void filledSlot.offsetWidth; // 强制重绘
                                         filledSlot.classList.add('flash');
                                     }
                                     
-                                    // 播放到達音效 (可選)
+                                    // 播放到达音效 (可选)
                                     audio.playCollect();
                                 },
                                 {
@@ -2813,7 +2818,7 @@ class DropBall {
                                 }
                             );
 
-                            // 將光球加入遊戲循環
+                            // 将光球加入游戏循环
                             game.energyOrbs.push(orb);
                         }else if (slot.type === 'wheel') {
                             slot.hit = true;
@@ -2829,13 +2834,13 @@ class DropBall {
                                 return { type: 'slot', slotType: 'wheel', pos: this.pos };
                             }
 
-                            // [修改] 觸發轉盤
+                            // [修改] 触发转盘
                             audio.playPowerup(); 
                             game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotWheel);
-                            showToast("命運輪盤啟動!");
+                            showToast("命运轮盘启动!");
 
-                            // [修改] 使用屏幕中心坐標 (game.width/2, game.height/2)
-                            // 稍微向上偏移一點 (-50) 視覺更平衡
+                            // [修改] 使用屏幕中心坐标 (game.width/2, game.height/2)
+                            // 稍微向上偏移一点 (-50) 视觉更平衡
                             const wheelX = game.width / 2;
                             const wheelY = game.height / 2 - 50; 
                             
@@ -2858,7 +2863,7 @@ class DropBall {
                                 // 获取属性名称
                                 const attrName = CONFIG.ui.attributeDisplay[winningType] ? CONFIG.ui.attributeDisplay[winningType].name : winningType;
                                 
-                                // 文字提示位置也改為屏幕中間
+                                // 文字提示位置也改为屏幕中间
                                 game.spawn_createFloatingText(wheelX, wheelY + 80, `${attrName} +${addCount}!`, "#fff");
                                 game.spawn_createSlotBurst(wheelX, wheelY, '#fff');
                                 audio.playPowerup(5);
@@ -3339,7 +3344,7 @@ class DropBall {
 
                             // ---  合成反馈 ---
                             if (isSynthesized) {
-                                game.spawn_createFloatingText(this.pos.x, this.pos.y, "⚡ SYNTHESIS!", "#c084fc");
+                                game.spawn_createFloatingText(this.pos.x, this.pos.y, "⚡ 合成", "#c084fc");
                                 audio.playLightning(); // 播放闪电音效
                             }
 
@@ -3422,7 +3427,12 @@ class DropBall {
          */
         draw(ctx) {
             if (!this.active) return;
-            
+            // [像素风] 弹珠：类型色阶像素球 + 最强两属性环绕点
+            if (isPixelArtMode()) {
+                pxDrawBall(ctx, this);
+                return;
+            }
+
             const x = this.pos.x;
             const y = this.pos.y;
             const r = this.radius;
@@ -3972,11 +3982,11 @@ class SlashAnim {
 // 辅助：平滑旋转函数（已迁移至 src/utils/math_utils.js）
 // rotateTowards 函数已通过顶部 import 语句引入
 
-// --- 替換原有的 SonSword 類 ---
+// --- 替换原有的 SonSword 类 ---
 class SonSword {
     constructor(x, y, mother, level, config, startDelay = 0) {
         this.pos = new Vec2(x, y);
-        // 初始速度稍微隨機化，避免重疊
+        // 初始速度稍微随机化，避免重叠
         this.vel = new Vec2(Math.random()-0.5, Math.random()-0.5).mult(5);
         this.mother = mother;
         this.level = level;
@@ -4009,8 +4019,8 @@ class SonSword {
         this.trail = []; // [新增] 拖尾轨迹
         this.maxTrailLength = 8; // 拖尾长度
 
-        // [性能優化]：索敵計時器
-        // 初始化為隨機值，讓不同子劍錯開索敵時間，避免同一幀計算量過大
+        // [性能优化]：索敌计时器
+        // 初始化为随机值，让不同子剑错开索敌时间，避免同一帧计算量过大
         this.searchTimer = Math.floor(Math.random() * 15);
     }
 
@@ -4025,14 +4035,14 @@ class SonSword {
         const candidates = enemies.filter(e => e.active && e.pos.y > -100 && e.pos.y < margin && e !== this.passingThroughEnemy);
         if (candidates.length === 0) return;
         
-        // 簡單距離權重算法 (尋找最近的)
+        // 简单距离权重算法 (寻找最近的)
         let best = null;
         let minD = 99999;
         
-        // 使用普通 for 循環比 forEach 稍微快一點點
+        // 使用普通 for 循环比 forEach 稍微快一点点
         for (let i = 0; i < candidates.length; i++) {
             const e = candidates[i];
-            const d = this.pos.distSq(e.pos); // [優化] 使用距離平方 distSq 避免開根號
+            const d = this.pos.distSq(e.pos); // [优化] 使用距离平方 distSq 避免开根号
             if (d < minD) { minD = d; best = e; }
         }
         
@@ -4043,10 +4053,10 @@ class SonSword {
     update(timeScale, enemies, game) {
         if (!this.active) return;
 
-        // 1. 啟動延遲
+        // 1. 启动延迟
         if (this.startDelay > 0) {
             this.startDelay -= timeScale;
-            // 簡單的跟隨母劍邏輯，避免過多計算
+            // 简单的跟随母剑逻辑，避免过多计算
             if (this.mother && this.mother.active) {
                 this.pos.x += (this.mother.pos.x - this.pos.x) * 0.1 * timeScale;
                 this.pos.y += (this.mother.pos.y - this.pos.y) * 0.1 * timeScale;
@@ -4054,13 +4064,13 @@ class SonSword {
             return;
         }
         
-        // 2. 穿透衝刺邏輯 (保持不變)
+        // 2. 穿透冲刺逻辑 (保持不变)
         if (this.passingThroughEnemy) {
              const enemy = this.passingThroughEnemy;
-             // 優化：簡單的距離檢查
+             // 优化：简单的距离检查
              const dx = this.pos.x - enemy.pos.x;
              const dy = this.pos.y - enemy.pos.y;
-             const distSq = dx*dx + dy*dy; // 距離平方
+             const distSq = dx*dx + dy*dy; // 距离平方
              const safeDist = (enemy.width + enemy.height)/4 + 40; 
              
              const isInside = enemy.active && distSq < safeDist * safeDist;
@@ -4121,7 +4131,7 @@ class SonSword {
              }
         }
 
-        // 3. 常規狀態機
+        // 3. 常规状态机
         if (this.state === 'flying' || this.state === 'recalling') {
             
             // @section:son_sword_target_search - 节流自动寻敌与目标验证
@@ -4290,7 +4300,7 @@ class SonSword {
                 // [修改] 最后一次攻击插在敌人身上
                 this.stickToEnemy(enemy, game);
             } else if (this.targetQueue.length === 0 && this.isAutoHunting) {
-                // 立即搜索下一個，不等待計時器
+                // 立即搜索下一个，不等待计时器
                 this.searchForTarget(game.enemies);
             }
         }
@@ -4316,7 +4326,7 @@ class SonSword {
         }
         
         // 视觉反馈
-        game.spawn_createFloatingText(this.pos.x, this.pos.y, "🗡️STUCK", "#0ea5e9");
+        game.spawn_createFloatingText(this.pos.x, this.pos.y, "🗡️卡住", "#0ea5e9");
         audio.playSlash();
     }
 
@@ -4443,8 +4453,8 @@ class CloneSpore {
         this.onLand = onLandCallback;
         
         this.progress = 0;
-        this.speed = 0.05; // 動畫速度
-        this.arcHeight = 100; // 拋物線高度
+        this.speed = 0.05; // 动画速度
+        this.arcHeight = 100; // 抛物线高度
         this.active = true;
     }
 
@@ -4454,29 +4464,29 @@ class CloneSpore {
         if (this.progress >= 1) {
             this.progress = 1;
             this.active = false;
-            this.onLand(); // 落地，呼叫回調生成敵人
+            this.onLand(); // 落地，呼叫回调生成敌人
             game.spawn_createImpactBlast(this.end.x, this.end.y, '#a855f7'); // 落地爆破
             audio.playPowerup();
         }
 
-        // 線性插值計算水平位置
+        // 线性插值计算水平位置
         const tx = this.start.x + (this.end.x - this.start.x) * this.progress;
-        // 線性插值垂直位置
+        // 线性插值垂直位置
         const tyBase = this.start.y + (this.end.y - this.start.y) * this.progress;
-        // 加上拋物線偏移 (sin(0~PI) * height)
+        // 加上抛物线偏移 (sin(0~PI) * height)
         const arc = Math.sin(this.progress * Math.PI) * this.arcHeight;
         
         this.pos.x = tx;
-        this.pos.y = tyBase - arc; // 向上拋
+        this.pos.y = tyBase - arc; // 向上抛
     }
 
     draw(ctx) {
         if (!this.active) return;
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
-        ctx.rotate(this.progress * Math.PI * 4); // 旋轉效果
+        ctx.rotate(this.progress * Math.PI * 4); // 旋转效果
         
-        // 繪製孢子
+        // 绘制孢子
         ctx.fillStyle = '#d8b4fe';
         ctx.shadowColor = '#a855f7';
         ctx.shadowBlur = _sb(10);

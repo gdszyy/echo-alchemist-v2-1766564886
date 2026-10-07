@@ -15,6 +15,7 @@
 
 import { RUNE_DB } from '../rune_config.js';
 import { RELIC_DB, CONFIG } from '../config.js';
+import { pxIconHtml } from '../pixel/icon_html.js';
 
 // ==================== Boss 元数据（用于节点图标注） ====================
 const BOSS_META = {
@@ -152,7 +153,7 @@ export const game_over_mixin = {
         // --- 符文列表（本局获得） ---
         const runesGained = (this.runeInventory || []).map(runeObj => {
             const def = RUNE_DB.find(r => r.id === runeObj.id);
-            return def ? { id: runeObj.id, name: def.name, icon: def.icon, rarity: def.rarity, level: runeObj.level || 1 } : null;
+            return def ? { id: runeObj.id, element: def.element, name: def.name, icon: def.icon, rarity: def.rarity, level: runeObj.level || 1 } : null;
         }).filter(Boolean);
 
         return {
@@ -208,7 +209,7 @@ export const game_over_mixin = {
             <h1 class="text-4xl font-bold text-red-400 font-[Cinzel] tracking-widest drop-shadow-[0_0_20px_rgba(248,113,113,0.5)] mb-1">
                 防线失守
             </h1>
-            <p class="text-slate-500 text-sm tracking-[0.4em] uppercase">Run Over</p>
+            <p class="text-slate-500 text-sm tracking-[0.4em]">本局结束</p>
         </div>
         `;
     },
@@ -309,11 +310,11 @@ export const game_over_mixin = {
                     </div>
                     <div class="flex items-center gap-1.5">
                         <div class="w-3 h-3 rounded-full bg-orange-500/30 border border-orange-500 flex items-center justify-center text-[8px]">👹</div>
-                        <span class="text-[10px] text-slate-500">Mini-Boss</span>
+                        <span class="text-[10px] text-slate-500">小首领</span>
                     </div>
                     <div class="flex items-center gap-1.5">
                         <div class="w-4 h-4 rounded-full bg-red-500/30 border-2 border-red-500 flex items-center justify-center text-[8px]">👹</div>
-                        <span class="text-[10px] text-slate-500">大 Boss</span>
+                        <span class="text-[10px] text-slate-500">大首领</span>
                     </div>
                     <div class="flex items-center gap-1.5">
                         <div class="w-3 h-3 rounded-full bg-red-500"></div>
@@ -344,7 +345,7 @@ export const game_over_mixin = {
                 return `
                 <div class="flex items-center gap-2 bg-slate-800/60 rounded-lg px-2.5 py-1.5 border border-slate-700/50 hover:border-slate-600 transition-colors cursor-default"
                      title="${r.name}">
-                    <span class="text-lg">${r.icon}</span>
+                    <span class="text-lg">${pxIconHtml({ kind: 'relic', id: r.id, emoji: r.icon }, r.icon)}</span>
                     <span class="text-xs font-medium" style="color: ${rarityColor};">${r.name}</span>
                 </div>
                 `;
@@ -417,7 +418,7 @@ export const game_over_mixin = {
                 <div class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-colors cursor-default"
                      style="background: ${rarityBg}; border-color: ${rarityColor}33;"
                      title="${r.name} Lv.${r.level}">
-                    <span class="text-base">${r.icon}</span>
+                    <span class="text-base">${pxIconHtml({ kind: 'rune', element: r.element, level: Math.min(2, r.level || 1) }, r.icon)}</span>
                     <div class="flex flex-col">
                         <span class="text-xs font-medium leading-tight" style="color: ${rarityColor};">${r.name}</span>
                         <span class="text-[9px] text-slate-600">Lv.${r.level}</span>
@@ -425,7 +426,7 @@ export const game_over_mixin = {
                 </div>
                 `;
             }).join('')
-            : `<span class="text-xs text-slate-600 italic">本局未获得符文</span>`;
+            : `<span class="text-xs text-slate-600 italic">结束时没有持有符文</span>`;
 
         return `
         <section class="gameover-section mb-6 px-4">
@@ -455,7 +456,7 @@ export const game_over_mixin = {
             </div>
             <!-- 符文列表 -->
             <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
-                <div class="text-[10px] text-slate-500 tracking-wider uppercase mb-2">获得符文 (${runesGained.length})</div>
+                <div class="text-[10px] text-slate-500 tracking-wider uppercase mb-2">结束时持有的符文 (${runesGained.length})</div>
                 <div class="flex flex-wrap gap-2">
                     ${runesHtml}
                 </div>

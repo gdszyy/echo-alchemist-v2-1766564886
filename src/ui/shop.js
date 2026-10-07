@@ -285,13 +285,13 @@ export const shop_system = {
             const count = (this.ownedRelics || []).filter(id => id === relic.id).length;
             const max = relic.maxStacks || 1;
             const stackInfo = max > 1
-                ? `<div class="relic-preview-stack">當前層數：${count} / ${max}</div>`
+                ? `<div class="relic-preview-stack">当前层数：${count} / ${max}</div>`
                 : '';
             const tagsHtml = (showRecommendation && relic.recommended && Array.isArray(relic.tags))
                 ? `<div class="relic-preview-tags">${relic.tags.map(tag => `<span class="relic-tag">${tag}</span>`).join('')}</div>`
                 : '';
             const tipHtml = (showRecommendation && relic.recommended && relic.recommendTip)
-                ? `<div class="relic-preview-tip">新手推薦：${relic.recommendTip}</div>`
+                ? `<div class="relic-preview-tip">新手推荐：${relic.recommendTip}</div>`
                 : '';
             const relicBitmapSrc = getRelicIconSrc(relic.id);
             const iconHtml = relicBitmapSrc
@@ -303,7 +303,7 @@ export const shop_system = {
                     <div class="relic-preview-icon">${iconHtml}</div>
                     <div>
                         <div class="relic-preview-name">${relic.name}</div>
-                        <div class="relic-preview-rarity">${relic.rarity || 'common'}</div>
+                        <div class="relic-preview-rarity" data-rarity="${relic.rarity || 'common'}">${({ common: '普通', rare: '稀有', epic: '史诗', legendary: '传说', cursed: '诅咒' })[relic.rarity || 'common'] || '普通'}</div>
                     </div>
                 </div>
                 <div class="relic-preview-desc">${relic.desc}</div>
@@ -368,7 +368,7 @@ export const shop_system = {
                         });
                         el.dataset.touchReady = 'true';
                         renderRelicPreview(relic, el);
-                        if (window.showToast) showToast('再次點擊以選擇該遺物');
+                        if (window.showToast) showToast('再次点击以选择该遗物');
                         return;
                     }
                     this.ui_selectRelic(relic, { sessionId: cardSessionId });
@@ -400,13 +400,13 @@ export const shop_system = {
             const subtitleEl = overlay.querySelector('.relic-title-block p');
             if (titleEl) {
                 titleEl.id = 'relic-dialog-title';
-                titleEl.textContent = showAllRelics ? '测试遗物库' : '古代遺物';
+                titleEl.textContent = showAllRelics ? '测试遗物库' : '古代遗物';
             }
-            if (subtitleEl) subtitleEl.textContent = showAllRelics ? '点击切换多个开局遗物，返回商店后从首页开始下一局生效' : '命運的饋贈，選擇一種力量';
+            if (subtitleEl) subtitleEl.textContent = showAllRelics ? '点击切换多个开局遗物，返回商店后从首页开始下一局生效' : '命运的馈赠，选择一种力量';
             const skipBtn = document.getElementById('relic-skip-to-shop-btn');
             if (skipBtn) {
                 const skipBonus = ((CONFIG.gameplay || {}).runShopSkipRelicBonus || 0);
-                skipBtn.textContent = showAllRelics ? '返回商店' : `放棄遺物 → +${skipBonus} 碎片并进商店`;
+                skipBtn.textContent = showAllRelics ? '返回商店' : `放弃遗物：获得 ${skipBonus} 局内碎片并前往商人`;
                 skipBtn.onclick = showAllRelics
                     ? () => this.ui_closeRelicSelection({ sessionId: session.id })
                     : () => this.ui_skipRelic({ sessionId: session.id });
@@ -514,7 +514,7 @@ export const shop_system = {
 
         if (!this.ownedRelics) this.ownedRelics = [];
         this.ownedRelics.push(relic.id);
-        if (window.showToast) showToast(`獲得遺物: ${relic.name}`);
+        if (window.showToast) showToast(`获得遗物: ${relic.name}`);
         
         // 处理遗物效果
         if (relic.effect === 'unlock_skill') {
@@ -579,7 +579,7 @@ export const shop_system = {
         else if (relic.effect === 'bullet_cap_up') {
             this.bulletCapBonus = 0;
             this.selectionRequiredCount = CONFIG.gameplay.selectionReq || 3;
-            if (window.showToast) showToast('Core slots fixed at 3. Old bandolier converted to calibration parts.');
+            if (window.showToast) showToast('核心槽固定为 3 个，旧弹药带已折算为校准零件。');
         }
         else if (relic.effect === 'row_count_up') {
             this.currentRows = (this.currentRows || 0) + 2;
@@ -606,19 +606,19 @@ export const shop_system = {
             // [补偿] 三角形底部钉子极少，+3 行补偿漏斗深度
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 3;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            if (window.showToast) showToast('三角陣形啟動！釘盤 +3 行，漏斗共鳴激活。');
+            if (window.showToast) showToast('三角阵形启动！钉盘 +3 行，漏斗共鸣激活。');
         } else if (relic.effect === 'board_layout_diamond') {
             this.boardLayout = 'diamond';
             // [补偿] 菱形顶底稀疏，+2 行让菱形更饱满
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            if (window.showToast) showToast('菱形陣形啟動！釘盤 +2 行，中段爆發激活。');
+            if (window.showToast) showToast('菱形阵形启动！钉盘 +2 行，中段爆发激活。');
         } else if (relic.effect === 'board_layout_sparse') {
             this.boardLayout = 'sparse';
             // [补偿] 稀疏布局钉子总数约为 default 的 75%，+4 行补偿总量
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 4;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            if (window.showToast) showToast('稀疏間隔啟動！釘盤 +4 行，通道蓄力激活。');
+            if (window.showToast) showToast('稀疏间隔启动！钉盘 +4 行，通道蓄力激活。');
         } else if (relic.effect === 'board_layout_mirror_sync') {
             this.boardLayout = 'mirror_sync';
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
@@ -627,7 +627,7 @@ export const shop_system = {
             // [补偿] 宽窄交替分布不均，+2 行轻度补偿
             this.currentRows = (this.currentRows || CONFIG.gameplay.rows) + 2;
             if (typeof this.phase_gathering_initPachinko === 'function') this.phase_gathering_initPachinko(true);
-            if (window.showToast) showToast('寬窄交替啟動！釘盤 +2 行，邊緣共振激活。');
+            if (window.showToast) showToast('宽窄交替启动！钉盘 +2 行，边缘共振激活。');
         } else if (relic.effect === 'unlock_marble') {
             const mt = relic.marbleType;
             const boost = relic.boost || 10;
@@ -661,7 +661,7 @@ export const shop_system = {
             this.assimilationBoostRounds[mt] = 2;
             this.doubleAssimilationBoostRounds[mt] = 2;
             const display = CONFIG.ui?.attributeDisplay?.[mt]?.name || mt;
-            if (window.showToast) showToast(`${relic.name}已啟動！${display} 同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}（持續 2 回合）。`);
+            if (window.showToast) showToast(`${relic.name}已启动！${display} 同化率 x${CONFIG.gameplay.assimilationDoubleMultiplier || 2}（持续 2 回合）。`);
             _grantRelicResourcePack(this, 0.5);
         } else if (relic.effect === 'pure_essence') {
             const packFragments = _grantRelicResourcePack(this, 0.5);
@@ -813,7 +813,7 @@ export const shop_system = {
         if (skipBonus > 0) {
             this.runFragments = (this.runFragments || 0) + skipBonus;
         }
-        if (window.showToast) showToast(skipBonus > 0 ? `放棄遗物，获得 ${skipBonus} 碎片` : "放棄遗物，进入局内商店");
+        if (window.showToast) showToast(skipBonus > 0 ? `放弃遗物，获得 ${skipBonus} 局内碎片` : "放弃遗物，前往商人");
         this.ui_closeRelicSelection({
             resume: false,
             restoreFocus: false,
@@ -939,7 +939,7 @@ export const shop_system = {
             const resDef = state.resDef || META_SHOP_CONFIG.resources.rune_fragments;
             const levelText = state.isMax ? 'MAX' : `LV.${state.level}`;
             const costText = state.isMax
-                ? '已達上限'
+                ? '已达上限'
                 : `${resDef.icon} ${state.cost.toLocaleString()}`;
             preview.innerHTML = `
                 <div class="shop-preview-header">
@@ -948,7 +948,7 @@ export const shop_system = {
                         <div class="shop-preview-name">${upgrade.name}</div>
                         <div class="shop-preview-meta">
                             <span class="shop-preview-pill">${category.icon || ''} ${category.name || upgrade.category}</span>
-                            <span class="shop-preview-pill">${upgrade.temporary ? '臨時強化' : '永久強化'}</span>
+                            <span class="shop-preview-pill">${upgrade.temporary ? '临时强化' : '永久强化'}</span>
                             <span class="shop-preview-pill">${levelText}</span>
                             <span class="shop-preview-pill">${costText}</span>
                         </div>

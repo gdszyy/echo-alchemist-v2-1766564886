@@ -14,6 +14,9 @@ import {
 } from './config.js';
 import { RUNE_DB, RUNEWORD_DB } from './rune_config.js';
 import { pixiInit, pixiDestroy } from './render/pixi_bridge.js';
+import { isPixelArtMode } from './render/art_mode.js';
+import { installPixelContextPatches, loadPixelFont } from './render/pixel_canvas.js';
+import { applyPixelPaletteToConfig } from './pixel/config_palette.js';
 
 import { 
     Vec2, MarbleDefinition, SpecialSlot, FortuneWheel, TriangleSideWheel, GhostPeg, Peg, DropBall, Enemy, SwordQi, 
@@ -213,8 +216,19 @@ class Game {
         this.isWheelSpinning = false;
         this.canvas = document.getElementById('gameCanvas'); 
         this.ctx = this.canvas.getContext('2d');
+        // [像素风] 像素模式：主画布改为低分辨率美术像素缓冲（sys_resize 计算 pixelLayout），
+        // ctx 装最近邻/像素字体/无模糊补丁；PixiJS 不初始化，全部特效走 Canvas 2D 后备路径，
+        // 保证所有画面落在同一张像素网格上。见 docs/design/pixel_art_mode.md。
+        this.pixelArtMode = isPixelArtMode();
+        this.pixelLayout = null;
+        if (this.pixelArtMode) {
+            installPixelContextPatches(this.ctx, () => this.pixelLayout);
+            loadPixelFont();
+            // 配置里的属性色 / 材质色统一到像素调色板（世界、特效、DOM 标签共用一套颜色）
+            applyPixelPaletteToConfig(CONFIG);
+        }
         // [PixiJS 迁移] 初始化 WebGL 渲染管线（双层 Canvas Overlay）
-        this._pixiReady = pixiInit();
+        this._pixiReady = this.pixelArtMode ? false : pixiInit();
         this.boardTilt = { current: { x: 0, y: 0 }, target: { x: 0, y: 0 }, enabled: false };
         this.phase = 'meta'; 
         this.marblesPool = []; 
@@ -403,7 +417,7 @@ class Game {
         this.currentRows = CONFIG.gameplay.rows; 
         this.boardBottomY = 0;
         // ==================== 钉盘形态遗物状态字段 ====================
-        // boardLayout: 异型布局枚举，可选値：
+        // boardLayout: 异型布局枚举，可选值：
         //   'default'         - 标准交错矩形（默认）
         //   'triangle'        - 三角形布局（顶行最宽，每行递减1列）
         //   'diamond'         - 菱形布局（前半扩展，后半收缩）
@@ -436,7 +450,7 @@ class Game {
         // 确保页面首次渲染后（CSS aspect-ratio 计算完成）canvas 尺寸能被正确设置。
         if (!this._resizeObserver) {
             this._resizeObserver = new ResizeObserver(() => {
-                if (this.canvas.width !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
+                if (this.width !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
                     this.sys_resize();
                 }
             });
@@ -458,7 +472,8 @@ class Game {
         // 当前特效等级：'high' | 'medium' | 'low'
         this.perfQualityLevel = 'high';
         // [Perf] shadowBlur 全局开关 - 由 perfQualityLevel 同步驱动；particles.js / entities.js 引用此布尔
-        this.shadowBlurEnabled = CONFIG.performance.high.shadowBlurEnabled !== false;
+        // 像素模式下模糊光晕恒关（ctx 补丁同样把 shadowBlur 钉为 0，这里让走 sb() 的路径提前短路）
+        this.shadowBlurEnabled = !this.pixelArtMode && CONFIG.performance.high.shadowBlurEnabled !== false;
         // FPS 滑动平均采样缓冲区（存储最近 N 帧的帧时间，单位 ms）
         this._fpsSamples = [];
         // 上一帧的时间戳（由 sys_loop 更新）
@@ -476,8 +491,11 @@ class Game {
         this._loopStopped = false;  // 循环是否被后台 visibilitychange 硬停
         this._rafId = null;         // 当前 requestAnimationFrame 句柄（用于 cancel）
         // [Phase 5B] 预加载所有 Sprite Sheet（在游戏循环开始前触发异步加载）
-        preloadAllSprites();
-        preloadUiBitmaps();
+        // 像素模式下敌人/首领/背景/发射器由程序化像素画绘制，不再预加载这些位图
+        if (!this.pixelArtMode) {
+            preloadAllSprites();
+            preloadUiBitmaps();
+        }
         // [省电] 注册页面可见性监听（后台硬停循环 + 挂起音频）
         this.sys_setupVisibilityHandling();
         // 启动游戏主循环
@@ -540,8 +558,8 @@ class Game {
             this.postBossSurgeRoundsLeft = 3;
             // [Task C.2] 战后高压期：3 回合内双词缀精英概率临时提升 25%
             this.postBossRoundsLeft = 3;
-            showToast('⚠️ Boss 余波：接下来 3 回合敌军进入高压反扑');
-            console.log('[DifficultyBalance] Boss击杀，战后高压因子激活: x1.3，持续3回合，双词缀精英概率提升25%');
+            showToast('⚠️ 首领余波：接下来 3 回合敌军进入高压反扑');
+            console.log('[DifficultyBalance] 首领击杀，战后高压因子激活: x1.3，持续3回合，双词缀精英概率提升25%');
             // [本局统计] 记录 Boss 击败日志
             if (!this.bossDefeatedLog) this.bossDefeatedLog = [];
             this.bossDefeatedLog.push({
@@ -569,10 +587,10 @@ class Game {
                     extraDelay = midDelay;
                 }
                 if (extraDelay > 0) {
-                    console.log(`[BossSchedule] Boss 击杀用时 ${killDuration} 回合，延期 ${extraDelay} 回合`);
+                    console.log(`[BossSchedule] 首领击杀用时 ${killDuration} 回合，延期 ${extraDelay} 回合`);
                 }
             } else {
-                console.log(`[BossSchedule] 第 ${spawnCount} 个 Boss 已超过延期限制（${delayMaxBossIndex}），不延期`);
+                console.log(`[BossSchedule] 第 ${spawnCount} 个首领已超过延期限制（${delayMaxBossIndex}），不延期`);
             }
             this.spawn_scheduleNextBoss(extraDelay);
         });

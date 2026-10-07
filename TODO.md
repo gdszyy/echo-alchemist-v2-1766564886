@@ -11,6 +11,19 @@
 
 ---
 
+## 2026-10-06 像素风美术重构（REQ-20261006-pixel-art）
+
+默认美术改为 2D canvas 像素风，不复刻旧位图：程序化场景/敌人/发射器、画布即时 HUD、菜单像素组件、繁转简与术语/数值对齐。规范 [`docs/design/pixel_art_mode.md`](docs/design/pixel_art_mode.md)，卡片 [`REQ-20261006-pixel-art`](docs/work_items/active/REQ-20261006-pixel-art.md)。
+
+| 项 | 状态 |
+| :--- | :--- |
+| P0 管线 / P1 战斗 / P2 研磨 / P3 菜单换装与文案 | verifying（第二轮完成，待 Owner 审阅与真机） |
+| P4 特效像素化、首领专属造型 | planning |
+| P5 菜单图标程序化重画、移除 `assets/px/` | done（2026-10-07） |
+| 试炼场 / 药剂面板像素组件化；最终伤害预览；瞄准期敌人意图 | planning |
+
+---
+
 ## 2026-07-22 UI / 交互硬化集成入口
 
 2026-07-17 巡检重开的四个独占实现批次已按 A -> B -> C -> D 合入干净集成 worktree；Goal E 已完成 pause lease、跨页术语、ARIA、CSS 状态与共享测试冲突修复，并完成最终全量证据、服务关闭与 Git 交付内容收口。完整合同与后续状态见 [`REQ-20260627-health-all-phases`](docs/work_items/active/REQ-20260627-health-all-phases.md) 的 Checkpoint 1 / Goal E，以及 [`REQ-20260717-ui-polish-integration`](docs/work_items/active/REQ-20260717-ui-polish-integration.md)。

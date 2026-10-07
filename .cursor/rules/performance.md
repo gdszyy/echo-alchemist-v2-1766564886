@@ -1,5 +1,7 @@
 # 自适应性能系统规范 (performance.md)
 
+> **像素模式（2026-10-06，默认）**：主画布后备缓冲约 287×509 美术像素（手机 2x），填充率约为原来 1/9；PixiJS 不初始化（特效走 Canvas 2D 后备）；ctx 的 `shadowBlur` 被钉为 0、`shadowBlurEnabled=false`；画布 HUD 与敌人精灵全部为缓存小画布。像素模式不下载任何旧位图：敌人 / 首领位图加载口按模式拦截，菜单图标为程序化像素图（data URL，首次使用时生成并缓存，画布绘制换回美术分辨率小画布）。无头 Chrome 主循环单帧 CPU 中位数，同日多轮成对测量：像素 0.7–2.5ms vs 位图 2.0–3.6ms，每轮像素都更低（环境波动大，真机未测）。粒子上限与三档切换仍按本文执行。新增像素绘制路径的影响标记见 `src/pixel/*` 与 `src/render/pixel_canvas.js` 的 `@perf-impact`。详见 [`docs/design/pixel_art_mode.md`](../../docs/design/pixel_art_mode.md)。
+
 > **状态**：已实现（2026-04-16）  
 > **涉及文件**：`src/config.js`、`src/core.js`、`src/game_system.js`、`src/render_system.js`、`src/spawn_system.js`、`src/combat_system.js`、`src/combat/damage_calc.js`、`src/entities.js`、`src/entities/enemy.js`
 

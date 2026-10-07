@@ -12,6 +12,7 @@ import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
+import { isPixelArtMode } from './render/art_mode.js';
 import { pixiAcquireParticleSprite, pixiIsActive } from './render/pixi_bridge.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
 import { predictBossIdFromHistory } from './utils/boss_schedule_utils.js';
@@ -131,8 +132,8 @@ export const spawn_system = {
         const py = rect.y + Math.random() * rect.h;
         
         // 强制使用全屏延伸位置（如果是风道）
-        const finalPx = type === 'tunnel' && isHorizontal ? (Math.random() * this.canvas.width) : px;
-        const finalPy = type === 'tunnel' && !isHorizontal ? (Math.random() * this.canvas.height) : py;
+        const finalPx = type === 'tunnel' && isHorizontal ? (Math.random() * this.width) : px;
+        const finalPy = type === 'tunnel' && !isHorizontal ? (Math.random() * this.height) : py;
         
         const p = this.spawn_createParticle(finalPx, finalPy, '#f0fdf4', 'line');
         if (!p) return;
@@ -178,13 +179,13 @@ export const spawn_system = {
 
 /**
      * @method createFloatingText
-     * @description 創建通用浮動文字 (修復報錯的關鍵)
+     * @description 创建通用浮动文字 (修复报错的关键)
      * @param {number} x - 位置 X
      * @param {number} y - 位置 Y
-     * @param {string} text - 文字內容
-     * @param {string} [color] - 文字顏色 (可選)
-     * @param {number} [fontSize] - 字號 (可選)
-     * @param {HTMLImageElement|null} [iconImg] - 可選圖標圖片
+     * @param {string} text - 文字内容
+     * @param {string} [color] - 文字颜色 (可选)
+     * @param {number} [fontSize] - 字号 (可选)
+     * @param {HTMLImageElement|null} [iconImg] - 可选图标图片
      */
     spawn_createFloatingText(x, y, text, color, fontSize, iconImg, options = {}) {
         if (looksLikeFloatingTextOptions(iconImg) && arguments.length < 7) {
@@ -975,7 +976,7 @@ export const spawn_system = {
                 clone.affixes = []; // 分身没有词缀
                 clone.isClone = true; // [Mikro联动] 标记为分身，用于母体减伤计算
                 this.enemies.push(clone);
-                this.spawn_createFloatingText(pos.x, pos.y, "SPAWN", "#a855f7");
+                this.spawn_createFloatingText(pos.x, pos.y, "生成", "#a855f7");
             }));
         }
     },
@@ -1152,15 +1153,15 @@ export const spawn_system = {
 
         // 各弹珠类型的补充说明（真理之书中未收录的类型）
         const supplementDesc = {
-            'white':     { icon: '⚪', tags: ['基础', '通用'], desc: '純淨彈珠，不帶任何屬性。本身不具備同化能力，無法將鉤釘轉化為屬性鉤釘。其價値在於展開彈珠選擇機會，適合在屬性彈珠稀缺時作為備用。' },
-            'damage':    { icon: '⚔️', tags: ['增幅', '強化'], desc: '增幅彈珠，直接提升子彈的基礎傷害數值。每層增幅屬性為戰鬥階段的子彈增加固定傷害加成。' },
-            'rainbow':   { icon: '🌈', tags: ['特殊', '分裂'], desc: '七彩彈珠，碰到鉤釘時立即消失並分裂為三顆子彈（彈性、穿透、散射），同時將三種屬性全部加入收集列表。分裂出的子彈不會再次觸發分裂。' },
-            'resonance': { icon: '🔔', tags: ['特殊', '共鳴'], desc: '共鳴彈珠，每次碰撞普通鉤釘時有概率額外觸發能量球，加速連擊充能。飛劍命中時觸發共鳴追加傷害。' },
-            'matryoshka':{ icon: '🧆', tags: ['特殊', '連鎖'], desc: '套娃彈珠，在戰鬥階段發射時，將彈藥隊列中的下一發嵌套為內層載荷。外層子彈消失時，內層子彈從原位置繼續發射，形成連鎖效果。' },
-            'explosive': { icon: '🧨', tags: ['特殊', 'AOE'], desc: '爆破彈珠，子彈接觸敵人時引發劇烈爆炸，對周圍所有敵人造成大範圍傷害。' },
+            'white':     { icon: '⚪', tags: ['基础', '通用'], desc: '纯净弹珠，不带任何属性。本身不具备同化能力，无法将钩钉转化为属性钩钉。其价值在于展开弹珠选择机会，适合在属性弹珠稀缺时作为备用。' },
+            'damage':    { icon: '⚔️', tags: ['增幅', '强化'], desc: '增幅弹珠，直接提升子弹的基础伤害数值。每层增幅属性为战斗阶段的子弹增加固定伤害加成。' },
+            'rainbow':   { icon: '🌈', tags: ['特殊', '分裂'], desc: '七彩弹珠，碰到钩钉时立即消失并分裂为三颗子弹（弹性、穿透、散射），同时将三种属性全部加入收集列表。分裂出的子弹不会再次触发分裂。' },
+            'resonance': { icon: '🔔', tags: ['特殊', '共鸣'], desc: '共鸣弹珠，每次碰撞普通钩钉时有概率额外触发能量球，加速连击充能。飞剑命中时触发共鸣追加伤害。' },
+            'matryoshka':{ icon: '🧆', tags: ['特殊', '连锁'], desc: '套娃弹珠，在战斗阶段发射时，将弹药队列中的下一发嵌套为内层载荷。外层子弹消失时，内层子弹从原位置继续发射，形成连锁效果。' },
+            'explosive': { icon: '🧨', tags: ['特殊', '范围'], desc: '爆破弹珠，子弹接触敌人时引发剧烈爆炸，对周围所有敌人造成大范围伤害。' },
         };
 
-        // 定義屬性到彈珠定義的映射
+        // 定义属性到弹珠定义的映射
         const typeMapping = {
             laser: () => new MarbleDefinition('laser'),
             white: () => new MarbleDefinition('white'),
@@ -1191,7 +1192,7 @@ export const spawn_system = {
         for(let i=0; i < generateCount; i++) {
             let m;
             
-            // 1. 保底機制
+            // 1. 保底机制
             if (this.guaranteedNextRound.length > 0) {
                 const rawKey = this.guaranteedNextRound.shift();
                 const key = (typeof rawKey === 'string') ? rawKey : (rawKey && rawKey.type);
@@ -1205,7 +1206,7 @@ export const spawn_system = {
                 }
             } 
             
-            // 2. 加權隨機機制
+            // 2. 加权随机机制
             if (!m) {
                 // [爽游模式] 教程局使用限定权重表
                 const sourceWeights = this._isTutorialRun ? tutorialWeights : (this.unlockedWeights || {});
@@ -1227,7 +1228,7 @@ export const spawn_system = {
                 }
             }
             
-            // 屌底防止出錯
+            // 兜底防止出错
             if (!m) m = new MarbleDefinition('white');
             
             this.marblesPool.push(m); 
@@ -1373,27 +1374,27 @@ export const spawn_system = {
         const marbleIcon = attrDisplay.icon || (tbEntry && tbEntry.icon) || '🔮';
 
         // 获取说明文字（优先真理之书）
-        const desc = (tbEntry && tbEntry.desc) || (supplementDesc && supplementDesc[m.type] && supplementDesc[m.type].desc) || '暫無說明。';
+        const desc = (tbEntry && tbEntry.desc) || (supplementDesc && supplementDesc[m.type] && supplementDesc[m.type].desc) || '暂无说明。';
         const tags = (tbEntry && tbEntry.tags) || (supplementDesc && supplementDesc[m.type] && supplementDesc[m.type].tags) || [];
 
         // 同步钉子/子弹效果说明
         const pegEffects = {
-            'bounce':    '同化鉤釘：使普通鉤釘轉化為【彈性鉤釘】。兩顆彈性球相撞彈性鉤釘可突變為【風屬性】。',
-            'pierce':    '同化鉤釘：使普通鉤釘轉化為【穿透鉤釘】。兩顆穿透球相撞穿透鉤釘可突變為【飛劍鉤釘】。',
-            'scatter':   '同化鉤釘：使普通鉤釘轉化為【散射鉤釘】。子彈命中後向兩側分裂出小型散射彈。',
-            'cryo':      '同化鉤釘：使普通鉤釘轉化為【冰霜鉤釘】。子彈命中時降低敵人溫度，觸發易傷或凍結狀態。',
-            'pyro':      '同化鉤釘：使普通鉤釘轉化為【火焰鉤釘】。子彈命中時升高敵人溫度，觸發燃燒或過熱爆炸。',
-            'lightning': '特殊屬性：由【冰】與【火】屬性抵消產生（合成）。子彈命中時觸發連鎖閃電。',
-            'laser':     '激光属性由弹珠本身提供，不能同化鉤釘。子彈命中時發射激光束，可被護盾反射。',
-            'wind':      '同化鉤釘：使普通鉤釘轉化為【風屬性鉤釘】（彈性突變）。命中後生成風暴法陣持續攻擊。',
-            'explosive': '同化鉤釘：使普通鉤釘轉化為【爆破鉤釘】。子彈命中時引發大範圍爆炸傷害。',
-            'damage':    '同化鉤釘：使普通鉤釘轉化為【增幅鉤釘】。子彈命中後增加基礎傷害加成。',
-            'matryoshka':'同化鉤釘：使普通鉤釘轉化為【套娃鉤釘】。子彈消失時分裂出下一顆子彈。',
-            'white':     '純淨彈珠可同化任意普通鉤釘，使其轉化為對應屬性鉤釘。同化概率受局外升級影響。',
-            'rainbow':   '七彩彈珠不同化鉤釘，而是在碰到鉤釘時直接分裂為三顆屬性子彈（彈性/穿透/散射）。',
-            'resonance': '共鳴彈珠碰撞普通鉤釘時有概率額外觸發能量球，加速連擊充能閾值達成。',
+            'bounce':    '同化钩钉：使普通钩钉转化为【弹性钩钉】。两颗弹性球相撞弹性钩钉可突变为【风属性】。',
+            'pierce':    '同化钩钉：使普通钩钉转化为【穿透钩钉】。两颗穿透球相撞穿透钩钉可突变为【飞剑钩钉】。',
+            'scatter':   '同化钩钉：使普通钩钉转化为【散射钩钉】。子弹命中后向两侧分裂出小型散射弹。',
+            'cryo':      '同化钩钉：使普通钩钉转化为【冰霜钩钉】。子弹命中时降低敌人温度，触发易伤或冻结状态。',
+            'pyro':      '同化钩钉：使普通钩钉转化为【火焰钩钉】。子弹命中时升高敌人温度，触发燃烧或过热爆炸。',
+            'lightning': '特殊属性：由【冰】与【火】属性抵消产生（合成）。子弹命中时触发连锁闪电。',
+            'laser':     '激光属性由弹珠本身提供，不能同化钩钉。子弹命中时发射激光束，可被护盾反射。',
+            'wind':      '同化钩钉：使普通钩钉转化为【风属性钩钉】（弹性突变）。命中后生成风暴法阵持续攻击。',
+            'explosive': '同化钩钉：使普通钩钉转化为【爆破钩钉】。子弹命中时引发大范围爆炸伤害。',
+            'damage':    '同化钩钉：使普通钩钉转化为【增幅钩钉】。子弹命中后增加基础伤害加成。',
+            'matryoshka':'同化钩钉：使普通钩钉转化为【套娃钩钉】。子弹消失时分裂出下一颗子弹。',
+            'white':     '纯净弹珠可同化任意普通钩钉，使其转化为对应属性钩钉。同化概率受局外升级影响。',
+            'rainbow':   '七彩弹珠不同化钩钉，而是在碰到钩钉时直接分裂为三颗属性子弹（弹性/穿透/散射）。',
+            'resonance': '共鸣弹珠碰撞普通钩钉时有概率额外触发能量球，加速连击充能阈值达成。',
         };
-        const pegEffect = pegEffects[m.type] || '可同化普通鉤釘，使其轉化為對應屬性。';
+        const pegEffect = pegEffects[m.type] || '可同化普通钩钉，使其转化为对应属性。';
 
         // 更新预览面板内容
         const previewIcon = panel.querySelector('#preview-marble-icon');
@@ -1410,9 +1411,18 @@ export const spawn_system = {
                 ? marbleColor
                 : `radial-gradient(circle at 35% 28%, #ffffff 0%, ${marbleGlowColor} 36%, #475569 100%)`;
             previewBall.className = `marble-fx-${m.type || 'white'}`;
-            previewBall.style.background = previewFill;
-            previewBall.style.border = `1px solid ${marbleGlowColor}`;
-            previewBall.style.boxShadow = `inset -3px -3px 6px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2), 0 0 14px ${marbleGlowColor}`;
+            if (isPixelArtMode()) {
+                // 像素模式：与卡片、钉盘同一颗程序化像素弹珠（不用 CSS 渐变球）
+                const src = getAmmoIconSrcByKey(m.type);
+                previewBall.className = 'px-marble-ball';
+                previewBall.style.background = src ? `url("${src}") center / contain no-repeat` : 'none';
+                previewBall.style.border = 'none';
+                previewBall.style.boxShadow = 'none';
+            } else {
+                previewBall.style.background = previewFill;
+                previewBall.style.border = `1px solid ${marbleGlowColor}`;
+                previewBall.style.boxShadow = `inset -3px -3px 6px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.2), 0 0 14px ${marbleGlowColor}`;
+            }
         }
         if (previewIcon) previewIcon.textContent = marbleIcon;
         if (previewName) previewName.textContent = marbleName;
@@ -1613,13 +1623,13 @@ export const spawn_system = {
         // [关键] 属性优先级：飞剑 > 激光
         // 如果是飞剑，优先处理飞剑逻辑
         if (recipe.type === 'flying_sword') {
-            // 1. 生成【唯一的母劍】 (Mother Sword)
-            // 母劍強制只有一把，不受 scatter/multicast 影響而分裂
+            // 1. 生成【唯一的母剑】 (Mother Sword)
+            // 母剑强制只有一把，不受 scatter/multicast 影响而分裂
             const motherSword = new Projectile(x, y, vel, recipe, false, shotId, isLast);
             this.projectiles.push(motherSword);
 
-            // 2. 處理散射 -> 生成【初始護衛子劍】
-            // 規則：散射數 = 初始攜帶的子劍數
+            // 2. 处理散射 -> 生成【初始护卫子剑】
+            // 规则：散射数 = 初始携带的子剑数
             const initialSonCount = recipe.scatter || 0;
             const pegLevel = recipe.level || 1;
 
@@ -1634,10 +1644,10 @@ export const spawn_system = {
                 });
             }
 
-            // 3. 處理光球效果 -> 劍氣
+            // 3. 处理光球效果 -> 剑气
             if (recipe.lightOrb || recipe.laser > 0) {
-                // 假設 laser 屬性代表光球/劍氣等級
-                // 這裡可以複用你的 SwordQi 邏輯
+                // 假设 laser 属性代表光球/剑气等级
+                // 这里可以复用你的 SwordQi 逻辑
                 if (typeof SwordQi !== 'undefined') {
                     this.swordQis = this.swordQis || [];
                     this.swordQis.push(new SwordQi(x, y, vel, 30));
@@ -1645,7 +1655,7 @@ export const spawn_system = {
                 }
             }
 
-            return; // <--- 飛劍邏輯結束，直接返回
+            return; // <--- 飞剑逻辑结束，直接返回
         }
 
         // 如果是激光且不是风属性，发射光束后直接 return，不生成 Projectile
@@ -2432,7 +2442,7 @@ export const spawn_system = {
         this.combat_updateMulticastDisplay(1);
     
     // @section:levelup_audio - 能量槽满触发多播升级爆发音（pitch = multicast 等级，越高越尖锐）
-    // 1. 音效爆發
+    // 1. 音效爆发
         audio.playPowerup(session.multicast); 
     
     // 2. UI 容器进入“满能量”状态动画
@@ -2454,7 +2464,7 @@ export const spawn_system = {
             this.spawn_createParticle(px, py, '#fcd34d', 'spark');
         }
 
-        this.spawn_createFloatingText(uiX, uiY - 50, "LEVEL UP!", "#fff");
+        this.spawn_createFloatingText(uiX, uiY - 50, "升级", "#fff");
         this.combat_updateHitProgress(0, session.nextTriggerThreshold);
     },
 
@@ -2478,7 +2488,7 @@ export const spawn_system = {
         if (this._isTutorialRun) {
             if (!this._bossSpawnCount || this._bossSpawnCount === 0) {
                 this._nextBossRound = 2;
-                console.log('[TutorialRun][BossSchedule] 最终 Boss 预定在 Round 2');
+                console.log('[TutorialRun][BossSchedule] 最终首领预定在 Round 2');
             } else {
                 // 已经出现过 Boss，不再调度（局内只有一个 Boss）
                 this._nextBossRound = 9999;
@@ -2494,7 +2504,7 @@ export const spawn_system = {
             if (spawnCount < segments.length) {
                 // 下一个 Boss 对应的段落索引 = 当前已生成数量
                 this._nextBossRound = segments[spawnCount].endRound;
-                console.log(`[BossSchedule] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（段落: ${segments[spawnCount].label}）`);
+                console.log(`[BossSchedule] 首领 #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（段落: ${segments[spawnCount].label}）`);
             } else {
                 // 超出段落数量（循环游戏）：以最后一个段落间隔为基准继续延伸
                 const lastSegment = segments[segments.length - 1];
@@ -2502,7 +2512,7 @@ export const spawn_system = {
                 const segInterval = lastSegment.endRound - prevSegment.endRound;
                 const lastSpawnRound = this._lastBossSpawnRound || this.round;
                 this._nextBossRound = lastSpawnRound + segInterval;
-                console.log(`[BossSchedule] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（循环延伸，间隔=${segInterval}）`);
+                console.log(`[BossSchedule] 首领 #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（循环延伸，间隔=${segInterval}）`);
             }
             return;
         }
@@ -2516,7 +2526,7 @@ export const spawn_system = {
             const lastSpawnRound = this._lastBossSpawnRound || this.round;
             this._nextBossRound = lastSpawnRound + 7;
         }
-        console.log(`[BossSchedule][Fallback] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}`);
+        console.log(`[BossSchedule][Fallback] 首领 #${spawnCount + 1} 预定在 Round ${this._nextBossRound}`);
     },
 
     /**
@@ -2569,7 +2579,7 @@ export const spawn_system = {
      * - 前期低保底倍率：降低保底下限，使血量更自由地跟随玩家战力浮动
      *
      * Boss 倍率梯度调整（Mult Gradient）:
-     * - 在 [earlyRound, lateRound] 前期区间，根据玩家实时战力与模板预期的比値动态缩放 bossMult
+     * - 在 [earlyRound, lateRound] 前期区间，根据玩家实时战力与模板预期的比值动态缩放 bossMult
      * - 当玩家战力偏弱时，前期模板血量自动降低，避免前几个 Boss 血量就已远超玩家战力
      * - 缩放上限为 1.0（不超过原倍率），下限为 bossMultGradientMin（默认 0.5）
      *
@@ -2614,8 +2624,8 @@ export const spawn_system = {
         const effectiveFloor  = earlyFloor + (lateFloor - earlyFloor)  * t;
 
         // 5. Boss 倍率梯度调整（Mult Gradient）
-        //    前期区间（t < 1）根据玩家实时战力与模板预期的比値，动态缩放 bossMult
-        //    比値 ratio = effectiveDPS / (templateHP / rawBossMult)
+        //    前期区间（t < 1）根据玩家实时战力与模板预期的比值，动态缩放 bossMult
+        //    比值 ratio = effectiveDPS / (templateHP / rawBossMult)
         //      ratio 越小表示玩家远弱于模板预期，应降低 bossMult
         //      ratio 越大表示玩家超过预期，不超过原始倍率
         //    后期（t = 1）完全使用原始 rawBossMult，不做梯度调整
@@ -2625,7 +2635,7 @@ export const spawn_system = {
             const unitHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor;
             // 玩家战力对应的「应当能打多少倍率的 Boss」
             const playerImpliedMult = (effectiveDPS * expectedTurns) / unitHP;
-            // 将比値限制在 [gradientMin, 1.0] 区间，再与 rawBossMult 相乘
+            // 将比值限制在 [gradientMin, 1.0] 区间，再与 rawBossMult 相乘
             const gradientMin = f.bossMultGradientMin || 0.5;
             const multRatio = Math.max(gradientMin, Math.min(1.0, playerImpliedMult / rawBossMult));
             // 前期梯度与后期原始倍率线性插展

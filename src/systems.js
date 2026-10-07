@@ -44,10 +44,10 @@ const UI_TERMINOLOGY = Object.freeze({
 
 /**
  * [V2 资源协议] 由 ENEMY_V2_METADATA 构建图鉴条目，
- * 與試煉場 V2 矩陣共用同一份 metadata。
+ * 与试炼场 V2 矩阵共用同一份 metadata。
  */
 function buildV2BestiaryEntries() {
-    // V2 基底的視覺標識（圖鑒列表使用 emoji；正式美術上線後可改用 iconSrc）
+    // V2 基底的视觉标识（图鉴列表使用 emoji；正式美术上线后可改用 iconSrc）
     const ICON_GLYPH = {
         bastion: '🧱', maw: '🕳️', deflector: '🔷', echoSpire: '🔮',
         prism: '🌈', hive: '🥚', siege: '🚜', gravityCore: '🌀',
@@ -56,12 +56,12 @@ function buildV2BestiaryEntries() {
         id: 'v2_' + meta.id,
         name: meta.name,
         icon: ICON_GLYPH[meta.id] || meta.footprint,
-        iconSrc: meta.iconPath,                 // 後續可由 TruthBook 渲染為 <img>
+        iconSrc: meta.iconPath,                 // 后续可由 TruthBook 渲染为 <img>
         tags: [meta.footprint, meta.priority, ...meta.affixes],
         desc: `【${meta.name}・${meta.footprint}】基底=${meta.baseArchetype}，专属词条=${meta.affixes.join('/') || '无'}\n` +
               `登场阶段：${meta.stage}\n战术职责：${meta.role}\n针对提示：${meta.targeting}\n` +
               (meta.placeholder ? '※ 当前为占位资源，待正式美术替换。' : ''),
-        // 圖鑒演示直接調用 V2 矩陣的單體場景
+        // 图鉴演示直接调用 V2 矩阵的单体场景
         setup: (game) => {
             const cx = 2.5 * game.enemyWidth + game.enemyWidth / 2;
             const cy = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -84,7 +84,7 @@ function buildV2BestiaryEntries() {
             game.enemies.push(e);
         },
         loop: [
-            { type: 'log', text: `${meta.name}（${meta.footprint}）登場` },
+            { type: 'log', text: `${meta.name}（${meta.footprint}）登场` },
             { type: 'wait', frames: 180 },
             { type: 'reset' }
         ]
@@ -96,10 +96,10 @@ const TRUTH_BOOK_DATA = {
     enemies: [
         {
             id: 'shield',
-            name: '護盾魔像',
+            name: '护盾魔像',
             icon: '🛡️',
             tags: ['高防御', '反射激光'],
-            desc: '全身覆蓋著強化合金，受到的傷害減少 50%。注意：它的護盾可以反射激光類攻擊。',
+            desc: '全身覆盖着强化合金，受到的伤害减少 50%。注意：它的护盾可以反射激光类攻击。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -107,7 +107,7 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(new Enemy(x, y, 60, 60, 500, 500, 'normal', ['shield']));
             },
             loop: [
-                { type: 'log', text: '檢測到護盾：傷害減免 50%' },
+                { type: 'log', text: '检测到护盾：伤害减免 50%' },
                 { type: 'spawn_projectile', config: { damage: 20 } },
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
@@ -117,8 +117,8 @@ const TRUTH_BOOK_DATA = {
             id: 'clone',
             name: '分身魔像',
             icon: '🦠',
-            tags: ['受擊分裂', '人海戰術'],
-            desc: '每回合開始時，有 50% 概率分裂出一個複製體；受到攻擊時，有 20% 概率額外觸發分裂。複製體繼承本體的詞條，可迅速填滿戰場。',
+            tags: ['受击分裂', '人海战术'],
+            desc: '每回合开始时，有 50% 概率分裂出一个复制体；受到攻击时，有 20% 概率额外触发分裂。复制体继承本体的词条，可迅速填满战场。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -126,10 +126,10 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(new Enemy(x, y, 60, 60, 300, 300, 'normal', ['clone']));
             },
             loop: [
-                { type: 'log', text: '回合開始：嘗試分裂' },
+                { type: 'log', text: '回合开始：尝试分裂' },
                 { type: 'enemy_turn' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '受擊觸發分裂' },
+                { type: 'log', text: '受击触发分裂' },
                 { type: 'spawn_projectile', config: { damage: 10 } },
                 { type: 'wait', frames: 150 },
                 { type: 'reset' }
@@ -137,10 +137,10 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'haste',
-            name: '極速魔像',
+            name: '极速魔像',
             icon: '⚡',
-            tags: ['高速', '急速衝刺'],
-            desc: '腿部裝有加速裝置，每回合在正常移動後額外追加一次衝刺移動。注意：加速僅作用於移動，不會重複結算其他詞條。',
+            tags: ['高速', '急速冲刺'],
+            desc: '腿部装有加速装置，每回合在正常移动后额外追加一次冲刺移动。注意：加速仅作用于移动，不会重复结算其他词条。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -148,7 +148,7 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(new Enemy(x, y, 60, 60, 200, 200, 'normal', ['haste']));
             },
             loop: [
-                { type: 'log', text: '極速行動 (2x)' },
+                { type: 'log', text: '极速行动 (2x)' },
                 { type: 'enemy_turn' }, 
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
@@ -158,8 +158,8 @@ const TRUTH_BOOK_DATA = {
             id: 'berserk',
             name: '狂暴魔像',
             icon: '😡',
-            tags: ['熱能轉化', '雙重結算'],
-            desc: '每回合結束時自動升溫 +20°C，且溫度結算執行兩次。當處於過熱狀態時，有概率觸發狂暴，使本回合的非移動行動（如治癒、吞噬、增殖）額外結算一次。觸發概率隨溫度升高而增加。',
+            tags: ['热能转化', '双重结算'],
+            desc: '每回合结束时自动升温 +20°C，且温度结算执行两次。当处于过热状态时，有概率触发狂暴，使本回合的非移动行动（如治愈、吞噬、增殖）额外结算一次。触发概率随温度升高而增加。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -172,9 +172,9 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(e, ally);
             },
             loop: [
-                { type: 'log', text: '當前溫度：150°C (過熱)' },
+                { type: 'log', text: '当前温度：150°C (过热)' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發狂暴判定...' },
+                { type: 'log', text: '触发狂暴判定...' },
                 { type: 'enemy_turn' },
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
@@ -182,10 +182,10 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'healer',
-            name: '治癒魔像',
+            name: '治愈魔像',
             icon: '💖',
-            tags: ['群體治療', '輔助'],
-            desc: '戰場上的醫療兵。回合行動時會治療周圍的友軍單位。',
+            tags: ['群体治疗', '辅助'],
+            desc: '战场上的医疗兵。回合行动时会治疗周围的友军单位。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 1.5, 2.5, 3.5, row: 1) - 靠近窗口中间
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -195,9 +195,9 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(e1, healer, e2);
             },
             loop: [
-                { type: 'log', text: '隊友生命危急...' },
+                { type: 'log', text: '队友生命危急...' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '施放群體治癒' },
+                { type: 'log', text: '施放群体治愈' },
                 { type: 'enemy_turn', targetIdx: 1 }, 
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
@@ -205,10 +205,10 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'devour',
-            name: '貪食魔像',
+            name: '贪食魔像',
             icon: '👅',
-            tags: ['吞噬友軍', '成長'],
-            desc: '殘忍的同類相食者。每回合行動時，有概率吞噬相鄰的一個友軍單位，繼承其全部血量與所有詞條，被吞噬的單位立即死亡。',
+            tags: ['吞噬友军', '成长'],
+            desc: '残忍的同类相食者。每回合行动时，有概率吞噬相邻的一个友军单位，继承其全部血量与所有词条，被吞噬的单位立即死亡。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2, 3, row: 1) - 靠近窗口中间
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -223,9 +223,9 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(food, eater);
             },
             loop: [
-                { type: 'log', text: '發現獵物 (分身魔像)' },
+                { type: 'log', text: '发现猎物 (分身魔像)' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '吞噬！(繼承血量與詞條)' },
+                { type: 'log', text: '吞噬！(继承血量与词条)' },
                 { type: 'enemy_turn', targetIdx: 1 },
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
@@ -233,10 +233,10 @@ const TRUTH_BOOK_DATA = {
         },
         {
             id: 'jump',
-            name: '跳躍魔像',
+            name: '跳跃魔像',
             icon: '🦘',
-            tags: ['越過障礙', '突進'],
-            desc: '腿部裝有彈簧裝置。當前方被阻擋時，可以直接跳過障礙物繼續前進。',
+            tags: ['越过障碍', '突进'],
+            desc: '腿部装有弹簧装置。当前方被阻挡时，可以直接跳过障碍物继续前进。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1, 0) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -249,22 +249,22 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(blocker, jumper);
             },
             loop: [
-                { type: 'log', text: '前方道路被阻擋' },
+                { type: 'log', text: '前方道路被阻挡' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '發動跳躍！' },
+                { type: 'log', text: '发动跳跃！' },
                 { type: 'enemy_turn', targetIdx: 1 },
                 { type: 'wait', frames: 120 },
                 { type: 'reset' }
             ]
         },
-        // ── 敵人視覺 V2 基底圖鑒條目（來源：src/data/enemy_v2_metadata.js）──
-        // 與試煉場 V2 矩陣共用同一份 metadata，避免重複維護。
+        // ── 敌人视觉 V2 基底图鉴条目（来源：src/data/enemy_v2_metadata.js）──
+        // 与试炼场 V2 矩阵共用同一份 metadata，避免重复维护。
         ...buildV2BestiaryEntries()
     ],
     attributes: [
         {
-            id: 'bounce', name: '彈性', icon: '⤴️', tags: ['物理', '連擊'],
-            desc: '增加彈珠在敵人之間彈射的次數，適合在密集怪群中製造混亂。',
+            id: 'bounce', name: '弹性', icon: '⤴️', tags: ['物理', '连击'],
+            desc: '增加弹珠在敌人之间弹射的次数，适合在密集怪群中制造混乱。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 1.5, 3.5, 2.5, 0.5, 4.5, row: 2, 2, 1, 0, 0) - 靠近窗口中间
                 const w = game.enemyWidth;
@@ -279,14 +279,14 @@ const TRUTH_BOOK_DATA = {
                 );
             },
             loop: [
-                { type: 'log', text: '發射高彈性彈珠' },
+                { type: 'log', text: '发射高弹性弹珠' },
                 { type: 'spawn_projectile', config: { damage: 15, bounce: 8 }, vel: {x: 2, y: -18} },
                 { type: 'wait', frames: 240 }, { type: 'reset' }
             ]
         },
         {
-            id: 'pierce', name: '穿透', icon: '↗️', tags: ['物理', '貫穿'],
-            desc: '使彈珠能夠穿透敵人的身體，直接打擊後排目標。',
+            id: 'pierce', name: '穿透', icon: '↗️', tags: ['物理', '贯穿'],
+            desc: '使弹珠能够穿透敌人的身体，直接打击后排目标。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 0-4) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -295,14 +295,14 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '發射強力穿透彈' },
+                { type: 'log', text: '发射强力穿透弹' },
                 { type: 'spawn_projectile', config: { damage: 20, pierce: 5 }, vel: {x: 0, y: -20} },
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
         },
         {
             id: 'scatter', name: '散射', icon: '🔱', tags: ['物理', '分裂'],
-            desc: '彈珠飛行時會向兩側分裂出小型子彈，擴大打擊覆蓋面。',
+            desc: '弹珠飞行时会向两侧分裂出小型子弹，扩大打击覆盖面。',
             setup: (game) => {
                 // 统一尺寸 60x60，对齐网格 (中心 col: 2.5, row: 2; 周围 col: 0.5, 1.5, 3.5, 4.5, row: 1, 3) - 靠近窗口中间
                 const w = game.enemyWidth;
@@ -319,33 +319,33 @@ const TRUTH_BOOK_DATA = {
                 });
             },
             loop: [
-                { type: 'log', text: '發射分裂散射彈' },
+                { type: 'log', text: '发射分裂散射弹' },
                 { type: 'spawn_projectile', config: { damage: 12, scatter: 8 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 180 }, { type: 'reset' }
             ]
         },
         {
             id: 'cryo', name: '冰霜', icon: '❄️', tags: ['元素', '控制'],
-            desc: '降低敵人溫度。溫度 < 0°C 時觸發【易傷】，每降低 1°C 增加 0.5% 受到的傷害。達到 -100°C 時觸發【凍結】，敵人將無法行動。',
+            desc: '降低敌人温度。温度 < 0°C 时触发【易伤】，每降低 1°C 增加 0.5% 受到的伤害。达到 -100°C 时触发【冻结】，敌人将无法行动。',
             setup: (game) => { 
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 const e = new Enemy(x, y, 60, 60, 2000);
-                e.temp = -100; // 預設凍結
+                e.temp = -100; // 预设冻结
                 game.enemies.push(e); 
             },
             loop: [
-                { type: 'log', text: '目標已處於【凍結】狀態' },
+                { type: 'log', text: '目标已处于【冻结】状态' },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '觸發【易傷】(傷害大幅提升)' },
+                { type: 'log', text: '触发【易伤】(伤害大幅提升)' },
                 { type: 'spawn_projectile', config: { damage: 100, cryo: 0 }, vel: {x: 0, y: -15} }, 
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
         },
         {
-            id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '範圍爆炸'],
-            desc: '升高敵人溫度。溫度 ≥ 34°C 時觸發「燃燒」，造成額外傷害（公式：火屬性層數 × 溫度 / 200）。溫度 > 200°C 時有概率觸發「過熱爆炸」，對自身及半徑 120 內的敵人造成 AOE 傷害，並消耗 27% 熱量。爆炸概率從 200°C 的 15% 線性增至 800°C 的 90%。',
+            id: 'pyro', name: '火焰', icon: '🔥', tags: ['元素', '范围爆炸'],
+            desc: '升高敌人温度。温度 ≥ 34°C 时触发「燃烧」，造成额外伤害（公式：火属性层数 × 温度 / 200）。温度 > 200°C 时有概率触发「过热爆炸」，对自身及半径 120 内的敌人造成范围伤害，并消耗 27% 热量。爆炸概率从 200°C 的 15% 线性增至 800°C 的 90%。',
             setup: (game) => { 
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -362,17 +362,17 @@ const TRUTH_BOOK_DATA = {
                 });
             },
             loop: [
-                { type: 'log', text: '第一步：施加火屬性使其【燃燒】' },
+                { type: 'log', text: '第一步：施加火属性使其【燃烧】' },
                 { type: 'spawn_projectile', config: { damage: 10, pyro: 600 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 100 },
-                { type: 'log', text: '第二步：擊殺燃燒中的敵人觸發爆炸' },
+                { type: 'log', text: '第二步：击杀燃烧中的敌人触发爆炸' },
                 { type: 'spawn_projectile', config: { damage: 2000 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 150 }, { type: 'reset' }
             ]
         },
         {
-            id: 'lightning', name: '閃電', icon: '⚡', tags: ['元素', '連鎖'],
-            desc: '命中時觸發連鎖閃電。閃電鏈可對重複敵人造成傷害，並對目標施加溫度。基礎連鎖概率 15%，目標溫度越低（冰凍狀態）概率越高（最高 100%）。連鎖傷害隨次數遞減，最多連鎖 100 次。',
+            id: 'lightning', name: '闪电', icon: '⚡', tags: ['元素', '连锁'],
+            desc: '命中时触发连锁闪电。闪电链可对重复敌人造成伤害，并对目标施加温度。基础连锁概率 15%，目标温度越低（冰冻状态）概率越高（最高 100%）。连锁伤害随次数递减，最多连锁 100 次。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -387,14 +387,14 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '打擊凍結目標 (啟動無限連鎖)' },
+                { type: 'log', text: '打击冻结目标 (启动无限连锁)' },
                 { type: 'spawn_projectile', config: { damage: 15, lightning: 10 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 300 }, { type: 'reset' }
             ]
         },
         {
-            id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬時'],
-            desc: '直接發射激光束，瞬間對路徑上的敵人造成傷害。激光可被護盾反射。',
+            id: 'laser', name: '光球', icon: '🔦', tags: ['特殊', '瞬时'],
+            desc: '直接发射激光束，瞬间对路径上的敌人造成伤害。激光可被护盾反射。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -407,14 +407,14 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '發射激光束 (isLaser=true)' },
+                { type: 'log', text: '发射激光束' },
                 { type: 'spawn_projectile', config: { damage: 40, laser: 10, isLaser: true }, vel: {x: 2, y: -15} },
                 { type: 'wait', frames: 150 }, { type: 'reset' }
             ]
         },
         {
             id: 'venom', name: '毒素', icon: '☠️', tags: ['元素', 'DoT'],
-            desc: '命中敵人時疊加毒素層數。每次敵人行動開始前結算一次毒素傷害（每層 0.8 傷害 × 共鳴倍率）。冰凍狀態下毒素暫停發作但保留層數，解凍當回合一次性結算；過熱（≥100°C）時每回合結算 2 次。毒素 DoT 不受護盾減傷影響。',
+            desc: '命中敌人时叠加毒素层数。每次敌人行动开始前结算一次毒素伤害（每层 0.8 伤害 × 共鸣倍率）。冰冻状态下毒素暂停发作但保留层数，解冻当回合一次性结算；过热（≥100°C）时每回合结算 2 次。毒素持续伤害不受护盾减伤影响。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -422,14 +422,14 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1500));
             },
             loop: [
-                { type: 'log', text: '疊加毒素層數' },
+                { type: 'log', text: '叠加毒素层数' },
                 { type: 'spawn_projectile', config: { damage: 5, venom: 6 }, vel: {x: 0, y: -15} },
                 { type: 'wait', frames: 120 }, { type: 'reset' }
             ]
         },
         {
-            id: 'overcharge', name: '超載', icon: '💥', tags: ['特殊', 'AOE'],
-            desc: '子彈飛行中積累充能（彈跳 +1，穿透命中 +3）。代價：發射前 bounce/pierce 減半（共鳴可降低削減）。子彈銷毀時觸發 AoE 爆炸：傷害 = 充能數 × 超載層數 × 基礎傷害 × 0.3，半徑 = 60 + 充能數 × 4。',
+            id: 'overcharge', name: '超载', icon: '💥', tags: ['特殊', '范围'],
+            desc: '子弹飞行中积累充能（弹跳 +1，穿透命中 +3）。代价：发射前弹跳 / 穿透减半（共鸣可降低削减）。子弹销毁时触发 范围爆炸：伤害 = 充能数 × 超载层数 × 基础伤害 × 0.3，半径 = 60 + 充能数 × 4。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -441,14 +441,14 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '發射超載子彈（積累充能後爆炸）' },
+                { type: 'log', text: '发射超载子弹（积累充能后爆炸）' },
                 { type: 'spawn_projectile', config: { damage: 10, overcharge: 3, bounce: 4, pierce: 2 }, vel: {x: 2, y: -15} },
                 { type: 'wait', frames: 240 }, { type: 'reset' }
             ]
         },
         {
-            id: 'echo', name: '回響', icon: '🔁', tags: ['特殊', '分裂'],
-            desc: '雙階段：研磨階段，弹珠碰撞 Peg 時按概率生成虛影 Peg（持續約 1 秒）。戰鬥階段，子弹弹跳時按 25% + echo×5% 概率向反方向鏡像生成回響子彈，繼承 50% 屬性（向下取整）。',
+            id: 'echo', name: '回响', icon: '🔁', tags: ['特殊', '分裂'],
+            desc: '双阶段：研磨阶段，弹珠碰撞钉子时按概率生成虚影钉子（持续约 1 秒）。战斗阶段，子弹弹跳时按 25% + 回响层数×5% 概率向反方向镜像生成回响子弹，继承 50% 属性（向下取整）。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -456,14 +456,14 @@ const TRUTH_BOOK_DATA = {
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
             },
             loop: [
-                { type: 'log', text: '發射帶回響的彈跳子彈' },
+                { type: 'log', text: '发射带回响的弹跳子弹' },
                 { type: 'spawn_projectile', config: { damage: 15, echo: 3, bounce: 6 }, vel: {x: 4, y: -15} },
                 { type: 'wait', frames: 240 }, { type: 'reset' }
             ]
         },
         {
-            id: 'wind', name: '風', icon: '🌪️', tags: ['特殊', '法陣'],
-            desc: '在命中點生成風暴法陣，持續發射風刃攻擊附近的敵人。',
+            id: 'wind', name: '风', icon: '🌪️', tags: ['特殊', '法阵'],
+            desc: '在命中点生成风暴法阵，持续发射风刃攻击附近的敌人。',
             setup: (game) => { 
                 // 统一尺寸 60x60，对齐网格 (col: 2.5, row: 1) - 靠近窗口中间
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
@@ -473,13 +473,13 @@ const TRUTH_BOOK_DATA = {
             loop: [
                 { type: 'spawn_projectile', config: { damage: 5, wind: 1, bounce: 4 }, vel: {x: 5, y: -15} },
                 { type: 'wait', frames: 60 },
-                { type: 'log', text: '風暴法陣持續攻擊...' },
+                { type: 'log', text: '风暴法阵持续攻击...' },
                 { type: 'wait', frames: 180 }, { type: 'reset' }
             ]
         },
         {
-            id: 'explosive', name: '爆破', icon: '🧨', tags: ['特殊', 'AOE'],
-            desc: '接觸敵人時引發劇烈爆炸，造成大範圍傷害。',
+            id: 'explosive', name: '爆破', icon: '🧨', tags: ['特殊', '范围'],
+            desc: '接触敌人时引发剧烈爆炸，造成大范围伤害。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -494,8 +494,8 @@ const TRUTH_BOOK_DATA = {
             ]
         },
         {
-            id: 'matryoshka', name: '套娃', icon: '🪆', tags: ['特殊', '連鎖'],
-            desc: '子彈消失時會分裂出下一顆子彈。演示：散射子彈分裂出散射火屬性子彈。',
+            id: 'matryoshka', name: '套娃', icon: '🪆', tags: ['特殊', '连锁'],
+            desc: '子弹消失时会分裂出下一颗子弹。演示：散射子弹分裂出散射火属性子弹。',
             setup: (game) => { 
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -507,7 +507,7 @@ const TRUTH_BOOK_DATA = {
                 }
             },
             loop: [
-                { type: 'log', text: '發射套娃彈 (散射->火散射)' },
+                { type: 'log', text: '发射套娃弹 (散射->火散射)' },
                 { type: 'spawn_projectile', config: { 
                     damage: 10, 
                     scatter: 3,
@@ -520,9 +520,9 @@ const TRUTH_BOOK_DATA = {
 };
 
 const TRUTH_BOOK_CATEGORIES = [
-    { id: 'boss', name: 'Boss 机制', icon: '☠️', hint: '专属资源、破绽谱与狂暴变化' },
+    { id: 'boss', name: '首领机制', icon: '☠️', hint: '专属资源、破绽谱与狂暴变化' },
     { id: 'enemy_affix', name: '敌人词缀', icon: '◇', hint: '普通/精英敌人的行为规则' },
-    { id: 'enemy_v2', name: 'V2 基底', icon: '▣', hint: '多格敌人与专属形体' },
+    { id: 'enemy_v2', name: '敌人基底', icon: '▣', hint: '多格敌人与专属形体' },
     { id: 'attribute', name: '属性百科', icon: '✦', hint: '弹药属性、元素反应与演示' },
     { id: 'skill', name: '主动技能', icon: '✨', hint: '四类来源、SP 消耗与效果' },
     { id: 'core', name: '核心机制', icon: '📘', hint: '充能、替换、保底与掉落' }
@@ -591,14 +591,14 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '熔炉守卫·伊格尼斯',
         icon: '🔥',
-        tags: ['R5', '温压', '流彩护盾', '破绽: pierce/pyro'],
+        tags: ['第5回合', '温压', '流彩护盾', '破绽: 穿透/火焰'],
         trainingScenarioId: 'boss_ignis',
-        content: '护盾、极速与流彩护盾构成第一段 Boss 教学。伊格尼斯不会把过热当作普通烧伤结算，100°C 以上的正温度会转化为温压；温压达到阈值时触发一次流彩护盾脉冲。狂暴后每回合额外升温，并对周围产生火焰溅射。穿透用于破甲，火焰用于推动炉心压力。试炼场入口：boss_ignis。',
+        content: '护盾、极速与流彩护盾构成第一段首领教学。伊格尼斯不会把过热当作普通烧伤结算，100°C 以上的正温度会转化为温压；温压达到阈值时触发一次流彩护盾脉冲。狂暴后每回合额外升温，并对周围产生火焰溅射。穿透用于破甲，火焰用于推动炉心压力。试炼场入口：boss_ignis。',
         setup: (game) => setupTruthBookBossDemo(game, 'ignis', false),
         loop: [
             { type: 'log', text: '温压核心：过热转为炉压' },
             { type: 'wait', frames: 80 },
-            { type: 'log', text: '破绽谱：pierce / pyro' },
+            { type: 'log', text: '破绽谱：穿透 / 火焰' },
             { type: 'enemy_turn' },
             { type: 'wait', frames: 120 },
             { type: 'reset' }
@@ -609,14 +609,14 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '霜晶缝合怪·格拉西斯',
         icon: '❄️',
-        tags: ['R12', '霜缝', '减伤提示', '破绽: cryo/pierce'],
+        tags: ['第12回合', '霜缝', '减伤提示', '破绽: 冰霜/穿透'],
         trainingScenarioId: 'boss_glacies',
-        content: '格拉西斯会在战斗场内缝合霜缝，给周围敌人短暂减伤、回血与护盾。被缝目标现在会有冰蓝缝线、外框与“减伤”状态提示，玩家能直接看到霜缝收益来源。cryo 会切断霜缝并冻结下一次机制 tick，pierce 会切断霜缝并在本次命中获得额外伤害。试炼场入口：boss_glacies。',
+        content: '格拉西斯会在战斗场内缝合霜缝，给周围敌人短暂减伤、回血与护盾。被缝目标现在会有冰蓝缝线、外框与“减伤”状态提示，玩家能直接看到霜缝收益来源。冰霜会切断霜缝并冻结下一次机制 tick，穿透会切断霜缝并在本次命中获得额外伤害。试炼场入口：boss_glacies。',
         setup: (game) => setupTruthBookBossDemo(game, 'glacies', false),
         loop: [
             { type: 'log', text: '霜缝：目标获得减伤与护盾' },
             { type: 'wait', frames: 80 },
-            { type: 'log', text: '破绽谱：cryo / pierce' },
+            { type: 'log', text: '破绽谱：冰霜 / 穿透' },
             { type: 'enemy_turn' },
             { type: 'wait', frames: 120 },
             { type: 'reset' }
@@ -627,14 +627,14 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '裂变母体·米克罗',
         icon: '🦠',
-        tags: ['R19', '分身减伤', '治疗链', '破绽: lightning/scatter'],
+        tags: ['第19回合', '分身减伤', '治疗链', '破绽: 闪电/散射'],
         trainingScenarioId: 'boss_mikro',
-        content: '米克罗把分身与治疗组合成群体压力。每个存活分身和入场裂变细胞都会为母体提供减伤，最高 50%；狂暴后分裂概率提升到 100%。lightning 适合过载分身链，scatter 适合清理复制体和治疗站位。试炼场入口：boss_mikro。',
+        content: '米克罗把分身与治疗组合成群体压力。每个存活分身和入场裂变细胞都会为母体提供减伤，最高 50%；狂暴后分裂概率提升到 100%。闪电适合过载分身链，散射适合清理复制体和治疗站位。试炼场入口：boss_mikro。',
         setup: (game) => setupTruthBookBossDemo(game, 'mikro', false),
         loop: [
             { type: 'log', text: '分身越多，母体越硬' },
             { type: 'wait', frames: 80 },
-            { type: 'log', text: '破绽谱：lightning / scatter' },
+            { type: 'log', text: '破绽谱：闪电 / 散射' },
             { type: 'enemy_turn' },
             { type: 'wait', frames: 120 },
             { type: 'reset' }
@@ -645,9 +645,9 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '贪婪之渊·噬神者',
         icon: '👅',
-        tags: ['R26', '深渊胃域', '吞噬换盾', '破绽: bounce/laser'],
+        tags: ['第26回合', '深渊胃域', '吞噬换盾', '破绽: 弹性/激光'],
         trainingScenarioId: 'boss_devourer',
-        content: 'Devourer 现在接管“胃域”机制。每回合先拉拽胃域范围内的非 Boss 敌人，并周期性召唤 maw_thrall 养料；消化时会吞噬胃域内所有非 Boss 目标，把吞噬次数与被吞护盾转化为自身护盾。狂暴后候选范围扩至全屏。bounce 用于胃袋反弹消耗，laser 用于精准灼穿。试炼场入口：boss_devourer。',
+        content: '噬神者现在接管“胃域”机制。每回合先拉拽胃域范围内的非首领敌人，并周期性召唤养料；消化时会吞噬胃域内所有非首领目标，把吞噬次数与被吞护盾转化为自身护盾。狂暴后候选范围扩至全屏。弹性用于胃袋反弹消耗，激光用于精准灼穿。试炼场入口：boss_devourer。',
         setup: (game) => setupTruthBookBossDemo(game, 'devourer', false),
         loop: [
             { type: 'log', text: '胃域拉拽并召唤养料' },
@@ -663,14 +663,14 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '翠绿共生体·维里迪斯',
         icon: '🍃',
-        tags: ['R33', '孢甲资源', '活体护甲', '破绽: pyro/venom'],
+        tags: ['第33回合', '孢甲资源', '活体护甲', '破绽: 火焰/剧毒'],
         trainingScenarioId: 'boss_viridis',
-        content: '维里迪斯围绕孢子活甲循环展开。专属孢子侍体、再生和治疗会积累孢甲资源；资源达到阈值后，为自身或侍体补充活体护甲。非反制破甲会反哺孢甲，pyro 与 venom 会直接蚀甲、降低资源并留下腐蚀反馈。试炼场入口：boss_viridis。',
+        content: '维里迪斯围绕孢子活甲循环展开。专属孢子侍体、再生和治疗会积累孢甲资源；资源达到阈值后，为自身或侍体补充活体护甲。非反制破甲会反哺孢甲，火焰与 剧毒会直接蚀甲、降低资源并留下腐蚀反馈。试炼场入口：boss_viridis。',
         setup: (game) => setupTruthBookBossDemo(game, 'viridis', true),
         loop: [
             { type: 'log', text: '孢甲资源积累中' },
             { type: 'wait', frames: 80 },
-            { type: 'log', text: '破绽谱：pyro / venom' },
+            { type: 'log', text: '破绽谱：火焰 / 剧毒' },
             { type: 'enemy_turn' },
             { type: 'wait', frames: 120 },
             { type: 'reset' }
@@ -681,14 +681,14 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '雷霆幻影·特斯拉',
         icon: '⚡',
-        tags: ['R40', '导体网络', '场强', '破绽: cryo/bounce'],
+        tags: ['第40回合', '导体网络', '场强', '破绽: 冰霜/弹性'],
         trainingScenarioId: 'boss_tesla',
-        content: '特斯拉每回合电击敌人并制造导体，导体越多场强越高；场强会带来额外行动和召唤压力，但有上限与回合衰减。lightning 会给导体充能，反过来喂给特斯拉；cryo 能移除临时 haste 并泄场，bounce 能接地并压低网络收益。试炼场入口：boss_tesla。',
+        content: '特斯拉每回合电击敌人并制造导体，导体越多场强越高；场强会带来额外行动和召唤压力，但有上限与回合衰减。闪电会给导体充能，反过来喂给特斯拉；冰霜能移除临时 极速并泄场，弹性能接地并压低网络收益。试炼场入口：boss_tesla。',
         setup: (game) => setupTruthBookBossDemo(game, 'tesla', true),
         loop: [
             { type: 'log', text: '导体网络提升场强' },
             { type: 'wait', frames: 80 },
-            { type: 'log', text: '破绽谱：cryo / bounce' },
+            { type: 'log', text: '破绽谱：冰霜 / 弹性' },
             { type: 'enemy_turn' },
             { type: 'wait', frames: 120 },
             { type: 'reset' }
@@ -699,9 +699,9 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '混沌融合体·奇美拉',
         icon: '◇',
-        tags: ['R47', '热核吞噬', '冷热抵消', '破绽: venom/laser'],
+        tags: ['第47回合', '热核吞噬', '冷热抵消', '破绽: 剧毒/激光'],
         trainingScenarioId: 'boss_chimera',
-        content: 'Chimera 现在是左右热核吞噬。每个奇美拉回合会先吞噬两个目标，左侧倾向低温、右侧倾向高温；吞噬结算后再在左侧生成低温养料、右侧生成高温养料，共 2-3 个且不带狂暴词条。被吞目标温度达到阈值时，按温度绝对值一比一转成热核或冰核；冷热核心互相抵消，并按抵消层数 100% 转化为流彩护盾，狂暴阶段最终护盾量翻倍。试炼场入口：boss_chimera。',
+        content: '奇美拉现在是左右热核吞噬。每个奇美拉回合会先吞噬两个目标，左侧倾向低温、右侧倾向高温；吞噬结算后再在左侧生成低温养料、右侧生成高温养料，共 2-3 个且不带狂暴词条。被吞目标温度达到阈值时，按温度绝对值一比一转成热核或冰核；冷热核心互相抵消，并按抵消层数 100% 转化为流彩护盾，狂暴阶段最终护盾量翻倍。试炼场入口：boss_chimera。',
         setup: (game) => setupTruthBookBossDemo(game, 'chimera', true),
         loop: [
             { type: 'log', text: '先吞噬后召唤养料' },
@@ -717,7 +717,7 @@ const TRUTH_BOOK_BOSS_ENTRIES = [
         categoryId: 'boss',
         title: '永恒回声·奥罗波罗斯',
         icon: '🔄',
-        tags: ['R54', '六附体', '动态破绽', '轮转封印'],
+        tags: ['第54回合', '六附体', '动态破绽', '轮转封印'],
         trainingScenarioId: 'boss_ouroboros',
         content: '奥罗波罗斯携带六个附体槽，前位附体每回合轮转，并授予护盾、治疗、召唤、位移、吞噬、加速六类机制。当前附体决定动态破绽谱；打满正确属性会封印该附体若干回合，使后续轮转跳过它。附体槽美术验收入口：boss_ouroboros_attachment_slots。',
         setup: (game) => setupTruthBookBossDemo(game, 'ouroboros', true),
@@ -799,8 +799,8 @@ const TRUTH_BOOK_CORE_ENTRIES = [
         categoryId: 'core',
         title: '智能符文掉落',
         icon: '🧭',
-        tags: ['Build Vector', '同属性加权', 'Boss 主题权重'],
-        content: '符文掉落会读取最近 5 回合伤害构成，形成玩家当前套路向量。近期某属性伤害占比越高，同属性符文权重越高；Boss 还会注入独立主题权重。最终权重 = 基础掉落权重 + 同属性伤害占比 × 3.0 + Boss 主题额外权重。runeBearer 与 adaptiveRune 敌人可以覆写掉落池：前者必掉通用智能符文，后者按最近承受属性定向掉落。',
+        tags: ['Build Vector', '同属性加权', '首领主题权重'],
+        content: '符文掉落会读取最近 5 回合伤害构成，形成玩家当前套路向量。近期某属性伤害占比越高，同属性符文权重越高；首领还会注入独立主题权重。最终权重 = 基础掉落权重 + 同属性伤害占比 × 3.0 + 首领主题额外权重。runeBearer 与 adaptiveRune 敌人可以覆写掉落池：前者必掉通用智能符文，后者按最近承受属性定向掉落。',
         loop: [
             { type: 'log', text: '读取最近 5 回合伤害构成' },
             { type: 'wait', frames: 90 },
@@ -862,105 +862,105 @@ class UIManager {
         
         this.affixDict = {
             'shield': { 
-                name: '🛡️ 護盾', 
-                desc: `受到的傷害減少 ${afx.shieldReduction * 100}%。(可反射激光)` 
+                name: '🛡️ 护盾',
+                desc: `受到的伤害减少 ${afx.shieldReduction * 100}%。(可反射激光)`
             },
             'radiantAegis': {
-                name: '✦ 流彩護盾',
-                desc: `Boss 版：只要流彩盾未破，每回合生成最大生命 ${(afx.radiantAegisBossRegenPct || 0.02) * 100}% 的数值护盾；满 ${(afx.radiantAegisBossCapPct || 0.10) * 100}% 后再次获取会给周围一格敌人 +1 层护盾。精英版数值减半。`
+                name: '✦ 流彩护盾',
+                desc: `首领版：只要流彩盾未破，每回合生成最大生命 ${(afx.radiantAegisBossRegenPct || 0.02) * 100}% 的数值护盾；满 ${(afx.radiantAegisBossCapPct || 0.10) * 100}% 后再次获取会给周围一格敌人 +1 层护盾。精英版数值减半。`
             },
             'haste': { 
-                name: '⚡ 極速', 
+                name: '⚡ 极速',
                 desc: '每回合在正常移动后额外追加一次冲刺移动。加速仅作用于移动，不重复结算其他词条。' 
             },
             'regen': { 
                 name: '💚 再生', 
-                desc: `每回合恢復 ${afx.regenPercent * 100}% 最大生命值。` 
+                desc: `每回合恢复 ${afx.regenPercent * 100}% 最大生命值。`
             },
             'clone': { 
                 name: '🦠 增殖', 
-                desc: `每回合開始有 ${afx.cloneChanceTurn * 100}% 概率分裂；受到攻擊時有 ${afx.cloneChanceHit * 100}% 概率額外分裂。` 
+                desc: `每回合开始有 ${afx.cloneChanceTurn * 100}% 概率分裂；受到攻击时有 ${afx.cloneChanceHit * 100}% 概率额外分裂。`
             },
             'berserk': { 
                 name: '😡 狂暴', 
-                desc: '每回合 +20°C，溫度結算執行兩次；有概率對非移动行動額外結算一次（概率隨溫度升高）。' 
+                desc: '每回合 +20°C，温度结算执行两次；有概率对非移动行动额外结算一次（概率随温度升高）。'
             },
             'healer': { 
-                name: '💖 治癒', 
-                desc: `每回合治療周圍友軍 ${afx.healerPercent * 100}% 最大生命值。` 
+                name: '💖 治愈',
+                desc: `每回合治疗周围友军 ${afx.healerPercent * 100}% 最大生命值。`
             },
             'devour': { 
                 name: '👅 吞噬', 
-                desc: `有概率吞噬相鄰友軍，繼承其全部生命與詞條。` 
+                desc: `有概率吞噬相邻友军，继承其全部生命与词条。`
             },
             'jump': {
-                name: '🦘 跳躍',
-                desc: `前方被阻擋時，可直接跳過最多 ${afx.jumpRows} 行障礙。`
+                name: '🦘 跳跃',
+                desc: `前方被阻挡时，可直接跳过最多 ${afx.jumpRows} 行障碍。`
             },
             // [V2 基底专属词条]
             'heavyArmor': {
-                name: '🛡️ 重裝',
-                desc: `占 3 列橫向裝甲：血量 ×${afx.heavyArmorHpMult || 2.0}，每 ${afx.heavyArmorMoveInterval || 2} 回合才能移動一次。`
+                name: '🛡️ 重装',
+                desc: `占 3 列横向装甲：血量 ×${afx.heavyArmorHpMult || 2.0}，每 ${afx.heavyArmorMoveInterval || 2} 回合才能移动一次。`
             },
             'deflectionWard': {
                 name: '🔷 偏折屏障',
-                desc: `2×1 棱盾獸：擁有相當於最大生命值 ${(afx.deflectionWardBarrierPct || 0.10) * 100}% 的屏障，僅吸收反彈/穿透類傷害，未被打破則每回合恢復至滿值。`
+                desc: `2×1 棱盾兽：拥有相当于最大生命值 ${(afx.deflectionWardBarrierPct || 0.10) * 100}% 的屏障，仅吸收反弹/穿透类伤害，未被打破则每回合恢复至满值。`
             },
             'echoRelay': {
-                name: '🔮 回響中繼',
-                desc: `1×2 共振尖塔：每回合額外觸發一次周圍敵人的詞條效果（再生/治療/分身/極速）；自身最大生命值僅為標準精英的 ${(afx.echoRelayHpPct || 0.5) * 100}%。`
+                name: '🔮 回响中继',
+                desc: `1×2 共振尖塔：每回合额外触发一次周围敌人的词条效果（再生/治疗/分身/极速）；自身最大生命值仅为标准精英的 ${(afx.echoRelayHpPct || 0.5) * 100}%。`
             },
             'prism': {
                 name: '🌈 折光',
-                desc: `1×3 折光棱柱：作為激光偏折面參與反射，命中後傷害衰減為原伤害的 ${(afx.prismLaserDeflect || 0.5) * 100}%，產生七色折射粒子。`
+                desc: `1×3 折光棱柱：作为激光偏折面参与反射，命中后伤害衰减为原伤害的 ${(afx.prismLaserDeflect || 0.5) * 100}%，产生七色折射粒子。`
             },
             'hive': {
                 name: '🥚 孵化',
-                desc: `2×3 孵化巢：每 ${afx.hiveSpawnInterval || 2} 回合在周圍生成一隻血量為自身 ${(afx.hiveSpawnHpPct || 0.15) * 100}% 的低血量幼體。`
+                desc: `2×3 孵化巢：每 ${afx.hiveSpawnInterval || 2} 回合在周围生成一只血量为自身 ${(afx.hiveSpawnHpPct || 0.15) * 100}% 的低血量幼体。`
             },
             'siege': {
-                name: '🚜 破陣',
-                desc: `3×2 攻城履帶：無法被冰凍；移動時若被前方敵人阻擋，會嘗試將阻擋鏈條一起向前推進 1 行。`
+                name: '🚜 破阵',
+                desc: `3×2 攻城履带：无法被冰冻；移动时若被前方敌人阻挡，会尝试将阻挡链条一起向前推进 1 行。`
             },
             'gravityWell': {
                 name: '🌀 引力井',
-                desc: `3×3 引力炉心：在 ${afx.gravityWellPullRadius || 220}px 半徑內對所有子彈施加微弱回拉，造成可預測的彈道偏折。`
+                desc: `3×3 引力炉心：在 ${afx.gravityWellPullRadius || 220}px 半径内对所有子弹施加微弱回拉，造成可预测的弹道偏折。`
             },
             'carrier': {
-                name: '▱ 鑄巢母架',
-                desc: `五格冂形母架：每 ${afx.carrierSpawnInterval || 1} 回合在第 5 格空艙投放一隻 haste+jump 小型敵人；若空艙被佔會先推出舊單位，推不出去則跳過本次投放。`
+                name: '▱ 铸巢母架',
+                desc: `五格冂形母架：每 ${afx.carrierSpawnInterval || 1} 回合在第 5 格空舱投放一只带极速与跳跃的小型敌人；若空舱被占会先推出旧单位，推不出去则跳过本次投放。`
             },
             'livingArmor': {
-                name: '🟢 活體護甲',
-                desc: `獲得最大生命 ${(afx.livingArmorPct || 0.10) * 100}% 的活體護甲；每回合開始回滿，破裂後自身不再生效，可被護甲孢子重新掛甲。代承反彈傷害，穿透會同時打護甲與本體。`
+                name: '🟢 活体护甲',
+                desc: `获得最大生命 ${(afx.livingArmorPct || 0.10) * 100}% 的活体护甲；每回合开始回满，破裂后自身不再生效，可被护甲孢子重新挂甲。代承反弹伤害，穿透会同时打护甲与本体。`
             },
             'armorSpore': {
-                name: '🍃 護甲孢子',
-                desc: `每回合為一名隨機友軍添加活體護甲；若目標已有活體護甲，按 ${(afx.armorSporeStackPct || 0.50) * 100}% 數值疊加。`
+                name: '🍃 护甲孢子',
+                desc: `每回合为一名随机友军添加活体护甲；若目标已有活体护甲，按 ${(afx.armorSporeStackPct || 0.50) * 100}% 数值叠加。`
             },
             'siegeBreaker': {
                 name: '🏚️ 撞城者',
-                desc: `撞擊防線屏障時造成占格數 ×${afx.siegeBreakerDamageMult || 2} 的屏障傷害。`
+                desc: `撞击防线屏障时造成占格数 ×${afx.siegeBreakerDamageMult || 2} 的屏障伤害。`
             },
             'deflectShell': {
-                name: '🔄 偏折殼',
-                desc: '僅 1×1 敵人攜帶；物理邊界持續旋轉，子彈反彈方向會被偏折。'
+                name: '🔄 偏折壳',
+                desc: '仅 1×1 敌人携带；物理边界持续旋转，子弹反弹方向会被偏折。'
             },
             'energyArmor': {
                 name: '🟡 蓄能甲',
-                desc: `單次傷害超過最大生命 ${(afx.energyArmorThresholdPct || 0.20) * 100}% 時，只承受閾值部分，溢出轉化為臨時護盾。`
+                desc: `单次伤害超过最大生命 ${(afx.energyArmorThresholdPct || 0.20) * 100}% 时，只承受阈值部分，溢出转化为临时护盾。`
             },
             'phaseShield': {
-                name: '🟣 相位護盾',
-                desc: `初始與新增護盾層數 ×${afx.phaseShieldMult || 2}；每 ${afx.phaseShieldCycle || 3} 個敵方回合有 1 回合護盾失效。`
+                name: '🟣 相位护盾',
+                desc: `初始与新增护盾层数 ×${afx.phaseShieldMult || 2}；每 ${afx.phaseShieldCycle || 3} 个敌方回合有 1 回合护盾失效。`
             },
             'overloadReactor': {
-                name: '🔥 過量反應爐',
-                desc: `本回合每累積受到最大生命 ${(afx.overloadStepPct || 0.20) * 100}% 的傷害，下次行動與移動次數 +1（最多 +${afx.overloadMaxBonus || 3}）。`
+                name: '🔥 过量反应炉',
+                desc: `本回合每累积受到最大生命 ${(afx.overloadStepPct || 0.20) * 100}% 的伤害，下次行动与移动次数 +1（最多 +${afx.overloadMaxBonus || 3}）。`
             },
             'lowDamageImmune': {
-                name: '⬜ 低傷免疫',
-                desc: `低於最大生命 ${(afx.lowDamageImmunePct || 0.05) * 100}% 的單次最終傷害無效。`
+                name: '⬜ 低伤免疫',
+                desc: `低于最大生命 ${(afx.lowDamageImmunePct || 0.05) * 100}% 的单次最终伤害无效。`
             },
             'runeBearer': {
                 name: '通用符文掉落',
@@ -1277,49 +1277,49 @@ class UIManager {
             tempBar.style.left = '50%';
             tempBar.style.transformOrigin = 'left';
             tempBar.style.background = '#f97316';
-            tempText.innerText = `溫度: +${enemy.temp.toFixed(0)}°C (過熱)`;
+            tempText.innerText = `温度: +${enemy.temp.toFixed(0)}°C (过热)`;
             tempText.style.color = '#fbbf24';
         } else if (enemy.temp < 0) {
             tempBar.style.left = `${50 - tempPct/2}%`;
             tempBar.style.transformOrigin = 'right';
             tempBar.style.background = '#06b6d4';
-            tempText.innerText = `溫度: ${enemy.temp.toFixed(0)}°C (過冷)`;
+            tempText.innerText = `温度: ${enemy.temp.toFixed(0)}°C (过冷)`;
             tempText.style.color = '#67e8f9';
         } else {
             tempBar.style.width = '0';
-            tempText.innerText = `溫度: 0°C (穩定)`;
+            tempText.innerText = `温度: 0°C (稳定)`;
             tempText.style.color = '#94a3b8';
         }
         const statusList = document.getElementById('info-status-list');
         statusList.innerHTML = '';
         if (enemy.isFrozenCurrentTurn || enemy.temp <= -100) {
-            this.addStatusItem(statusList, '❄️ 深度凍結', '無法移動與行動。', 'text-cyan-300');
+            this.addStatusItem(statusList, '❄️ 深度冻结', '无法移动与行动。', 'text-cyan-300');
         } else if (enemy.temp < 0) {
             const freezeChance = Math.min(100, Math.abs(enemy.temp)) / 2;
-            this.addStatusItem(statusList, '📉 低溫影響', `下回合有 ${freezeChance.toFixed(0)}% 概率被凍結。`, 'text-cyan-200');
+            this.addStatusItem(statusList, '📉 低温影响', `下回合有 ${freezeChance.toFixed(0)}% 概率被冻结。`, 'text-cyan-200');
         }
         if (enemy.temp > 0) {
             if (enemy.temp >= 100) {
                 const dmg = 5 + (enemy.temp - 100);
-                this.addStatusItem(statusList, '🔥 極限燃燒', `每回合受到 ${dmg.toFixed(0)} 點傷害，並向周圍擴散。`, 'text-orange-400');
+                this.addStatusItem(statusList, '🔥 极限燃烧', `每回合受到 ${dmg.toFixed(0)} 点伤害，并向周围扩散。`, 'text-orange-400');
             } else {
-                this.addStatusItem(statusList, '🌡️ 過熱狀態', '溫度 >100°C 時觸發燃燒傷害。', 'text-orange-200');
+                this.addStatusItem(statusList, '🌡️ 过热状态', '温度 >100°C 时触发燃烧伤害。', 'text-orange-200');
             }
             if (enemy.affixes.includes('berserk')) {
                 const berserkChance = (enemy.temp / 100) * 0.5 * 100;
-                this.addStatusItem(statusList, '😡 熱能狂暴', `因過熱，有 ${berserkChance.toFixed(0)}% 概率行動兩次。`, 'text-red-400');
+                this.addStatusItem(statusList, '😡 热能狂暴', `因过热，有 ${berserkChance.toFixed(0)}% 概率行动两次。`, 'text-red-400');
             }
         }
         if (enemy.temp < 0) {
             const conductBonus = Math.min(100, 15 + Math.abs(enemy.temp) * 0.85);
-            this.addStatusItem(statusList, '⚡ 導電體質', `低溫使連鎖閃電傳導概率提升至 ${(conductBonus).toFixed(0)}%。`, 'text-purple-300');
+            this.addStatusItem(statusList, '⚡ 导电体质', `低温使连锁闪电传导概率提升至 ${(conductBonus).toFixed(0)}%。`, 'text-purple-300');
         } else {
-            this.addStatusItem(statusList, '⚡ 導電體質', `基礎連鎖閃電傳導概率 15%。`, 'text-purple-300/50');
+            this.addStatusItem(statusList, '⚡ 导电体质', `基础连锁闪电传导概率 15%。`, 'text-purple-300/50');
         }
         const affixContainer = document.getElementById('info-affix-list');
         affixContainer.innerHTML = '';
         if (enemy.affixes.length === 0) {
-            affixContainer.innerHTML = '<p class="text-slate-500 text-center italic mt-4">該敵人無特殊詞條</p>';
+            affixContainer.innerHTML = '<p class="text-slate-500 text-center italic mt-4">该敌人无特殊词条</p>';
         } else {
             enemy.affixes.forEach(affix => {
                 const info = this.affixDict[affix];
@@ -1502,18 +1502,18 @@ function setupSkillTrainingTargets(game) {
 
 const TRAINING_SCENARIOS = {
     categories: [
-        { id: 'enemy', name: '敵人詞條' },
-        { id: 'attribute', name: '屬性效果' },
-        { id: 'boss', name: 'Boss 機制' },
+        { id: 'enemy', name: '敌人词条' },
+        { id: 'attribute', name: '属性效果' },
+        { id: 'boss', name: '首领机制' },
         { id: 'skill', name: '主动技能' },
-        { id: 'runeword', name: '符文詞條' },
-        { id: 'resonance', name: '屬性共鳴' },
-        { id: 'relic', name: '遺物/精華' },
-        { id: 'v2matrix', name: '敵人 V2 矩陣' },
-        { id: 'enemy_v2', name: '敵人 V2 / 美術驗收' }
+        { id: 'runeword', name: '符文词条' },
+        { id: 'resonance', name: '属性共鸣' },
+        { id: 'relic', name: '遗物/精华' },
+        { id: 'v2matrix', name: '敌人 V2 矩阵' },
+        { id: 'enemy_v2', name: '敌人 V2 / 美术验收' }
     ],
     scenarios: [
-        // ── 敵人詞條 ──────────────────────────────────────────────────
+        // ── 敌人词条 ──────────────────────────────────────────────────
         {
             id: 'active_skill_sandbox',
             categoryId: 'skill',
@@ -1533,9 +1533,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'enemy_shield',
             categoryId: 'enemy',
-            name: '護盾魔像',
+            name: '护盾魔像',
             icon: '🛡️',
-            desc: '護盾減傷 50%，激光可被反射。建議用激光子彈測試反射效果。',
+            desc: '护盾减伤 50%，激光可被反射。建议用激光子弹测试反射效果。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1547,9 +1547,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'enemy_radiant_aegis',
             categoryId: 'enemy',
-            name: '流彩護盾',
+            name: '流彩护盾',
             icon: '✦',
-            desc: '超級精英詞條：流彩盾未破時每回合自增；满层后再次获取会为周围一格敌人增加 1 层护盾。此场景演示精英半强度版本。',
+            desc: '超级精英词条：流彩盾未破时每回合自增；满层后再次获取会为周围一格敌人增加 1 层护盾。此场景演示精英半强度版本。',
             setup: (game) => {
                 const w = game.enemyWidth;
                 const h = game.enemyHeight;
@@ -1568,7 +1568,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'enemy',
             name: '分身魔像',
             icon: '🦠',
-            desc: '受擊有 20% 概率分裂，回合開始有 50% 概率分裂。可迅速填滿戰場。',
+            desc: '受击有 20% 概率分裂，回合开始有 50% 概率分裂。可迅速填满战场。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1580,9 +1580,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'enemy_haste',
             categoryId: 'enemy',
-            name: '極速魔像',
+            name: '极速魔像',
             icon: '⚡',
-            desc: '每回合額外追加一次衝刺移動，速度是普通敵人的兩倍。',
+            desc: '每回合额外追加一次冲刺移动，速度是普通敌人的两倍。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 0 * game.enemyHeight + game.enemyHeight / 2;
@@ -1595,7 +1595,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'enemy',
             name: '狂暴魔像',
             icon: '😡',
-            desc: '每回合自動升溫 +20°C，溫度結算執行兩次。過熱時有概率觸發狂暴。',
+            desc: '每回合自动升温 +20°C，温度结算执行两次。过热时有概率触发狂暴。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1609,9 +1609,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'enemy_healer',
             categoryId: 'enemy',
-            name: '治癒魔像',
+            name: '治愈魔像',
             icon: '💖',
-            desc: '回合行動時治療周圍友軍。優先消滅治療者，否則傷害難以積累。',
+            desc: '回合行动时治疗周围友军。优先消灭治疗者，否则伤害难以积累。',
             setup: (game) => {
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 const e1 = new Enemy(1.5 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 200);
@@ -1625,9 +1625,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'enemy_devour',
             categoryId: 'enemy',
-            name: '貪食魔像',
+            name: '贪食魔像',
             icon: '👅',
-            desc: '每回合有概率吞噬相鄰友軍，繼承其血量與詞條，被吞噬單位立即死亡。',
+            desc: '每回合有概率吞噬相邻友军，继承其血量与词条，被吞噬单位立即死亡。',
             setup: (game) => {
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 const food = new Enemy(2 * game.enemyWidth + game.enemyWidth / 2, y, 60, 60, 100, 100, 'normal', ['clone']);
@@ -1639,9 +1639,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'enemy_jump',
             categoryId: 'enemy',
-            name: '跳躍魔像',
+            name: '跳跃魔像',
             icon: '🦘',
-            desc: '前方被阻擋時可直接跳過障礙物繼續前進，無視阻擋。',
+            desc: '前方被阻挡时可直接跳过障碍物继续前进，无视阻挡。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const blocker = new Enemy(x, game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2, 60, 60, 100, 100);
@@ -1655,7 +1655,7 @@ const TRAINING_SCENARIOS = {
             categoryId: 'enemy',
             name: '再生魔像',
             icon: '💚',
-            desc: '每回合自動回復一定比例血量。需在回合間隙造成足夠傷害才能擊殺。',
+            desc: '每回合自动回复一定比例血量。需在回合间隙造成足够伤害才能击杀。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1665,7 +1665,7 @@ const TRAINING_SCENARIOS = {
             },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
         },
-        // ── 屬性效果 ──────────────────────────────────────────────────
+        // ── 属性效果 ──────────────────────────────────────────────────
         {
             id: 'enemy_rune_bearer',
             categoryId: 'enemy',
@@ -1700,9 +1700,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_bounce',
             categoryId: 'attribute',
-            name: '彈性 (Bounce)',
+            name: '弹性',
             icon: '⤴️',
-            desc: '子彈在敵人間彈射，適合密集怪群。彈跳次數越多，連擊越多。',
+            desc: '子弹在敌人间弹射，适合密集怪群。弹跳次数越多，连击越多。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
@@ -1722,9 +1722,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_pierce',
             categoryId: 'attribute',
-            name: '穿透 (Pierce)',
+            name: '穿透',
             icon: '↗️',
-            desc: '子彈穿透敵人身體，直接打擊後排目標，適合縱列排布的敵人。',
+            desc: '子弹穿透敌人身体，直接打击后排目标，适合纵列排布的敌人。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 for (let i = 0; i < 5; i++) {
@@ -1740,9 +1740,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_scatter',
             categoryId: 'attribute',
-            name: '散射 (Scatter)',
+            name: '散射',
             icon: '🔱',
-            desc: '子彈飛行時向兩側分裂出小型子彈，擴大打擊覆蓋面。',
+            desc: '子弹飞行时向两侧分裂出小型子弹，扩大打击覆盖面。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
@@ -1759,9 +1759,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_cryo',
             categoryId: 'attribute',
-            name: '冰霜 (Cryo)',
+            name: '冰霜',
             icon: '❄️',
-            desc: '降低敵人溫度。低溫觸發【易傷】，-100°C 觸發【凍結】使敵人無法行動。',
+            desc: '降低敌人温度。低温触发【易伤】，-100°C 触发【冻结】使敌人无法行动。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1778,9 +1778,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_pyro',
             categoryId: 'attribute',
-            name: '火焰 (Pyro)',
+            name: '火焰',
             icon: '🔥',
-            desc: '升高敵人溫度。高溫觸發【燃燒】持續傷害，過熱可引發【爆炸】AOE。',
+            desc: '升高敌人温度。高温触发【燃烧】持续伤害，过热可引发【爆炸】范围伤害。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1500));
@@ -1797,9 +1797,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_lightning',
             categoryId: 'attribute',
-            name: '閃電 (Lightning)',
+            name: '闪电',
             icon: '⚡',
-            desc: '命中觸發連鎖閃電。目標溫度越低（冰凍狀態）連鎖概率越高，最多連鎖 100 次。',
+            desc: '命中触发连锁闪电。目标温度越低（冰冻状态）连锁概率越高，最多连锁 100 次。',
             setup: (game) => {
                 // @section:drawer_reward_calc - 奖励计算：属性汇总与等级提升
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
@@ -1820,9 +1820,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_laser',
             categoryId: 'attribute',
-            name: '激光 (Laser)',
+            name: '激光',
             icon: '🔦',
-            desc: '瞬時射線，對路徑上所有敵人造成傷害。激光可被護盾反射，改變方向。',
+            desc: '瞬时射线，对路径上所有敌人造成伤害。激光可被护盾反射，改变方向。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let i = 0; i < 6; i++) {
@@ -1842,9 +1842,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_wind',
             categoryId: 'attribute',
-            name: '風暴 (Wind)',
+            name: '风暴',
             icon: '🌪️',
-            desc: '命中點生成風暴法陣，持續發射風刃攻擊附近敵人。',
+            desc: '命中点生成风暴法阵，持续发射风刃攻击附近敌人。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -1861,9 +1861,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_venom',
             categoryId: 'attribute',
-            name: '毒素 (Venom)',
+            name: '毒素',
             icon: '☠️',
-            desc: '命中疊加毒層，造成持續傷害（DoT）。毒層越高，每秒傷害越高。適合高血量敵人。',
+            desc: '命中叠加毒层，造成持续伤害。毒层越高，每秒伤害越高。适合高血量敌人。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 3000));
@@ -1880,9 +1880,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_overcharge',
             categoryId: 'attribute',
-            name: '超載 (Overcharge)',
+            name: '超载',
             icon: '💥',
-            desc: '命中時引發超載爆炸，對命中點周圍敵人造成 AOE 傷害。適合密集怪群。',
+            desc: '命中时引发超载爆炸，对命中点周围敌人造成范围伤害。适合密集怪群。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1200));
@@ -1899,9 +1899,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'attr_echo',
             categoryId: 'attribute',
-            name: '回響 (Echo)',
+            name: '回响',
             icon: '🔁',
-            desc: '命中時有概率分裂出回響子彈，繼承部分屬性向附近敵人飛行。適合擴大打擊覆蓋面。',
+            desc: '命中时有概率分裂出回响子弹，继承部分属性向附近敌人飞行。适合扩大打击覆盖面。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -1916,13 +1916,13 @@ const TRAINING_SCENARIOS = {
                 game.spawn_spawnBullet(game.width / 2, game.height - 100, vel, { ...tg.bulletConfig }, null, true);
             }
         },
-        // ── Boss 機制 ──────────────────────────────────────────────────
+        // ── Boss 机制 ──────────────────────────────────────────────────
         {
             id: 'boss_ignis',
             categoryId: 'boss',
-            name: '熔爐守衛·伊格尼斯',
+            name: '熔炉守卫·伊格尼斯',
             icon: '🔥',
-            desc: '護盾+極速。狂暴後每回合升溫 +30°C 並對周圍敵人火焰濺射。破綻譜：穿透/火焰。',
+            desc: '护盾+极速。狂暴后每回合升温 +30°C 并对周围敌人火焰溅射。破绽谱：穿透/火焰。',
             setup: (game) => { game.spawn_spawnBoss('ignis', false); },
             bulletConfig: { damage: 50, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 200, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1930,9 +1930,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'boss_glacies',
             categoryId: 'boss',
-            name: '霜晶縫合怪·格拉西斯',
+            name: '霜晶缝合怪·格拉西斯',
             icon: '❄️',
-            desc: '跳躍+再生。回合與落地會在戰場內縫合霜縫，使敵人短暫減傷、回血並獲得護盾；冰霜可凍結下一次霜縫，穿透可切斷霜縫。破綻譜：冰霜/穿透。',
+            desc: '跳跃+再生。回合与落地会在战场内缝合霜缝，使敌人短暂减伤、回血并获得护盾；冰霜可冻结下一次霜缝，穿透可切断霜缝。破绽谱：冰霜/穿透。',
             setup: (game) => { game.spawn_spawnBoss('glacies', false); },
             bulletConfig: { damage: 50, bounce: 0, pierce: 3, scatter: 0, multicast: 0, pyro: 0, cryo: 200, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1940,9 +1940,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'boss_mikro',
             categoryId: 'boss',
-            name: '裂變母體·米克羅',
+            name: '裂变母体·米克罗',
             icon: '🦠',
-            desc: '分身+治療。每個存活分身提供 10% 減傷（上限 50%）。破綻譜：閃電/散射。',
+            desc: '分身+治疗。每个存活分身提供 10% 减伤（上限 50%）。破绽谱：闪电/散射。',
             setup: (game) => { game.spawn_spawnBoss('mikro', false); },
             bulletConfig: { damage: 20, bounce: 0, pierce: 0, scatter: 5, multicast: 0, pyro: 0, cryo: 0, lightning: 8, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1950,9 +1950,9 @@ const TRAINING_SCENARIOS = {
         {
             id: 'boss_devourer',
             categoryId: 'boss',
-            name: '貪婪之淵·噬神者',
+            name: '贪婪之渊·噬神者',
             icon: '👅',
-            desc: '深渊胃域+护盾。每回合拉拽并召唤 maw_thrall 养料，吞噬胃域内所有非 Boss 敌人并转化为护盾；狂暴后吞噬范围扩至全屏。破绽谱：弹跳/激光。',
+            desc: '深渊胃域+护盾。每回合拉拽并召唤养料，吞噬胃域内所有非首领敌人并转化为护盾；狂暴后吞噬范围扩至全屏。破绽谱：弹跳/激光。',
             setup: (game) => { game.spawn_spawnBoss('devourer', false); },
             bulletConfig: { damage: 40, bounce: 5, pierce: 0, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: true, isMatryoshka: false, type: 'normal', laser: 8 },
             demoAction: (game) => { game.phase_enemy_startLogic(); }
@@ -1990,7 +1990,7 @@ const TRAINING_SCENARIOS = {
         {
             id: 'boss_ouroboros',
             categoryId: 'boss',
-            name: '永恆回聲·奧羅波羅斯',
+            name: '永恒回声·奥罗波罗斯',
             icon: '🔄',
             desc: '六附体轮转。每回合前位附体更换并授予护盾、治疗、召唤、位移、吞噬、加速六类机制；当前附体决定破绽谱，打满破绽会封印该附体并改变轮转节奏。',
             setup: (game) => { game.spawn_spawnBoss('ouroboros', true); },
@@ -1999,20 +1999,20 @@ const TRAINING_SCENARIOS = {
         {
             id: 'boss_ouroboros_attachment_slots',
             categoryId: 'boss',
-            name: '奧羅波羅斯·附体槽验收',
+            name: '奥罗波罗斯·附体槽验收',
             icon: '⬡',
             keepSidebarOpenOnDemo: true,
-            desc: '使用真实 Ouroboros Boss 逐槽预览六个附体槽贴图。点击触发演示会依次切换 aegis / graft / brood / stride / maw / surge；槽位贴在 Boss 环上，不生成会移动的 orbit_echo 伴生敌。',
+            desc: '使用真实的奥罗波罗斯首领逐槽预览六个附体槽贴图。点击触发演示会依次切换 aegis / graft / brood / stride / maw / surge；槽位贴在首领环上，不生成会移动的 orbit_echo 伴生敌。',
             setup: (game) => { setupOuroborosAttachmentSlotAcceptance(game, 0); },
             demoAction: (game) => { advanceOuroborosAttachmentSlotAcceptance(game); }
         },
         {
             id: 'boss_vulnerability_break',
             categoryId: 'boss',
-            name: 'Boss 破綻逐档验收',
+            name: '首领破绽逐档验收',
             icon: '🎯',
             keepSidebarOpenOnDemo: true,
-            desc: '逐档预览 8 个 Boss 的身体破绽层：0/25/50/75/破绽爆开/暴露停摆/恢复闭合。点击触发演示切换到下一档。',
+            desc: '逐档预览 8 个首领的身体破绽层：0/25/50/75/破绽爆开/暴露停摆/恢复闭合。点击触发演示切换到下一档。',
             setup: (game) => {
                 game._bossVulnerabilityVisualAcceptance = { bossIndex: 0, stateIndex: 0 };
                 const bossId = BOSS_VULNERABILITY_VISUAL_BOSSES[0];
@@ -2055,18 +2055,18 @@ const TRAINING_SCENARIOS = {
                 }
             }
         },
-        // ── 符文詞條 ──────────────────────────────────────────────────────────────────
+        // ── 符文词条 ──────────────────────────────────────────────────────────────────
         {
             id: 'rw_meltdown',
             categoryId: 'runeword',
             runewordId: 'runeword_meltdown',
             runewordLevel: 1,
-            name: '燔毀',
+            name: '燔毁',
             icon: '🌋',
-            desc: '[炸毒系] 火焰燃燒傷害與過熱爆炸最終傷害提升 50%。建議將敵人溫度提升至爆燃閾値再觸發演示。',
+            desc: '[炸毒系] 火焰燃烧伤害与过热爆炸最终伤害提升 50%。建议将敌人温度提升至爆燃阈值再触发演示。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
-                // 中心一个高血量敌人，初始温度设为 160°C（接近爆燃閾値 200°C）
+                // 中心一个高血量敌人，初始温度设为 160°C（接近爆燃阈值 200°C）
                 const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 3000, 3000);
                 e.temp = 160;
                 game.enemies.push(e);
@@ -2086,14 +2086,14 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_absolute_zero',
             runewordLevel: 1,
-            name: '絕對零度',
+            name: '绝对零度',
             icon: '❄️',
-            desc: '[冰霜系] 散人處於凍結狀態時，每次受到物理傷害都會令該散人本回合受到的所有傷害加深。建議先用冰霜將敵人凍結再改用穿透子彈測試。',
+            desc: '[冰霜系] 散人处于冻结状态时，每次受到物理伤害都会令该散人本回合受到的所有伤害加深。建议先用冰霜将敌人冻结再改用穿透子弹测试。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
                 const e = new Enemy(x, y, 60, 60, 5000, 5000);
-                e.temp = -120; // 已凍結
+                e.temp = -120; // 已冻结
                 game.enemies.push(e);
             },
             bulletConfig: { damage: 50, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
@@ -2110,7 +2110,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '冰霜新星',
             icon: '💠',
-            desc: '[冰霜系] 彈珠每彈跳 5 次，釋放一次冰霜新星，造成冰屬性傷害並降溫；被冰霜新星击中的敌人按当前冻结概率链式触发新一轮新星，每次链式概率减半。建議配合高彈跳与低温敵人測試链式触发。',
+            desc: '[冰霜系] 弹珠每弹跳 5 次，释放一次冰霜新星，造成冰属性伤害并降温；被冰霜新星击中的敌人按当前冻结概率链式触发新一轮新星，每次链式概率减半。建议配合高弹跳与低温敌人测试链式触发。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2130,15 +2130,15 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_thunderstorm',
             runewordLevel: 1,
-            name: '雷暴之語',
+            name: '雷暴之语',
             icon: '🌩️',
-            desc: '[閃電系] 閃電鏈的傷害衰減係數提升 50%，連鎖傷害更高。建護將敵人先凍結再用閃電以激發更高連鎖機率。',
+            desc: '[闪电系] 闪电链的伤害衰减系数提升 50%，连锁伤害更高。建议将敌人先冻结再用闪电以激发更高连锁机率。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
                     for (let c = 1; c < 5; c++) {
                         const e = new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 600);
-                        e.temp = -100; // 凍結狀態，提高閃電連鎖機率
+                        e.temp = -100; // 冻结状态，提高闪电连锁机率
                         game.enemies.push(e);
                     }
                 }
@@ -2154,9 +2154,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_kinetic_surge',
             runewordLevel: 1,
-            name: '動能激増',
+            name: '动能激增',
             icon: '💥',
-            desc: '[彈射系] 本次發射的彈珠，後續的每一次彈射傷害固定增加 +1。彈跳次數越多，總傷害越高。',
+            desc: '[弹射系] 本次发射的弹珠，后续的每一次弹射伤害固定增加 +1。弹跳次数越多，总伤害越高。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
@@ -2178,9 +2178,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_focused_fire',
             runewordLevel: 1,
-            name: '專注射擊',
+            name: '专注射击',
             icon: '🎯',
-            desc: '[專注系] 符文配方已改为「寒冰 + 穿刺」（不再依赖激光）。將所有彈跳和連射層數轉化為基礎傷害；傷害有 20% 機率暴擊，造成 200% 傷害。建議配合高彈跳屬性測試。',
+            desc: '[专注系] 符文配方已改为「寒冰 + 穿刺」（不再依赖激光）。将所有弹跳和连射层数转化为基础伤害；伤害有 20% 机率暴击，造成 200% 伤害。建议配合高弹跳属性测试。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -2199,9 +2199,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_mass_collapse',
             runewordLevel: 1,
-            name: '質量崩塌',
+            name: '质量崩塌',
             icon: '💣',
-            desc: '[爆炸系] 強制獲得爆炸屬性（範圍減半）。仅清空所有散射層數（連射保留），每清空 1 層散射爆炸範圍 +10%。建議配合高散射屬性測試。',
+            desc: '[爆炸系] 强制获得爆炸属性（范围减半）。仅清空所有散射层数（连射保留），每清空 1 层散射爆炸范围 +10%。建议配合高散射属性测试。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2222,9 +2222,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_kinetic_decay',
             runewordLevel: 1,
-            name: '動能衰變',
+            name: '动能衰变',
             icon: '📉',
-            desc: '[衰變系] 子彈初始獲得 25% 傷害加成。但每次命中敵人後，此加成會衰減 7%。建護配合高穿透屬性測試傷害逐次降低。',
+            desc: '[衰变系] 子弹初始获得 25% 伤害加成。但每次命中敌人后，此加成会衰减 7%。建议配合高穿透属性测试伤害逐次降低。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 for (let i = 0; i < 5; i++) {
@@ -2243,9 +2243,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_echo_shot',
             runewordLevel: 1,
-            name: '回響射擊',
+            name: '回响射击',
             icon: '🔄',
-            desc: '[回響系] 子彈首次擊中敵人時，有 25% 機率按原角度額外發射一顆單發子彈。建護用多次發射測試回響觸發機率。',
+            desc: '[回响系] 子弹首次击中敌人时，有 25% 机率按原角度额外发射一颗单发子弹。建议用多次发射测试回响触发机率。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
@@ -2271,7 +2271,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '嗜血初锋',
             icon: '🗡️',
-            desc: '[成長系] 每次擊殺敵人，本局全局基礎傷害永久 +1。但冰霜與火焰屬性層數降低 30%。建護先擊殺小怪累積傷害加成再汋試精英怪。',
+            desc: '[成长系] 每次击杀敌人，本局全局基础伤害永久 +1。但冰霜与火焰属性层数降低 30%。建议先击杀小怪累积伤害加成再尝试精英怪。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 // 低血量小怪：第一排 15 血，第二排 31 血
@@ -2279,7 +2279,7 @@ const TRAINING_SCENARIOS = {
                     game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 0 * h + h/2, 60, 60, 15));
                     game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + 1 * h + h/2, 60, 60, 31));
                 }
-                // 一個高血量精英怪
+                // 一个高血量精英怪
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 2000, 2000, 'normal', ['shield']));
             },
             bulletConfig: { damage: 15, bounce: 0, pierce: 2, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
@@ -2294,9 +2294,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_scatter_matrix',
             runewordLevel: 1,
-            name: '散射矩陣',
+            name: '散射矩阵',
             icon: '🔱',
-            desc: '[轉化系] 連射次數全部轉化為散射層數。基礎傷害降低 25%，散射子彈的發射夾角縮小 70%。建護配合高連射屬性測試。',
+            desc: '[转化系] 连射次数全部转化为散射层数。基础伤害降低 25%，散射子弹的发射夹角缩小 70%。建议配合高连射属性测试。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2317,9 +2317,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_flame_sword',
             runewordLevel: 1,
-            name: '炎光劍影',
+            name: '炎光剑影',
             icon: '🔥',
-            desc: '[穿透系] 子母飞剑/普通子彈穿透敵人時，有 30% 機率在命中位置生成一道剑光 AOE 伤害（非爆炸），并对范围内敌人额外升温。建議配合高穿透與高伤害子彈測試。',
+            desc: '[穿透系] 子母飞剑/普通子弹穿透敌人时，有 30% 机率在命中位置生成一道剑光范围伤害（非爆炸），并对范围内敌人额外升温。建议配合高穿透与高伤害子弹测试。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 for (let i = 0; i < 4; i++) {
@@ -2337,15 +2337,15 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_elemental_fusion',
             runewordLevel: 1,
-            name: '元素聚變',
+            name: '元素聚变',
             icon: '⚗️',
-            desc: '[元素系] 當敵人同時承受火、冰、雷三種狀態時，引發元素聚變爆炸。建護先用冰霜+閃電將敵人凍結，再用火焰觸發聚變。',
+            desc: '[元素系] 当敌人同时承受火、冰、雷三种状态时，引发元素聚变爆炸。建议先用冰霜+闪电将敌人冻结，再用火焰触发聚变。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
-                // 中心目標敵人，初始狀態設為冰電共存
+                // 中心目标敌人，初始状态设为冰电共存
                 // [修复] 同时设置 temp=-100 和 _cryoHitThisRound=true，确保冰状态标记有效
                 const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 4000, 4000);
-                e.temp = -100; // 凍結
+                e.temp = -100; // 冻结
                 e._cryoHitThisRound = true;      // [修复] 预设冰元素标记，供聚变触发条件使用
                 e._lightningHitThisRound = true; // [修复] 预设雷元素标记，模拟已被闪电命中状态
                 game.enemies.push(e);
@@ -2370,7 +2370,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '雷霖散射',
             icon: '⚡',
-            desc: '[閃電系] 每次成功觸發閃電鏈時，額外釋放一條同屬性閃電鏈。建護配合凍結狀態的密集敵人測試連鎖暴發。',
+            desc: '[闪电系] 每次成功触发闪电链时，额外释放一条同属性闪电链。建议配合冻结状态的密集敌人测试连锁暴发。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2394,7 +2394,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '照射',
             icon: '☀️',
-            desc: '[激光系] 激光變為持續照射。累積照射同一個敵人，受到的傷害加深 15%。建護對單一敵人持續照射測試傷害累加效果。',
+            desc: '[激光系] 激光变为持续照射。累积照射同一个敌人，受到的伤害加深 15%。建议对单一敌人持续照射测试伤害累加效果。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -2416,7 +2416,7 @@ const TRAINING_SCENARIOS = {
             runewordLevel: 1,
             name: '穿甲流星',
             icon: '💨',
-            desc: '[穿透系] 散射出的子彈丸繼承 100% 的穿透層數。建護配合高穿透+高散射屬性測試。',
+            desc: '[穿透系] 散射出的子弹丸继承 100% 的穿透层数。建议配合高穿透+高散射属性测试。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 4; r++) {
@@ -2436,9 +2436,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_blazing_beam',
             runewordLevel: 1,
-            name: '炽熱光線',
+            name: '炽热光线',
             icon: '🔥',
-            desc: '[復合系] 激光照射敵人時，除了造成傷害，每 0.5 秒還會額外提升敵人溫度 +5°C。建議配合火焰屬性持續照射高血量敵人，觀察升溫→燃燒觸發的完整鏈路。',
+            desc: '[复合系] 激光照射敌人时，除了造成伤害，每 0.5 秒还会额外提升敌人温度 +5°C。建议配合火焰属性持续照射高血量敌人，观察升温→燃烧触发的完整链路。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -2457,9 +2457,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_lightning_shield',
             runewordLevel: 1,
-            name: '雷電護盾',
+            name: '雷电护盾',
             icon: '🛡️',
-            desc: '[復合系] 彈珠彈射時有 15% 機率在自身周圍生成靜電場；被靜電場击中的敌人 100% 觸發闪电链。建議配合高彈跳/低层闪电属性測試。',
+            desc: '[复合系] 弹珠弹射时有 15% 机率在自身周围生成静电场；被静电场击中的敌人 100% 触发闪电链。建议配合高弹跳/低层闪电属性测试。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
@@ -2481,9 +2481,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_blade_storm',
             runewordLevel: 1,
-            name: '劍刃風暴',
+            name: '剑刃风暴',
             icon: '🌀',
-            desc: '[復合系] 首個子彈定期對範圍內所有敵人生成一次劍光斬擊。建護將子彈射入敵人堆中測試周期性傷害。',
+            desc: '[复合系] 首个子弹定期对范围内所有敌人生成一次剑光斩击。建议将子弹射入敌人堆中测试周期性伤害。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2504,9 +2504,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_sword_resonance',
             runewordLevel: 1,
-            name: '劍意共鳴',
+            name: '剑意共鸣',
             icon: '⚔️',
-            desc: '[特殊系] 解鎖飛劍變異。穿透彈珠碰撞穿透鉤釘時，有 70% 機率使其變異為飛劍鉤釘。該場景需在收集階段測試，此處僅展示詞條激活狀態。',
+            desc: '[特殊系] 解锁飞剑变异。穿透弹珠碰撞穿透钩钉时，有 70% 机率使其变异为飞剑钩钉。该场景需在收集阶段测试，此处仅展示词条激活状态。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -2523,9 +2523,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_storm_resonance',
             runewordLevel: 1,
-            name: '風暴共鳴',
+            name: '风暴共鸣',
             icon: '🌪️',
-            desc: '[特殊系] 解鎖風屬性變異。反彈彈珠碰撞反彈鉤釘時，有 70% 機率使其變異為風屬性鉤釘。該場景需在收集階段測試，此處僅展示詞條激活狀態。',
+            desc: '[特殊系] 解锁风属性变异。反弹弹珠碰撞反弹钩钉时，有 70% 机率使其变异为风属性钩钉。该场景需在收集阶段测试，此处仅展示词条激活状态。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 const y = game.combatGridTopY + 1 * game.enemyHeight + game.enemyHeight / 2;
@@ -2542,9 +2542,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_bullet_to_sword',
             runewordLevel: 1,
-            name: '化彈為劍',
+            name: '化弹为剑',
             icon: '⚔️',
-            desc: '[穿透系] 首輪發射的子彈被替換為一把子飛劍（取消連射），原連射層數轉為子飛劍攻擊次數；詞條等級對應子飛劍等級（Lv1/Lv2/Lv3）。建議搭配高連射屬性測試攻擊次數。',
+            desc: '[穿透系] 首轮发射的子弹被替换为一把子飞剑（取消连射），原连射层数转为子飞剑攻击次数；词条等级对应子飞剑等级（Lv1/Lv2/Lv3）。建议搭配高连射属性测试攻击次数。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2565,12 +2565,12 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_toxic_bloom',
             runewordLevel: 1,
-            name: '毒花綻放',
+            name: '毒花绽放',
             icon: '🌿',
-            desc: '[劇毒系] 劇毒命中時向半徑 90 內的鄰近敵人擴散少量毒層。建議讓子彈命中密集怪群的中心，觀察周圍敵人是否被附加毒層。',
+            desc: '[剧毒系] 剧毒命中时向半径 90 内的邻近敌人扩散少量毒层。建议让子弹命中密集怪群的中心，观察周围敌人是否被附加毒层。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
-                // 3x3 密集怪群：子彈命中前排即可向四周擴散毒層
+                // 3x3 密集怪群：子弹命中前排即可向四周扩散毒层
                 [{c:1.5,r:0},{c:2.5,r:0},{c:3.5,r:0},
                  {c:1.5,r:1},{c:2.5,r:1},{c:3.5,r:1},
                  {c:1.5,r:2},{c:2.5,r:2},{c:3.5,r:2}].forEach(p => {
@@ -2588,9 +2588,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_overload_core',
             runewordLevel: 1,
-            name: '超載核心',
+            name: '超载核心',
             icon: '💥',
-            desc: '[超載系] 超載爆炸半徑 +24、爆炸傷害 +20%。建議命中怪群中心，觀察更大的爆炸範圍與更高的 AOE 傷害。',
+            desc: '[超载系] 超载爆炸半径 +24、爆炸伤害 +20%。建议命中怪群中心，观察更大的爆炸范围与更高的范围伤害。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1500));
@@ -2609,9 +2609,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_echo_chamber',
             runewordLevel: 1,
-            name: '回響腔體',
+            name: '回响腔体',
             icon: '🔁',
-            desc: '[回響系] 回響觸發率 +10%，回響子彈繼承更多屬性。建議多次發射帶回響的子彈，觀察分裂子彈數量與屬性繼承。',
+            desc: '[回响系] 回响触发率 +10%，回响子弹继承更多属性。建议多次发射带回响的子弹，观察分裂子弹数量与属性继承。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2631,12 +2631,12 @@ const TRAINING_SCENARIOS = {
             categoryId: 'runeword',
             runewordId: 'runeword_son_sword_summon',
             runewordLevel: 1,
-            name: '召劍之語',
+            name: '召剑之语',
             icon: '🗡️',
-            desc: '[特殊系] 彈珠每次命中敵人時有 7% 概率在命中位置召喚一把三級子飛劍，子飛劍繼承彈珠屬性（火/冰/雷）。建議用高彈跳+元素子彈製造大量命中，觀察子飛劍召喚。',
+            desc: '[特殊系] 弹珠每次命中敌人时有 7% 概率在命中位置召唤一把三级子飞剑，子飞剑继承弹珠属性（火/冰/雷）。建议用高弹跳+元素子弹制造大量命中，观察子飞剑召唤。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
-                // 密集怪群 + 高血量，製造大量命中以觸發召喚
+                // 密集怪群 + 高血量，制造大量命中以触发召唤
                 for (let r = 0; r < 4; r++) {
                     for (let c = 1; c < 4; c++) {
                         game.enemies.push(new Enemy((c + 0.5) * w + w/2, top + r * h + h/2, 60, 60, 1200));
@@ -2651,7 +2651,7 @@ const TRAINING_SCENARIOS = {
         {
             id: 'rw_pierce_decay',
             categoryId: 'attribute',
-            name: '穿透衰減',
+            name: '穿透衰减',
             icon: '📉',
             desc: '[平衡] 穿透子弹每次穿透命中后伤害衰减 35%（最低保留 15% 基础伤害）；穿透共鸣 T2/T3 可降低衰减率（T2 -20%，T3 -40%）。建议配合高穿透层数子弹测试逐次衰减。',
             setup: (game) => {
@@ -2667,7 +2667,7 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // ── 屬性共鳴（ELEMENT_RESONANCE_DB）────────────────────────────────────────────────
+        // ── 属性共鸣（ELEMENT_RESONANCE_DB）────────────────────────────────────────────────
         //   每个场景注入对应元素的「三阶」共鸣（statCount 设为阈值），并配置对应属性子弹用于现场观察。
         //   切换 resonanceTier(1/2/3) 可验证不同阶位。引擎在 loadScenario 中自动注入到 activeElementResonances。
         {
@@ -2675,9 +2675,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'pyro',
             resonanceTier: 3,
-            name: '炎焰共鳴·三階',
+            name: '炎焰共鸣·三阶',
             icon: '🔥',
-            desc: '[炎焰共鳴 T3] 火焰額外傷害觸發溫度降至 0°、爆燃閾值降至 100°、基礎火焰 +25、火焰傷害整體 +50%。建議連續命中觀察更快的燃燒/爆燃。',
+            desc: '[炎焰共鸣 T3] 火焰额外伤害触发温度降至 0°、爆燃阈值降至 100°、基础火焰 +25、火焰伤害整体 +50%。建议连续命中观察更快的燃烧/爆燃。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 2500);
@@ -2698,9 +2698,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'cryo',
             resonanceTier: 3,
-            name: '冰霜共鳴·三階',
+            name: '冰霜共鸣·三阶',
             icon: '❄️',
-            desc: '[冰霜共鳴 T3] 凍結觸發溫度提升至 -20°（極易凍結）、基礎冰霜 +25、冰霜傷害 +50%、凍結狀態額外受傷 +30%。建議觀察敵人是否快速凍結。',
+            desc: '[冰霜共鸣 T3] 冻结触发温度提升至 -20°（极易冻结）、基础冰霜 +25、冰霜伤害 +50%、冻结状态额外受伤 +30%。建议观察敌人是否快速冻结。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 const e = new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 2000);
@@ -2718,9 +2718,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'lightning',
             resonanceTier: 3,
-            name: '雷霆共鳴·三階',
+            name: '雷霆共鸣·三阶',
             icon: '⚡',
-            desc: '[雷霆共鳴 T3] 閃電鏈觸發概率與額外鏈數大幅提升、基礎閃電 +25。建議布置密集敵群觀察連鎖閃電覆蓋。',
+            desc: '[雷霆共鸣 T3] 闪电链触发概率与额外链数大幅提升、基础闪电 +25。建议布置密集敌群观察连锁闪电覆盖。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 4; r++) {
@@ -2742,9 +2742,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'bounce',
             resonanceTier: 3,
-            name: '彈跳共鳴·三階',
+            name: '弹跳共鸣·三阶',
             icon: '⤴️',
-            desc: '[彈跳共鳴 T3] 彈跳相關加成達到最高階。建議布置分散怪群，觀察彈跳次數與連擊加成。',
+            desc: '[弹跳共鸣 T3] 弹跳相关加成达到最高阶。建议布置分散怪群，观察弹跳次数与连击加成。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(
@@ -2766,9 +2766,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'pierce',
             resonanceTier: 3,
-            name: '穿透共鳴·三階',
+            name: '穿透共鸣·三阶',
             icon: '↗️',
-            desc: '[穿透共鳴 T3] 穿透衰減率大幅降低（T3 -40%）、基礎穿透提升。建議布置縱列敵群，觀察穿透後排傷害衰減是否減緩。',
+            desc: '[穿透共鸣 T3] 穿透衰减率大幅降低（T3 -40%）、基础穿透提升。建议布置纵列敌群，观察穿透后排伤害衰减是否减缓。',
             setup: (game) => {
                 const x = 2.5 * game.enemyWidth + game.enemyWidth / 2;
                 for (let i = 0; i < 6; i++) {
@@ -2786,9 +2786,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'scatter',
             resonanceTier: 3,
-            name: '散射共鳴·三階',
+            name: '散射共鸣·三阶',
             icon: '🔱',
-            desc: '[散射共鳴 T3] 散射分裂相關加成達到最高階。建議布置寬幅怪群，觀察分裂子彈覆蓋面。',
+            desc: '[散射共鸣 T3] 散射分裂相关加成达到最高阶。建议布置宽幅怪群，观察分裂子弹覆盖面。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 2 * h + h/2, 60, 60, 1000));
@@ -2807,9 +2807,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'venom',
             resonanceTier: 3,
-            name: '毒素共鳴·三階',
+            name: '毒素共鸣·三阶',
             icon: '☠️',
-            desc: '[毒素共鳴 T3] 命中附加更多毒層（baseVenomBonus）、毒素傷害提升。建議用高血量敵人觀察 DoT 疊加速度。',
+            desc: '[毒素共鸣 T3] 命中附加更多毒层、毒素伤害提升。建议用高血量敌人观察持续伤害叠加速度。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 4000));
@@ -2828,9 +2828,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'overcharge',
             resonanceTier: 3,
-            name: '超載共鳴·三階',
+            name: '超载共鸣·三阶',
             icon: '💥',
-            desc: '[超載共鳴 T3] 超載爆炸範圍/傷害達到最高階。建議命中怪群中心觀察 AOE 範圍與傷害。',
+            desc: '[超载共鸣 T3] 超载爆炸范围/伤害达到最高阶。建议命中怪群中心观察范围与伤害。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 1200));
@@ -2849,9 +2849,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'echo',
             resonanceTier: 3,
-            name: '回響共鳴·三階',
+            name: '回响共鸣·三阶',
             icon: '🔁',
-            desc: '[回響共鳴 T3] 回響觸發率與屬性繼承達到最高階。建議多次發射，觀察分裂子彈數量。',
+            desc: '[回响共鸣 T3] 回响触发率与属性继承达到最高阶。建议多次发射，观察分裂子弹数量。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let r = 0; r < 3; r++) {
@@ -2871,9 +2871,9 @@ const TRAINING_SCENARIOS = {
             categoryId: 'resonance',
             resonanceElement: 'laser',
             resonanceTier: 3,
-            name: '激光共鳴·三階',
+            name: '激光共鸣·三阶',
             icon: '🔦',
-            desc: '[激光共鳴 T3] 激光相關加成（持續/反射/傷害）達到最高階。建議布置縱列敵群觀察射線穿透與傷害。',
+            desc: '[激光共鸣 T3] 激光相关加成（持续/反射/伤害）达到最高阶。建议布置纵列敌群观察射线穿透与伤害。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let i = 0; i < 6; i++) {
@@ -2891,15 +2891,15 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // ── 遺物/精華 测试场景 ────────────────────────────────────────────────────────────────────────────────
+        // ── 遗物/精华 测试场景 ────────────────────────────────────────────────────────────────────────────────
 
-        // 場景 1：遺物保底计数器验证
+        // 场景 1：遗物保底计数器验证
         {
             id: 'relic_pity_essence',
             categoryId: 'relic',
-            name: '精華保底验证',
+            name: '精华保底验证',
             icon: '✨',
-            desc: '[保底测试] 重置精華保底计数器为 0，展示当前保底进度。连续击杀 4 行普通敌人后，第 5 行应强制触发精华掌落。点击「模拟击杀」按钮逐行进行验证。',
+            desc: '[保底测试] 重置精华保底计数器为 0，展示当前保底进度。连续击杀 4 行普通敌人后，第 5 行应强制触发精华掌落。点击「模拟击杀」按钮逐行进行验证。',
             setup: (game) => {
                 // 展示 5 行普通敌人，每行 1 个，共 5 个
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
@@ -2918,7 +2918,7 @@ const TRAINING_SCENARIOS = {
                     const nameEl = document.getElementById('rw-banner-name');
                     const descEl = document.getElementById('rw-banner-desc');
                     if (nameEl) nameEl.textContent = '保底计数器';
-                    if (descEl) descEl.textContent = `精華保底: ${game.dropPity ? game.dropPity.essence : 'N/A'} / 4 行 | 遗物保底: ${game.dropPity ? game.dropPity.relic : 'N/A'} / 12 行`;
+                    if (descEl) descEl.textContent = `精华保底: ${game.dropPity ? game.dropPity.essence : 'N/A'} / 4 行 | 遗物保底: ${game.dropPity ? game.dropPity.relic : 'N/A'} / 12 行`;
                 }
             },
             bulletConfig: { damage: 200, bounce: 0, pierce: 5, scatter: 0, multicast: 0, pyro: 0, cryo: 0, lightning: 0, wind: 0, isLaser: false, isMatryoshka: false, type: 'normal' },
@@ -2937,12 +2937,12 @@ const TRAINING_SCENARIOS = {
                 // 更新展示
                 const descEl = document.getElementById('rw-banner-desc');
                 if (descEl && game.dropPity) {
-                    descEl.textContent = `精華保底: ${game.dropPity.essence} / 4 行 | 遗物保底: ${game.dropPity.relic} / 12 行 | 待结算奖励: ${(game.pendingRoundStartRewards || []).length} 个`;
+                    descEl.textContent = `精华保底: ${game.dropPity.essence} / 4 行 | 遗物保底: ${game.dropPity.relic} / 12 行 | 待结算奖励: ${(game.pendingRoundStartRewards || []).length} 个`;
                 }
             }
         },
 
-        // 場景 2：遗物选择界面验证（保底强制触发）
+        // 场景 2：遗物选择界面验证（保底强制触发）
         {
             id: 'relic_selection_ui',
             categoryId: 'relic',
@@ -2965,13 +2965,13 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // 場景 3：混沌精华（Chaos Essence）命运抗决验证
+        // 场景 3：混沌精华（Chaos Essence）命运抗决验证
         {
             id: 'relic_chaos_essence',
             categoryId: 'relic',
             name: '混沌精华命运',
             icon: '🎡',
-            desc: '[混沌精华] 向奖励队列压入 chaos_essence，触发命运抗决界面。验证：底栏是否显示 0/3、选择 3 枚弹珠后确认按鈕是否可用。',
+            desc: '[混沌精华] 向奖励队列压入 chaos_essence，触发命运抗决界面。验证：底栏是否显示 0/3、选择 3 枚弹珠后确认按钮是否可用。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
@@ -2986,7 +2986,7 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // 場景 4：纯净精华（Pure Essence）全链路验证
+        // 场景 4：纯净精华（Pure Essence）全链路验证
         {
             id: 'relic_pure_essence',
             categoryId: 'relic',
@@ -3011,13 +3011,13 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // 場景 5：纯净精华——跳过研磨分支验证
+        // 场景 5：纯净精华——跳过研磨分支验证
         {
             id: 'relic_pure_essence_skip_grind',
             categoryId: 'relic',
             name: '精华跳过研磨',
             icon: '⚡',
-            desc: '[跳过研磨] 触发纯净精华后，直接点击「跳过研磨」按鈕。验证关键点：\n1. ammoQueue 是否被正确充能（优先用 _chargedAmmoQueue，其次编译 marbleQueue）\n2. 进入战斗后不会显示「弹药耗尽」\n3. 是否获得随机符文',
+            desc: '[跳过研磨] 触发纯净精华后，直接点击「跳过研磨」按钮。验证关键点：\n1. ammoQueue 是否被正确充能（优先用 _chargedAmmoQueue，其次编译 marbleQueue）\n2. 进入战斗后不会显示「弹药耗尽」\n3. 是否获得随机符文',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 for (let c = 0; c < 5; c++) {
@@ -3046,13 +3046,13 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // 場景 6：同化涌潮遗物（surge_bounce）验证
+        // 场景 6：同化涌潮遗物（surge_bounce）验证
         {
             id: 'relic_surge_bounce',
             categoryId: 'relic',
             name: '弹性涌潮遗物',
             icon: '🔵',
-            desc: '[同化涌潮] 模拟获得「弹性涌潮」遗物后的状态。验证：\n1. doubleAssimilationBoostRounds[bounce] 是否被设为 2\n2. guaranteedNextRound 是否包含 2 个 bounce 弹珠\n3. 发射 bounce 弹珠后，同化概率是否为基础值 × 2',
+            desc: '[同化涌潮] 模拟获得「弹性涌潮」遗物后的状态。验证：\n1. doubleAssimilationBoostRounds[bounce] 是否被设为 2\n2. guaranteedNextRound 是否包含 2 个 弹性弹珠\n3. 发射 弹性弹珠后，同化概率是否为基础值 × 2',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 // 布置带弹性钉子的敌人（模拟已同化的钉盘）
@@ -3090,29 +3090,29 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // 場景 7：钉盘形态遗物互斥验证
+        // 场景 7：钉盘形态遗物互斥验证
         {
             id: 'relic_board_exclusion',
             categoryId: 'relic',
             name: '钉盘形态互斥',
             icon: '🔺',
-            desc: '[鑉盘形态遗物互斥] 模拟玩家已拥有 triangle_formation，验证遗物选择界面是否正确排除其他鑉盘结构遗物。展示候选遗物列表，确认不包含 diamond_formation、sparse_interval、mirror_sync、wide_narrow、dimension_shard。',
+            desc: '[钉盘形态遗物互斥] 模拟玩家已拥有 triangle_formation，验证遗物选择界面是否正确排除其他钉盘结构遗物。展示候选遗物列表，确认不包含 diamond_formation、sparse_interval、mirror_sync、wide_narrow、dimension_shard。',
             setup: (game) => {
                 const w = game.enemyWidth, h = game.enemyHeight, top = game.combatGridTopY;
                 game.enemies.push(new Enemy(2.5 * w + w/2, top + 1 * h + h/2, 60, 60, 500, 500));
-                // 模拟玩家已拥有三角鑉盘遗物
+                // 模拟玩家已拥有三角钉盘遗物
                 if (!game.ownedRelics) game.ownedRelics = [];
                 if (!game.ownedRelics.includes('triangle_formation')) {
                     game.ownedRelics.push('triangle_formation');
                 }
                 game.boardLayout = 'triangle';
-                // 展示当前鑉盘布局
+                // 展示当前钉盘布局
                 const banner = document.getElementById('train-runeword-banner');
                 if (banner) {
                     banner.classList.add('visible');
                     const nameEl = document.getElementById('rw-banner-name');
                     const descEl = document.getElementById('rw-banner-desc');
-                    if (nameEl) nameEl.textContent = '当前鑉盘布局';
+                    if (nameEl) nameEl.textContent = '当前钉盘布局';
                     if (descEl) descEl.textContent = `boardLayout = '${game.boardLayout}' | ownedRelics 包含: ${game.ownedRelics.filter(r => ['triangle_formation','diamond_formation','sparse_interval','mirror_sync','wide_narrow','dimension_shard'].includes(r)).join(', ')}`;
                 }
             },
@@ -3128,12 +3128,12 @@ const TRAINING_SCENARIOS = {
                     const BOARD_STRUCTURE = ['triangle_formation', 'diamond_formation', 'sparse_interval', 'mirror_sync', 'wide_narrow', 'dimension_shard'];
                     const owned = game.ownedRelics || [];
                     const hasBoard = BOARD_STRUCTURE.some(r => owned.includes(r));
-                    descEl.textContent = `已拥有鑉盘结构遗物: ${hasBoard} | 遗物界面已弹出，请确认候选列表不包含其他鑉盘形态遗物`;
+                    descEl.textContent = `已拥有钉盘结构遗物: ${hasBoard} | 遗物界面已弹出，请确认候选列表不包含其他钉盘形态遗物`;
                 }
             }
         },
 
-        // 場景 8：存档与恢复验证
+        // 场景 8：存档与恢复验证
         {
             id: 'relic_save_restore',
             categoryId: 'relic',
@@ -3174,27 +3174,27 @@ const TRAINING_SCENARIOS = {
             }
         },
 
-        // ── 敵人 V2 美術驗收（逐場景单独验证基底 + 词条视觉）─────────────
+        // ── 敌人 V2 美术验收（逐场景单独验证基底 + 词条视觉）─────────────
         // 对应 docs/enemy_art_implementation_impact.md §试炼场验收说明。
         // 每个场景显式创建 Enemy 实例，字段与 spawn_trySpawnArchetypes 保持一致。
         ...buildEnemyV2Scenarios(),
 
-        // ── 敵人 V2 矩陣（尺寸基底 + 專屬詞條可見性驗收）─────────────
-        // 對應文檔 docs/enemy_visual_design_v2.md：
-        // 9 種 V2 基底（1×1 / 2×1 / 1×2 / 2×2 / 3×1 / 1×3 / 2×3 / 3×2 / 3×3）
-        // 字段命名與 spawn_trySpawnArchetypes 保持一致：
+        // ── 敌人 V2 矩阵（尺寸基底 + 专属词条可见性验收）─────────────
+        // 对应文档 docs/enemy_visual_design_v2.md：
+        // 9 种 V2 基底（1×1 / 2×1 / 1×2 / 2×2 / 3×1 / 1×3 / 2×3 / 3×2 / 3×3）
+        // 字段命名与 spawn_trySpawnArchetypes 保持一致：
         //   - baseArchetype  基底 ID
         //   - gridCols/gridRows 占格尺寸
-        //   - isWideEnemy    cols >= 2 時為 true
-        //   - affixes        專屬詞條
+        //   - isWideEnemy    cols >= 2 时为 true
+        //   - affixes        专属词条
         ...buildV2MatrixScenarios()
     ]
 };
 
 /**
- * [V2 可見性驗收] 構建敵人 V2 矩陣演示場景。
- * 一次性放置 9 種 V2 基底，字段寫法與 spawn_trySpawnArchetypes 保持一致。
- * 為避免大改 Enemy 構造函數，採用「先 new 後賦值」的兼容寫法。
+ * [V2 可见性验收] 构建敌人 V2 矩阵演示场景。
+ * 一次性放置 9 种 V2 基底，字段写法与 spawn_trySpawnArchetypes 保持一致。
+ * 为避免大改 Enemy 构造函数，采用「先 new 后赋值」的兼容写法。
  */
 function buildV2MatrixScenarios() {
     // [V2 资源协议] 演示矩阵从 ENEMY_V2_METADATA 读取，避免演示页与图鉴重复维护。
@@ -3212,7 +3212,7 @@ function buildV2MatrixScenarios() {
         hpMult: m.hpMult,
     }))];
 
-    // 6 列 × 6 行的緊湊矩陣布局（與 enemyCols=6 對齊）：
+    // 6 列 × 6 行的紧凑矩阵布局（与 enemyCols=6 对齐）：
     //   row 0       : 1×1 sludge | 2×1 deflector | 3×1 bastion
     //   row 1-2     : 1×2 echoSpire | 2×2 maw     | 3×2 siege
     //   row 3-5     : 1×3 prism     | 2×3 hive    | 3×3 gravityCore
@@ -3253,18 +3253,18 @@ function buildV2MatrixScenarios() {
                 def.affixes.length > 0 ? 'elite' : 'normal',
                 def.affixes.slice());
 
-            // 與 spawn_trySpawnArchetypes 對齊的字段命名
+            // 与 spawn_trySpawnArchetypes 对齐的字段命名
             e.baseArchetype = def.baseArchetype;
             e.gridCols = def.cols;
             e.gridRows = def.rows;
             if (def.cols >= 2) e.isWideEnemy = true;
 
-            // 凍結移動，保持矩陣穩定可視
+            // 冻结移动，保持矩阵稳定可视
             e._moveInterval = 9999;
             e._moveCooldown = 9999;
             e.hasActedThisTurn = true;
 
-            // 專屬詞條的初始化（與 spawn_trySpawnArchetypes 對齊）
+            // 专属词条的初始化（与 spawn_trySpawnArchetypes 对齐）
             if (def.affixes.includes('deflectionWard')) {
                 const pct = afx.deflectionWardBarrierPct || 0.10;
                 e.wardBarrierMax = Math.max(1, Math.floor(hp * pct));
@@ -3275,7 +3275,7 @@ function buildV2MatrixScenarios() {
                 e._hiveCooldown = afx.hiveSpawnInterval || 2;
             }
 
-            // 異形輪廓（複用 spawn_system 的形狀映射）
+            // 异形轮廓（复用 spawn_system 的形状映射）
             if (typeof game.spawn_applyArchetypeShape === 'function') {
                 game.spawn_applyArchetypeShape(e, def.baseArchetype);
             }
@@ -3285,7 +3285,7 @@ function buildV2MatrixScenarios() {
             labelData.push({ enemy: e, def, centerX, centerY, hPx });
         }
 
-        // 渲染標籤（DOM overlay）
+        // 渲染标签（DOM overlay）
         if (tg && typeof tg._renderV2MatrixLabels === 'function') {
             tg._renderV2MatrixLabels(labelData);
         }
@@ -3293,10 +3293,10 @@ function buildV2MatrixScenarios() {
 
     const triggerBehaviors = (game) => {
         const tg = game.trainingGround;
-        // 1) deflectionWard：把屏障打掉一半，使副屏障條視覺差異可見
-        // 2) hive：直接調 spawn_spawnEnemyClone 或減少冷卻
-        // 3) gravityWell：在範圍內顯示一條引力環視覺（用 shockwave）
-        // 4) echoRelay：以 floatingText 標出範圍
+        // 1) deflectionWard：把屏障打掉一半，使副屏障条视觉差异可见
+        // 2) hive：直接调 spawn_spawnEnemyClone 或减少冷却
+        // 3) gravityWell：在范围内显示一条引力环视觉（用 shockwave）
+        // 4) echoRelay：以 floatingText 标出范围
         const enemies = game.enemies;
         for (const e of enemies) {
             if (!e || !e.active) continue;
@@ -3315,15 +3315,15 @@ function buildV2MatrixScenarios() {
                 }
             }
         }
-        if (tg && tg.addLog) tg.addLog && tg.addLog('觸發 V2 行為演示（屏障 / 引力環 / 回響波）');
+        if (tg && tg.addLog) tg.addLog && tg.addLog('触发 V2 行为演示（屏障 / 引力环 / 回响波）');
     };
 
     const all = {
         id: 'v2_matrix_all',
         categoryId: 'v2matrix',
-        name: '🧩 V2 矩陣（全部 9 種）',
+        name: '🧩 V2 矩阵（全部 9 种）',
         icon: '🧩',
-        desc: '一次性展示 9 種 V2 基底敵人（1×1 ~ 3×3）。每個敵人下方標籤顯示 footprint / baseArchetype / affixes。點「觸發演示」可看到代表性詞條視覺反饋。',
+        desc: '一次性展示 9 种 V2 基底敌人（1×1 ~ 3×3）。每个敌人下方标签显示 footprint / baseArchetype / affixes。点「触发演示」可看到代表性词条视觉反馈。',
         setup: (game) => setupMatrix(game, null),
         demoAction: (game) => triggerBehaviors(game)
     };
@@ -3941,7 +3941,7 @@ function buildEnemyV2Scenarios() {
         {
             id: 'ev2_enemy_targeting_footprints',
             categoryId: 'enemy_v2',
-            name: 'Targeting Footprints',
+            name: '索敌占位演示',
             icon: '▣',
             assetHitTag: 'Overlay PNG',
             keepSidebarOpenOnDemo: true,
@@ -3971,7 +3971,7 @@ function buildEnemyV2Scenarios() {
         {
             id: 'ev2_fallback_large',
             categoryId: 'enemy_v2',
-            name: '资源 Fallback（3×3）',
+            name: '资源兜底（3×3）',
             icon: '🔧',
             assetHitTag: tagFor({ archetype: 'gravityWell', cols: 3, rows: 3, affixes: ['gravityWell'], archetypeIdForPlaceholder: 'gravityCore' }),
             desc: mkDesc('3×3', 'gravityWell', ['gravityWell'],
@@ -4575,7 +4575,7 @@ class TrainingGround {
                 <div class="train-top-bar absolute top-0 left-0 right-0 h-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between gap-2 px-2 z-20">
                     <div id="train-simulation-label" class="text-slate-400 text-[10px] uppercase tracking-wider flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                        Combat Simulation
+                        战斗模拟
                     </div>
                     <div id="train-combat-status-mount"></div>
                     <div id="train-stats" class="text-amber-400 font-mono text-xs">DPS: 0 | TOTAL: 0</div>
@@ -4591,7 +4591,7 @@ class TrainingGround {
                     <div class="rw-banner-desc" id="rw-banner-desc"></div>
                     <div class="rw-banner-params" id="rw-banner-params"></div>
                 </div>
-                <!-- 快捷操作按鈕 (仅在面板收起时显示) -->
+                <!-- 快捷操作按钮 (仅在面板收起时显示) -->
                 <div id="train-quick-actions" class="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-4 z-[450] transition-opacity duration-300">
                     <button type="button" onclick="game.trainingGround.fireBullet()" aria-label="发射测试子弹" class="w-12 h-12 rounded-full bg-indigo-600/80 backdrop-blur-md border border-indigo-400/50 text-white shadow-lg shadow-indigo-500/20 flex items-center justify-center active:scale-90 transition-transform">
                         <span class="text-xl">🔥</span>
@@ -4790,13 +4790,13 @@ class TrainingGround {
                 { id: 'livingArmor', name: '活体护甲' },
                 { id: 'deflectShell', name: '偏折壳' },
                 { id: 'lowDamageImmune', name: '低伤免疫' },
-                { id: 'overloadReactor', name: '过量炉' },
+                { id: 'overloadReactor', name: '过量反应炉' },
             ] },
             { label: '行为', items: [
                 { id: 'regen', name: '再生' },
-                { id: 'healer', name: '治疗' },
+                { id: 'healer', name: '治愈' },
                 { id: 'haste', name: '极速' },
-                { id: 'clone', name: '分裂' },
+                { id: 'clone', name: '增殖' },
                 { id: 'jump', name: '跳跃' },
                 { id: 'berserk', name: '狂暴' },
                 { id: 'siegeBreaker', name: '撞城者' },
@@ -4809,12 +4809,12 @@ class TrainingGround {
                 { id: 'echoRelay', name: '回响中继' },
                 { id: 'prism', name: '折光' },
                 { id: 'hive', name: '孵化' },
-                { id: 'siege', name: '攻城' },
-                { id: 'carrier', name: '铸巢' },
-                { id: 'gravityWell', name: '引力' },
+                { id: 'siege', name: '破阵' },
+                { id: 'carrier', name: '铸巢母架' },
+                { id: 'gravityWell', name: '引力井' },
             ] },
             { label: '符文', items: [
-                { id: 'runeBearer', name: '符文携带' },
+                { id: 'runeBearer', name: '通用符文掉落' },
                 { id: 'adaptiveRune', name: '自适应符文' },
             ] },
         ];
@@ -5229,29 +5229,29 @@ class TrainingGround {
         sidebar.innerHTML = `
             <!-- 侧边栏标题 -->
             <div class="train-sidebar-header">
-                <span class="text-xs font-bold tracking-widest text-cyan-400 uppercase">場景配置</span>
+                <span class="text-xs font-bold tracking-widest text-cyan-400 uppercase">场景配置</span>
                 <button id="train-sidebar-toggle" type="button" onclick="game.trainingGround.toggleSidebar()" title="收起场景配置" aria-label="收起场景配置" aria-expanded="true" class="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-slate-200 text-xs transition-colors">◀</button>
             </div>
             <!-- 分类 Tab -->
             <div class="train-sidebar-tabs" id="train-sidebar-tabs">
-                <button type="button" onclick="game.trainingGround.switchCategory('enemy')" id="scat-btn-enemy" class="train-scat-btn active">敵人</button>
-                <button type="button" onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">屬性</button>
-                <button type="button" onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">Boss</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('enemy')" id="scat-btn-enemy" class="train-scat-btn active">敌人</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('attribute')" id="scat-btn-attribute" class="train-scat-btn">属性</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('boss')" id="scat-btn-boss" class="train-scat-btn">首领</button>
                 <button type="button" onclick="game.trainingGround.switchCategory('skill')" id="scat-btn-skill" class="train-scat-btn">技能</button>
                 <button type="button" onclick="game.trainingGround.switchCategory('runeword')" id="scat-btn-runeword" class="train-scat-btn">符文</button>
-                <button type="button" onclick="game.trainingGround.switchCategory('resonance')" id="scat-btn-resonance" class="train-scat-btn" title="屬性共鳴 1/2/3 階驗證">共鳴</button>
-                <button type="button" onclick="game.trainingGround.switchCategory('relic')" id="scat-btn-relic" class="train-scat-btn">遺物</button>
-                <button type="button" onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敵人視覺 V2 基底矩陣">V2</button>
-                <button type="button" onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敵人 V2 美術驗收場景">驗收</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('resonance')" id="scat-btn-resonance" class="train-scat-btn" title="属性共鸣 1/2/3 阶验证">共鸣</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('relic')" id="scat-btn-relic" class="train-scat-btn">遗物</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('v2matrix')" id="scat-btn-v2matrix" class="train-scat-btn" title="敌人视觉 V2 基底矩阵">V2</button>
+                <button type="button" onclick="game.trainingGround.switchCategory('enemy_v2')" id="scat-btn-enemy_v2" class="train-scat-btn" title="敌人 V2 美术验收场景">验收</button>
             </div>
             <!-- 场景列表 -->
             <div id="train-scenario-list" class="train-scenario-list"></div>
             <!-- 场景说明 -->
-            <div id="train-scenario-desc" class="train-scenario-desc">← 選擇一個場景開始演示</div>
+            <div id="train-scenario-desc" class="train-scenario-desc">← 选择一个场景开始演示</div>
             <!-- 操作按钮 -->
             <div class="train-sidebar-actions">
-                <button type="button" onclick="game.trainingGround.triggerScenarioAction()" id="train-demo-btn" class="train-demo-btn" disabled>▶ 觸發演示</button>
-                <button type="button" onclick="game.trainingGround.resetCurrentScenario()" id="train-reset-btn" class="train-reset-btn" disabled>⟳ 重置場景</button>
+                <button type="button" onclick="game.trainingGround.triggerScenarioAction()" id="train-demo-btn" class="train-demo-btn" disabled>▶ 触发演示</button>
+                <button type="button" onclick="game.trainingGround.resetCurrentScenario()" id="train-reset-btn" class="train-reset-btn" disabled>⟳ 重置场景</button>
             </div>
         `;
         document.getElementById('phase-training').appendChild(sidebar);
@@ -5321,7 +5321,7 @@ class TrainingGround {
         this.game.activeElementResonances = {};
 
         // 0b. 根据分类动态调整 combatGridTopY
-        // 符文词条分类有顶部横幅（约70px），需要让敵人在横幅下方居中偏上放置
+        // 符文词条分类有顶部横幅（约70px），需要让敌人在横幅下方居中偏上放置
         const trainTopBarH = window.innerWidth > 1024 ? 40 : 44;
         if (scenario.categoryId === 'runeword' || scenario.categoryId === 'resonance') {
             // 横幅高度约70px，在其下方保留 8px 间距
@@ -5566,7 +5566,7 @@ class TrainingGround {
     }
 
     /**
-     * [V2 可見性驗收] 清空 V2 矩陣的 DOM 標籤層
+     * [V2 可见性验收] 清空 V2 矩阵的 DOM 标签层
      */
     _clearV2MatrixOverlay() {
         const layer = document.getElementById('train-v2-matrix-layer');
@@ -5574,8 +5574,8 @@ class TrainingGround {
     }
 
     /**
-     * [V2 可見性驗收] 在每個 V2 基底下方繪製標籤（footprint / baseArchetype / affixes）。
-     * 使用 DOM overlay 而非 canvas，避免侵入主渲染管線。
+     * [V2 可见性验收] 在每个 V2 基底下方绘制标签（footprint / baseArchetype / affixes）。
+     * 使用 DOM overlay 而非 canvas，避免侵入主渲染管线。
      */
     _renderV2MatrixLabels(labelData) {
         const host = document.getElementById('phase-training');
@@ -5623,7 +5623,7 @@ class TrainingGround {
      * 清空战场（敌人、子弹、粒子等）
      */
     _clearBattlefield() {
-        // [V2 可見性驗收] 同步清理矩陣標籤層
+        // [V2 可见性验收] 同步清理矩阵标签层
         this._clearV2MatrixOverlay();
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止孤立 Sprite 残留
         pixiCleanupAllEffects(this.game);
@@ -5718,7 +5718,7 @@ class TrainingGround {
         }
         const statsEl = document.getElementById('train-stats');
         if (statsEl) {
-            statsEl.innerText = `DPS: ${this.stats.dps.toLocaleString()} | TOTAL: ${Math.floor(this.stats.totalDamage).toLocaleString()}`;
+            statsEl.innerText = `秒伤：${this.stats.dps.toLocaleString()} | 总伤害：${Math.floor(this.stats.totalDamage).toLocaleString()}`;
         }
     }
 
@@ -6150,7 +6150,7 @@ class TruthBook {
         title.textContent = entry.title || entry.name;
         const subtitle = document.createElement('span');
         subtitle.className = 'text-[9px] text-slate-500 uppercase tracking-wider group-hover:text-cyan-400/70 truncate';
-        subtitle.textContent = (entry.tags && entry.tags[0]) || entry.categoryId || 'ENTITY';
+        subtitle.textContent = (entry.tags && entry.tags[0]) || entry.categoryId || '条目';
         textWrap.append(title, subtitle);
         btn.append(iconWrap, textWrap);
         btn.onclick = () => this.showEntry(entry, btn);

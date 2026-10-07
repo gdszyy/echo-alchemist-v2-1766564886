@@ -1628,7 +1628,7 @@ phase_gathering_getRandomPegType() {
 
         // [tsk-bullet-ui] 兜底保护：若 ammoQueue 与 marbleQueue 同时为空（例如玩家在
         // 纯净精华命运时刻点击「跳过研磨」获取符文，且上回合无 _chargedAmmoQueue），
-        // 此时直接进入战斗会导致「彈藥耗盡」横幅一直显示且敌人回合无法推进。
+        // 此时直接进入战斗会导致「弹药耗尽」横幅一直显示且敌人回合无法推进。
         // 此处强制回退到研磨阶段，重新生成弹珠选择，避免无限敌人回合死循环。
         if (this.ammoQueue.length === 0 && (!this.marbleQueue || this.marbleQueue.length === 0)) {
             console.warn('[phase_startCombatPhase] ammoQueue 与 marbleQueue 均为空，回退到研磨阶段防止死循环');
@@ -1820,7 +1820,7 @@ phase_gathering_getRandomPegType() {
         
         this.lastMousePos = logicPos;
 
-        // 处理 gameOver 状态的点击（gameover 阶段由其自身 UI 按鈕处理，此处直接忽略）
+        // 处理 gameOver 状态的点击（gameover 阶段由其自身 UI 按钮处理，此处直接忽略）
         if (this.gameOver) {
             return;
         }
@@ -1842,7 +1842,7 @@ phase_gathering_getRandomPegType() {
         }
         else if (this.phase === 'gathering') {
             if (this.isWheelSpinning) {
-                showToast("請等待輪盤結算...");
+                showToast("请等待轮盘结算...");
                 return;
             }
             if (this.dropBalls.length > 0 || this.energyOrbs.length > 0) {
@@ -1973,8 +1973,8 @@ phase_gathering_getRandomPegType() {
         }
 
         
-        //  只要觸發了結算，強迫掃描波在接下來的 45 幀內保持慢速
-        // 這樣即使敵人被燒死消失了，波浪也會慢慢掃過屍體位置，展現"擊殺確認"的感覺
+        //  只要触发了结算，强迫扫描波在接下来的 45 帧内保持慢速
+        // 这样即使敌人被烧死消失了，波浪也会慢慢扫过尸体位置，展现"击杀确认"的感觉
         this.waveMomentumTimer = 45; 
 
         // --- 1. 温度结算逻辑 ---
@@ -2042,7 +2042,7 @@ phase_gathering_getRandomPegType() {
                 } else {
                     e.isFrozenCurrentTurn = false;
                     if (shouldFreeze && e.affixes && e.affixes.includes('siege')) {
-                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 35, 'FREEZE IMMUNE', '#facc15');
+                        this.spawn_createFloatingText(e.pos.x, e.pos.y - 35, '免疫冻结', '#facc15');
                     }
                 }
                 _ventIgnisPressure();
@@ -2334,7 +2334,7 @@ phase_gathering_getRandomPegType() {
             });
             
             if (buffCount > 0) {
-                showToast("⚠️ 敵軍狂暴 (HASTE APPLIED) ⚠️");
+                showToast("⚠️ 敌军狂暴：全体获得极速 ⚠️");
                 audio.playPowerup(); // 播放警示音
             }
         }
@@ -2369,7 +2369,7 @@ phase_gathering_getRandomPegType() {
                     }
                 });
                 if (hasteCount > 0) {
-                    showToast("⚡ 增援部隊！空列敵人獲得極速！");
+                    showToast("⚡ 增援部队！空列敌人获得极速！");
                 }
             }
         }
@@ -2426,7 +2426,7 @@ phase_gathering_getRandomPegType() {
         // @section:finalize_round_decay - 跨回合增益递减
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
-            showToast("強敵來襲！HP x" + this.nextRoundHpMultiplier);
+            showToast("强敌来袭！HP x" + this.nextRoundHpMultiplier);
             this.nextRoundHpMultiplier = 1;
         }
 
@@ -2576,7 +2576,7 @@ phase_gathering_getRandomPegType() {
             this._lastBossSpawnRound = this.round;
             if (!this._bossSpawnCount) this._bossSpawnCount = 0;
             this._bossSpawnCount++;
-            console.log(`[BossSchedule] Boss #${this._bossSpawnCount} 已在 Round ${this.round} 生成`);
+            console.log(`[BossSchedule] 首领 #${this._bossSpawnCount} 已在 Round ${this.round} 生成`);
         }
 
         this.isEnemyTurn = false;
@@ -2640,7 +2640,7 @@ phase_gathering_getRandomPegType() {
         }
         // 5. 居中浮动文字提示
         if (typeof this.spawn_createFloatingText === 'function') {
-            this.spawn_createFloatingText(cx, cy - 90, `+${leftoverCount} 蓄能升級！`, '#fde047');
+            this.spawn_createFloatingText(cx, cy - 90, `+${leftoverCount} 蓄能升级！`, '#fde047');
         }
     },
 
@@ -2727,7 +2727,7 @@ phase_gathering_getRandomPegType() {
                 this.spawn_createGreedyWheelEffect(gx, gy, 'success');
             }
             if (typeof this.spawn_createFloatingText === 'function') {
-                this.spawn_createFloatingText(gx, gy - 34, 'GREED +1', '#fbbf24', 16);
+                this.spawn_createFloatingText(gx, gy - 34, '贪婪 +1', '#fbbf24', 16);
             }
             this.burstQueue.push({
                 delay: CONFIG.gameplay.greedyWheelFireDelayFrames ?? 10,
@@ -2746,7 +2746,7 @@ phase_gathering_getRandomPegType() {
             }
             if (typeof this.triggerScreenShake === 'function') this.triggerScreenShake(6);
             if (typeof this.spawn_createFloatingText === 'function') {
-                this.spawn_createFloatingText(gx, gy - 34, 'GREED FAIL', '#fca5a5', 14);
+                this.spawn_createFloatingText(gx, gy - 34, '贪婪落空', '#fca5a5', 14);
             }
         }
     },
@@ -2866,7 +2866,7 @@ phase_gathering_getRandomPegType() {
         if (this.swordQis) {
             for (let i = this.swordQis.length - 1; i >= 0; i--) {
                 const qi = this.swordQis[i];
-                qi.update(timeScale, this.enemies, this); // 傳入 enemies 和 game 實例
+                qi.update(timeScale, this.enemies, this); // 传入 enemies 和 game 实例
                 if (!qi.active) {
                     this.swordQis.splice(i, 1);
                 }
@@ -3467,7 +3467,7 @@ phase_gathering_getRandomPegType() {
         // 清理不活跃的子剑
         this.sonSwords = this.sonSwords.filter(s => s.active);
 
-        // --- 符文採落物渲染与自动拾取 ---
+        // --- 符文采落物渲染与自动拾取 ---
         if (this.runeLootItems && this.runeLootItems.length > 0) {
             for (let i = this.runeLootItems.length - 1; i >= 0; i--) {
                 const loot = this.runeLootItems[i];
@@ -3475,7 +3475,7 @@ phase_gathering_getRandomPegType() {
                     this.runeLootItems.splice(i, 1);
                     continue;
                 }
-                // 绘制符文採落物
+                // 绘制符文采落物
                 loot.draw(this.ctx);
                 // 当所有敌人被清除时，自动拾取尚在场地上的符文
                 if (activeEnemies === 0 && loot.active) {
@@ -3491,7 +3491,7 @@ phase_gathering_getRandomPegType() {
                     }
                 }
             }
-            // 清理已拾取的採落物
+            // 清理已拾取的采落物
             this.runeLootItems = this.runeLootItems.filter(l => l && l.active);
         }
 
@@ -3556,7 +3556,7 @@ phase_gathering_getRandomPegType() {
                 this.ammoQueue = [];
                 // 5. 显著的蓄能发光升级特效
                 this.phase_playChargeUpgradeFX(leftoverCount);
-                showToast(`⚡ 完美清場！剩餘 ${leftoverCount} 發彈藥蓄能升級 +1！`);
+                showToast(`⚡ 完美清场！剩余 ${leftoverCount} 发弹药蓄能升级 +1！`);
                 audio.playPowerup();
                 this.ui_updateAmmoUI();
                 this.ui_renderRecipeHUD();
@@ -3577,7 +3577,7 @@ phase_gathering_getRandomPegType() {
             this.combat_wind_mergeStormCores();
             this.combat_wind_decayStormCoresEnergy();
             // @section:combat_update_phase_end - 战斗结束条件检查与阶段切换
-            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">彈藥耗盡</span><span class="text-sm text-slate-300">點擊收集新彈药</span></div>';
+            document.getElementById('combat-message').innerHTML = '<div class="bg-black/50 p-4 rounded-xl backdrop-blur-md border border-blue-500/50 pointer-events-none"><span class="text-blue-300 font-bold text-xl block mb-2">弹药耗尽</span><span class="text-sm text-slate-300">点击收集新弹药</span></div>';
         } else if (!_roundAmmoClear && !this.gameOver) {
             document.getElementById('combat-message').innerHTML = '';
         }
@@ -3920,8 +3920,8 @@ phase_gathering_getRandomPegType() {
 // Gathering Phase Update
     /**
      * @method updateGathering
-     * @description 收集階段的遊戲邏輯更新。
-     * @param {number} [timeScale=1] - **重要參數** 時間縮放因子。
+     * @description 收集阶段的游戏逻辑更新。
+     * @param {number} [timeScale=1] - **重要参数** 时间缩放因子。
      */
     // @section:gathering_update_balls - 弹珠物理更新与碰撞处理
     phase_gathering_update(timeScale = 1) {
@@ -4036,7 +4036,7 @@ phase_gathering_getRandomPegType() {
                 }
             }
         });
-        // 繪製釘子
+        // 绘制钉子
         // [修复] 增加保底半径，防止 this.width 为 0 时钉子消失
         const pegRadius = Math.max(3.2, Math.min(5.6, CONFIG.physics.pegRadius || (this.width || 400) / 85));
         
@@ -4071,7 +4071,7 @@ phase_gathering_getRandomPegType() {
             });
         });
         this.specialSlots = this.specialSlots.filter(s => !s.hit);
-        // 繪製特殊槽位
+        // 绘制特殊槽位
         this.specialSlots.forEach(s => s.draw(this.ctx));
 
         // [v2 重构] 钉板编辑模式：在实时钉板上叠加可点击的虚框区域
@@ -4105,10 +4105,10 @@ phase_gathering_getRandomPegType() {
                 this.collectionBeams.splice(i, 1);
             }
         }
-        // 更新和繪製下落的彈珠
+        // 更新和绘制下落的弹珠
         for (let i = this.dropBalls.length - 1; i >= 0; i--) {
             const ball = this.dropBalls[i];
-            // **重要參數** result: 'finished' (落出屏幕), {type: 'collected', ...}, {type: 'slot', ...}, {action: 'split', ...}
+            // **重要参数** result: 'finished' (落出屏幕), {type: 'collected', ...}, {type: 'slot', ...}, {action: 'split', ...}
             const result = ball.update(this.pegs, this.specialSlots, this.width, this.height, this.timeScale, tilt);
                 
             //  绘制时也可以传入 tilt 做球体高光偏移 (可选)
@@ -4163,7 +4163,7 @@ phase_gathering_getRandomPegType() {
                     ? session.marbleIndex
                     : this.activeMarbleIndex;
                 const marbleDef = (this.marbleQueue && this.marbleQueue[marbleIndex]) || ball.def;
-                // 處理彈珠落出屏幕
+                // 处理弹珠落出屏幕
                 if (result === 'finished') {
                     // 1. 生成光柱 (在球掉落的X轴位置，屏幕底部升起)
                     this.collectionBeams.push(new CollectionBeam(ball.pos.x, this.height));
@@ -4187,18 +4187,18 @@ phase_gathering_getRandomPegType() {
                     this.dropBalls.splice(i, 1);
                     if (session) session.activeBalls--;
                     
-                    // --- ：不再直接結算，而是嘗試結算 ---
-                    // 處理“能量球先落地，彈珠後死”的情況
+                    // --- ：不再直接结算，而是尝试结算 ---
+                    // 处理“能量球先落地，弹珠后死”的情况
                     this.phase_gathering_attemptComplete();
 
                 } else if (result.type === 'collected') {
-                    // 彈珠收集到材料
+                    // 弹珠收集到材料
                     if (session) session.collected.push(result.material);
                     // 这样 UI (renderRecipeCard) 才能读取到变化
                     if (marbleDef) {
                         marbleDef.collected.push(result.material);
                     }
-                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material, { session }); // 這裡也許要傳入屬性類型作為顏色依據
+                    this.spawn_createHitFeedback(ball.pos.x, ball.pos.y, ball.vel, result.material, { session }); // 这里也许要传入属性类型作为颜色依据
                     audio.playCollect();
                     this.ui_renderRecipeHUD();
                     
@@ -4208,22 +4208,22 @@ phase_gathering_getRandomPegType() {
                     this.ui_renderRecipeHUD();
                     
                 } else if (result.type === 'slot') {
-                    // 彈珠擊中特殊槽位
+                    // 弹珠击中特殊槽位
                     if (result.slotType === 'recall') {
-                        // 回溯槽位：將彈珠傳送回頂部
+                        // 回溯槽位：将弹珠传送回顶部
                         ball.pos.y = 50;
                         ball.vel = new Vec2(0, 2);
                         showToast("回溯!");
                     } else if (result.slotType === 'multicast') {
-                        // 多重發射槽位：增加多重發射次數
+                        // 多重发射槽位：增加多重发射次数
                         if (session && !session.multicastAdded.includes(i)) {
                             session.multicast++;
                             session.multicastAdded.push(i);
                             this.combat_updateMulticastDisplay(1);
-                            showToast("+連射!");
+                            showToast("+连射!");
                         }
                     } else if (result.slotType === 'split' && ball.canTriggerSplitSlot) {
-                        // 分裂槽位：分裂彈珠
+                        // 分裂槽位：分裂弹珠
                         ball.canTriggerSplitSlot = false;
                         const newBall = new DropBall(ball.pos.x, ball.pos.y, ball.def, session);
                         newBall.vel = new Vec2(-ball.vel.x, ball.vel.y);
@@ -4232,15 +4232,15 @@ phase_gathering_getRandomPegType() {
                         if (session) session.activeBalls++;
                         showToast("分裂!");
                     } else if (result.slotType === 'relic') {
-                        // 調用遺物選擇
+                        // 调用遗物选择
                         this.ui_showRelicSelection(); 
                         
-                        // 將彈珠移除
+                        // 将弹珠移除
                         this.dropBalls.splice(i, 1);
                         if (session) session.activeBalls--;
                     }
                 } else if (result.action === 'split') {
-                    // 處理 DropBall 內部觸發的分裂
+                    // 处理 DropBall 内部触发的分裂
                     const newBall1 = new DropBall(result.pos.x - 10, result.pos.y, result.def, session);
                     const newBall2 = new DropBall(result.pos.x + 10, result.pos.y, result.def, session);
                     newBall1.vel = new Vec2(-Math.abs(result.vel.x) - 2, result.vel.y);
@@ -4270,7 +4270,7 @@ phase_gathering_getRandomPegType() {
                     this.ui_renderRecipeHUD();
 
                 } else if (result.action === 'rainbow_split') {
-                    // 處理彩虹彈珠分裂
+                    // 处理彩虹弹珠分裂
                     const colors = ['bounce', 'pierce', 'scatter'];
                     if (marbleDef) {
                         colors.forEach(c => {
@@ -4299,7 +4299,7 @@ phase_gathering_getRandomPegType() {
             }
         } 
         
-        // --- 更新和繪製能量球 ---
+        // --- 更新和绘制能量球 ---
         for (let i = this.energyOrbs.length - 1; i >= 0; i--) {
             const orb = this.energyOrbs[i];
             orb.update(timeScale);
@@ -4321,7 +4321,7 @@ phase_gathering_getRandomPegType() {
                 }
             }
         }
-        // 繪製粒子（两指针原地压缩，归还对象池；同步 particleCounts）
+        // 绘制粒子（两指针原地压缩，归还对象池；同步 particleCounts）
         {
             const arr = this.particles;
             const counts = this.particleCounts;
@@ -4380,7 +4380,7 @@ phase_gathering_getRandomPegType() {
             }
             arr.length = w;
         }
-        // 更新和繪製 Shockwaves
+        // 更新和绘制 Shockwaves
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
             let s = this.shockwaves[i];
             if (s) {
