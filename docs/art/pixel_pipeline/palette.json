@@ -1,0 +1,73 @@
+{
+  "schema": "echo-alchemist/pixel-palette@1",
+  "name": "echo_alchemist_pixel_v1",
+  "status": "provisional",
+  "source": "docs/design/art_vfx_ui_direction_v1.md §2.3 (adopted 2026-10-22, A1 = 2 CSS px per art px)",
+  "notes": [
+    "Index 0 is reserved for full transparency and is not a color. Colors are indices 1..N.",
+    "Ramps are ordered dark (step 1) to bright (step 5).",
+    "Role tags: background = may appear in the background layer (no outline, no ramp step 4/5); interactable = enemies / pegs / marbles / facilities / icons (full range, auto 1px outline); feedback = VFX / numbers (ramp step 5 + white, glow does not get outlined).",
+    "Low saturation for the background layer is a soft rule; the machine check only enforces the tag list.",
+    "Wind has no dedicated ramp in v1: wind marks use the steel ramp (spare_a) plus cryo highlights. Change only by bumping the palette version; every manifest records the palette hash.",
+    "The key colors #00FF00 and #FF00FF are intentionally NOT in this palette."
+  ],
+  "transparent_index": 0,
+  "outline_id": "outline",
+  "colors": [
+    {"id": "outline",      "hex": "#140c1c", "group": "outline", "step": 0, "roles": ["interactable"]},
+    {"id": "bg_0",         "hex": "#3a3848", "group": "background", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "bg_1",         "hex": "#504d60", "group": "background", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "bg_2",         "hex": "#686478", "group": "background", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "bg_3",         "hex": "#837f90", "group": "background", "step": 4, "roles": ["background", "interactable"]},
+
+    {"id": "pyro_1",       "hex": "#4a1418", "group": "pyro", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "pyro_2",       "hex": "#8e2a1c", "group": "pyro", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "pyro_3",       "hex": "#d4502a", "group": "pyro", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "pyro_4",       "hex": "#f59a3a", "group": "pyro", "step": 4, "roles": ["interactable"]},
+    {"id": "pyro_5",       "hex": "#ffe08a", "group": "pyro", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "cryo_1",       "hex": "#142a4a", "group": "cryo", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "cryo_2",       "hex": "#1f5a8c", "group": "cryo", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "cryo_3",       "hex": "#3a9ad0", "group": "cryo", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "cryo_4",       "hex": "#7fd6f0", "group": "cryo", "step": 4, "roles": ["interactable"]},
+    {"id": "cryo_5",       "hex": "#d6f6ff", "group": "cryo", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "lightning_1",  "hex": "#3a2a10", "group": "lightning", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "lightning_2",  "hex": "#806018", "group": "lightning", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "lightning_3",  "hex": "#c8a020", "group": "lightning", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "lightning_4",  "hex": "#f0d840", "group": "lightning", "step": 4, "roles": ["interactable"]},
+    {"id": "lightning_5",  "hex": "#fffbb0", "group": "lightning", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "venom_1",      "hex": "#12301a", "group": "venom", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "venom_2",      "hex": "#1f6a2a", "group": "venom", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "venom_3",      "hex": "#3aa83a", "group": "venom", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "venom_4",      "hex": "#8ade4a", "group": "venom", "step": 4, "roles": ["interactable"]},
+    {"id": "venom_5",      "hex": "#d8ff9a", "group": "venom", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "laser_1",      "hex": "#3a0a2a", "group": "laser", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "laser_2",      "hex": "#7a1448", "group": "laser", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "laser_3",      "hex": "#c8286a", "group": "laser", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "laser_4",      "hex": "#f46aa0", "group": "laser", "step": 4, "roles": ["interactable"]},
+    {"id": "laser_5",      "hex": "#ffc8e0", "group": "laser", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "echo_1",       "hex": "#1e1640", "group": "echo", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "echo_2",       "hex": "#3e2e8a", "group": "echo", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "echo_3",       "hex": "#6a54d0", "group": "echo", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "echo_4",       "hex": "#a890f0", "group": "echo", "step": 4, "roles": ["interactable"]},
+    {"id": "echo_5",       "hex": "#e4dcff", "group": "echo", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "steel_1",      "hex": "#1c2228", "group": "spare_a_steel", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "steel_2",      "hex": "#34404a", "group": "spare_a_steel", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "steel_3",      "hex": "#56687a", "group": "spare_a_steel", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "steel_4",      "hex": "#8aa0b0", "group": "spare_a_steel", "step": 4, "roles": ["interactable"]},
+    {"id": "steel_5",      "hex": "#c8d8e0", "group": "spare_a_steel", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "stone_1",      "hex": "#2a2420", "group": "spare_b_stone", "step": 1, "roles": ["background", "interactable"]},
+    {"id": "stone_2",      "hex": "#4a4036", "group": "spare_b_stone", "step": 2, "roles": ["background", "interactable"]},
+    {"id": "stone_3",      "hex": "#726454", "group": "spare_b_stone", "step": 3, "roles": ["background", "interactable"]},
+    {"id": "stone_4",      "hex": "#a49276", "group": "spare_b_stone", "step": 4, "roles": ["interactable"]},
+    {"id": "stone_5",      "hex": "#d8cab0", "group": "spare_b_stone", "step": 5, "roles": ["interactable", "feedback"]},
+
+    {"id": "white",        "hex": "#ffffff", "group": "white", "step": 6, "roles": ["interactable", "feedback"]}
+  ]
+}

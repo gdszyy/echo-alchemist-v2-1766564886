@@ -1,0 +1,2315 @@
+{
+  "schema": "echo-alchemist/pixel-asset-catalog@1",
+  "generated_by": "scripts/pixel_pipeline/asset_catalog.py",
+  "count": 78,
+  "assets": [
+    {
+      "id": "enemy_residue_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "炼金残渣（标准 1×1）",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "居中一颗小镶嵌核心",
+      "feature_en": "one small inlaid core in the centre",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "stone",
+        "echo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一块切角几何磨石块，表面少量裂纹，中心嵌一颗小紫色晶核。唯一的大机制特征：居中一颗小镶嵌核心。占格 1×1，轮廓填满该比例的外框。配色：磨石（暖灰褐）、回响（靛→紫→淡紫）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a chamfered geometric whetstone block with a few cracks and one small violet crystal core inlaid in the centre. One big readable mechanic feature: one small inlaid core in the centre. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: warm grey-brown whetstone, echo ramp (indigo to violet to lavender). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "docs/enemy_visual_design_v2.md §4.1",
+      "note": null
+    },
+    {
+      "id": "enemy_bastion_3x1",
+      "group": "enemy",
+      "class": "enemy_3x1",
+      "name_zh": "重装横梁 heavyArmor",
+      "grid_px": [
+        72,
+        24
+      ],
+      "cells": [
+        3,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "横向三段厚装甲板 + 两排铆钉，横向封锁感",
+      "feature_en": "three thick horizontal armour plates with two rows of rivets, reads as a wall",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1536x512",
+      "prompt_zh": "横向三格长的磨石装甲横梁，厚边框，铆钉槽。唯一的大机制特征：横向三段厚装甲板 + 两排铆钉，横向封锁感。占格 3×1，轮廓填满该比例的外框。配色：钢（蓝灰）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a long horizontal whetstone armour beam three cells wide, thick frame, riveted slots. One big readable mechanic feature: three thick horizontal armour plates with two rows of rivets, reads as a wall. Footprint 3x1 cells; the silhouette fills a box of that aspect ratio. Palette: steel blue-grey, warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3427 (3x1)",
+      "note": null
+    },
+    {
+      "id": "enemy_deflector_2x1",
+      "group": "enemy",
+      "class": "enemy_2x1",
+      "name_zh": "棱盾兽 deflectionWard",
+      "grid_px": [
+        48,
+        24
+      ],
+      "cells": [
+        2,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "正面一块斜置的大楔形护板（偏折屏障）",
+      "feature_en": "one big slanted wedge barrier plate on the front",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1536x768",
+      "prompt_zh": "横向两格的楔形磨石兽，前方顶着一块斜置晶盾。唯一的大机制特征：正面一块斜置的大楔形护板（偏折屏障）。占格 2×1，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a two-cell-wide wedge-shaped whetstone beast pushing a slanted crystal shield plate in front. One big readable mechanic feature: one big slanted wedge barrier plate on the front. Footprint 2x1 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3426 (2x1)",
+      "note": null
+    },
+    {
+      "id": "enemy_echo_spire_1x2",
+      "group": "enemy",
+      "class": "enemy_1x2",
+      "name_zh": "共振尖塔 echoRelay",
+      "grid_px": [
+        24,
+        48
+      ],
+      "cells": [
+        1,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "顶部一颗裂纹晶核 + 两道同心回响环",
+      "feature_en": "one cracked crystal core on top with two concentric echo rings",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "768x1536",
+      "prompt_zh": "纵向两格的细高磨石尖塔，塔顶嵌裂纹紫晶。唯一的大机制特征：顶部一颗裂纹晶核 + 两道同心回响环。占格 1×2，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a tall thin whetstone spire two cells high with a cracked violet crystal at the tip. One big readable mechanic feature: one cracked crystal core on top with two concentric echo rings. Footprint 1x2 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3425 (1x2)",
+      "note": null
+    },
+    {
+      "id": "enemy_prism_1x3",
+      "group": "enemy",
+      "class": "enemy_1x3",
+      "name_zh": "折光棱柱 prism",
+      "grid_px": [
+        24,
+        72
+      ],
+      "cells": [
+        1,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "纵向三棱柱 + 一道被劈成两束的光",
+      "feature_en": "a tall triangular prism splitting one beam into two",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "laser"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "512x1536",
+      "prompt_zh": "纵向三格的透明棱柱石，内部有分束的光路。唯一的大机制特征：纵向三棱柱 + 一道被劈成两束的光。占格 1×3，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、激光（酒红→粉）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a three-cell-tall translucent prism column with a split light path inside. One big readable mechanic feature: a tall triangular prism splitting one beam into two. Footprint 1x3 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), laser ramp (wine red to pink). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3423 (1x3)",
+      "note": null
+    },
+    {
+      "id": "enemy_maw_2x2",
+      "group": "enemy",
+      "class": "enemy_2x2",
+      "name_zh": "深渊胃囊 maw (devour)",
+      "grid_px": [
+        48,
+        48
+      ],
+      "cells": [
+        2,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "正面一个张开的大吞噬口（暗红旋涡）",
+      "feature_en": "one huge open devouring mouth with a dark red swirl",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "laser",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "2×2 的圆角掏空磨石胃囊，底部锯齿石槽。唯一的大机制特征：正面一个张开的大吞噬口（暗红旋涡）。占格 2×2，轮廓填满该比例的外框。配色：激光（酒红→粉）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a 2x2 rounded hollow whetstone stomach with a jagged toothed slot at the bottom. One big readable mechanic feature: one huge open devouring mouth with a dark red swirl. Footprint 2x2 cells; the silhouette fills a box of that aspect ratio. Palette: laser ramp (wine red to pink), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3424 (2x2)",
+      "note": null
+    },
+    {
+      "id": "enemy_hive_2x3",
+      "group": "enemy",
+      "class": "enemy_2x3",
+      "name_zh": "孵化巢 hive",
+      "grid_px": [
+        48,
+        72
+      ],
+      "cells": [
+        2,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "三个排成竖列的孵化卵孔（一个正在开裂）",
+      "feature_en": "three egg pods in a column, one cracking open",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom",
+        "stone"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1536",
+      "prompt_zh": "2 列 3 行的竖向巢穴磨石，表面嵌卵囊。唯一的大机制特征：三个排成竖列的孵化卵孔（一个正在开裂）。占格 2×3，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a tall nest-shaped whetstone two cells wide three cells high with egg pods embedded. One big readable mechanic feature: three egg pods in a column, one cracking open. Footprint 2x3 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/spawn_system.js:3422 (2x3)",
+      "note": null
+    },
+    {
+      "id": "enemy_siege_3x2",
+      "group": "enemy",
+      "class": "enemy_3x2",
+      "name_zh": "破阵履带 siege",
+      "grid_px": [
+        72,
+        48
+      ],
+      "cells": [
+        3,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "底部履带 + 正前方一根撞角",
+      "feature_en": "tank treads at the bottom and one battering ram in front",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1536x1024",
+      "prompt_zh": "3 列 2 行的履带石板，正面撞角。唯一的大机制特征：底部履带 + 正前方一根撞角。占格 3×2，轮廓填满该比例的外框。配色：雷（暗金→亮黄）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a 3x2 tracked stone slab with a battering ram on its front edge. One big readable mechanic feature: tank treads at the bottom and one battering ram in front. Footprint 3x2 cells; the silhouette fills a box of that aspect ratio. Palette: lightning ramp (dark gold to bright yellow), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3421 (3x2)",
+      "note": null
+    },
+    {
+      "id": "enemy_carrier_3x2",
+      "group": "enemy",
+      "class": "enemy_3x2",
+      "name_zh": "铸巢母架 carrier（冂形）",
+      "grid_px": [
+        72,
+        48
+      ],
+      "cells": [
+        3,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "冂形：下排中间第 5 格必须是空洞（投放舱）",
+      "feature_en": "an upside-down U shape: the bottom-middle cell is an empty launch bay",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1536x1024",
+      "prompt_zh": "3×2 冂形甲板，左右两条腿，下排正中留空。唯一的大机制特征：冂形：下排中间第 5 格必须是空洞（投放舱）。占格 3×2，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a 3x2 upside-down-U deck, two legs left and right, the bottom-centre cell left empty. One big readable mechanic feature: an upside-down U shape: the bottom-middle cell is an empty launch bay. Footprint 3x2 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，下排正中被填满，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, bottom-centre cell filled in, green subject",
+      "anchor": "src/spawn_system.js:3420; docs/enemy_visual_design_v2.md §6",
+      "note": "碰撞非矩形：填充率按 3×2 盒计，第 5 格空洞须人工确认"
+    },
+    {
+      "id": "enemy_gravity_core_3x3",
+      "group": "enemy",
+      "class": "enemy_3x3",
+      "name_zh": "引力炉心 gravityWell",
+      "grid_px": [
+        72,
+        72
+      ],
+      "cells": [
+        3,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "中心黑核 + 三层环形炉壁",
+      "feature_en": "a black core in the centre with three concentric furnace rings",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "3×3 的圆形炉心磨石，向心网格线。唯一的大机制特征：中心黑核 + 三层环形炉壁。占格 3×3，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a 3x3 round furnace-core whetstone with inward-collapsing grid lines. One big readable mechanic feature: a black core in the centre with three concentric furnace rings. Footprint 3x3 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/spawn_system.js:3419 (3x3)",
+      "note": null
+    },
+    {
+      "id": "minion_ignis_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "炉卫随从 furnace_guard",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "胸口一个小炉口",
+      "feature_en": "a small furnace mouth on the chest",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：胸口一个小炉口。占格 1×1，轮廓填满该比例的外框。配色：火（暗红→橙→浅黄）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: a small furnace mouth on the chest. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: fire ramp (dark red to orange to pale yellow), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_glacies_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "霜缝随从 frost_stitch",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "身上一道缝合的冰裂",
+      "feature_en": "one stitched ice crack across the body",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：身上一道缝合的冰裂。占格 1×1，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: one stitched ice crack across the body. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_mikro_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "裂变细胞 fission_cell",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "一分为二的细胞膜（中间缢缩）",
+      "feature_en": "a cell membrane pinching into two",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：一分为二的细胞膜（中间缢缩）。占格 1×1，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、白（仅高光）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: a cell membrane pinching into two. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), white highlights only. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_devourer_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "胃域仆从 maw_thrall",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "一张小獠牙嘴",
+      "feature_en": "one small fanged mouth",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "laser",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：一张小獠牙嘴。占格 1×1，轮廓填满该比例的外框。配色：激光（酒红→粉）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: one small fanged mouth. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: laser ramp (wine red to pink), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_viridis_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "孢甲侍从 spore_vassal",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "背上两颗孢子囊",
+      "feature_en": "two spore pods on its back",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom",
+        "stone"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：背上两颗孢子囊。占格 1×1，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: two spore pods on its back. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_tesla_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "导体 conductor",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "头顶一根导电避雷针",
+      "feature_en": "one conductor rod sticking up",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：头顶一根导电避雷针。占格 1×1，轮廓填满该比例的外框。配色：雷（暗金→亮黄）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: one conductor rod sticking up. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: lightning ramp (dark gold to bright yellow), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_chimera_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "混沌养料 chaos_feed",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "左冷右热的半边配色",
+      "feature_en": "left half cold blue, right half hot orange",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro",
+        "cryo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：左冷右热的半边配色。占格 1×1，轮廓填满该比例的外框。配色：火（暗红→橙→浅黄）、冰（深蓝→青→冰白）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: left half cold blue, right half hot orange. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: fire ramp (dark red to orange to pale yellow), ice ramp (deep blue to cyan to ice white). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "minion_ouroboros_1x1",
+      "group": "enemy",
+      "class": "enemy_1x1",
+      "name_zh": "回声附环 orbit_echo",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "一个首尾相衔的小环",
+      "feature_en": "a small ring biting its own tail",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格小磨石怪，Boss 同族配色。唯一的大机制特征：一个首尾相衔的小环。占格 1×1，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell small whetstone creature in its boss family colours. One big readable mechanic feature: a small ring biting its own tail. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js:914-923 bossMinionProfiles",
+      "note": null
+    },
+    {
+      "id": "elite_base_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "精英底形（无词条）",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "四角各一枚尖棱（精英冠角），核心比普通怪更大",
+      "feature_en": "four sharp corner spikes (elite crown), larger core than a normal enemy",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "stone",
+        "echo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格切角磨石块，四角突出尖棱。唯一的大机制特征：四角各一枚尖棱（精英冠角），核心比普通怪更大。占格 1×1，轮廓填满该比例的外框。配色：磨石（暖灰褐）、回响（靛→紫→淡紫）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell chamfered whetstone block with four protruding corner spikes. One big readable mechanic feature: four sharp corner spikes (elite crown), larger core than a normal enemy. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: warm grey-brown whetstone, echo ramp (indigo to violet to lavender). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "docs/design/art_vfx_ui_direction_v1.md §2.2",
+      "note": null
+    },
+    {
+      "id": "elite_shield_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "护盾 shield",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "外层整圈甲片（像盔甲包住身体）",
+      "feature_en": "a full ring of outer armour plates wrapping the body",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：外层整圈甲片（像盔甲包住身体）。占格 1×1，轮廓填满该比例的外框。配色：钢（蓝灰）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a full ring of outer armour plates wrapping the body. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: steel blue-grey, warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.shieldReduction",
+      "note": null
+    },
+    {
+      "id": "elite_regen_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "再生 regen",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "一道螺旋状的再生愈合缝（新长出的嫩芽）",
+      "feature_en": "one spiral healing seam with fresh sprouts",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom",
+        "stone"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：一道螺旋状的再生愈合缝（新长出的嫩芽）。占格 1×1，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: one spiral healing seam with fresh sprouts. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js gameplay.affixes.regenPercent",
+      "note": null
+    },
+    {
+      "id": "elite_healer_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "治愈 healer",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "正中一个大十字核心",
+      "feature_en": "a big cross-shaped core in the centre",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom",
+        "white"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：正中一个大十字核心。占格 1×1，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、白（仅高光）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a big cross-shaped core in the centre. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), white highlights only. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js gameplay.affixes.healerPercent",
+      "note": null
+    },
+    {
+      "id": "elite_haste_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "极速 haste",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "身体前倾 + 身后三道速度尾迹",
+      "feature_en": "body leaning forward with three speed trails behind",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：身体前倾 + 身后三道速度尾迹。占格 1×1，轮廓填满该比例的外框。配色：雷（暗金→亮黄）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: body leaning forward with three speed trails behind. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: lightning ramp (dark gold to bright yellow), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.hasteActions",
+      "note": null
+    },
+    {
+      "id": "elite_jump_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "跳跃 jump",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "下蹲弹簧腿（两条压缩的粗腿）",
+      "feature_en": "two crouched spring legs, compressed",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：下蹲弹簧腿（两条压缩的粗腿）。占格 1×1，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: two crouched spring legs, compressed. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.jumpRows",
+      "note": null
+    },
+    {
+      "id": "elite_clone_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "增殖 clone",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "身上冒出三颗芽孢小分身",
+      "feature_en": "three budding spores sprouting from the body",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：身上冒出三颗芽孢小分身。占格 1×1，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: three budding spores sprouting from the body. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.cloneChanceHit",
+      "note": null
+    },
+    {
+      "id": "elite_berserk_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "狂暴 berserk",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "裂开的外壳露出炽热内核 + 锯齿尖刺",
+      "feature_en": "split-open shell exposing a red-hot core, jagged spikes",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：裂开的外壳露出炽热内核 + 锯齿尖刺。占格 1×1，轮廓填满该比例的外框。配色：火（暗红→橙→浅黄）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: split-open shell exposing a red-hot core, jagged spikes. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: fire ramp (dark red to orange to pale yellow), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.berserkChanceMult",
+      "note": null
+    },
+    {
+      "id": "elite_devour_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "吞噬 devour",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "正面一张大獠牙口",
+      "feature_en": "one big fanged mouth on the front",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "laser",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：正面一张大獠牙口。占格 1×1，轮廓填满该比例的外框。配色：激光（酒红→粉）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: one big fanged mouth on the front. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: laser ramp (wine red to pink), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.devourChance",
+      "note": null
+    },
+    {
+      "id": "elite_radiantAegis_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "流彩护盾 radiantAegis",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "头顶一圈棱镜冠片",
+      "feature_en": "a crown of prismatic plates on top",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "laser"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：头顶一圈棱镜冠片。占格 1×1，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、激光（酒红→粉）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a crown of prismatic plates on top. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), laser ramp (wine red to pink). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.radiantAegisBossRegenPct",
+      "note": null
+    },
+    {
+      "id": "elite_livingArmor_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "活体护甲 livingArmor",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "树皮状的活体外壳包裹",
+      "feature_en": "a bark-like living shell wrapping the body",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom",
+        "stone"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：树皮状的活体外壳包裹。占格 1×1，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a bark-like living shell wrapping the body. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js gameplay.affixes.livingArmorPct",
+      "note": null
+    },
+    {
+      "id": "elite_armorSpore_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "护甲孢子 armorSpore",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "甲片上长着两颗孢子囊",
+      "feature_en": "two spore pods growing on armour plates",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom",
+        "steel"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：甲片上长着两颗孢子囊。占格 1×1，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: two spore pods growing on armour plates. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js gameplay.affixes.armorSporeStackPct",
+      "note": null
+    },
+    {
+      "id": "elite_siegeBreaker_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "撞城者 siegeBreaker",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "正前方一根加固撞角",
+      "feature_en": "one reinforced ram horn in front",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：正前方一根加固撞角。占格 1×1，轮廓填满该比例的外框。配色：钢（蓝灰）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: one reinforced ram horn in front. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: steel blue-grey, warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.siegeBreakerDamageMult",
+      "note": null
+    },
+    {
+      "id": "elite_deflectShell_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "偏折壳 deflectShell",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "光滑多棱面的倾斜外壳（子弹会被弹偏）",
+      "feature_en": "a smooth faceted slanted shell that deflects shots",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：光滑多棱面的倾斜外壳（子弹会被弹偏）。占格 1×1，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a smooth faceted slanted shell that deflects shots. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.deflectShellNormalRotateAmp",
+      "note": null
+    },
+    {
+      "id": "elite_energyArmor_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "蓄能甲 energyArmor",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "胸前一块蓄电池甲板（电格刻度）",
+      "feature_en": "a battery plate with charge cells on the chest",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：胸前一块蓄电池甲板（电格刻度）。占格 1×1，轮廓填满该比例的外框。配色：雷（暗金→亮黄）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a battery plate with charge cells on the chest. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: lightning ramp (dark gold to bright yellow), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.energyArmorThresholdPct",
+      "note": null
+    },
+    {
+      "id": "elite_phaseShield_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "相位护盾 phaseShield",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "偏移半格的幽灵重影外壳",
+      "feature_en": "a ghostly duplicate shell offset by half a step",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：偏移半格的幽灵重影外壳。占格 1×1，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、白（仅高光）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a ghostly duplicate shell offset by half a step. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), white highlights only. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.phaseShieldCycle",
+      "note": null
+    },
+    {
+      "id": "elite_overloadReactor_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "过量反应炉 overloadReactor",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "背后两根反应炉排气管",
+      "feature_en": "two reactor exhaust vents on the back",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro",
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：背后两根反应炉排气管。占格 1×1，轮廓填满该比例的外框。配色：火（暗红→橙→浅黄）、雷（暗金→亮黄）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: two reactor exhaust vents on the back. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: fire ramp (dark red to orange to pale yellow), lightning ramp (dark gold to bright yellow). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.overloadStepPct",
+      "note": null
+    },
+    {
+      "id": "elite_lowDamageImmune_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "低伤免疫 lowDamageImmune",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "钻石般的厚硬棱面外壳",
+      "feature_en": "a thick diamond-hard faceted carapace",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：钻石般的厚硬棱面外壳。占格 1×1，轮廓填满该比例的外框。配色：钢（蓝灰）、白（仅高光）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: a thick diamond-hard faceted carapace. Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: steel blue-grey, white highlights only. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.lowDamageImmunePct",
+      "note": null
+    },
+    {
+      "id": "elite_runeBearer_1x1",
+      "group": "elite",
+      "class": "elite_1x1",
+      "name_zh": "符文携带者 runeBearer",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "collision": null,
+      "feature_zh": "背着一块刻符石板（只画符号形，不画文字）",
+      "feature_en": "carrying a carved rune tablet (glyph shape only, no letters)",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "单格精英磨石怪（同精英底形），词条特征占画面 1/3 以上。唯一的大机制特征：背着一块刻符石板（只画符号形，不画文字）。占格 1×1，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a single-cell elite whetstone creature (same base as the elite), the affix feature covering at least a third of the figure. One big readable mechanic feature: carrying a carved rune tablet (glyph shape only, no letters). Footprint 1x1 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js gameplay.affixes.runeBearerTempAffixPool",
+      "note": null
+    },
+    {
+      "id": "boss_ignis",
+      "group": "boss",
+      "class": "boss_2x2",
+      "name_zh": "熔炉守卫·伊格尼斯",
+      "grid_px": [
+        48,
+        48
+      ],
+      "cells": [
+        2,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "外层多块护盾甲片 + 胸口熔炉",
+      "feature_en": "layered outer shield plates over a chest furnace",
+      "weak_point_zh": "胸口熔炉格栅（破甲熔炉：穿透 / 火 3 次命中）",
+      "weak_point_en": "the chest furnace grille (pierce / pyro, 3 hits)",
+      "ramps": [
+        "pyro",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "厚重的熔炉守卫，石甲覆盖全身，胸口炉门。唯一的大机制特征：外层多块护盾甲片 + 胸口熔炉。弱点必须清晰可见并做成最亮色块：胸口熔炉格栅（破甲熔炉：穿透 / 火 3 次命中）。占格 2×2，轮廓填满该比例的外框。配色：火（暗红→橙→浅黄）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a heavy furnace guardian covered in stone armour with a furnace door on the chest. One big readable mechanic feature: layered outer shield plates over a chest furnace. The weak point must be clearly visible as the brightest block: the chest furnace grille (pierce / pyro, 3 hits). Footprint 2x2 cells; the silhouette fills a box of that aspect ratio. Palette: fire ramp (dark red to orange to pale yellow), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js bossConfigs.ignis (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_glacies",
+      "group": "boss",
+      "class": "boss_2x2",
+      "name_zh": "霜晶缝合怪·格拉西斯",
+      "grid_px": [
+        48,
+        48
+      ],
+      "cells": [
+        2,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "全身缝合的冰晶块 + 强壮跳跃后腿",
+      "feature_en": "stitched ice crystal chunks and strong jumping hind legs",
+      "weak_point_zh": "正中一道发光的缝合冰裂（冻结裂隙：冰 / 穿透）",
+      "weak_point_en": "one glowing stitched ice seam in the middle (cryo / pierce)",
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "由冰晶块缝合而成的怪物。唯一的大机制特征：全身缝合的冰晶块 + 强壮跳跃后腿。弱点必须清晰可见并做成最亮色块：正中一道发光的缝合冰裂（冻结裂隙：冰 / 穿透）。占格 2×2，轮廓填满该比例的外框。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a monster stitched together from ice crystal chunks. One big readable mechanic feature: stitched ice crystal chunks and strong jumping hind legs. The weak point must be clearly visible as the brightest block: one glowing stitched ice seam in the middle (cryo / pierce). Footprint 2x2 cells; the silhouette fills a box of that aspect ratio. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js bossConfigs.glacies (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_mikro",
+      "group": "boss",
+      "class": "boss_2x2",
+      "name_zh": "裂变母体·米克罗",
+      "grid_px": [
+        48,
+        48
+      ],
+      "cells": [
+        2,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "半透明细胞母体 + 外缘三个连接分身的链节",
+      "feature_en": "a translucent mother cell with three link nodes on its rim tethering clones",
+      "weak_point_zh": "膜上三个链节（群体断链：雷 / 散射 5 次命中）",
+      "weak_point_en": "three link nodes on the membrane (lightning / scatter, 5 hits)",
+      "ramps": [
+        "echo",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "巨大的分裂细胞母体，内部有多个核。唯一的大机制特征：半透明细胞母体 + 外缘三个连接分身的链节。弱点必须清晰可见并做成最亮色块：膜上三个链节（群体断链：雷 / 散射 5 次命中）。占格 2×2，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、白（仅高光）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a giant dividing mother cell with several nuclei inside. One big readable mechanic feature: a translucent mother cell with three link nodes on its rim tethering clones. The weak point must be clearly visible as the brightest block: three link nodes on the membrane (lightning / scatter, 5 hits). Footprint 2x2 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), white highlights only. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js bossConfigs.mikro (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_devourer",
+      "group": "boss",
+      "class": "boss_2x2",
+      "name_zh": "贪婪之渊·噬神者",
+      "grid_px": [
+        48,
+        48
+      ],
+      "cells": [
+        2,
+        2
+      ],
+      "collision": null,
+      "feature_zh": "占身体一半的深渊巨口",
+      "feature_en": "an abyssal mouth taking up half the body",
+      "weak_point_zh": "巨口内部（深渊开口：弹射 / 激光）",
+      "weak_point_en": "the inside of the mouth (bounce / laser)",
+      "ramps": [
+        "laser",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "贪婪的深渊胃囊巨兽，环形獠牙。唯一的大机制特征：占身体一半的深渊巨口。弱点必须清晰可见并做成最亮色块：巨口内部（深渊开口：弹射 / 激光）。占格 2×2，轮廓填满该比例的外框。配色：激光（酒红→粉）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a greedy abyssal stomach beast with a ring of fangs. One big readable mechanic feature: an abyssal mouth taking up half the body. The weak point must be clearly visible as the brightest block: the inside of the mouth (bounce / laser). Footprint 2x2 cells; the silhouette fills a box of that aspect ratio. Palette: laser ramp (wine red to pink), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js bossConfigs.devourer (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_viridis",
+      "group": "boss",
+      "class": "boss_3x3",
+      "name_zh": "翠绿共生体·维里迪斯",
+      "grid_px": [
+        72,
+        72
+      ],
+      "cells": [
+        3,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "孢甲甲片 + 正中开花的孢子囊",
+      "feature_en": "spore-armour plates with a blooming spore pod in the centre",
+      "weak_point_zh": "正中孢子花苞（孢甲净化：火 / 毒）",
+      "weak_point_en": "the central spore bloom (pyro / venom)",
+      "ramps": [
+        "venom",
+        "stone"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "巨大的植物-磨石共生体，甲片间长满孢子。唯一的大机制特征：孢甲甲片 + 正中开花的孢子囊。弱点必须清晰可见并做成最亮色块：正中孢子花苞（孢甲净化：火 / 毒）。占格 3×3，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、磨石（暖灰褐）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a huge plant-and-stone symbiote with spores growing between plates. One big readable mechanic feature: spore-armour plates with a blooming spore pod in the centre. The weak point must be clearly visible as the brightest block: the central spore bloom (pyro / venom). Footprint 3x3 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), warm grey-brown whetstone. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js bossConfigs.viridis (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_tesla",
+      "group": "boss",
+      "class": "boss_3x3",
+      "name_zh": "雷霆幻影·特斯拉",
+      "grid_px": [
+        72,
+        72
+      ],
+      "cells": [
+        3,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "肩上两组导体线圈 + 脚下一根接地桩",
+      "feature_en": "two conductor coils on the shoulders and one grounding spike below",
+      "weak_point_zh": "脚下接地桩（导体接地：冰 / 弹射 4 次命中）",
+      "weak_point_en": "the grounding spike at the base (cryo / bounce, 4 hits)",
+      "ramps": [
+        "lightning",
+        "cryo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "高速的雷电幻影机体。唯一的大机制特征：肩上两组导体线圈 + 脚下一根接地桩。弱点必须清晰可见并做成最亮色块：脚下接地桩（导体接地：冰 / 弹射 4 次命中）。占格 3×3，轮廓填满该比例的外框。配色：雷（暗金→亮黄）、冰（深蓝→青→冰白）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "a fast lightning phantom construct. One big readable mechanic feature: two conductor coils on the shoulders and one grounding spike below. The weak point must be clearly visible as the brightest block: the grounding spike at the base (cryo / bounce, 4 hits). Footprint 3x3 cells; the silhouette fills a box of that aspect ratio. Palette: lightning ramp (dark gold to bright yellow), ice ramp (deep blue to cyan to ice white). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js bossConfigs.tesla (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_chimera",
+      "group": "boss",
+      "class": "boss_3x3",
+      "name_zh": "混沌融合体·奇美拉",
+      "grid_px": [
+        72,
+        72
+      ],
+      "cells": [
+        3,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "左半冰冷、右半炽热的融合体 + 中间污染胃囊",
+      "feature_en": "left half frozen, right half burning, polluted stomach in the middle",
+      "weak_point_zh": "中央污染胃囊（污染胃域：毒 / 激光）",
+      "weak_point_en": "the central polluted stomach (venom / laser)",
+      "ramps": [
+        "venom",
+        "pyro",
+        "cryo"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "两种生物拼合的混沌巨兽。唯一的大机制特征：左半冰冷、右半炽热的融合体 + 中间污染胃囊。弱点必须清晰可见并做成最亮色块：中央污染胃囊（污染胃域：毒 / 激光）。占格 3×3，轮廓填满该比例的外框。配色：毒（墨绿→酸绿）、火（暗红→橙→浅黄）、冰（深蓝→青→冰白）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #FF00FF，无文字无字母无 UI 边框",
+      "prompt_en": "a chaotic beast fused from two creatures. One big readable mechanic feature: left half frozen, right half burning, polluted stomach in the middle. The weak point must be clearly visible as the brightest block: the central polluted stomach (venom / laser). Footprint 3x3 cells; the silhouette fills a box of that aspect ratio. Palette: venom ramp (dark green to acid green), fire ramp (dark red to orange to pale yellow), ice ramp (deep blue to cyan to ice white). pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #FF00FF background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "src/config.js bossConfigs.chimera (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "boss_ouroboros",
+      "group": "boss",
+      "class": "boss_3x3",
+      "name_zh": "永恒回声·奥罗波罗斯",
+      "grid_px": [
+        72,
+        72
+      ],
+      "cells": [
+        3,
+        3
+      ],
+      "collision": null,
+      "feature_zh": "首尾相衔的巨蛇环 + 环上六个附体插槽",
+      "feature_en": "a great serpent ring biting its tail with six attachment sockets on the ring",
+      "weak_point_zh": "当前点亮的那个插槽（轮转破绽，6 组）",
+      "weak_point_en": "the currently lit socket (rotating weak point, 6 sets)",
+      "ramps": [
+        "echo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "回响能量构成的衔尾蛇。唯一的大机制特征：首尾相衔的巨蛇环 + 环上六个附体插槽。弱点必须清晰可见并做成最亮色块：当前点亮的那个插槽（轮转破绽，6 组）。占格 3×3，轮廓填满该比例的外框。配色：回响（靛→紫→淡紫）、钢（蓝灰）。像素画友好的游戏素材概念图，正交 3/4 俯视角，平涂无光照，无投影、无渐变、无轮廓光、无发光，单一主体居中占画面约 80%，粗而干净的剪影与深色粗描边，大色块，最多 6 种颜色，纯色背景 #00FF00，无文字无字母无 UI 边框",
+      "prompt_en": "an ouroboros serpent made of echo energy. One big readable mechanic feature: a great serpent ring biting its tail with six attachment sockets on the ring. The weak point must be clearly visible as the brightest block: the currently lit socket (rotating weak point, 6 sets). Footprint 3x3 cells; the silhouette fills a box of that aspect ratio. Palette: echo ramp (indigo to violet to lavender), steel blue-grey. pixel-art-ready game sprite concept, orthographic 3/4 top-down view, flat unlit cel colours, no cast shadow, no gradient, no rim light, no glow, single subject centred filling about 80% of the frame, bold clean silhouette with a thick dark outline, large flat colour blocks, at most 6 colours, solid pure #00FF00 background, no text, no letters, no UI frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "src/config.js bossConfigs.ouroboros (vulnerability) + BOSS_DB",
+      "note": "Boss 尺寸以规格 §2.2 为准；当前代码 4×3 格（spawn_system.js:2587）待对齐"
+    },
+    {
+      "id": "icon_energy_24",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "能量 ⚡",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一道粗闪电能量结晶",
+      "feature_en": "a chunky lightning-bolt energy crystal",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一道粗闪电能量结晶。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a chunky lightning-bolt energy crystal. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §4",
+      "note": null
+    },
+    {
+      "id": "icon_energy_16",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "能量 ⚡（HUD 16）",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一道粗闪电",
+      "feature_en": "a single chunky lightning bolt",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一道粗闪电。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a single chunky lightning bolt. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §4",
+      "note": null
+    },
+    {
+      "id": "icon_crystal_24",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "晶核 💎",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一颗切面晶核宝石",
+      "feature_en": "one faceted crystal core gem",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一颗切面晶核宝石。只表达一个符号 + 一个元素色。配色：回响（靛→紫→淡紫）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one faceted crystal core gem. One symbol plus one element colour only. Palette: echo ramp (indigo to violet to lavender). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §4",
+      "note": null
+    },
+    {
+      "id": "icon_crystal_16",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "晶核 💎（HUD 16）",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一颗菱形宝石",
+      "feature_en": "one rhombus gem",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一颗菱形宝石。只表达一个符号 + 一个元素色。配色：回响（靛→紫→淡紫）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one rhombus gem. One symbol plus one element colour only. Palette: echo ramp (indigo to violet to lavender). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §4",
+      "note": null
+    },
+    {
+      "id": "icon_cannon_damage",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "主炮·伤害",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "炮口 + 一个向上箭头的炮弹（伤害）",
+      "feature_en": "a cannon muzzle with a heavy shell and an up arrow",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "炮口 + 一个向上箭头的炮弹（伤害）。只表达一个符号 + 一个元素色。配色：火（暗红→橙→浅黄）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a cannon muzzle with a heavy shell and an up arrow. One symbol plus one element colour only. Palette: fire ramp (dark red to orange to pale yellow), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_cannon_rate",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "主炮·射速",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "炮口 + 两发连射炮弹",
+      "feature_en": "a cannon muzzle firing two shells in a row",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "炮口 + 两发连射炮弹。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a cannon muzzle firing two shells in a row. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_cannon_bounce",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "主炮·弹道（反弹）",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一发炮弹走折线反弹轨迹",
+      "feature_en": "one shell on a zig-zag bouncing path",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一发炮弹走折线反弹轨迹。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one shell on a zig-zag bouncing path. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_branch_pierce",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "分支·穿透",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一把贯穿两块石板的飞剑",
+      "feature_en": "a flying sword piercing through two stone slabs",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一把贯穿两块石板的飞剑。只表达一个符号 + 一个元素色。配色：钢（蓝灰）、白（仅高光）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a flying sword piercing through two stone slabs. One symbol plus one element colour only. Palette: steel blue-grey, white highlights only. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_branch_scatter",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "分支·散射",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "三道扇形散开的风刃",
+      "feature_en": "three wind blades fanning out",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "三道扇形散开的风刃。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "three wind blades fanning out. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_branch_element_pyro",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "分支·元素（火）",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "炮弹裹着火舌",
+      "feature_en": "a shell wrapped in flame tongues",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "炮弹裹着火舌。只表达一个符号 + 一个元素色。配色：火（暗红→橙→浅黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a shell wrapped in flame tongues. One symbol plus one element colour only. Palette: fire ramp (dark red to orange to pale yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_branch_element_cryo",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "分支·元素（冰）",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "炮弹镶着冰菱",
+      "feature_en": "a shell set with ice rhombus crystals",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "炮弹镶着冰菱。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a shell set with ice rhombus crystals. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_branch_element_lightning",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "分支·元素（雷）",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "炮弹缠着折线闪电",
+      "feature_en": "a shell wrapped in zig-zag lightning",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "炮弹缠着折线闪电。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a shell wrapped in zig-zag lightning. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.1",
+      "note": null
+    },
+    {
+      "id": "icon_facility_turret",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "设施·炮台",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一座单管小炮台",
+      "feature_en": "a small single-barrel turret",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "pyro"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一座单管小炮台。只表达一个符号 + 一个元素色。配色：钢（蓝灰）、火（暗红→橙→浅黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a small single-barrel turret. One symbol plus one element colour only. Palette: steel blue-grey, fire ramp (dark red to orange to pale yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.2",
+      "note": null
+    },
+    {
+      "id": "icon_facility_lightning_tower",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "设施·雷击塔",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "塔顶放出连锁闪电的高塔",
+      "feature_en": "a tower releasing a chain of lightning from its tip",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "塔顶放出连锁闪电的高塔。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a tower releasing a chain of lightning from its tip. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.2",
+      "note": null
+    },
+    {
+      "id": "icon_facility_frost_tower",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "设施·冰霜塔",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "塔顶一颗冰晶的塔",
+      "feature_en": "a tower topped with an ice crystal",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "塔顶一颗冰晶的塔。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a tower topped with an ice crystal. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.2",
+      "note": null
+    },
+    {
+      "id": "icon_facility_shield_generator",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "设施·结界发生器",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "底座上方一面半圆结界盾",
+      "feature_en": "a half-dome barrier shield above a base",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "echo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "底座上方一面半圆结界盾。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）、回响（靛→紫→淡紫）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a half-dome barrier shield above a base. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white), echo ramp (indigo to violet to lavender). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.2",
+      "note": null
+    },
+    {
+      "id": "icon_facility_alchemy_collector",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "设施·炼金收集器",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "接住闪电能量的炼金漏斗",
+      "feature_en": "an alchemy funnel catching lightning energy",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "接住闪电能量的炼金漏斗。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）、磨石（暖灰褐）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "an alchemy funnel catching lightning energy. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow), warm grey-brown whetstone. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.2",
+      "note": null
+    },
+    {
+      "id": "icon_item_bomb",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "道具·炸弹",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一颗点燃引信的圆炸弹",
+      "feature_en": "one round bomb with a lit fuse",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一颗点燃引信的圆炸弹。只表达一个符号 + 一个元素色。配色：火（暗红→橙→浅黄）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one round bomb with a lit fuse. One symbol plus one element colour only. Palette: fire ramp (dark red to orange to pale yellow), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.4",
+      "note": null
+    },
+    {
+      "id": "icon_item_timestop",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "道具·时停",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一只停住的沙漏",
+      "feature_en": "one frozen hourglass",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一只停住的沙漏。只表达一个符号 + 一个元素色。配色：回响（靛→紫→淡紫）、白（仅高光）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one frozen hourglass. One symbol plus one element colour only. Palette: echo ramp (indigo to violet to lavender), white highlights only. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.4",
+      "note": null
+    },
+    {
+      "id": "icon_item_emergency_shield",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "道具·急救结界",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一面带十字的盾",
+      "feature_en": "a shield with a cross on it",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一面带十字的盾。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）、白（仅高光）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a shield with a cross on it. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white), white highlights only. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.4",
+      "note": null
+    },
+    {
+      "id": "icon_item_extra_dig",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "道具·加挖",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一把镐 + 两颗额外弹珠",
+      "feature_en": "a pickaxe with two extra marbles",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "stone",
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一把镐 + 两颗额外弹珠。只表达一个符号 + 一个元素色。配色：磨石（暖灰褐）、雷（暗金→亮黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a pickaxe with two extra marbles. One symbol plus one element colour only. Palette: warm grey-brown whetstone, lightning ramp (dark gold to bright yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §5.4",
+      "note": null
+    },
+    {
+      "id": "icon_mining_collector_plus1",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "挖矿·采集弹珠 +1",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "三颗弹珠排一行，最后一颗发亮",
+      "feature_en": "three marbles in a row, the last one glowing",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "三颗弹珠排一行，最后一颗发亮。只表达一个符号 + 一个元素色。配色：钢（蓝灰）、雷（暗金→亮黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "three marbles in a row, the last one glowing. One symbol plus one element colour only. Palette: steel blue-grey, lightning ramp (dark gold to bright yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §6",
+      "note": null
+    },
+    {
+      "id": "icon_mining_wide_bucket",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "挖矿·宽口能量桶",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一个口特别宽的能量桶",
+      "feature_en": "an energy bucket with an extra-wide mouth",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一个口特别宽的能量桶。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）、磨石（暖灰褐）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "an energy bucket with an extra-wide mouth. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow), warm grey-brown whetstone. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §6",
+      "note": null
+    },
+    {
+      "id": "icon_mining_magnet_peg",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "挖矿·磁力钉",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一颗马蹄磁铁形的钉子吸住弹珠",
+      "feature_en": "a horseshoe-magnet peg pulling a marble",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "laser",
+        "steel"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一颗马蹄磁铁形的钉子吸住弹珠。只表达一个符号 + 一个元素色。配色：激光（酒红→粉）、钢（蓝灰）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a horseshoe-magnet peg pulling a marble. One symbol plus one element colour only. Palette: laser ramp (wine red to pink), steel blue-grey. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §6",
+      "note": null
+    },
+    {
+      "id": "icon_mining_throat_widen",
+      "group": "icon",
+      "class": "icon_24",
+      "name_zh": "挖矿·咽喉加宽",
+      "grid_px": [
+        24,
+        24
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一道窄门被两个向外箭头撑宽",
+      "feature_en": "a narrow gate pushed wider by two outward arrows",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "echo",
+        "stone"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一道窄门被两个向外箭头撑宽。只表达一个符号 + 一个元素色。配色：回响（靛→紫→淡紫）、磨石（暖灰褐）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 6 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "a narrow gate pushed wider by two outward arrows. One symbol plus one element colour only. Palette: echo ramp (indigo to violet to lavender), warm grey-brown whetstone. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 6 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "dig_build_defend_loop_v1.md §6",
+      "note": null
+    },
+    {
+      "id": "icon_mark_pyro",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·火",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一簇火舌",
+      "feature_en": "one flame tongue",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "pyro"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一簇火舌。只表达一个符号 + 一个元素色。配色：火（暗红→橙→浅黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one flame tongue. One symbol plus one element colour only. Palette: fire ramp (dark red to orange to pale yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_cryo",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·冰",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一颗冰菱",
+      "feature_en": "one ice rhombus",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一颗冰菱。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one ice rhombus. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_lightning",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·雷",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一道折线闪电",
+      "feature_en": "one zig-zag bolt",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "lightning"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一道折线闪电。只表达一个符号 + 一个元素色。配色：雷（暗金→亮黄）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one zig-zag bolt. One symbol plus one element colour only. Palette: lightning ramp (dark gold to bright yellow). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_venom",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·毒",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一颗液滴",
+      "feature_en": "one droplet",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "venom"
+      ],
+      "key_color": "#FF00FF",
+      "request_size": "1024x1024",
+      "prompt_zh": "一颗液滴。只表达一个符号 + 一个元素色。配色：毒（墨绿→酸绿）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #FF00FF，无文字无数字无边框",
+      "prompt_en": "one droplet. One symbol plus one element colour only. Palette: venom ramp (dark green to acid green). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #FF00FF background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，品红色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, magenta subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_wind",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·风",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一个旋涡",
+      "feature_en": "one swirl vortex",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "cryo"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一个旋涡。只表达一个符号 + 一个元素色。配色：钢（蓝灰）、冰（深蓝→青→冰白）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one swirl vortex. One symbol plus one element colour only. Palette: steel blue-grey, ice ramp (deep blue to cyan to ice white). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_laser",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·激光",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一道直线光束",
+      "feature_en": "one straight beam",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "laser"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一道直线光束。只表达一个符号 + 一个元素色。配色：激光（酒红→粉）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one straight beam. One symbol plus one element colour only. Palette: laser ramp (wine red to pink). pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_pierce",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·穿透",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "一支穿过横线的箭",
+      "feature_en": "one arrow passing through a bar",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "steel",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "一支穿过横线的箭。只表达一个符号 + 一个元素色。配色：钢（蓝灰）、白（仅高光）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "one arrow passing through a bar. One symbol plus one element colour only. Palette: steel blue-grey, white highlights only. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    },
+    {
+      "id": "icon_mark_scatter",
+      "group": "icon",
+      "class": "icon_16",
+      "name_zh": "元素标记·散射",
+      "grid_px": [
+        16,
+        16
+      ],
+      "cells": null,
+      "collision": null,
+      "feature_zh": "三道扇形短线",
+      "feature_en": "three short lines fanning out",
+      "weak_point_zh": null,
+      "weak_point_en": null,
+      "ramps": [
+        "cryo",
+        "white"
+      ],
+      "key_color": "#00FF00",
+      "request_size": "1024x1024",
+      "prompt_zh": "三道扇形短线。只表达一个符号 + 一个元素色。配色：冰（深蓝→青→冰白）、白（仅高光）。像素画友好的游戏 UI 图标概念图，正面正交，平涂无光照，无投影、无渐变、无发光，单一符号居中占画面约 80%，粗剪影与深色粗描边，最多 4 种颜色，纯色背景 #00FF00，无文字无数字无边框",
+      "prompt_en": "three short lines fanning out. One symbol plus one element colour only. Palette: ice ramp (deep blue to cyan to ice white), white highlights only. pixel-art-ready game UI icon concept, front orthographic view, flat unlit colours, no shadow, no gradient, no glow, one symbol centred filling about 80% of the frame, bold silhouette with a thick dark outline, at most 4 colours, solid pure #00FF00 background, no text, no numbers, no frame",
+      "negative_zh": "写实、3D 渲染、照片、渐变、柔光、发光、投影、景深、模糊、噪点纹理、细碎细节、多个主体、文字、水印、边框、背景场景，绿色主体",
+      "negative_en": "photorealistic, 3d render, photo, gradient, soft lighting, glow, bloom, drop shadow, depth of field, blur, noisy texture, tiny details, multiple subjects, text, watermark, border, background scenery, green subject",
+      "anchor": "art_vfx_ui_direction_v1.md §4.2",
+      "note": null
+    }
+  ]
+}
