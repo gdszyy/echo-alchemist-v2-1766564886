@@ -4,7 +4,7 @@ import { RUNE_DB, RUNEWORD_DB, STAT_DISPLAY } from './rune_config.js';
 import { CONFIG, META_SHOP_CONFIG, RELIC_DB, BOSS_DB, ENEMY_CURVE_CONFIG, setDeepValue } from './config.js';
 import { getAmmoIconSrcByKey, getBossPreviewIconSrc, getRelicIconSrc, getLootCapsuleSrc } from './bitmap_icons.js';
 import { getAmmoReadabilityProfile } from './utils/ammo_readability.js';
-import { getBossDisplayName, getBossPreviewInfo, getBossShortName, normalizeBossKey } from './utils/boss_schedule_utils.js';
+import { getBossDisplayName, getBossPreviewInfo, getBossShortName, getWaveInfo, normalizeBossKey } from './utils/boss_schedule_utils.js';
 import {
     MODULE_DEFS,
     getModuleSpan,
@@ -66,17 +66,17 @@ function _getNextBossThreatInfo(game) {
         };
     }
 
-    const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG);
+    const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG, CONFIG.balance?.waveCycle?.normalWavesPerBoss);
     if (!preview) return null;
 
     const { bossId, known, nextRound, turnsUntil } = preview;
     const shortName = known ? getBossShortName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB) : '未知';
     const label = turnsUntil <= 0
-        ? (known ? '本回合' : '未知')
-        : `${known ? shortName : '未知'} ${turnsUntil}`;
+        ? (known ? '本波' : '未知')
+        : `${known ? shortName : '未知'} ${turnsUntil}波`;
     const title = known
-        ? `下一威胁：${getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB)} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`
-        : `下一威胁：未知 Boss 将在 Round ${nextRound} 出现（${turnsUntil} 回合后，未遭遇前仅显示剪影）`;
+        ? `下一威胁：${getBossDisplayName(bossId, CONFIG.balance?.bossConfigs, BOSS_DB)} 将在 ${turnsUntil} 波后（Round ${nextRound}）出现`
+        : `下一威胁：未知 Boss 将在 ${turnsUntil} 波后（Round ${nextRound}）出现，未遭遇前仅显示剪影`;
 
     return {
         state: turnsUntil <= 1 ? 'soon' : 'countdown',
@@ -1962,19 +1962,52 @@ export const ui_system = {
         }
         const topPhaseLabel = document.getElementById('top-phase-label');
         if (topPhaseLabel) {
+            // [波次循环] Dome Keeper 式「挖 → 守」：钉板 = 挖掘，战斗 = 守卫
             const topLabelMap = {
-                gathering: '研磨',
-                combat: '战斗',
+                gathering: '挖掘',
+                combat: '守卫',
                 training: '试炼',
             };
             topPhaseLabel.textContent = topLabelMap[this.phase] || '';
         }
+        this.ui_updateIncomingWavePreview();
 
         // 8. 战斗技能充能 UI
         const runeChargeUi = document.getElementById('combat-rune-charge-ui');
         if (runeChargeUi) {
             runeChargeUi.style.display = (this.phase === 'combat') ? 'flex' : 'none';
         }
+    },
+
+    /**
+     * @method ui_updateIncomingWavePreview
+     * @description [波次循环] 挖掘（钉板）阶段在钉板左下角（与 ⚡ 符文发射器按钮同一行）预告即将迎战的波次：
+     *   普通波「来袭 N · 精英 M」，Boss 波「Boss 来袭 · N」。挂在 #phase-gathering 内，随阶段一起显隐。
+     *   顶栏中部在挖掘阶段归商人旅程 dock 使用，故不放在顶栏。
+     *   敌人数按当前在场 + 画面外待入场的敌人统计（即本波战斗实际要面对的全部敌人）。
+     */
+    ui_updateIncomingWavePreview() {
+        if (this.phase !== 'gathering') return;
+        const host = document.getElementById('phase-gathering');
+        if (!host) return;
+        let chip = document.getElementById('incoming-wave-chip');
+        if (!chip) {
+            chip = document.createElement('div');
+            chip.id = 'incoming-wave-chip';
+            chip.className = 'incoming-wave-chip';
+            host.appendChild(chip);
+        }
+        const info = getWaveInfo(this, CONFIG.balance?.waveCycle?.normalWavesPerBoss);
+        const foes = (this.enemies || []).filter(e => e && e.active && !e.isDead && e.hp > 0);
+        const hasBoss = info.isBossWave || foes.some(e => e.type === 'boss') || !!this._pendingBossSpawn;
+        const eliteCount = foes.filter(e => e.type !== 'boss' && Array.isArray(e.affixes) && e.affixes.length >= 2).length;
+        chip.classList.toggle('is-boss', hasBoss);
+        chip.textContent = hasBoss
+            ? `Boss 来袭 · ${foes.length}`
+            : `来袭 ${foes.length}${eliteCount > 0 ? ` · 精英 ${eliteCount}` : ''}`;
+        chip.title = hasBoss
+            ? `Boss 波：击败 Boss 后进入下一轮 ${info.normalWavesPerBoss} 个普通波`
+            : `第 ${info.waveInCycle}/${info.normalWavesPerBoss} 波：即将迎战 ${foes.length} 个敌人${info.wavesUntilBoss === 1 ? '，下一波是 Boss' : ''}`;
     },
 
     ui_updatePCLayout() {

@@ -635,18 +635,15 @@ const CONFIG = {
         // =========================================
         // Boss 系统配置
         // =========================================
-        /** Boss 出现回合配置 */
-        bossRounds: {
-            firstBoss: 5,             // 第一个 Boss 固定在 Round 5
-            intervalMin: 7,           // 后续 Boss 最小间隔回合数
-            intervalMax: 9,           // 后续 Boss 最大间隔回合数
-            // 延期机制：根据玩家击杀上个 Boss 的速度动态延期
-            // 快速击杀（≤ 2 回合）：延期 2 回合；中速（3 回合）：延期 1 回合；慢速（≥ 4 回合）：不延期
-            delayFastKillThreshold: 2,  // 快速击杀阈值（回合数）
-            delayFastKillRounds: 2,     // 快速击杀时延期回合数
-            delayMidKillThreshold: 3,   // 中速击杀阈值（回合数）
-            delayMidKillRounds: 1,      // 中速击杀时延期回合数
-            delayMaxBossIndex: 3,       // 第几个 Boss 之后不再延期（含）：第 3 个 Boss 之后（即第 4 个起）不延期
+        /**
+         * 波次循环配置（Dome Keeper 式「挖 → 守」循环）
+         * 每回合 = 1 波：钉板阶段（挖）→ 战斗阶段（守）。
+         * 一个循环 = normalWavesPerBoss 个普通波 + 1 个 Boss 波；Boss 波持续到 Boss 被击杀，
+         * 击杀后重新数 normalWavesPerBoss 个普通波再进入下一个 Boss 波。
+         * 判定与展示的唯一口径见 src/utils/boss_schedule_utils.js（computeNextBossRound / getWaveInfo）。
+         */
+        waveCycle: {
+            normalWavesPerBoss: 3,    // 每个 Boss 前的普通波数量（第 1 个 Boss 在 Round 4）
         },
 
         /** Boss 血量公式参数 */

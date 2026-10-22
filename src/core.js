@@ -528,6 +528,8 @@ class Game {
 
         // [难度平衡] Boss 被击杀事件：触发战后高压因子
         this.eventBus.on('boss:defeated', (data) => {
+            // [波次循环] 真理之书演示等共用全局事件总线：不属于本局的 Boss 不得改动本局 Boss 波排期
+            if (data && data.boss && Array.isArray(this.enemies) && !this.enemies.includes(data.boss)) return;
             this.postBossMultiplier = 1.3;
             this.postBossSurgeRoundsLeft = 3;
             // [Task C.2] 战后高压期：3 回合内双词缀精英概率临时提升 25%
@@ -542,31 +544,9 @@ class Game {
                 round:     this.round,
                 isBigBoss: !!(data.isBigBoss || (data.boss && data.boss.isBigBoss) || false),
             });
-            // [Boss 调度] 根据击杀用时计算延期回合数，并预定下一个 Boss
-            const cfg = CONFIG.balance.bossRounds;
-            const spawnCount = this._bossSpawnCount || 0;
-            const delayMaxBossIndex = (cfg && cfg.delayMaxBossIndex) || 3;
-            let extraDelay = 0;
-            // 第三个 Boss 之后（已生成数量 >= delayMaxBossIndex）不再延期
-            if (spawnCount < delayMaxBossIndex) {
-                const spawnRound = this._lastBossSpawnRound || this.round;
-                const killDuration = this.round - spawnRound; // 击杀用了多少回合
-                const fastThreshold = (cfg && cfg.delayFastKillThreshold) || 2;
-                const midThreshold  = (cfg && cfg.delayMidKillThreshold)  || 3;
-                const fastDelay     = (cfg && cfg.delayFastKillRounds)    || 2;
-                const midDelay      = (cfg && cfg.delayMidKillRounds)     || 1;
-                if (killDuration <= fastThreshold) {
-                    extraDelay = fastDelay;
-                } else if (killDuration <= midThreshold) {
-                    extraDelay = midDelay;
-                }
-                if (extraDelay > 0) {
-                    console.log(`[BossSchedule] Boss 击杀用时 ${killDuration} 回合，延期 ${extraDelay} 回合`);
-                }
-            } else {
-                console.log(`[BossSchedule] 第 ${spawnCount} 个 Boss 已超过延期限制（${delayMaxBossIndex}），不延期`);
-            }
-            this.spawn_scheduleNextBoss(extraDelay);
+            // [波次循环] Boss 波结束：从下一回合起重新数普通波，预定下一个 Boss 波
+            this.spawn_scheduleNextBoss();
+            if (typeof this.sys_updateWaveHud === 'function') this.sys_updateWaveHud();
         });
 
         // [Task 3.2] 注册 UI 层 EventBus 监听器

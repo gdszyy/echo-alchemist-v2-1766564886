@@ -1,6 +1,6 @@
 # src\ui_system.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 3416 | 函数数: 57 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 3449 | 函数数: 58 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -23,6 +23,7 @@
 | meta_getResourceCount | method | `meta_getResourceCount(resourceId)` |  |
 | meta_spendResource | method | `meta_spendResource(resourceId, amount)` |  |
 | ui_updateUI | method | `ui_updateUI()` |  |
+| ui_updateIncomingWavePreview | method | `ui_updateIncomingWavePreview()` |  |
 | ui_updatePCLayout | method | `ui_updatePCLayout()` |  |
 | _ui_updateLeftSidebarContent | method | `_ui_updateLeftSidebarContent(phase /* , wasPC */)` |  |
 | _ui_movePanelTo | method | `_ui_movePanelTo(elId, mountId, toSidebar)` |  |

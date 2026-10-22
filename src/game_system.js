@@ -22,7 +22,7 @@ import { pixiTick, pixiResize, pixiSetVisibility } from './render/pixi_bridge.js
 import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDestroy, doomsdayClock_pixiDestroy } from './render/pixi_effect_adapter.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
-import { getBossDisplayName, getBossPreviewInfo, getBossShortName } from './utils/boss_schedule_utils.js';
+import { getBossDisplayName, getBossPreviewInfo, getBossShortName, getWaveInfo } from './utils/boss_schedule_utils.js';
 import { getBossPreviewIconSrc } from './bitmap_icons.js';
 import {
     addModuleComponentToInventory,
@@ -31,8 +31,26 @@ import {
     normalizeModuleInventory,
 } from './pinboard_modules.js';
 
+function _getNormalWavesPerBoss() {
+    return CONFIG.balance?.waveCycle?.normalWavesPerBoss;
+}
+
+/** 当前波次信息（波次循环唯一口径，见 utils/boss_schedule_utils.js getWaveInfo） */
+export function sys_getWaveInfo(game) {
+    return getWaveInfo(game, _getNormalWavesPerBoss());
+}
+
+/** 横幅主标题：普通波「第 2 波 / 3」，Boss 波「Boss 波」，Boss 未死的后续回合「Boss 波 · 第 2 回合」 */
+export function sys_getWaveBannerText(waveInfo) {
+    if (!waveInfo) return '';
+    if (waveInfo.isBossWave) {
+        return waveInfo.bossRoundsElapsed > 1 ? `Boss 波 · 第 ${waveInfo.bossRoundsElapsed} 回合` : 'Boss 波';
+    }
+    return `第 ${waveInfo.waveInCycle} 波 / ${waveInfo.normalWavesPerBoss}`;
+}
+
 function _getRoundStartBossThreat(game) {
-    const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG);
+    const preview = getBossPreviewInfo(game, ENEMY_CURVE_CONFIG, _getNormalWavesPerBoss());
     if (!preview) return null;
 
     const { bossId, known, nextRound, turnsUntil } = preview;
@@ -44,13 +62,13 @@ function _getRoundStartBossThreat(game) {
         bossId,
         known,
         stateClass: isNow ? 'is-now' : (turnsUntil <= 1 ? 'is-soon' : 'is-countdown'),
-        kicker: isNow ? '本回合威胁' : '下一威胁',
-        label: isNow ? `${shortName} 登场` : `${shortName} · ${turnsUntil} 回合后`,
+        kicker: isNow ? 'Boss 波' : (turnsUntil <= 1 ? '下一波 Boss' : '下一威胁'),
+        label: isNow ? `${shortName} 登场` : `${shortName} · ${turnsUntil} 波后`,
         meta: known ? `Round ${nextRound}` : `Round ${nextRound} · 剪影预告`,
         iconSrc: getBossPreviewIconSrc(bossId, { known }),
         title: isNow
-            ? `${fullName} 将在本回合登场`
-            : `${fullName} 将在 Round ${nextRound} 出现（${turnsUntil} 回合后）`,
+            ? `${fullName} 将在本波登场`
+            : `${fullName} 将在 ${turnsUntil} 波后（Round ${nextRound}）出现`,
     };
 }
 
@@ -610,6 +628,8 @@ export const game_system = {
         this.runKillCount = 0;
         this.runRuneFragmentsGained = 0;
         this.bossDefeatedLog = [];
+        // [波次循环] Boss 状态全部重置后再刷新顶栏，新局从「第 1/3 波」开始
+        this.sys_updateWaveHud();
         // [词条 Hook] 嗜血初锋 (bloodthirst_growth) - 每局重置击杀计数（跨回合持久）
         this.runewordKillCount = 0;
 
@@ -2175,6 +2195,25 @@ export const game_system = {
     },
 
     /**
+     * @method sys_updateWaveHud
+     * @description [波次循环] 刷新顶栏波次胶囊：普通波显示「x/3」，下一波是 Boss 时琥珀色，Boss 波红色。
+     */
+    sys_updateWaveHud() {
+        const pill = document.getElementById('wave-pill');
+        const waveEl = document.getElementById('wave-num');
+        const roundEl = document.getElementById('round-num');
+        if (!pill || !waveEl) return;
+        const info = sys_getWaveInfo(this);
+        waveEl.textContent = info.isBossWave ? 'BOSS' : `${info.waveInCycle}/${info.normalWavesPerBoss}`;
+        if (roundEl) roundEl.textContent = String(info.round);
+        pill.classList.toggle('is-boss-wave', info.isBossWave);
+        pill.classList.toggle('is-boss-next', !info.isBossWave && info.wavesUntilBoss === 1);
+        pill.title = info.isBossWave
+            ? `Boss 波（第 ${info.cycle} 个 Boss）：击败 Boss 后进入下一轮 ${info.normalWavesPerBoss} 个普通波`
+            : `第 ${info.waveInCycle}/${info.normalWavesPerBoss} 波 · ${info.wavesUntilBoss} 波后 Boss`;
+    },
+
+    /**
      * @method sys_showRoundStartBanner
      * @description 无弹珠包研磨入口时，在直接进入战斗前显示「第 X 回合开始」大字提示（约 2.2 秒），
      * 同时触发左侧子弹属性面板充能特效。特效等级接入 CONFIG.performance 三档预算。
@@ -2226,7 +2265,8 @@ export const game_system = {
         }
 
         // 更新文本
-        if (bannerText) bannerText.textContent = `第 ${round} 回合開始`;
+        if (bannerText) bannerText.textContent = sys_getWaveBannerText(sys_getWaveInfo(this)) || `第 ${round} 回合開始`;
+        this.sys_updateWaveHud();
         if (threatEl) {
             threatEl.classList.remove('is-hidden', 'is-known', 'is-unknown', 'is-now', 'is-soon', 'is-countdown');
             if (bossThreat) {
@@ -3465,6 +3505,7 @@ export const game_system = {
 
             // --- 更新 UI ---
             document.getElementById('round-num').innerText = this.round;
+            this.sys_updateWaveHud();
             this.ui_updateRuneCountDisplay();
             this.ui_updateMetaCurrency();
 

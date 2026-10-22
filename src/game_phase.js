@@ -48,6 +48,7 @@ import {
     setModulePegState,
 } from './pinboard_modules.js';
 import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from './combat/collision_shapes.js';
+import { BOSS_WAVE_IN_PROGRESS } from './utils/boss_schedule_utils.js';
 
 function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
     let closest = null;
@@ -2336,7 +2337,7 @@ phase_gathering_getRandomPegType() {
         const nextRound = this.round + 1;
         const bossCheck = this.spawn_checkBossRoundFor(nextRound);
         if (bossCheck.shouldSpawn) {
-            // Boss 回合：不生成普通敌人行，改为生成 Boss
+            // Boss 波：不生成普通敌人行，改为生成 Boss（3 个普通波后进入，见 waveCycle）
             const bossId = this.spawn_selectBossForRound(bossCheck.isBigBoss);
             // 延迟到回合切换后生成 Boss，确保 round++ 已执行
             this._pendingBossSpawn = { bossId, isBigBoss: bossCheck.isBigBoss };
@@ -2432,6 +2433,7 @@ phase_gathering_getRandomPegType() {
         this.roundDamage = 0;
         eventBus.emit(EVENT_TYPES.UI_ROUND_NUM_UPDATE, { round: this.round });
         document.getElementById("round-num").innerText = this.round;
+        if (typeof this.sys_updateWaveHud === 'function') this.sys_updateWaveHud();
 
         // --- [遗物 Hook] 末日计时器 (doomsday_timer) & 回廊电弧 (corridor_arc) 回合开始触发 ---
         // 在 round++ 之后立即结算，使用新回合数作为伤害基数。
@@ -2491,6 +2493,9 @@ phase_gathering_getRandomPegType() {
             if (!this._bossSpawnCount) this._bossSpawnCount = 0;
             this._bossSpawnCount++;
             console.log(`[BossSchedule] Boss #${this._bossSpawnCount} 已在 Round ${this.round} 生成`);
+            // [波次循环] Boss 波进行中：击杀前不再排期下一个 Boss（boss:defeated 时重新排期）
+            this._nextBossRound = BOSS_WAVE_IN_PROGRESS;
+            if (typeof this.sys_updateWaveHud === 'function') this.sys_updateWaveHud();
         }
 
         this.isEnemyTurn = false;

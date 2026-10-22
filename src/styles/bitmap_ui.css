@@ -1675,7 +1675,8 @@ body:not(.pc-mode) #info-drawer.translate-y-full {
     right: auto;
     top: max(7px, calc(env(safe-area-inset-top) + 7px));
     bottom: auto;
-    width: min(190px, calc(100% - 168px));
+    /* [波次循环] 给右侧波次胶囊让位（顶栏右列含结界 + 波次 + 加速 + 设置） */
+    width: min(190px, calc(100% - 230px));
     min-height: 40px;
     padding: 5px 6px;
     transform: translateX(-50%);

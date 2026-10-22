@@ -14,7 +14,13 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { getAmmoIconSrcByKey } from './bitmap_icons.js';
 import { pixiAcquireParticleSprite, pixiIsActive } from './render/pixi_bridge.js';
 import { interpolateAffixWeights, weightedRandom, getEliteDualAffixChance } from './utils/math_utils.js';
-import { predictBossIdFromHistory } from './utils/boss_schedule_utils.js';
+import {
+    BOSS_WAVE_IN_PROGRESS,
+    computeNextBossRound,
+    findActiveBoss,
+    predictBossIdFromHistory,
+    resolveNormalWavesPerBoss,
+} from './utils/boss_schedule_utils.js';
 import {
     ENEMY_WAVE_PRESETS,
     ENEMY_WAVE_PRESET_ARCHETYPES,
@@ -354,8 +360,8 @@ export const spawn_system = {
         const window = DIRECTOR_SCRIPT_CONFIG.preTeachWindow || 0;
         if (nextRound < round || nextRound - round > window) return [];
         const segments = (ENEMY_CURVE_CONFIG && ENEMY_CURVE_CONFIG.THEME_SEGMENTS) || [];
-        const seg = segments.find(s => round >= s.startRound && round <= s.endRound)
-            || segments[Math.min(this._bossSpawnCount || 0, Math.max(0, segments.length - 1))];
+        // [波次循环] Boss 不再按回合区间出场，下一个 Boss 对应的段落 = 已生成 Boss 数量
+        const seg = segments[Math.min(this._bossSpawnCount || 0, Math.max(0, segments.length - 1))];
         if (!seg || !seg.bossId) return [];
         const aliasMap = DIRECTOR_SCRIPT_CONFIG.bossIdAlias || {};
         const bossKey = aliasMap[seg.bossId] || seg.bossId.replace(/^boss_/, '');
@@ -2464,82 +2470,87 @@ export const spawn_system = {
 
     /**
      * @method spawn_scheduleNextBoss
-     * @description 预计算下一个 Boss 应在哪个回合出现，并将结果存入 this._nextBossRound。
-     *   - 使用 ENEMY_CURVE_CONFIG.THEME_SEGMENTS 中各段落的 endRound 作为固定 Boss 出现回合
-     *   - 每个段落的最后一回合（endRound）即为该段落 Boss 的出现回合
-     *   - 对齐表：R5(Ignis), R12(Glacies), R19(Mikro), R26(Devourer), R33(Viridis), R40(Tesla), R47(Chimera), R54(Ouroboros)
-     * @param {number} [extraDelay=0] - 额外延期回合数（保留参数兼容性，固定回合模式下忽略）
+     * @description [波次循环] 预定下一个 Boss 波的回合号，存入 this._nextBossRound。
+     *   - 一个循环 = CONFIG.balance.waveCycle.normalWavesPerBoss 个普通波 + 1 个 Boss 波
+     *   - 开局：Round N+1（默认 Round 4）；Boss 在第 K 回合被击杀：Round K+N+1
+     *   - 由 boss:defeated 事件（core.js）与首次检测时调用；Boss 生成后置为 BOSS_WAVE_IN_PROGRESS，
+     *     直到被击杀才重新排期，因此同一时间最多只有一个 Boss 波
+     *   - 计算口径唯一来源：utils/boss_schedule_utils.js computeNextBossRound()
      */
-    spawn_scheduleNextBoss(extraDelay = 0) {
-        const cfg = CONFIG.balance.bossRounds;
-        if (!cfg) return;
-
+    spawn_scheduleNextBoss() {
         // [爽游模式] 新手教程局：第一个 Boss 固定在第 2 回合，后续不再调度（局只有 5 回合）
         if (this._isTutorialRun) {
             if (!this._bossSpawnCount || this._bossSpawnCount === 0) {
                 this._nextBossRound = 2;
                 console.log('[TutorialRun][BossSchedule] 最终 Boss 预定在 Round 2');
             } else {
-                // 已经出现过 Boss，不再调度（局内只有一个 Boss）
-                this._nextBossRound = 9999;
+                this._nextBossRound = BOSS_WAVE_IN_PROGRESS;
             }
             return;
         }
 
-        // [主题段落对齐] 使用 ENEMY_CURVE_CONFIG.THEME_SEGMENTS 的 endRound 作为固定 Boss 出现回合
-        // 每个段落的 endRound 对应该段落的 Boss：R5/R12/R19/R26/R33/R40/R47/R54
-        const segments = ENEMY_CURVE_CONFIG && ENEMY_CURVE_CONFIG.THEME_SEGMENTS;
-        if (segments && segments.length > 0) {
-            const spawnCount = this._bossSpawnCount || 0;
-            if (spawnCount < segments.length) {
-                // 下一个 Boss 对应的段落索引 = 当前已生成数量
-                this._nextBossRound = segments[spawnCount].endRound;
-                console.log(`[BossSchedule] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（段落: ${segments[spawnCount].label}）`);
-            } else {
-                // 超出段落数量（循环游戏）：以最后一个段落间隔为基准继续延伸
-                const lastSegment = segments[segments.length - 1];
-                const prevSegment = segments[segments.length - 2];
-                const segInterval = lastSegment.endRound - prevSegment.endRound;
-                const lastSpawnRound = this._lastBossSpawnRound || this.round;
-                this._nextBossRound = lastSpawnRound + segInterval;
-                console.log(`[BossSchedule] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}（循环延伸，间隔=${segInterval}）`);
-            }
-            return;
-        }
+        const normalWaves = CONFIG.balance.waveCycle && CONFIG.balance.waveCycle.normalWavesPerBoss;
+        // 首次排期（尚无 Boss）从 0 起算；Boss 被击杀后从击杀回合起算
+        const fromRound = (this._bossSpawnCount || 0) > 0 ? (this.round || 0) : 0;
+        this._nextBossRound = computeNextBossRound(fromRound, normalWaves);
+        console.log(`[BossSchedule] Boss #${(this._bossSpawnCount || 0) + 1} 预定在 Round ${this._nextBossRound}（${resolveNormalWavesPerBoss(normalWaves)} 个普通波后）`);
+    },
 
-        // 降级回退：ENEMY_CURVE_CONFIG 不可用时，使用固定回合表
-        const fallbackRounds = [5, 12, 19, 26, 33, 40, 47, 54];
-        const spawnCount = this._bossSpawnCount || 0;
-        if (spawnCount < fallbackRounds.length) {
-            this._nextBossRound = fallbackRounds[spawnCount];
-        } else {
-            const lastSpawnRound = this._lastBossSpawnRound || this.round;
-            this._nextBossRound = lastSpawnRound + 7;
+    /**
+     * @method spawn_reconcileBossWave
+     * @description [波次循环] Boss 波兜底收口。只有 combat_damageEnemy 会广播 BOSS_DEFEATED，
+     *   燃烧/毒素 DoT、AoE 溅射、遗物连锁等路径直接调用 takeDamage() 击杀 Boss 时不会广播，
+     *   导致 _nextBossRound 永远停在 BOSS_WAVE_IN_PROGRESS、后续 Boss 不再出现。
+     *   这里在回合结算检测时发现「Boss 波进行中但场上已无存活 Boss」，补发同一事件，
+     *   由 core.js 的 boss:defeated 处理器统一记录击杀、战后节奏与下一个 Boss 波排期。
+     * @returns {boolean} 是否执行了补发
+     */
+    spawn_reconcileBossWave() {
+        if (this._isTutorialRun) return false;
+        if (!(Number(this._nextBossRound) >= BOSS_WAVE_IN_PROGRESS)) return false;
+        if (this._pendingBossSpawn || findActiveBoss(this)) return false;
+        if (!((this._bossSpawnCount || 0) > 0)) {
+            this._nextBossRound = null;
+            return false;
         }
-        console.log(`[BossSchedule][Fallback] Boss #${spawnCount + 1} 预定在 Round ${this._nextBossRound}`);
+        const boss = (this.enemies || []).find(e => e && e.type === 'boss') || null;
+        const history = this.bossHistory || [];
+        console.warn('[BossSchedule] Boss 未经 boss:defeated 离场（DoT/AoE 等击杀路径），补发事件以结束 Boss 波');
+        eventBus.emit(EVENT_TYPES.BOSS_DEFEATED, {
+            boss,
+            bossId: (boss && boss.bossType) || history[history.length - 1],
+            bossName: boss && boss.bossName,
+            isBigBoss: !!(boss && boss.isBigBoss),
+            reconciled: true,
+        });
+        // 兜底：若无监听器完成排期（例如事件总线未注册），直接排期
+        if (Number(this._nextBossRound) >= BOSS_WAVE_IN_PROGRESS) this.spawn_scheduleNextBoss();
+        return true;
     },
 
     /**
      * @method spawn_checkBossRoundFor
-     * @description 检测指定回合数是否应触发 Boss（供 game_phase.js 使用）。
-     *   采用预计算的 _nextBossRound 进行匹配。
+     * @description 检测指定回合数是否应进入 Boss 波（供 game_phase.js 使用）。
+     *   用 >= 匹配预定回合，读档/跳回合时不会错过 Boss 波；Boss 在场或待生成时不再触发。
      * @param {number} round - 要检测的回合数
      * @returns {{ shouldSpawn: boolean, isBigBoss: boolean }}
      */
     spawn_checkBossRoundFor(round) {
         // 如果 _nextBossRound 尚未初始化（游戏开始第一次），先调度
         if (this._nextBossRound === undefined || this._nextBossRound === null) {
-            this.spawn_scheduleNextBoss(0);
+            this.spawn_scheduleNextBoss();
         }
-        if (round === this._nextBossRound) {
+        this.spawn_reconcileBossWave();
+        if (this._pendingBossSpawn || findActiveBoss(this)) {
+            return { shouldSpawn: false, isBigBoss: false };
+        }
+        if (round >= this._nextBossRound) {
             // [爽游模式] 新手教程局：强制为大 Boss（ouroboros）
             if (this._isTutorialRun) {
                 return { shouldSpawn: true, isBigBoss: true };
             }
             // 第五个 Boss 起为大 Boss（第 1-4 个为 Mini-Boss：Ignis/Glacies/Mikro/Devourer）
             // _bossSpawnCount 是已生成的 Boss 数量（生成前读取）
-            // 检测第1个时 count=0, 第4个时 count=3 → 均 < 4 → mini ✓
-            // 检测第5个时 count=4 → >= 4 → big ✓
             const isBigBoss = (this._bossSpawnCount || 0) >= 4;
             return { shouldSpawn: true, isBigBoss };
         }

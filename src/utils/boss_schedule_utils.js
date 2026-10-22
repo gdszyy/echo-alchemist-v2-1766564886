@@ -1,6 +1,42 @@
 const DEFAULT_MINI_BOSS_ORDER = ['ignis', 'glacies', 'mikro', 'devourer'];
 const DEFAULT_BIG_BOSS_ORDER = ['viridis', 'tesla', 'chimera', 'ouroboros'];
-const FALLBACK_BOSS_ROUNDS = [5, 12, 19, 26, 33, 40, 47, 54];
+
+// =========================================
+// 波次循环（Dome Keeper 式「挖 → 守」）
+// 每回合 = 1 波；一个循环 = N 个普通波 + 1 个 Boss 波（Boss 波持续到 Boss 被击杀）。
+// =========================================
+export const DEFAULT_NORMAL_WAVES_PER_BOSS = 3;
+/** 已生成 Boss、等待击杀期间 _nextBossRound 的占位值（>= 9000 视为未排期） */
+export const BOSS_WAVE_IN_PROGRESS = 9999;
+
+export function resolveNormalWavesPerBoss(value) {
+    const n = Math.floor(Number(value));
+    return Number.isFinite(n) && n >= 1 ? n : DEFAULT_NORMAL_WAVES_PER_BOSS;
+}
+
+/**
+ * 计算下一个 Boss 波的回合号。
+ * @param {number} lastBossKillRound - 上一个 Boss 被击杀的回合（尚无则传 0）
+ * @param {number} [normalWavesPerBoss]
+ * @returns {number} 首局为 N+1（默认 Round 4）；击杀于 K 回合则为 K+N+1
+ */
+export function computeNextBossRound(lastBossKillRound, normalWavesPerBoss) {
+    const n = resolveNormalWavesPerBoss(normalWavesPerBoss);
+    const base = Number(lastBossKillRound);
+    return (Number.isFinite(base) && base > 0 ? base : 0) + n + 1;
+}
+
+export function findActiveBoss(game) {
+    return (game?.enemies || []).find(enemy =>
+        enemy && enemy.active && !enemy.isDead && enemy.hp > 0 && enemy.type === 'boss'
+    ) || null;
+}
+
+function _lastBossKillRound(game) {
+    const log = Array.isArray(game?.bossDefeatedLog) ? game.bossDefeatedLog : [];
+    const last = log[log.length - 1];
+    return last && Number.isFinite(Number(last.round)) ? Number(last.round) : 0;
+}
 
 export function normalizeBossKey(id) {
     const raw = String(id || '').replace(/^boss_/, '');
@@ -48,7 +84,7 @@ export function predictBossIdFromHistory(history, isBigBoss, curveConfig = null)
     return remaining.length > 0 ? remaining[0] : order[appeared.length % order.length];
 }
 
-export function getNextBossRoundPreview(game, curveConfig = null) {
+export function getNextBossRoundPreview(game, curveConfig = null, normalWavesPerBoss = DEFAULT_NORMAL_WAVES_PER_BOSS) {
     if (!game) return null;
 
     const scheduledRound = Number(game._nextBossRound);
@@ -58,22 +94,64 @@ export function getNextBossRoundPreview(game, curveConfig = null) {
 
     const spawnCount = game._bossSpawnCount || 0;
     if (game._isTutorialRun) return spawnCount === 0 ? 2 : null;
-
-    const segments = curveConfig?.THEME_SEGMENTS || [];
-    if (segments.length > 0) {
-        if (spawnCount < segments.length) return segments[spawnCount].endRound;
-        const lastSegment = segments[segments.length - 1];
-        const prevSegment = segments[segments.length - 2];
-        const interval = lastSegment && prevSegment ? lastSegment.endRound - prevSegment.endRound : 7;
-        return (game._lastBossSpawnRound || game.round || 1) + interval;
+    // Boss 波进行中：下一个 Boss 波要等本 Boss 被击杀后才排期
+    if (findActiveBoss(game) || game._pendingBossSpawn) return null;
+    // Boss 已离场但尚未经 boss:defeated 排期（DoT/AoE 击杀，回合结算时由 spawn_reconcileBossWave 收口）：
+    // 按本回合击杀预告，避免 HUD 显示不存在的 Boss 波
+    if (scheduledRound >= BOSS_WAVE_IN_PROGRESS && spawnCount > 0) {
+        return computeNextBossRound(Number(game.round) || 0, normalWavesPerBoss);
     }
 
-    if (spawnCount < FALLBACK_BOSS_ROUNDS.length) return FALLBACK_BOSS_ROUNDS[spawnCount];
-    return (game._lastBossSpawnRound || game.round || 1) + 7;
+    return computeNextBossRound(_lastBossKillRound(game), normalWavesPerBoss);
 }
 
-export function getBossPreviewInfo(game, curveConfig = null) {
-    const nextRound = getNextBossRoundPreview(game, curveConfig);
+/**
+ * 当前波次信息（HUD / 横幅 / 钉板预告的唯一口径）。
+ * @returns {{ round:number, cycle:number, waveInCycle:number, wavesPerCycle:number,
+ *   normalWavesPerBoss:number, isBossWave:boolean, wavesUntilBoss:number,
+ *   bossRoundsElapsed:number, nextBossRound:(number|null) }}
+ */
+export function getWaveInfo(game, normalWavesPerBoss = DEFAULT_NORMAL_WAVES_PER_BOSS) {
+    let n = resolveNormalWavesPerBoss(normalWavesPerBoss);
+    // 新手教程局：唯一 Boss 在 Round 2，按「1 个普通波 + Boss 波」展示
+    if (game?._isTutorialRun) n = 1;
+    const round = Math.max(1, Number(game?.round) || 1);
+    const bossesSpawned = game?._bossSpawnCount || 0;
+    const activeBoss = findActiveBoss(game);
+
+    if (activeBoss) {
+        const spawnRound = Number(game?._lastBossSpawnRound) || round;
+        return {
+            round,
+            cycle: Math.max(1, bossesSpawned),
+            waveInCycle: n + 1,
+            wavesPerCycle: n + 1,
+            normalWavesPerBoss: n,
+            isBossWave: true,
+            wavesUntilBoss: 0,
+            bossRoundsElapsed: Math.max(1, round - spawnRound + 1),
+            nextBossRound: null,
+        };
+    }
+
+    const nextBossRound = getNextBossRoundPreview(game, null, n);
+    const wavesUntilBoss = Number.isFinite(nextBossRound) ? Math.max(0, nextBossRound - round) : n;
+    const waveInCycle = Math.min(n + 1, Math.max(1, n + 1 - wavesUntilBoss));
+    return {
+        round,
+        cycle: bossesSpawned + 1,
+        waveInCycle,
+        wavesPerCycle: n + 1,
+        normalWavesPerBoss: n,
+        isBossWave: wavesUntilBoss === 0,
+        wavesUntilBoss,
+        bossRoundsElapsed: 0,
+        nextBossRound: Number.isFinite(nextBossRound) ? nextBossRound : null,
+    };
+}
+
+export function getBossPreviewInfo(game, curveConfig = null, normalWavesPerBoss = DEFAULT_NORMAL_WAVES_PER_BOSS) {
+    const nextRound = getNextBossRoundPreview(game, curveConfig, normalWavesPerBoss);
     if (!nextRound) return null;
 
     const currentRound = Math.max(1, Number(game?.round) || 1);

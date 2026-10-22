@@ -1,6 +1,6 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-06-30 | 总行数: 3584 | 函数数: 62 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 3625 | 函数数: 66 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -11,6 +11,9 @@
 
 | 函数名 | 类型 | 签名 | 备注 |
 |--------|------|------|------|
+| _getNormalWavesPerBoss | function | `_getNormalWavesPerBoss()` |  |
+| sys_getWaveInfo | function | `sys_getWaveInfo(game)` |  |
+| sys_getWaveBannerText | function | `sys_getWaveBannerText(waveInfo)` |  |
 | _getRoundStartBossThreat | function | `_getRoundStartBossThreat(game)` |  |
 | sys_loop | method | `sys_loop()` |  |
 | sys_setupVisibilityHandling | method | `sys_setupVisibilityHandling()` |  |
@@ -47,6 +50,7 @@
 | sys_maybeOfferRunShopBeforeRoundStart | method | `sys_maybeOfferRunShopBeforeRoundStart()` |  |
 | sys_startRoundStartResolver | method | `sys_startRoundStartResolver()` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_continueRoundStartResolver | method | `sys_continueRoundStartResolver()` |  |
+| sys_updateWaveHud | method | `sys_updateWaveHud()` |  |
 | sys_showRoundStartBanner | method | `sys_showRoundStartBanner()` |  |
 | sys_toggleMarbleSelection | method | `sys_toggleMarbleSelection(idx, cardEl)` |  |
 | sys_resetMultiplier | method | `sys_resetMultiplier()` |  |

@@ -1,6 +1,6 @@
 # src\spawn_system.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 3905 | 函数数: 67 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 3916 | 函数数: 68 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 3 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -55,7 +55,8 @@
 | spawn_createAffixSkillVFX | method | `spawn_createAffixSkillVFX(x, y, skillType, opts = {})` |  |
 | spawn_createHitFeedback | method | `spawn_createHitFeedback(x, y, velocity, type = 'normal', options = {})` |  |
 | spawn_triggerLevelUpEvent | method | `spawn_triggerLevelUpEvent(uiX, uiY, session = this.currentSession)` |  |
-| spawn_scheduleNextBoss | method | `spawn_scheduleNextBoss(extraDelay = 0)` |  |
+| spawn_scheduleNextBoss | method | `spawn_scheduleNextBoss()` |  |
+| spawn_reconcileBossWave | method | `spawn_reconcileBossWave()` |  |
 | spawn_checkBossRoundFor | method | `spawn_checkBossRoundFor(round)` |  |
 | spawn_checkBossRound | method | `spawn_checkBossRound()` |  |
 | spawn_calculateBossHP | method | `spawn_calculateBossHP(isBigBoss)` |  |
