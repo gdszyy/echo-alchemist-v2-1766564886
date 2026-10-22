@@ -355,6 +355,23 @@
 
 S1 未做（留 S2+）：整备阶段、主炮三轨与分支、设施、道具、挖矿升级、满匣替换单选卡（S1 满匣丢最旧）、桶倍率重抽（S1 恒 ×1）、真实盘面热条、晶脉。数值仍是夹具；**未做试玩，不声明好玩或平衡**。
 
+### S2 实现状态（2026-10-22，整备 + 经济 + 设施 + 新 UI 组件系统，未提交待验收）
+
+| 内容 | S2 落地 | 锚点 |
+|---|---|---|
+| §3 / §7 整备阶段 | 挖掘落定 → `digCount++`、收集器付款 → `#phase-build`（无时限）→「开战」进入战斗；Boss 存活回合不挖不整备；读档时「已挖未开战」回到整备 | `src/build_system.js` `sys_onDigComplete` / `sys_startBuildPhase` / `sys_commitBuild` / `sys_shouldResumeBuild` |
+| §5.1 主炮三轨 + 分支 | 伤害 30/30/45/60/80（每级 +4）、射速 60/90/130（2→5 发）、弹道 25/40/60；击败第 1 个 Boss 后 1💎 选分支（穿透 / 散射 / 火 / 冰 / 雷），不可换 | `sys_getCannonStats` / `sys_buildCannonShots`；`CONFIG.gameplay.build.cannon` |
+| §5.2 设施 | 3 位（开局 1，另 2 位各 2💎）；5 种设施，Lv3 另需 1💎，收集器全局 1 座；敌人回合开始前按冷却触发，新建即就绪；设施伤害不吃分支与猎人本能 | `tickFacilities`、`sys_triggerFacilities`、`phase_enemy_startLogic` |
+| §5.3 满匣 | 挖掘时不再丢最旧一发；整备弹出「替换第 i 发 / 丢弃新弹」，未处理不能开战 | `_pendingAlchemyOverflow`、`sys_resolveAlchemyOverflow` |
+| §5.4 道具 | 2 位；炸弹 / 急救结界第 3 波、时停 / 加挖 Boss 后；战斗中使用 | `sys_useItem`、`_timeStopPending` → `_enemyDescentSuppressed`、`_extraDigPending` |
+| §6 挖矿升级 | 只开「采集弹珠 +1」（50/90/140）；其余 3 项显示锁定 S3 | `miningLevels.collector`、`sys_startDigPhase` |
+| §8 逐波解锁 | 按 `digCount` 与 Boss 击杀数累计解锁 | `getReveal`；`CONFIG.gameplay.build.reveal` |
+| §5.6 商人 | 倒计时与底部浮条下线，S3 改为 Boss 后固定出现 | `sys_updateRunShopScheduleForRound` |
+| UI（美术方向稿 §6） | 令牌 + 组件库 + 整备界面 + 守卫 HUD（设施冷却格、道具）；图标为占位字形块 | `src/styles/ui_tokens.css`、`src/ui/components/` |
+| §9 夹具 | 玩家 A / B 推演写成确定性测试 | `tests/validate_build_loop_s2.mjs` |
+
+S2 未做（留 S3+）：商人（Boss 后固定出现、晶核换遗物）、晶脉（晶核目前只来自 Boss 击杀）、桶倍率重抽、其余 3 种挖矿升级、真实盘面热条、正式像素图标；全解锁时整备界面在 375 宽需要滚动，P3「一屏可见」未达成。数值仍是夹具；**未做试玩，不声明好玩或平衡**。
+
 ---
 
 ## 13. 独立复核记录（v1 → v1.1）

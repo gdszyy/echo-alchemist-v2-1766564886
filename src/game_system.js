@@ -23,7 +23,8 @@ import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDest
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import { getBossDisplayName, getBossPreviewInfo, getBossShortName, getWaveInfo } from './utils/boss_schedule_utils.js';
-import { buildCannonShots, shouldDigThisRound } from './utils/dig_loop_utils.js';
+import { shouldDigThisRound } from './utils/dig_loop_utils.js';
+import { normalizeBuildState } from './utils/build_economy_utils.js';
 import { getBossPreviewIconSrc } from './bitmap_icons.js';
 import {
     addModuleComponentToInventory,
@@ -654,6 +655,8 @@ export const game_system = {
         this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
         this._digDoneRound = null;
         this._digState = null;
+        // [REQ-20261022-wave-loop S2] 整备状态（主炮三轨 / 设施 / 道具 / 挖矿升级 / digCount）
+        if (typeof this.sys_initBuildState === 'function') this.sys_initBuildState();
         this.runShopInventory = [];     // 当前刷新结果
         this.runShopRefreshes = 0;      // 已刷新次数
         this._runShopOpenedRound = -1;  // 防止同回合重复打开
@@ -1525,7 +1528,13 @@ export const game_system = {
      */
     sys_startDigPhase() {
         const digCfg = (CONFIG.gameplay && CONFIG.gameplay.dig) || {};
-        const collectorCount = Math.max(1, Math.floor(digCfg.collectorCount || 5));
+        // [REQ-20261022-wave-loop S2] 采集弹珠数 = 基础 + 挖矿升级「采集弹珠 +1」等级 + 道具「加挖」（一次性，本次挖掘消耗）
+        const miningBonus = Math.max(0, Math.floor((this.miningLevels && this.miningLevels.collector) || 0));
+        const extraDig = Math.max(0, Math.floor(this._extraDigPending || 0));
+        this._extraDigPending = 0;
+        const collectorCount = Math.max(1, Math.floor(digCfg.collectorCount || 5)) + miningBonus + extraDig;
+        if (extraDig > 0) showToast(`加挖：本次采集弹珠 +${extraDig}`);
+        this._digEnergyStart = Math.floor(this.energy || 0); // 挖掘页「本次 +⚡」读数起点
         const queue = [];
         for (let i = 0; i < collectorCount; i++) {
             const def = new MarbleDefinition('white');
@@ -1578,11 +1587,10 @@ export const game_system = {
         if (!this.sys_canSwapAlchemyShot()) return false;
         if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
         const head = this.ammoQueue[0];
-        const cannonCfg = (CONFIG.gameplay && CONFIG.gameplay.cannon) || {};
-        const cannonDamage = (cannonCfg.damage || 10) + ((CONFIG.gameplay.baseDamage || 1) - 1);
         if (head && head._shotKind === 'alchemy') {
             this.alchemyMagazine.push(head);
-            this.ammoQueue[0] = buildCannonShots(1, cannonDamage, cannonCfg.bounce || 0)[0];
+            // [S2] 换回的主炮按当前主炮三轨 + 分支生成
+            this.ammoQueue[0] = this.sys_buildCannonShots(1)[0];
         } else {
             if (!Number.isInteger(i) || i < 0 || i >= this.alchemyMagazine.length) return false;
             if (head && head._shotKind !== 'cannon') return false;
@@ -1963,6 +1971,8 @@ export const game_system = {
     },
 
     sys_updateRunShopScheduleForRound() {
+        // [REQ-20261022-wave-loop S2] 商人倒计时下线：S3 改为每个 Boss 后固定出现（§5.6）。run_shop.js 代码保留未用。
+        if (CONFIG.gameplay && CONFIG.gameplay.runShopScheduleEnabled !== true) return;
         const cfg = CONFIG.gameplay || {};
         const round = this.round || 1;
         const firstRound = cfg.runShopFirstOfferRound || 3;
@@ -2240,6 +2250,11 @@ export const game_system = {
         });
         // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入战斗阶段
         if (this.sys_maybeOfferRunShopBeforeRoundStart()) return;
+        // [REQ-20261022-wave-loop S2] 本回合已挖、尚未点「开战」（读档恢复）→ 回到整备，不重挖也不跳过整备。
+        if (typeof this.sys_shouldResumeBuild === 'function' && this.sys_shouldResumeBuild()) {
+            this.sys_startBuildPhase();
+            return;
+        }
         // [REQ-20261022-wave-loop S1 · §3] 每波挖一次：普通波每回合挖；Boss 波只在 Boss 登场回合挖，Boss 存活的后续回合直接战斗。
         if (shouldDigThisRound(this)) {
             this.sys_startDigPhase();
@@ -3143,12 +3158,24 @@ export const game_system = {
                 // 局内商店经济
                 runFragments: this.runFragments || 0,
                 // [REQ-20261022-wave-loop S1] 新循环资源与状态
-                loopVersion: 2,
+                loopVersion: 3,
                 energy: this.energy || 0,
                 crystal: this.crystal || 0,
                 alchemyMagazine: (this.alchemyMagazine || []).map(r => JSON.parse(JSON.stringify(r))),
                 cannonShotsPerTurn: this.cannonShotsPerTurn || 0,
                 _digDoneRound: Number.isFinite(this._digDoneRound) ? this._digDoneRound : null,
+                // [REQ-20261022-wave-loop S2] 整备状态
+                digCount: this.digCount || 0,
+                cannonLevels: { ...(this.cannonLevels || {}) },
+                cannonBranch: this.cannonBranch || null,
+                facilities: (this.facilities || []).map(f => (f ? { ...f } : null)),
+                facilitySlotsOpen: this.facilitySlotsOpen || 1,
+                items: (this.items || []).slice(),
+                miningLevels: { ...(this.miningLevels || {}) },
+                _extraDigPending: this._extraDigPending || 0,
+                _timeStopPending: !!this._timeStopPending,
+                _pendingAlchemyOverflow: this._pendingAlchemyOverflow ? JSON.parse(JSON.stringify(this._pendingAlchemyOverflow)) : null,
+                _buildCommittedRound: Number.isFinite(this._buildCommittedRound) ? this._buildCommittedRound : null,
                 runShopInventory: this.runShopInventory ? JSON.parse(JSON.stringify(this.runShopInventory)) : [],
                 runShopRefreshes: this.runShopRefreshes || 0,
                 _runShopOpenedRound: this._runShopOpenedRound || -1,
@@ -3378,6 +3405,23 @@ export const game_system = {
             this.cannonShotsPerTurn = Math.max(1, Math.floor(Number(state.cannonShotsPerTurn)
                 || (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2));
             this._digDoneRound = Number.isFinite(state._digDoneRound) ? state._digDoneRound : null;
+            // [REQ-20261022-wave-loop S2] 整备状态（loopVersion < 3 的存档全部取默认值；sys_applyBuildState 规范化并同步射击次数镜像）
+            this.sys_initBuildState();
+            this.digCount = Math.max(0, Math.floor(Number(state.digCount) || 0));
+            this.sys_applyBuildState(normalizeBuildState({
+                energy: this.energy,
+                crystal: this.crystal,
+                cannonLevels: state.cannonLevels,
+                cannonBranch: state.cannonBranch,
+                facilities: state.facilities,
+                facilitySlotsOpen: state.facilitySlotsOpen,
+                items: state.items,
+                miningLevels: state.miningLevels,
+            }, (CONFIG.gameplay && CONFIG.gameplay.build) || {}));
+            this._extraDigPending = Math.max(0, Math.floor(Number(state._extraDigPending) || 0));
+            this._timeStopPending = !!state._timeStopPending;
+            this._pendingAlchemyOverflow = state._pendingAlchemyOverflow ? { ...state._pendingAlchemyOverflow } : null;
+            this._buildCommittedRound = Number.isFinite(state._buildCommittedRound) ? state._buildCommittedRound : null;
             this.runShopInventory = state.runShopInventory ? JSON.parse(JSON.stringify(state.runShopInventory)) : [];
             this.runShopRefreshes = state.runShopRefreshes || 0;
             this._runShopOpenedRound = state._runShopOpenedRound || -1;
@@ -3648,6 +3692,10 @@ export const game_system = {
                 if (previewMarble && typeof this.spawn_showMarblePreview === 'function') {
                     this.spawn_showMarblePreview(previewMarble, null, {});
                 }
+            } else if (typeof this.sys_shouldResumeBuild === 'function' && this.sys_shouldResumeBuild()
+                && !(this.pendingRoundStartRewards || []).length) {
+                // [REQ-20261022-wave-loop S2] 挖完未开战的存档 → 直接回到整备
+                this.sys_startBuildPhase();
             } else {
                 this.sys_startRoundStartResolver();
             }

@@ -49,7 +49,7 @@ import {
 } from './pinboard_modules.js';
 import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from './combat/collision_shapes.js';
 import { BOSS_WAVE_IN_PROGRESS } from './utils/boss_schedule_utils.js';
-import { alchemyDamage, buildCannonShots, capAlchemyCollection } from './utils/dig_loop_utils.js';
+import { alchemyDamage, capAlchemyCollection } from './utils/dig_loop_utils.js';
 
 function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
     let closest = null;
@@ -1521,10 +1521,11 @@ phase_gathering_getRandomPegType() {
         // [REQ-20261022-wave-loop S1] 主炮：每回合固定 N 发无限弹药（§5.1），不再从弹珠队列编译子弹。
         // 炼成弹不进 ammoQueue，存放在 alchemyMagazine，战斗中由 sys_swapNextShotWithAlchemy 替换下一发主炮。
         {
-            const cannonCfg = (CONFIG.gameplay && CONFIG.gameplay.cannon) || {};
-            const shots = Math.max(1, Math.floor(this.cannonShotsPerTurn || cannonCfg.shotsPerTurn || 2));
-            const cannonDamage = (cannonCfg.damage || 10) + ((CONFIG.gameplay.baseDamage || 1) - 1);
-            this.ammoQueue = buildCannonShots(shots, cannonDamage, cannonCfg.bounce || 0);
+            // [REQ-20261022-wave-loop S2] 射击次数 / 伤害 / 反弹 / 分支统一取 sys_getCannonStats（主炮三轨 + 分支）；
+            // cannonShotsPerTurn 只是派生镜像（S1 存档兼容）。
+            const cannonStats = this.sys_getCannonStats();
+            this.cannonShotsPerTurn = cannonStats.shots;
+            this.ammoQueue = this.sys_buildCannonShots(cannonStats.shots);
         }
         this._carryOverAmmo = null;
         // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
@@ -1560,8 +1561,7 @@ phase_gathering_getRandomPegType() {
         // [REQ-20261022-wave-loop S1] 兜底：主炮弹药不会为空；若异常为空，至少补 1 发主炮，避免「彈藥耗盡」死循环。
         if (this.ammoQueue.length === 0) {
             console.warn('[phase_startCombatPhase] ammoQueue 为空，补 1 发主炮');
-            const cannonCfg = (CONFIG.gameplay && CONFIG.gameplay.cannon) || {};
-            this.ammoQueue = buildCannonShots(1, (cannonCfg.damage || 10) + ((CONFIG.gameplay.baseDamage || 1) - 1), cannonCfg.bounce || 0);
+            this.ammoQueue = this.sys_buildCannonShots(1);
         }
 
         // --- [核心修复 2]：UI 渲染 ---
@@ -2067,7 +2067,7 @@ phase_gathering_getRandomPegType() {
         // --- 3. 行动逻辑 ---
         // 只有活着的敌人才移动
         const isBossVulnerabilityExposed = e.type === 'boss' && (e._bossVulnerabilityExposedTurns || 0) > 0;
-        if (e.active && (e.isFrozenCurrentTurn == false || isBossVulnerabilityExposed)) {
+        if (e.active && !this._enemyDescentSuppressed && (e.isFrozenCurrentTurn == false || isBossVulnerabilityExposed)) {
             // 奥罗波罗斯 Boss：回合开始时进行词缀轮转
             if (!isBossVulnerabilityExposed && e.type === 'boss' && e.bossType === 'ouroboros' && typeof e._performOuroborosRotation === 'function') {
                 e._performOuroborosRotation(this);
@@ -2162,6 +2162,14 @@ phase_gathering_getRandomPegType() {
      * @description 启动敌人回合：锁定状态、显示UI提示、并计算所有敌人的移动与技能
      */
     phase_enemy_startLogic() {
+        // [REQ-20261022-wave-loop S2 · §5.2] 设施在敌人回合开始前按冷却自动触发。必须在 isEnemyTurn = true 之前：
+        // 设施击杀清场时 combat_damageEnemy 会检查 isEnemyTurn；冰霜塔写入的低温要赶在扫描波温度结算（_processTempOnce）之前。
+        if (this.phase === 'combat' && typeof this.sys_triggerFacilities === 'function') this.sys_triggerFacilities();
+        // [REQ-20261022-wave-loop S2 · §5.4] 道具「时停」：本回合敌人不行动（不下压），回合结算时不补行，然后清除。
+        if (this._timeStopPending) {
+            this._timeStopPending = false;
+            this._enemyDescentSuppressed = true;
+        }
         this.isEnemyTurn = true;
         this.enemyTurnTimer = 0;
 
@@ -2261,6 +2269,8 @@ phase_gathering_getRandomPegType() {
             const bossId = this.spawn_selectBossForRound(bossCheck.isBigBoss);
             // 延迟到回合切换后生成 Boss，确保 round++ 已执行
             this._pendingBossSpawn = { bossId, isBigBoss: bossCheck.isBigBoss };
+        } else if (this._enemyDescentSuppressed) {
+            // [REQ-20261022-wave-loop S2] 时停：本回合敌人没有下压，也不补新行
         } else {
             // 普通回合：生成敌人行
             const rowCountCurrent = uniqueRows.size;
@@ -2283,6 +2293,7 @@ phase_gathering_getRandomPegType() {
                 this.spawn_spawnEnemyRowOffScreen(spawnCount);
             }
         }
+        this._enemyDescentSuppressed = false;
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
             showToast("強敵來襲！HP x" + this.nextRoundHpMultiplier);
@@ -3663,15 +3674,21 @@ phase_gathering_getRandomPegType() {
                 recipe._alchemyLevels = capped.totalLevels;
                 recipe._alchemyGroups = capped.groups.map(g => ({ ...g }));
                 if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
-                this.alchemyMagazine.push(recipe);
                 const cap = Math.max(1, Math.floor(alchemyCfg.magazineCap || 3));
-                // S1：满匣直接丢弃最旧一发（S2 改为整备阶段的「替换哪一发 / 丢弃新弹」单选卡）
-                while (this.alchemyMagazine.length > cap) this.alchemyMagazine.shift();
+                // [REQ-20261022-wave-loop S2 · §5.3] 满匣不再丢最旧一发：暂存新弹，整备阶段弹出「替换哪一发 / 丢弃新弹」单选卡，
+                // 未处理前 sys_commitBuild 不放行。
+                if (this.alchemyMagazine.length >= cap) {
+                    this._pendingAlchemyOverflow = recipe;
+                } else {
+                    this.alchemyMagazine.push(recipe);
+                }
                 const label = capped.groups.map(g => {
                     const display = CONFIG.ui.attributeDisplay[g.type];
                     return `${(display && display.name) || g.type}${g.level}`;
                 }).join(' + ');
-                showToast(`炼成弹入匣：${label} · 伤害 ${recipe.damage}`);
+                showToast(this._pendingAlchemyOverflow === recipe
+                    ? `弹匣已满：${label} · 伤害 ${recipe.damage}，整备时选择替换或丢弃`
+                    : `炼成弹入匣：${label} · 伤害 ${recipe.damage}`);
                 return;
             }
 
@@ -3705,8 +3722,8 @@ phase_gathering_getRandomPegType() {
             this.activeMarbleIndex = this.marbleQueue.length;
             this._digDoneRound = this.round;
             if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
-            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-            setTimeout(() => this.phase_startCombatPhase(), 500);
+            // [REQ-20261022-wave-loop S2] 挖 → 整备：digCount++、收集器付款、存档，再进入 #phase-build（「开战」后才进入战斗）。
+            this.sys_onDigComplete();
             return;
         }
 

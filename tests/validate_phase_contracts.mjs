@@ -643,7 +643,7 @@ check(has(gameSystem, /runShopStarterBoostDamageRounds/), 'starter merchant boos
 // [REQ-20261022-wave-loop S1] 挖掘队列契约：采集弹珠 ×collectorCount + 炼成弹珠 ×1（同为 white，用 role 区分）。
 check(has(gamePhase, /function\s+buildDigMarbleQueue\s*\(\)\s*\{[\s\S]{0,400}collectorCount[\s\S]{0,300}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'gathering has a dig marble queue builder (collector x N + alchemy x 1)');
 check(has(gamePhase, /phase_startGatheringPhase\s*\(\)\s*\{[\s\S]*this\.marbleQueue\s*=\s*buildDigMarbleQueue\(\)/), 'gathering phase rebuilds a missing marbleQueue as a dig queue');
-check(has(gameSystem, /sys_startDigPhase\s*\(\)\s*\{[\s\S]{0,600}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'dig phase queues collectors plus one alchemy marble');
+check(has(gameSystem, /sys_startDigPhase\s*\(\)\s*\{[\s\S]{0,1400}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'dig phase queues collectors plus one alchemy marble');
 check(!has(gamePhase, /ownedRelics\.includes\(['"]chaos_pact['"]\)[\s\S]{0,400}跳过研磨/), 'chaos pact no longer skips digging');
 check(has(gamePhase, /runShopStarterBoostDamageRounds[\s\S]*flatDamageBonus[\s\S]*runShopStarterBoostDamageAmount/), 'starter merchant damage boost expires during round finalization');
 check(has(gamePhase, /import\s*\{\s*calc_getCirclePolygonCollision,\s*calc_getCircleArcCollision\s*\}\s*from\s*['"]\.\/combat\/collision_shapes\.js['"]/), 'combat aim guide imports shared collision shape helpers');
@@ -679,12 +679,13 @@ check(has(read('src/ui/shop.js'), /debugShopDisabled[\s\S]*debugShopDefaultEnabl
 check(has(read('src/ui_system.js'), /debugShopDisabled[\s\S]*debugShopDefaultEnabled[\s\S]*echo_debug_shop['"]\)\s*===\s*['"]1/), 'debug purchase guard honors default-on config and localStorage override');
 check(has(read('src/ui/rune_launcher.js'), /meta_getResourceCount\(['"]rune_fragments['"]\)/), 'rune launcher shard display reads unified rune fragment resource');
 check(has(indexHtml, /game\.ui_abandonRunToMeta\(\)/), 'pause abandon button uses ui_abandonRunToMeta');
-check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown dock exists');
-check(has(runShop, /const\s+visiblePhase\s*=\s*this\.phase\s*===\s*['"]gathering['"]\s*\|\|\s*this\.phase\s*===\s*['"]combat['"]/), 'run shop countdown remains visible in gathering and combat');
+// [REQ-20261022-wave-loop S2] 商人倒计时浮条下线（S3 改为每个 Boss 后固定出现）：dock 不存在，渲染器遇空即返回。
+check(!has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown dock absent (S2: merchant deferred to S3)');
+check(has(runShop, /ui_updateRunShopScheduleUI\s*\(\)\s*\{\s*const\s+dock\s*=\s*document\.getElementById\(['"]run-shop-status-dock['"]\);\s*if\s*\(!dock\)\s*return;/), 'run shop countdown renderer is a no-op when the dock is absent');
 // [REQ-20261022-wave-loop S1] 多重施法 / 0/15 命中充能删除；主炮固定 N 发、multicast 恒为 0。
 check(has(gamePhase, /role:\s*marbleDef\.role\s*\|\|\s*null,[\s\S]{0,200}multicast:\s*0/), 'gathering sessions carry a dig role and no multicast');
-check(has(gamePhase, /phase_startCombatPhase\s*\(\)\s*\{[\s\S]{0,2600}this\.ammoQueue\s*=\s*buildCannonShots\(/) && has(read('src/utils/dig_loop_utils.js'), /multicast:\s*0,[\s\S]{0,400}_shotKind:\s*['"]cannon['"]/), 'combat start loads cannon shots with multicast 0');
-check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD keeps the (hidden) charge stack container');
+check(has(gamePhase, /phase_startCombatPhase\s*\(\)\s*\{[\s\S]{0,2600}this\.ammoQueue\s*=\s*this\.sys_buildCannonShots\(/) && has(read('src/utils/dig_loop_utils.js'), /multicast:\s*0,[\s\S]{0,400}_shotKind:\s*['"]cannon['"]/), 'combat start loads cannon shots with multicast 0');
+check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/) && !has(indexHtml, /id=["']hero-gauge-container["']/), 'gathering HUD keeps the (hidden) charge stack container outside the removed gauge');
 check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack\s*\(\)\s*\{[\s\S]{0,400}stack\.classList\.add\(['"]hidden['"]\)[\s\S]{0,600}return\s+false;\s*\}/), 'per-marble charge stack is always hidden');
 check(has(spawnSystem, /chargeSession\s*&&\s*chargeSession\.role\s*===\s*['"]collector['"]\s*&&\s*!options\.secondary[\s\S]{0,400}this\.energy\s*=\s*\(this\.energy\s*\|\|\s*0\)\s*\+\s*gain/) && !has(spawnSystem, /chargeSession\.currentHits\+\+/), 'collector peg-hit orbs credit energy instead of hit charge');
 check(has(read('src/ui/hud.js'), /UI_HIT_PROGRESS[\s\S]{0,220}_hud_renderSessionChargeStack/), 'hit progress updates refresh the per-marble charge stack');

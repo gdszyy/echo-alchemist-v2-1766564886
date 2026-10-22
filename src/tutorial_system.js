@@ -116,15 +116,37 @@ const TUTORIAL_STEPS = [
             <p>每一波开始前先挖一次，共<strong>两次发射</strong>，先发哪批由你决定：</p>
             <p class="mt-2">⚡ <strong>采集 ×5</strong>：5 颗采集弹珠从同一位置落下，每碰一次钉子获得<strong>能量</strong>。</p>
             <p class="mt-2">🧪 <strong>炼成弹珠</strong>：只有它会拾取钉子上的属性（最多 3 种 × 3 级），落地后炼成 1 发强力<strong>炼成弹</strong>放进弹匣。</p>
-            <p class="mt-2">用右下角按钮切换要发射的那一批，再点击<strong>钉板上方区域</strong>发射。两批都落定后自动进入战斗。</p>
+            <p class="mt-2">用右下角按钮切换要发射的那一批，再点击<strong>钉板上方区域</strong>发射。两批都落定后进入<strong>整备</strong>。</p>
             <p class="mt-2 text-amber-300/80 text-xs">💡 战斗中点击弹匣里的炼成弹，可以把下一发主炮换成它。</p>
         `,
         position: 'bottom-fixed',   // 固定在底部，不遮挡钉板
         noOverlay: true,            // 取消遮罩，让玩家能操作
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
-        waitForEventFilter: (data) => data && data.to === 'combat',
+        // [REQ-20261022-wave-loop S2] 挖完先进整备，不再直接进战斗
+        waitForEventFilter: (data) => data && data.to === 'build',
         autoAdvance: true,
         actionLabel: null,          // 纯等待玩家投入弹珠
+        actionFn: null,
+    },
+    // ── 第 3.5 步：整备阶段说明 ───────────────────────────────────────────────
+    // [REQ-20261022-wave-loop S2] 高亮「开战」按钮；不遮罩，玩家可以先买再开战
+    {
+        id: 'build_intro',
+        phase: 'build',
+        targetId: null,
+        highlightSelector: '#build-fight-btn',
+        title: '整备阶段',
+        content: `
+            <p>挖到的<strong>能量 ⚡</strong>在这里花：升级主炮（伤害 / 射速 / 弹道）、建造设施、买道具。</p>
+            <p class="mt-2">第 1 波只开放<strong>伤害轨</strong>，之后每波解锁新东西。没有时间限制。</p>
+            <p class="mt-2">准备好后点<strong>「开战」</strong>。</p>
+        `,
+        position: 'top',
+        noOverlay: true,
+        waitForEvent: EVENT_TYPES.PHASE_CHANGED,
+        waitForEventFilter: (data) => data && data.to === 'combat',
+        autoAdvance: true,
+        actionLabel: null,
         actionFn: null,
     },
     // ── 第 4 步：战斗阶段 ─────────────────────────────────────────────────────

@@ -1887,7 +1887,8 @@ export const ui_system = {
                 // [BUGFIX] 将 'training' 加入 needsAuto 列表：
                 // 试炼场 #phase-training 是 DOM 驱动的（场景列表/属性 +/- 按钮/退出按钮等），
                 // 默认 pointer-events:none 会让所有按钮失效（点击穿透到底层 canvas）。
-                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause', 'selection', 'training'].includes(this.phase);
+                // [REQ-20261022-wave-loop S2] 'build'（整备）是 DOM 驱动的全屏面板，同样需要 pointer-events:auto。
+                const needsAuto = ['meta', 'shop', 'truth_book', 'gameover', 'relic', 'pause', 'selection', 'training', 'build'].includes(this.phase);
                 activeEl.style.pointerEvents = needsAuto ? 'auto' : 'none';
                 setTimeout(() => {
                     activeEl.classList.remove('hidden-phase');
@@ -1903,6 +1904,8 @@ export const ui_system = {
         // [REQ-20261022-wave-loop S1] 顶栏能量/晶核胶囊 + 挖掘发射选择
         if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
         if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
+        // [REQ-20261022-wave-loop S2] 守卫 HUD（设施冷却条 + 道具按钮），非战斗阶段自隐藏
+        if (typeof this.ui_renderDefendHud === 'function') this.ui_renderDefendHud();
         if (typeof this.ui_updateRunShopScheduleUI === 'function') {
             this.ui_updateRunShopScheduleUI();
         }
@@ -1958,7 +1961,7 @@ export const ui_system = {
         // 7. 统一顶部栏：在全屏阶段隐藏
         const unifiedTopBar = document.getElementById('unified-top-bar');
         if (unifiedTopBar) {
-            const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection', 'gameover'];
+            const hideInPhases = ['meta', 'shop', 'truth_book', 'training', 'relic', 'selection', 'gameover', 'build'];
             const shouldHideTopBar = hideInPhases.includes(this.phase) && !(typeof this.ui_isFateMomentPhase === 'function' && this.ui_isFateMomentPhase());
             unifiedTopBar.classList.toggle('is-gathering', this.phase === 'gathering');
             unifiedTopBar.classList.toggle('is-combat', this.phase === 'combat' || this.phase === 'training');
@@ -1969,6 +1972,7 @@ export const ui_system = {
             // [波次循环] Dome Keeper 式「挖 → 守」：钉板 = 挖掘，战斗 = 守卫
             const topLabelMap = {
                 gathering: '挖掘',
+                build: '整备',
                 combat: '守卫',
                 training: '试炼',
             };

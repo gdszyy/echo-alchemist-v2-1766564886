@@ -885,8 +885,6 @@ export const hud_system = {
         }
         const phaseEl = document.getElementById('phase-gathering');
         if (phaseEl) phaseEl.classList.remove('has-ammo-panels');
-        const gaugeEl = document.getElementById('hero-gauge-container');
-        if (gaugeEl) gaugeEl.classList.remove('has-session-panels');
         return false;
     },
 
@@ -897,7 +895,7 @@ export const hud_system = {
      */
     ui_updateResourceHud(options = {}) {
         if (typeof document === 'undefined') return;
-        const visible = this.phase === 'gathering' || this.phase === 'combat';
+        const visible = this.phase === 'gathering' || this.phase === 'combat' || this.phase === 'build';
         const energyPill = document.getElementById('energy-pill');
         const energyCount = document.getElementById('energy-count');
         const crystalPill = document.getElementById('crystal-pill');
@@ -915,6 +913,12 @@ export const hud_system = {
             }
         }
         if (crystalPill) crystalPill.classList.toggle('is-visible', visible && crystal > 0);
+        // [REQ-20261022-wave-loop S2] 挖掘页中部读数：本次挖掘已获得的能量（sys_startDigPhase 记录起点）
+        const digValue = document.getElementById('dig-energy-value');
+        if (digValue) {
+            const start = Number.isFinite(this._digEnergyStart) ? this._digEnergyStart : energy;
+            digValue.textContent = `+${Math.max(0, energy - Math.floor(start))}`;
+        }
     },
 
     /**
@@ -942,6 +946,8 @@ export const hud_system = {
         const old = host.querySelector('.alchemy-magazine-row');
         if (old) old.remove();
         if (this.phase !== 'combat') return;
+        // [REQ-20261022-wave-loop S2] 道具按钮的可用条件与换弹一致，随弹药 HUD 一起刷新
+        if (typeof this.ui_renderDefendHud === 'function') this.ui_renderDefendHud();
         const magazine = Array.isArray(this.alchemyMagazine) ? this.alchemyMagazine : [];
         const head = Array.isArray(this.ammoQueue) ? this.ammoQueue[0] : null;
         const headIsAlchemy = !!(head && head._shotKind === 'alchemy');
@@ -1078,7 +1084,8 @@ export const hud_system = {
 /**
      */
     ui_updateUICache() {
-        const gaugeEl = document.getElementById('hero-gauge-container');
+        // [REQ-20261022-wave-loop S2] 旧 #hero-gauge-container 已移除，能量球飞行兜底目标改为挖掘能量读数
+        const gaugeEl = document.getElementById('dig-energy-readout');
         if (gaugeEl) {
             const panelStack = document.getElementById('session-charge-stack');
             const targetEl = panelStack && !panelStack.classList.contains('hidden') && panelStack.children.length > 0

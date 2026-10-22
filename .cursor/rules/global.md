@@ -55,6 +55,8 @@
 - 否（Boss 存活的后续回合）→ `sys_showRoundStartBanner` → `combat`。
 - `combat`：`ammoQueue` = 主炮 `buildCannonShots(cannonShotsPerTurn)`（无限弹药、限射速，multicast 恒 0）；`sys_swapNextShotWithAlchemy(i)` 把下一发主炮换成炼成弹。弹药打完 → 敌人回合 → `phase_finalizeRound`（不再有低存活极速 / 补行 / 清屏反扑）→ 下一回合 resolver。
 - 资源：`runFragments` 是 `energy` 的访问器别名（core.js，S2 改名后删除）；`crystal` 晶核仅 Boss 击杀 +3（同时排一次遗物三选一）。
+- **[S2 整备，未提交待验收]** 挖掘落定后不再直接开战：`sys_onDigComplete` → `build`（`#phase-build`，`src/build_system.js` + `src/ui/build_screen.js`）→「开战」`sys_commitBuild` → `combat`。主炮数值统一取 `sys_getCannonStats()`；设施在敌人回合前 `sys_triggerFacilities()`；道具 `sys_useItem(i)`；纯函数 `src/utils/build_economy_utils.js`；存档 `loopVersion: 3`（新字段 `digCount / cannonLevels / cannonBranch / facilities / facilitySlotsOpen / items / miningLevels / _extraDigPending / _timeStopPending / _pendingAlchemyOverflow / _buildCommittedRound`，旧存档取默认）。契约测试 `tests/validate_build_loop_s2.mjs`。
+- **[S2] 新 UI 组件系统**：令牌 `src/styles/ui_tokens.css`（1 美术像素 = 2 CSS px、角色色、元素色带、5 层 z：world 0 / hud 100 / panel 200 / popover 300 / system 400），组件样式 `src/styles/ui_components.css`，组件工厂 `src/ui/components/*.js`（`create*(props) → HTMLElement`，不读 Game）。像素 9 宫格边框由 `scripts/gen_ui_pixel_frames.py` 生成到 `assets/ui/pixel/`。新界面只用这套；旧内联 `<style>` / `bitmap_ui.css` 不在 S2 迁移。图标暂为占位字形块（`.ui-glyph--placeholder`）。
 - 下线（数据保留）：技能 4 槽 + SP、局内符文发射器入口（试炼场保留）、弹珠包、普通敌人遗物掉落、0/15 命中充能与多重施法。纯函数在 `src/utils/dig_loop_utils.js`，契约测试 `tests/validate_dig_loop_s1.mjs`。
 
 ## 3. 智能编辑策略决策树

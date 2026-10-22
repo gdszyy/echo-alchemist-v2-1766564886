@@ -3916,7 +3916,8 @@ export const combat_system = {
         }
 
         // --- [遗物 Hook] 猎人本能 (hunter_instinct)：场上血量最低的敌人受伤害 +25% ---
-        if (this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
+        // [REQ-20261022-wave-loop S2 · §5.2] 设施 / 道具伤害（config._facility）不吃主炮类遗物
+        if (!config._facility && this.ownedRelics && this.ownedRelics.includes('hunter_instinct')) {
             let lowestHpEnemy = null;
             let lowestHp = Infinity;
             for (const e of this.enemies) {

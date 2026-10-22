@@ -53,6 +53,10 @@ import { rune_launcher_system } from './ui/rune_launcher.js';
 import { calc_utils } from './calc_utils.js';
 import { tutorial_system } from './tutorial_system.js';
 import { game_over_mixin } from './ui/game_over.js';
+// [REQ-20261022-wave-loop S2] 整备阶段运行时 + 整备界面 + 守卫 HUD
+import { build_system } from './build_system.js';
+import { build_screen_system } from './ui/build_screen.js';
+import { defend_hud_system } from './ui/defend_hud.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
 import { preloadUiBitmaps } from './bitmap_icons.js';
 
@@ -172,7 +176,7 @@ class Game {
             game_system, game_phase, combat_system, render_system, spawn_system,
             ui_system, hud_system, shop_system, rune_launcher_system,
             calc_utils, tutorial_system, game_over_mixin,
-            run_shop
+            run_shop, build_system, build_screen_system, defend_hud_system
         ];
         for (const subsystem of _subsystems) {
             for (const [key, val] of Object.entries(subsystem)) {
@@ -372,6 +376,7 @@ class Game {
         this.alchemyMagazine = [];        // 炼成弹匣（上限 CONFIG.gameplay.alchemy.magazineCap）
         this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
         this._digDoneRound = null;        // 本回合是否已完成挖掘（§3：每波只挖一次）
+        this.sys_initBuildState();        // [S2] 主炮三轨 / 设施 / 道具 / 挖矿升级 / digCount
         this.runShopInventory = [];
         this.runShopRefreshes = 0;
         this._runShopOpenedRound = -1;

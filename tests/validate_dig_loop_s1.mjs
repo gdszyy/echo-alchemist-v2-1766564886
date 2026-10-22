@@ -135,7 +135,7 @@ check(!/calc_getRecentAverageDamage|combat_calculatePlayerExpectedDamage|dynamic
 
 check(/sys_swapNextShotWithAlchemy\s*\(i\)\s*\{/.test(gameSystem), '战斗：存在「下一发换成炼成弹」入口');
 check(/sys_canSwapAlchemyShot\s*\(\)\s*\{[\s\S]{0,400}isEnemyTurn[\s\S]{0,120}_roundStartBannerActive[\s\S]{0,200}projectiles/.test(gameSystem), '战斗：换弹仅限玩家回合、非横幅、无飞行子弹');
-check(/loopVersion:\s*2/.test(gameSystem) && /state\.energy\s*\?\?\s*state\.runFragments/.test(gameSystem), '存档：loopVersion 2，读档时旧碎片并入能量');
+check(/loopVersion:\s*[23]/.test(gameSystem) && /state\.energy\s*\?\?\s*state\.runFragments/.test(gameSystem), '存档：loopVersion ≥ 2（S2 为 3），读档时旧碎片并入能量');
 check(/source:\s*['"]boss_kill['"]/.test(read('src/core.js')) && /this\.crystal\s*=\s*\(this\.crystal\s*\|\|\s*0\)\s*\+\s*3/.test(read('src/core.js')), 'Boss 击杀：晶核 +3 并排队遗物三选一');
 
 console.log('\n===================================================');

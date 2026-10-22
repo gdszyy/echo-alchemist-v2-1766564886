@@ -1131,6 +1131,9 @@ class UIManager {
         if (max === null) {
             max = Math.max(CONFIG.gameplay.maxSkillPoints, current);
         }
+        // [REQ-20261022-wave-loop S2] #sp-panel 已随 SP 下线移除：容器不存在时直接跳过
+        if (!this.spContainer) this.spContainer = document.getElementById('sp-panel');
+        if (!this.spContainer) return;
         this.spContainer.innerHTML = '';
         for (let i = 0; i < max; i++) {
             const slot = document.createElement('div');
@@ -4387,6 +4390,8 @@ class TrainingGround {
                     </div>
                 </div>
             </div>
+            <!-- [REQ-20261022-wave-loop S2] 技能栏只剩试炼场使用（局内技能 / SP 已下线），随试炼场 DOM 一起创建 -->
+            <div id="skill-bar" class="skill-bar-panel pointer-events-auto" style="display:none;"></div>
         `;
         document.body.appendChild(ui);
         this.initSidebar();

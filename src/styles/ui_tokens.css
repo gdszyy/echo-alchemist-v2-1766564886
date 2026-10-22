@@ -1,0 +1,67 @@
+/*
+ * ui_tokens.css - [REQ-20261022-wave-loop S2 / R2] 新 UI 组件系统的设计令牌（唯一来源）。
+ *
+ * 依据：docs/design/art_vfx_ui_direction_v1.md §2（1 美术像素 = 2 CSS px、整数倍、无平滑）、
+ *       §2.3（固定调色板：1 个描边暗色 + 元素色带 + 4 个背景中性色）、§6.1（一套样式系统、5 层 z-index）。
+ * 规则：新组件（src/ui/components/*、#phase-build、#defend-hud）只读这里的变量，不写裸色值与裸 z-index。
+ *       旧样式（index.html 内联 <style>、bitmap_ui.css）暂不迁移，按 §7 R2 逐块替换。
+ */
+:root {
+    /* ---------- 像素网格：1 美术像素 = 2 CSS px ---------- */
+    --px: 2px;
+    --s1: calc(var(--px) * 1);   /* 2px */
+    --s2: calc(var(--px) * 2);   /* 4px */
+    --s3: calc(var(--px) * 3);   /* 6px */
+    --s4: calc(var(--px) * 4);   /* 8px */
+    --s5: calc(var(--px) * 6);   /* 12px */
+    --s6: calc(var(--px) * 8);   /* 16px */
+    --frame-w: calc(var(--px) * 4);       /* 9 宫格边框宽 = 4 美术像素 */
+    --icon-build: calc(var(--px) * 24);   /* 整备图标 24×24 美术像素 → 48 CSS px */
+    --icon-hud: calc(var(--px) * 16);     /* 战斗 HUD 小图标 16×16 → 32 CSS px */
+    --tap-min: 40px;                      /* 触控热区下限 */
+
+    /* ---------- 角色色（role），与 scripts/gen_ui_pixel_frames.py 一致 ---------- */
+    --c-outline: #0b0d14;
+    --c-bg-0: #11141f;
+    --c-bg-1: #1a1f2e;
+    --c-bg-2: #2a3247;
+    --c-bg-3: #424f6b;
+    --c-text: #e6e9f2;
+    --c-text-dim: #8b93a8;
+    --c-text-locked: #5b6276;
+    --c-energy: #f5c542;
+    --c-energy-dark: #a37019;
+    --c-crystal: #7fd8ff;
+    --c-crystal-dark: #2b7ea6;
+    --c-danger: #ef5b5b;
+    --c-ok: #6ee7a0;
+
+    /* 元素色带（5 阶：0 最暗 → 4 最亮）。反馈层只用 3/4 阶；背景层不用 3/4 阶。 */
+    --c-fire-0: #4a1608; --c-fire-1: #8f2a0c; --c-fire-2: #d9541a; --c-fire-3: #ff8c3a; --c-fire-4: #ffd08a;
+    --c-ice-0: #0c2a3d; --c-ice-1: #145a7a; --c-ice-2: #2b9cc4; --c-ice-3: #67e8f9; --c-ice-4: #d6fbff;
+    --c-bolt-0: #2a1a4a; --c-bolt-1: #4f2c8f; --c-bolt-2: #8b5cf6; --c-bolt-3: #c4a1ff; --c-bolt-4: #f0e4ff;
+    --c-poison-0: #0f2a12; --c-poison-1: #1f5a26; --c-poison-2: #3fa34d; --c-poison-3: #86efac; --c-poison-4: #dcfce7;
+    --c-laser-0: #3a0a1a; --c-laser-1: #7a1236; --c-laser-2: #e11d74; --c-laser-3: #ff7ab6; --c-laser-4: #ffd6ea;
+    --c-echo-0: #1c2433; --c-echo-1: #34435e; --c-echo-2: #5b7aa8; --c-echo-3: #9fb9e0; --c-echo-4: #e3ecfa;
+
+    /* ---------- 字体：数字与短标签用像素字体（缺省回退等宽） ---------- */
+    --font-pixel: "Press Start 2P", "Zpix", "Fusion Pixel", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --font-body: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --fs-xs: 10px;
+    --fs-sm: 12px;
+    --fs-md: 14px;
+    --fs-lg: 18px;
+
+    /* ---------- 5 层 z-index（§6.1），只用这 5 个值 ---------- */
+    --z-world: 0;
+    --z-hud: 100;
+    --z-panel: 200;
+    --z-popover: 300;
+    --z-system: 400;
+
+    /* ---------- 像素 9 宫格素材 ---------- */
+    --frame-panel: url('../../assets/ui/pixel/panel_frame.png');
+    --frame-button: url('../../assets/ui/pixel/button_frame.png');
+    --frame-primary: url('../../assets/ui/pixel/button_primary.png');
+    --frame-slot: url('../../assets/ui/pixel/slot_frame.png');
+}

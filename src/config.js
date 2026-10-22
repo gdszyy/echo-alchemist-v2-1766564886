@@ -945,7 +945,44 @@ const CONFIG = {
             base: 15,               // 炼成弹伤害 = base × (2 + 属性总级数)，炼成时锁定
             maxTypes: 3,            // 炼成弹最多 3 种属性
             maxLevel: 3,            // 每种属性最多 3 级
-            magazineCap: 3,         // 炼成弹匣上限（S1：满匣丢弃最旧一发）
+            magazineCap: 3,         // 炼成弹匣上限（S2：满匣在整备阶段弹出「替换哪一发 / 丢弃新弹」单选卡）
+        },
+        // ==================== [REQ-20261022-wave-loop S2] 整备：主炮三轨 / 设施 / 道具 / 挖矿升级 ====================
+        // 全部是测试夹具数值（docs/design/dig_build_defend_loop_v1.md §5 / §8 / §9），不是平衡；调参交资源与战斗调参专家。
+        // 纯函数见 src/utils/build_economy_utils.js（价格 / 购买 / 逐波解锁 / 设施冷却 / 满匣处理）。
+        build: {
+            cannon: {
+                damagePerLv: 4,                     // 伤害轨每级 +4（主炮单发 = cannon.damage + (baseDamage-1) + 4×级）
+                damagePrices: [30, 30, 45, 60, 80], // 伤害轨逐级价格（⚡），共 5 级
+                ratePrices: [60, 90, 130],          // 射速轨：每级 +1 发/回合，2 → 5 发
+                bouncePrices: [25, 40, 60],         // 弹道轨：每级反弹 +1
+                branchCrystal: 1,                   // 分支（击败第 1 个 Boss 后解锁）价格（💎），选定不可换
+                branches: ['pierce', 'scatter', 'fire', 'ice', 'lightning'],
+            },
+            slots: { total: 3, openAtStart: 1, openCrystal: 2 }, // 设施位：开局 1 个，另 2 个各 2💎
+            facilities: {
+                turret:    { cost: 40, upCost: [40, 40], cd: 1, dmg: [6, 9, 13] },            // 炮台：最前敌人单体
+                lightning: { cost: 50, upCost: [50, 50], cd: 2, dmg: 7, targets: [3, 4, 5] },  // 雷击塔：连锁 N 目标
+                frost:     { cost: 50, upCost: [50, 50], cd: 3, count: [1, 2, 3] },            // 冰霜塔：冻结前排最高血 N 个
+                shieldGen: { cost: 45, upCost: [45, 45], cd: 2, cap: [3, 4, 5] },              // 结界发生器：+1 护盾（上限）
+                collector: { cost: 60, upCost: [60, 60], perDig: [8, 12, 16], unique: true },  // 炼金收集器：每次挖掘 +⚡
+                lv3Crystal: 1,                      // 任一设施升到 Lv3 另需 1💎
+            },
+            items: {
+                slots: 2,                           // 道具位（一次性，战斗中使用）
+                bomb: { cost: 20, dmg: 30, radius: 100 },
+                timestop: { cost: 30 },             // 敌人跳过 1 次下压（本回合不移动、不补行）
+                shield: { cost: 25, amount: 2 },    // 急救结界 +2 护盾
+                extraDig: { cost: 20, collectors: 2 }, // 下次挖掘采集弹珠 +2
+            },
+            mining: { collector: { prices: [50, 90, 140] } }, // 挖矿升级：采集弹珠 +1（S2 只开这一项，其余 3 项 S3）
+            // 逐波解锁（§8）：键为第几次挖掘（= 第几波）；boss1 = 击败第 1 个 Boss 后。累计生效。
+            reveal: {
+                1: ['dmg'],
+                2: ['rate', 'bounce', 'slots', 'turret', 'shieldGen'],
+                3: ['crystal', 'items', 'bomb', 'shield', 'mining'],
+                boss1: ['branch', 'lightning', 'frost', 'collector', 'timestop', 'extraDig'],
+            },
         },
         enemyRelicDropsEnabled: false, // [S1] 普通敌人不再掉遗物线索（遗物只在开局与 Boss 击杀时获得）
         potionAlchemyFailRefundRatio: 0.35,

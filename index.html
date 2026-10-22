@@ -4927,6 +4927,9 @@
     </style>
     <!-- Phase 5A: 位图化 UI 样式覆盖层 -->
     <link rel="stylesheet" href="src/styles/bitmap_ui.css?v=20260626-skill-charge-right-panel">
+    <!-- [REQ-20261022-wave-loop S2 / R2] 新 UI 组件系统：令牌 + 组件（整备界面 / 守卫 HUD），加载在旧样式之后 -->
+    <link rel="stylesheet" href="src/styles/ui_tokens.css?v=20261022-s2">
+    <link rel="stylesheet" href="src/styles/ui_components.css?v=20261022-s2">
 </head>
 <body>
 <div id="app-wrapper">
@@ -4969,18 +4972,7 @@
         </div>
     </div>
 
-    <div id="run-shop-status-dock" class="run-shop-status-dock" aria-live="polite">
-        <div class="run-shop-status-main">
-            <div class="run-shop-status-copy">
-                <span id="run-shop-status-title">商人旅程</span>
-                <span id="run-shop-status-detail">3 回合后到访</span>
-            </div>
-            <div class="run-shop-status-track" aria-hidden="true">
-                <div id="run-shop-status-fill"></div>
-            </div>
-        </div>
-        <button id="run-shop-status-open" type="button">商店</button>
-    </div>
+    <!-- [REQ-20261022-wave-loop S2] #run-shop-status-dock（商人倒计时浮条）已移除：S3 改为每个 Boss 后固定出现 -->
 
     <!-- Phase Title Animation (中央淡入淡出，不再缩小到左上角) -->
     <div id="phase-title-container">
@@ -5016,7 +5008,6 @@
                 </div>
                 <div id="combat-status-note" class="combat-status-note">等待战斗开始</div>
             </div>
-            <div id="sp-panel" class="flex flex-wrap gap-2 pointer-events-none transition-opacity duration-300"></div>
         </div>
 
         <!-- 中间：战斗阶段保持空场，技能充能已下沉到底部技能舱 -->
@@ -5512,47 +5503,15 @@
 
     </div>
 
-    <!-- [chaos-skip-upgrade] 混沌精华跳过：子弹老虎机升级覆盖层 -->
-    <div id="chaos-slot-machine-overlay" style="display:none; position: fixed; inset: 0; z-index: 500; background: rgba(2, 6, 23, 0.92); backdrop-filter: blur(8px); pointer-events: auto; align-items: center; justify-content: center; flex-direction: column;">
-        <div style="text-align: center; margin-bottom: 18px;">
-            <div style="font-family: 'Cinzel', serif; font-size: 22px; color: #f0abfc; letter-spacing: 4px; text-shadow: 0 0 18px rgba(192, 132, 252, 0.7);">CHAOS UPGRADE</div>
-            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">混沌精华：升级当前子弹</div>
-        </div>
-        <div id="chaos-slot-machine-slots" style="display: flex; gap: 18px; justify-content: center; align-items: center;"></div>
-        <div id="chaos-slot-machine-result" style="margin-top: 22px; min-height: 28px; font-size: 14px; color: #fde68a; text-align: center; letter-spacing: 1px;"></div>
-        <button id="chaos-slot-machine-continue" style="display:none; margin-top: 20px;" class="btn-main">进入战斗</button>
-    </div>
-
     <!-- Phase 1: Gathering -->
     <div id="phase-gathering" class="ui-overlay" style="display: none;">
         <div class="absolute top-24 w-full text-center pointer-events-none">
             <p class="text-xs text-cyan-100/40">點擊上方區域釋放</p>
         </div>
 
-        <div id="hero-gauge-container" class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
-            <div class="text-[10px] text-cyan-200 tracking-widest mb-1 opacity-80 font-bold" style="text-shadow: 0 0 10px #06b6d4;">
-                AMMO CHARGE
-            </div>
-            <div id="multicast-ui" class="absolute left-[110%] bottom-0 flex flex-col items-center justify-center transition-all duration-300 opacity-0 scale-50">
-                <div class="text-[9px] text-orange-300 font-bold tracking-wider mb-1 whitespace-nowrap">SHOTS</div>
-                <div class="relative flex items-center justify-center w-12 h-12">
-                    <div class="absolute inset-0 bg-orange-500/20 rounded-full blur-md animate-pulse"></div>
-                    <div class="absolute inset-0 border-2 border-orange-400 rounded-full opacity-80"></div>
-                    <span id="multicast-num" class="relative text-2xl font-[Cinzel] font-bold text-orange-100 drop-shadow-[0_0_5px_#f97316]">x1</span>
-                </div>
-            </div>
-            <div id="gauge-shell" class="relative w-48 h-5 bg-slate-900/90 rounded-full border border-slate-600/50 backdrop-blur-md shadow-lg">
-                
-                <div id="gauge-pulse-layer"></div>
-
-                <div id="hit-bar"></div>
-                
-                <div class="absolute inset-0 flex items-center justify-center z-10">
-                    <span id="hit-text" class="text-[10px] font-bold text-white drop-shadow-md tracking-wider">0/5</span>
-                </div>
-            </div>
-            <div id="session-charge-stack" class="session-charge-stack mt-2"></div>
-        </div>
+        <!-- [REQ-20261022-wave-loop S2] 原 #hero-gauge-container（0/15 充能表）已移除；本次挖掘能量读数，也是能量球飞行兜底目标（hud.js ui_updateUICache） -->
+        <div id="dig-energy-readout" class="dig-energy-readout" aria-live="polite" title="本次挖掘获得的能量"><span aria-hidden="true">⚡</span><b id="dig-energy-value">+0</b></div>
+        <div id="session-charge-stack" class="session-charge-stack hidden"></div>
         
         <!-- 研磨阶段符文发射器按钮 -->
         <button onclick="game.ui_openRuneLauncher()" class="rune-launcher-float-btn absolute bottom-32 right-2 w-10 h-10 bg-slate-800/90 hover:bg-purple-900/80 rounded-full border-2 border-purple-600/60 hover:border-purple-300 flex items-center justify-center pointer-events-auto z-40 transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg" title="符文發射器">
@@ -5570,8 +5529,17 @@
         </div>
     </div>
 
+    <!-- [REQ-20261022-wave-loop S2] Phase 2: Build（整备）：内容由 src/ui/build_screen.js 用组件库渲染 -->
+    <div id="phase-build" class="ui-overlay build-overlay" style="display: none;" aria-label="整备">
+        <div id="build-screen-root" class="build-root">
+            <footer class="build-foot"><button id="build-fight-btn" type="button" class="ui-btn ui-btn--primary build-fight" onclick="game.sys_commitBuild()"><span class="ui-btn__label">开战</span></button></footer>
+        </div>
+    </div>
+
     <!-- Phase 3: Combat -->
     <div id="phase-combat" class="ui-overlay" style="display: none;">
+        <!-- [REQ-20261022-wave-loop S2] 守卫 HUD：设施冷却条（左）+ 道具按钮（右），发射台上方；由 src/ui/defend_hud.js 渲染 -->
+        <div id="defend-hud" class="defend-hud" hidden></div>
         <div id="combat-bottom-dock" aria-label="战斗底部操作区">
             <div class="combat-dock-pane combat-ammo-pane">
                 <div id="recipe-hud-container" class="z-40 pointer-events-none"></div>
@@ -5602,8 +5570,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="skill-bar" class="skill-bar-panel pointer-events-auto z-50"></div>
-                <button id="skill-editor-open-btn" type="button" class="skill-editor-open-btn pointer-events-auto" style="display:none;" title="技能装配" aria-label="技能装配"></button>
+                <!-- [REQ-20261022-wave-loop S2] #skill-bar 已迁入试炼场 DOM（src/systems.js TrainingGround.initUI），技能编辑入口随技能下线移除 -->
             </div>
         </div>
 
@@ -5611,21 +5578,6 @@
 
 
 
-    </div>
-
-    <!-- [技能装配系统] 技能编辑器 overlay -->
-    <div id="skill-editor-overlay" class="skill-editor-overlay" style="display:none;">
-        <div class="skill-editor-modal">
-            <div class="skill-editor-header">
-                <div class="skill-editor-titles">
-                    <h3 class="skill-editor-title">技能装配</h3>
-                    <span id="skill-editor-count" class="skill-editor-count">已装备 0/4</span>
-                </div>
-                <button id="skill-editor-close-btn" type="button" class="skill-editor-close-btn" aria-label="关闭">✕</button>
-            </div>
-            <div id="skill-editor-hint" class="skill-editor-hint" style="display:none;"></div>
-            <div id="skill-editor-body" class="skill-editor-body"></div>
-        </div>
     </div>
 
     <!-- Phase: Truth Book (Encyclopedia) -->
