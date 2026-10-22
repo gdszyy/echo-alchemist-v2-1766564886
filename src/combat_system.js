@@ -1834,8 +1834,11 @@ export const combat_system = {
         const purchased = Array.isArray(this.purchasedSkillIds) ? this.purchasedSkillIds : [];
 
         // —— 1. 计算技能池（四类来源并集） ——
+        // [REQ-20261022-wave-loop S1 · D3] 技能 4 槽 + SP 下线：局内技能池恒为空（activeSkills / equippedSkillIds 随之清空）；
+        // 试炼场（phase === 'training'）保留旧技能池以便验收旧内容。
+        const skillsRetired = this.phase !== 'training';
         const pool = [];
-        for (const sk of SKILL_DB) {
+        for (const sk of (skillsRetired ? [] : SKILL_DB)) {
             if (!sk || !sk.id) continue;
             let unlocked = false;
             if (sk.source === 'base') unlocked = true;
@@ -5837,6 +5840,8 @@ export const combat_system = {
      * @param {boolean} isKill - 是否为击杀
      */
     combat_skillCharge_onHit(hitX, hitY, isKill = false) {
+        // [REQ-20261022-wave-loop S1 · D3] 局内技能充能下线：战斗阶段不再累积 SP 充能（试炼场保留）。
+        if (this.phase === 'combat') return;
         const gameplay = CONFIG.gameplay || {};
         const baseCharge = isKill
             ? (gameplay.skillChargeKillGain ?? 0.10)

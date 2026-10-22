@@ -48,6 +48,15 @@
     *   **核心职责**：世界变迁模拟器引擎——基于元胞自动机的星球演化（地幔/气候/晶石/生物四层），自 `world-morphing-simulator` 移植为原生 JS。`SimulationEngine` 内部沿用组合模式（`bind(this)` 注入四层），是**纯数据模块**（无 DOM/渲染/UI）。
     *   **依赖关系**：自包含，仅内部互相引用（`engine` → 四层 + `bio_spawn` + `cell`/`params`；地幔 → `perlin`）。**当前未接入 `core.js`/`Game` 实例，未注册 EventBus，与打砖块玩法零耦合。** 详见 [`world_sim.md`](world_sim.md)。
 
+### 2.5 局内主循环状态流（REQ-20261022-wave-loop S1，直接替换旧循环）
+
+`meta_startRun` → `sys_initGameStart`（只排开局遗物）→ `sys_startRoundStartResolver`（结算遗物；旧存档的弹珠包/资源包折算为能量）→ `shouldDigThisRound`？
+- 是 → `sys_startDigPhase` → `gathering`：采集弹珠 ×5（只挖能量 `game.energy`）+ 炼成弹珠 ×1（拾取属性，3 种 × 3 级封顶 → 1 发炼成弹入 `alchemyMagazine`，上限 3）；两批都落定 → 记 `_digDoneRound` → `phase_startCombatPhase`。
+- 否（Boss 存活的后续回合）→ `sys_showRoundStartBanner` → `combat`。
+- `combat`：`ammoQueue` = 主炮 `buildCannonShots(cannonShotsPerTurn)`（无限弹药、限射速，multicast 恒 0）；`sys_swapNextShotWithAlchemy(i)` 把下一发主炮换成炼成弹。弹药打完 → 敌人回合 → `phase_finalizeRound`（不再有低存活极速 / 补行 / 清屏反扑）→ 下一回合 resolver。
+- 资源：`runFragments` 是 `energy` 的访问器别名（core.js，S2 改名后删除）；`crystal` 晶核仅 Boss 击杀 +3（同时排一次遗物三选一）。
+- 下线（数据保留）：技能 4 槽 + SP、局内符文发射器入口（试炼场保留）、弹珠包、普通敌人遗物掉落、0/15 命中充能与多重施法。纯函数在 `src/utils/dig_loop_utils.js`，契约测试 `tests/validate_dig_loop_s1.mjs`。
+
 ## 3. 智能编辑策略决策树
 
 为了降低 Token 消耗并提高修改的精确度，在对代码进行修改时，必须严格遵守以下智能编辑策略决策树：

@@ -284,11 +284,13 @@ check(has(gameSystem, /this\.marblesPool\s*=\s*state\.marblesPool\.map\(m\s*=>\s
 check(has(gameSystem, /const\s+shouldRestoreSelection\s*=\s*savedPhase\s*===\s*['"]selection['"][\s\S]*this\.fateMomentContext[\s\S]*this\.selectionMode[\s\S]*!==\s*['"]standard['"]/), 'run load detects saved fate selection before running resolver');
 check(has(gameSystem, /else\s+if\s*\(shouldRestoreSelection\)\s*\{[\s\S]*phase_switchPhase\(['"]selection['"]\)[\s\S]*spawn_generateMarbleOptions\(\)[\s\S]*ui_refreshSelectionModeUI\(\)[\s\S]*spawn_showMarblePreview/), 'run load restores selection UI instead of falling through to round-start resolver');
 check(has(gameSystem, /sys_showRoundStartBanner\s*\(\)\s*\{[\s\S]*phase_switchPhase\(['"]combat['"]\)[\s\S]*phase_startCombatPhase\(\)/), 'normal round-start banner transitions to combat, not gathering');
-check(has(gameSystem, /sys_queueRoundStartReward\(\{\s*type:\s*['"]marble_pack['"][\s\S]{0,120}source:\s*['"]run_start['"]/), 'run start queues a mixed marble pack after the first relic');
-check(has(gameSystem, /sys_startMarblePackGrind\s*\(reward\s*=\s*\{\}\)[\s\S]*phase_startGatheringPhase\(\)/), 'marble packs directly enter gathering grind');
+// [REQ-20261022-wave-loop S1] 每波都挖（D1）：开局不再送弹珠包，resolver 结算完奖励后按 shouldDigThisRound 进入挖掘。
+check(!has(gameSystem, /sys_queueRoundStartReward\(\{\s*type:\s*['"]marble_pack['"][\s\S]{0,120}source:\s*['"]run_start['"]/), 'run start no longer queues a mixed marble pack');
+check(has(gameSystem, /sys_startDigPhase\s*\(\)\s*\{[\s\S]*phase_startGatheringPhase\(\)/), 'dig phase directly enters gathering');
+check(has(gameSystem, /if\s*\(shouldDigThisRound\(this\)\)\s*\{\s*this\.sys_startDigPhase\(\);\s*return;\s*\}\s*this\.sys_showRoundStartBanner\(\);/), 'round-start resolver digs every wave before the combat banner');
 check(!has(gameSystem, /sourceRewardType\s*===\s*['"]marble_pack['"]/), 'marble packs no longer enter selection mode');
-check(has(runShop, /kind:\s*['"]marble_pack['"][\s\S]{0,180}name:\s*['"]杂色弹珠包['"]/), 'run shop sells mixed marble packs');
-check(has(runShop, /it\.kind\s*===\s*['"]marble_pack['"][\s\S]{0,260}sys_startMarblePackGrind/), 'buying a marble pack starts grind immediately');
+check(!has(runShop, /kind:\s*['"]marble_pack['"][\s\S]{0,180}name:\s*['"]杂色弹珠包['"]/), 'run shop no longer sells mixed marble packs');
+check(!has(runShop, /it\.kind\s*===\s*['"]marble_pack['"][\s\S]{0,260}sys_startMarblePackGrind/), 'legacy marble pack shop items no longer start a grind');
 check(has(shop, /_grantRelicResourcePack\s*\(game,\s*multiplier\s*=\s*0\.5\)/), 'relic marble-weight bonuses grant run resource packs');
 check(has(uiSystem, /type\s*===\s*['"]marble_pack['"][\s\S]{0,240}title\s*=\s*['"]杂色弹珠包['"]/), 'marble packs use a dedicated reveal animation card');
 check(has(indexHtml, /#round-start-banner\s*\{[\s\S]{0,140}position:\s*absolute;[\s\S]{0,80}inset:\s*0;/), 'round-start banner centers inside the game container');
@@ -298,7 +300,7 @@ check(
     'marble packs are semantically distinct from fate selection reroll'
 );
 check(has(config, /combatSideInsetRatio\s*:\s*0\.08/), 'combat side inset ratio is configured');
-check(has(config, /runShopMixedMarblePackPrice:\s*18/), 'mixed marble pack shop price is configured');
+check(!has(config, /runShopMixedMarblePackPrice/), 'mixed marble pack shop price is retired');
 check(has(gameSystem, /combatGridLeftX[\s\S]*combatGridRightX[\s\S]*combatGridWidth[\s\S]*this\.enemyWidth\s*=\s*\(this\.combatGridWidth\s*\/\s*CONFIG\.gameplay\.enemyCols\)/), 'sys_resize derives enemy grid width from inset combat arena');
 check(has(gameSystem, /sys_getCombatBounds\s*\(\)/), 'combat bounds helper exists');
 check(has(gameSystem, /sys_getCombatColumnCenterX\s*\(col,\s*spanCols\s*=\s*1\)/), 'combat column center helper exists');
@@ -638,9 +640,11 @@ check(has(gameSystem, /sys_rollNextRunShopRound[\s\S]*runShopRandomWaitMin[\s\S]
 check(has(gameSystem, /sys_maybeOfferRunShopBeforeRoundStart\s*\(\)\s*\{[\s\S]*sys_updateRunShopScheduleForRound\(\)[\s\S]*return\s+false/), 'round-start merchant schedule updates without blocking the banner');
 check(has(gameSystem, /_runShopInventoryGeneratedForRound/), 'run shop inventory generation marker is persisted with run state');
 check(has(gameSystem, /runShopStarterBoostDamageRounds/), 'starter merchant boost damage duration is persisted with run state');
-check(has(gamePhase, /function\s+buildFallbackMarbleQueue\s*\(game\)/), 'gathering has fallback marble queue builder');
-check(has(gamePhase, /phase_startGatheringPhase\s*\(\)\s*\{[\s\S]*this\.marbleQueue\s*=\s*buildFallbackMarbleQueue\(this\)/), 'gathering phase rebuilds missing marbleQueue before empty grind');
-check(has(gamePhase, /while\s*\(\s*queue\.length\s*<\s*required\s*\)\s*\{[\s\S]*new\s+MarbleDefinition\(pickType\(\)\)/), 'fallback marble queue fills partial stale pools to the required count');
+// [REQ-20261022-wave-loop S1] 挖掘队列契约：采集弹珠 ×collectorCount + 炼成弹珠 ×1（同为 white，用 role 区分）。
+check(has(gamePhase, /function\s+buildDigMarbleQueue\s*\(\)\s*\{[\s\S]{0,400}collectorCount[\s\S]{0,300}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'gathering has a dig marble queue builder (collector x N + alchemy x 1)');
+check(has(gamePhase, /phase_startGatheringPhase\s*\(\)\s*\{[\s\S]*this\.marbleQueue\s*=\s*buildDigMarbleQueue\(\)/), 'gathering phase rebuilds a missing marbleQueue as a dig queue');
+check(has(gameSystem, /sys_startDigPhase\s*\(\)\s*\{[\s\S]{0,600}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'dig phase queues collectors plus one alchemy marble');
+check(!has(gamePhase, /ownedRelics\.includes\(['"]chaos_pact['"]\)[\s\S]{0,400}跳过研磨/), 'chaos pact no longer skips digging');
 check(has(gamePhase, /runShopStarterBoostDamageRounds[\s\S]*flatDamageBonus[\s\S]*runShopStarterBoostDamageAmount/), 'starter merchant damage boost expires during round finalization');
 check(has(gamePhase, /import\s*\{\s*calc_getCirclePolygonCollision,\s*calc_getCircleArcCollision\s*\}\s*from\s*['"]\.\/combat\/collision_shapes\.js['"]/), 'combat aim guide imports shared collision shape helpers');
 check(has(gamePhase, /function\s+getCombatAimEnemyHit[\s\S]*enemy\.collisionShape\s*===\s*['"]polygon['"][\s\S]*calc_getCirclePolygonCollision[\s\S]*enemy\.collisionShape\s*===\s*['"]arc['"][\s\S]*calc_getCircleArcCollision/), 'combat aim guide respects polygon and arc enemy collision shapes');
@@ -677,10 +681,12 @@ check(has(read('src/ui/rune_launcher.js'), /meta_getResourceCount\(['"]rune_frag
 check(has(indexHtml, /game\.ui_abandonRunToMeta\(\)/), 'pause abandon button uses ui_abandonRunToMeta');
 check(has(indexHtml, /id=["']run-shop-status-dock["']/), 'run-shop countdown dock exists');
 check(has(runShop, /const\s+visiblePhase\s*=\s*this\.phase\s*===\s*['"]gathering['"]\s*\|\|\s*this\.phase\s*===\s*['"]combat['"]/), 'run shop countdown remains visible in gathering and combat');
-check(has(gamePhase, /multicast:\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)/), 'gathering sessions inherit stored marble multicast layers');
-check(has(gamePhase, /const\s+inheritedMulticast\s*=\s*Math\.max\(0,\s*Math\.floor\(marbleDef\.multicast\s*\|\|\s*0\)\)[\s\S]{0,220}recipe\.multicast\s*=\s*inheritedMulticast/), 'combat fallback compile preserves stored marble multicast layers');
-check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD has a three-session charge stack container');
-check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack[\s\S]{0,900}(?:session-charge-row|gathering-ammo-panel)[\s\S]{0,420}session-charge-multicast/), 'gathering HUD renders per-marble charge and multicast rows');
+// [REQ-20261022-wave-loop S1] 多重施法 / 0/15 命中充能删除；主炮固定 N 发、multicast 恒为 0。
+check(has(gamePhase, /role:\s*marbleDef\.role\s*\|\|\s*null,[\s\S]{0,200}multicast:\s*0/), 'gathering sessions carry a dig role and no multicast');
+check(has(gamePhase, /phase_startCombatPhase\s*\(\)\s*\{[\s\S]{0,2600}this\.ammoQueue\s*=\s*buildCannonShots\(/) && has(read('src/utils/dig_loop_utils.js'), /multicast:\s*0,[\s\S]{0,400}_shotKind:\s*['"]cannon['"]/), 'combat start loads cannon shots with multicast 0');
+check(has(indexHtml, /id=["']session-charge-stack["'][\s\S]{0,80}session-charge-stack/), 'gathering HUD keeps the (hidden) charge stack container');
+check(has(read('src/ui/hud.js'), /_hud_renderSessionChargeStack\s*\(\)\s*\{[\s\S]{0,400}stack\.classList\.add\(['"]hidden['"]\)[\s\S]{0,600}return\s+false;\s*\}/), 'per-marble charge stack is always hidden');
+check(has(spawnSystem, /chargeSession\s*&&\s*chargeSession\.role\s*===\s*['"]collector['"]\s*&&\s*!options\.secondary[\s\S]{0,400}this\.energy\s*=\s*\(this\.energy\s*\|\|\s*0\)\s*\+\s*gain/) && !has(spawnSystem, /chargeSession\.currentHits\+\+/), 'collector peg-hit orbs credit energy instead of hit charge');
 check(has(read('src/ui/hud.js'), /UI_HIT_PROGRESS[\s\S]{0,220}_hud_renderSessionChargeStack/), 'hit progress updates refresh the per-marble charge stack');
 check(has(read('src/ui/hud.js'), /ui_getCanvasPointForElement\s*\(el,\s*options\s*=\s*\{\}\)[\s\S]{0,900}canvasRect\.left[\s\S]{0,240}scaleX/), 'gathering HUD converts DOM target centers into canvas coordinates');
 check(has(spawnSystem, /gathering-ammo-panel\[data-marble-index="\$\{chargeSession\.marbleIndex\}"\][\s\S]{0,420}ui_getCanvasPointForElement\(targetPanel\)/), 'gathering hit feedback targets the matching per-marble ammo panel');

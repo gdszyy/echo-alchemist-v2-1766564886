@@ -1,6 +1,6 @@
 # src\ui\hud.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 1634 | 函数数: 31 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 1679 | 函数数: 35 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 2 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -34,6 +34,10 @@
 | ui_renderRecipeCard | method | `ui_renderRecipeCard(container, item, isActive, statusClass)` |  |
 | _hud_getGatheringSessionViewModels | method | `_hud_getGatheringSessionViewModels()` |  |
 | _hud_renderSessionChargeStack | method | `_hud_renderSessionChargeStack()` |  |
+| ui_updateResourceHud | method | `ui_updateResourceHud(options = {})` |  |
+| _hud_formatAlchemyLabel | method | `_hud_formatAlchemyLabel(recipe)` |  |
+| ui_renderAlchemyMagazine | method | `ui_renderAlchemyMagazine(container = null)` |  |
+| ui_renderDigLaunchToggle | method | `ui_renderDigLaunchToggle()` |  |
 | _hud_updateLegacyHitProgress | method | `_hud_updateLegacyHitProgress(val, target)` |  |
 | ui_getCanvasPointForElement | method | `ui_getCanvasPointForElement(el, options = {})` |  |
 | ui_updateUICache | method | `ui_updateUICache()` |  |

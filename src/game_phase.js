@@ -49,6 +49,7 @@ import {
 } from './pinboard_modules.js';
 import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from './combat/collision_shapes.js';
 import { BOSS_WAVE_IN_PROGRESS } from './utils/boss_schedule_utils.js';
+import { alchemyDamage, buildCannonShots, capAlchemyCollection } from './utils/dig_loop_utils.js';
 
 function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
     let closest = null;
@@ -524,39 +525,27 @@ function drawBottomRewardZones(ctx, zones) {
     ctx.restore();
 }
 
-function buildFallbackMarbleQueue(game) {
-    const cfg = CONFIG.gameplay || {};
-    const required = Math.max(1, (cfg.selectionReq || 3));
-    const existingPool = Array.isArray(game.marblesPool) ? game.marblesPool : [];
-    const selected = Array.isArray(game.selectedMarbles) ? game.selectedMarbles : [];
-    const queue = selected
-        .map(i => existingPool[i])
-        .filter(Boolean);
-
-    for (const marble of existingPool) {
-        if (queue.length >= required) break;
-        if (marble && !queue.includes(marble)) queue.push(marble);
+/**
+ * [REQ-20261022-wave-loop S1] 每次挖掘的弹珠队列（§6）：collectorCount 颗采集弹珠 + 1 颗炼成弹珠。
+ * 所有弹珠类型相同（'white'），只用 role 区分「采集」与「炼成」；切片取消弹珠类型权重（§5.3）。
+ */
+function buildDigMarbleQueue() {
+    const digCfg = (CONFIG.gameplay && CONFIG.gameplay.dig) || {};
+    const collectorCount = Math.max(1, Math.floor(digCfg.collectorCount || 5));
+    const queue = [];
+    for (let i = 0; i < collectorCount; i++) {
+        const def = new MarbleDefinition('white');
+        def.role = 'collector';
+        queue.push(def);
     }
+    const alchemyDef = new MarbleDefinition('white');
+    alchemyDef.role = 'alchemy';
+    queue.push(alchemyDef);
+    return queue;
+}
 
-    const rewardOnlyTypes = new Set(cfg.bottomRewardOnlyTypes || []);
-    const weighted = Object.entries(game.unlockedWeights || CONFIG.probabilities || {})
-        .filter(([type, weight]) => (weight || 0) > 0 && !rewardOnlyTypes.has(type) && type !== 'normal')
-        .map(([type, weight]) => ({ type, weight }));
-    const total = weighted.reduce((sum, item) => sum + item.weight, 0);
-    const pickType = () => {
-        if (total <= 0 || weighted.length === 0) return 'white';
-        let roll = Math.random() * total;
-        for (const item of weighted) {
-            roll -= item.weight;
-            if (roll <= 0) return item.type;
-        }
-        return weighted[0].type;
-    };
-
-    while (queue.length < required) {
-        queue.push(new MarbleDefinition(pickType()));
-    }
-    return queue.slice(0, required);
+function isDigMarbleQueue(queue) {
+    return Array.isArray(queue) && queue.some(def => def && (def.role === 'collector' || def.role === 'alchemy'));
 }
 
 export const game_phase = {
@@ -634,37 +623,17 @@ export const game_phase = {
             });
         }
 
-        // --- [遗物 Hook] 混沌契约 (chaos_pact)：跳过研磨阶段，直接进入战斗 ---
-        // 规则：契约持有者无法进行研磨；ammoQueue 复用上一回合的子弹快照，没有则用默认基础子弹兜底。
-        // [v2 重构] 必须在切换到 gathering / 构建钉板之前判断并提前返回。
-        if (this.ownedRelics && this.ownedRelics.includes('chaos_pact')) {
-            const baseDmg = (CONFIG && CONFIG.gameplay && CONFIG.gameplay.baseDamage) || 1;
-            const defaultRecipe = () => ({
-                damage: baseDmg, bounce: 0, pierce: 0, scatter: 0, explosive: false,
-                isMatryoshka: false, isLaser: false, nestedPayload: null, chainPayload: null,
-                multicast: 0, flying_sword: 0, cryo: 0, pyro: 0, lightning: 0, laser: 0,
-                wind: 0, overcharge: 0, level: 1, type: 'normal'
-            });
-            const snapshot = this._lastFiredAmmoSnapshot;
-            if (snapshot && snapshot.length > 0) {
-                this.ammoQueue = snapshot.map(r => ({ ...r }));
-            } else {
-                this.ammoQueue = [defaultRecipe(), defaultRecipe(), defaultRecipe()];
-            }
-            if (typeof showToast === 'function') showToast('混沌契约：跳过研磨，直接进入战斗！');
-            if (typeof this.phase_startCombatPhase === 'function') this.phase_startCombatPhase();
-            else this.phase_switchPhase('combat');
-            return;
-        }
-
-        // Round-start banner switches to the gathering background before this initializer runs.
-        // If that transitional state is saved/restored or a special flow cleared marbleQueue,
-        // rebuild launchable marble definitions here instead of entering an empty grind.
+        // [REQ-20261022-wave-loop S1] 混沌契约（跳过研磨）已随遗物下线；每波都要挖（D1）。
+        // 队列为空（存档恢复 / 异常路径）时补一套挖掘队列（采集 ×N + 炼成 ×1），而不是旧的随机弹珠。
         if (!Array.isArray(this.marbleQueue) || this.marbleQueue.length === 0) {
-            this.marbleQueue = buildFallbackMarbleQueue(this);
+            this.marbleQueue = buildDigMarbleQueue();
             this.marblesPool = this.marbleQueue.slice();
             this.selectedMarbles = this.marbleQueue.map((_, idx) => idx);
         }
+        // 挖掘状态：两批（采集 / 炼成）各发射一次，先发哪批由玩家决定（§6）。
+        this._digState = isDigMarbleQueue(this.marbleQueue)
+            ? { launched: { collector: false, alchemy: false }, selectedKind: 'collector', completed: false }
+            : null;
 
         this.phase_switchPhase('gathering');
         requestAnimationFrame(() => {
@@ -690,6 +659,7 @@ export const game_phase = {
         this.ui_renderRecipeHUD();
         this.combat_updateMulticastDisplay(0);
         this.ui_renderRecipeHUD();
+        if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
 
         // ==================== [v2 重构] 钉板编辑入口 ====================
         // 实时钉板已构建完成后，只显示「编辑钉板」入口；玩家点击入口才进入编辑态。
@@ -794,7 +764,8 @@ export const game_phase = {
             this.combat_recomputeActiveSkills({ allowEditorPopup: false });
         }
         // [unlock_slot 遗物 + slot_count_up] 在模块外额外创建特殊槽
-        let effectiveSlots = [...(this.unlockedSlots || [])].filter(t => t !== 'skill_point');
+        // [REQ-20261022-wave-loop S1] 连射槽随多重施法删除，不再生成到钉板上。
+        let effectiveSlots = [...(this.unlockedSlots || [])].filter(t => t !== 'skill_point').filter(t => t !== 'multicast');
         const effectiveSlotCount = Math.min(this.slotCount || 0, effectiveSlots.length > 0 ? this.slotCount : 0);
         if (effectiveSlots.length > 0 && effectiveSlotCount > 0) {
             const validIdx = this.pegs.map((p, i) => i).filter(i => this.pegs[i].type !== 'pink');
@@ -1547,30 +1518,15 @@ phase_gathering_getRandomPegType() {
             this.ammoQueue = [];
         }
 
-        // [feat] 每回合开始检查 ammoQueue：若为空则从 marbleQueue 重新编译充能。
-        // 覆盖所有进入战斗的路径（无精华直接充能、有精华研磨后进入战斗均适用）。
-        if (this.ammoQueue.length === 0 && this.marbleQueue && this.marbleQueue.length > 0) {
-            this.ammoQueue = this.marbleQueue.map(marbleDef => {
-                const collected = Array.isArray(marbleDef.collected) ? marbleDef.collected : [];
-                const inheritedMulticast = Math.max(0, Math.floor(marbleDef.multicast || 0));
-                const recipe = this.calc_compileCollectionToRecipe(marbleDef, collected, inheritedMulticast > 0);
-                recipe.finalHits = 0;
-                recipe.multicast = inheritedMulticast;
-                return recipe;
-            });
+        // [REQ-20261022-wave-loop S1] 主炮：每回合固定 N 发无限弹药（§5.1），不再从弹珠队列编译子弹。
+        // 炼成弹不进 ammoQueue，存放在 alchemyMagazine，战斗中由 sys_swapNextShotWithAlchemy 替换下一发主炮。
+        {
+            const cannonCfg = (CONFIG.gameplay && CONFIG.gameplay.cannon) || {};
+            const shots = Math.max(1, Math.floor(this.cannonShotsPerTurn || cannonCfg.shotsPerTurn || 2));
+            const cannonDamage = (cannonCfg.damage || 10) + ((CONFIG.gameplay.baseDamage || 1) - 1);
+            this.ammoQueue = buildCannonShots(shots, cannonDamage, cannonCfg.bounce || 0);
         }
-
-        // [perfect-clear-upgrade] 上回合「围墙清空且仍有剩余弹药」蓄能升级保留下来的子弹，
-        // prepend 回本回合 ammoQueue 首部，让升级首先生效。
-        if (Array.isArray(this._carryOverAmmo) && this._carryOverAmmo.length > 0) {
-            this.ammoQueue = [...this._carryOverAmmo, ...this.ammoQueue];
-            this._carryOverAmmo = null;
-        }
-        // 子弹持有上限：基础 3 颗，对应三枚晶石核心充能位
-        const _bulletCap = (CONFIG.gameplay.selectionReq || 3);
-        if (this.ammoQueue.length > _bulletCap) {
-            this.ammoQueue = this.ammoQueue.slice(0, _bulletCap);
-        }
+        this._carryOverAmmo = null;
         // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
         this._chargeUpgradeApplied = false;
         // [in-wall-clear-lottery] 重置「本回合是否已触发围墙清空抽奖」标志
@@ -1601,25 +1557,11 @@ phase_gathering_getRandomPegType() {
             }
         }
 
-        // [tsk-bullet-ui] 兜底保护：若 ammoQueue 与 marbleQueue 同时为空（例如玩家在
-        // 纯净精华命运时刻点击「跳过研磨」获取符文，且上回合无 _chargedAmmoQueue），
-        // 此时直接进入战斗会导致「彈藥耗盡」横幅一直显示且敌人回合无法推进。
-        // 此处强制回退到研磨阶段，重新生成弹珠选择，避免无限敌人回合死循环。
-        if (this.ammoQueue.length === 0 && (!this.marbleQueue || this.marbleQueue.length === 0)) {
-            console.warn('[phase_startCombatPhase] ammoQueue 与 marbleQueue 均为空，回退到研磨阶段防止死循环');
-            // 重置可能残留的命运时刻状态，确保进入标准研磨流程
-            this.selectionMode = 'standard';
-            this.fateMomentContext = null;
-            this.pendingSelectionMode = null;
-            this.replaceAmmoContext = null;
-            this._chargedAmmoQueue = null;
-            // 进入标准选择阶段（非命运时刻），让玩家选择弹珠后再进研磨
-            if (typeof this.sys_initSelectionPhase === 'function') {
-                this.sys_initSelectionPhase();
-            } else {
-                this.phase_switchPhase('selection');
-            }
-            return;
+        // [REQ-20261022-wave-loop S1] 兜底：主炮弹药不会为空；若异常为空，至少补 1 发主炮，避免「彈藥耗盡」死循环。
+        if (this.ammoQueue.length === 0) {
+            console.warn('[phase_startCombatPhase] ammoQueue 为空，补 1 发主炮');
+            const cannonCfg = (CONFIG.gameplay && CONFIG.gameplay.cannon) || {};
+            this.ammoQueue = buildCannonShots(1, (cannonCfg.damage || 10) + ((CONFIG.gameplay.baseDamage || 1) - 1), cannonCfg.bounce || 0);
         }
 
         // --- [核心修复 2]：UI 渲染 ---
@@ -1725,8 +1667,10 @@ phase_gathering_getRandomPegType() {
             game: this,
             marbleIndex,
             marbleDef,
+            // [REQ-20261022-wave-loop S1] 'collector'：只挖能量、不拾取属性；'alchemy'：拾取属性炼成 1 发炼成弹
+            role: marbleDef.role || null,
             collected: [...inheritedCollected, ...runeSlotCollected],
-            multicast: Math.max(0, Math.floor(marbleDef.multicast || 0)),
+            multicast: 0, // 多重施法已删除（§5.1）
             activeBalls: 1,
             currentHits: 0,
             nextTriggerThreshold: this.persistentThreshold,
@@ -1742,9 +1686,51 @@ phase_gathering_getRandomPegType() {
         return session;
     },
 
-    phase_gathering_launchMarbleBatch(pos) {
-        const queue = Array.isArray(this.marbleQueue) ? this.marbleQueue.slice(0, CONFIG.gameplay.selectionReq || 3) : [];
-        if (queue.length === 0) return false;
+    phase_gathering_launchMarbleBatch(pos, kind = null) {
+        const allQueue = Array.isArray(this.marbleQueue) ? this.marbleQueue : [];
+        if (allQueue.length === 0) return false;
+
+        // [REQ-20261022-wave-loop S1] 挖掘：采集批（同一 x 一批）与炼成弹珠各发射一次，会话追加而不是重置。
+        const digState = this._digState;
+        if (digState && isDigMarbleQueue(allQueue)) {
+            const launchKind = kind || digState.selectedKind
+                || (!digState.launched.collector ? 'collector' : 'alchemy');
+            if (!['collector', 'alchemy'].includes(launchKind) || digState.launched[launchKind]) return false;
+            const batch = allQueue
+                .map((marbleDef, marbleIndex) => ({ marbleDef, marbleIndex }))
+                .filter(entry => entry.marbleDef && entry.marbleDef.role === launchKind);
+            if (batch.length === 0) return false;
+            digState.launched[launchKind] = true;
+            const nextKind = launchKind === 'collector' ? 'alchemy' : 'collector';
+            digState.selectedKind = digState.launched[nextKind] ? null : nextKind;
+            if (!Array.isArray(this.gatheringSessions)) this.gatheringSessions = [];
+
+            const spread = Math.min(30, Math.max(16, this.width / 18));
+            const centerOffset = (batch.length - 1) / 2;
+            batch.forEach(({ marbleDef, marbleIndex }, batchIdx) => {
+                const session = this.phase_gathering_createSession(marbleDef, marbleIndex);
+                const offsetX = (batchIdx - centerOffset) * spread * 0.5;
+                const spawnX = Math.max(20, Math.min(this.width - 20, pos.x + offsetX));
+                const newBall = new DropBall(spawnX, 30 - batchIdx * 6, marbleDef, session);
+                newBall.vel.x += offsetX * 0.018;
+                newBall.layoutParams = getLayoutParams(this.currentLayout || 'default');
+                this.gatheringSessions.push(session);
+                this.dropBalls.push(newBall);
+                this._updateDropDistribution(spawnX);
+            });
+            this.currentSession = this.gatheringSessions[this.gatheringSessions.length - 1] || null;
+            if (launchKind === 'alchemy') {
+                this.activeMarbleIndex = batch[0].marbleIndex;
+            }
+            this.ui_updateGatheringQueueUI();
+            this.ui_renderRecipeHUD();
+            if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
+            audio.playShoot();
+            return true;
+        }
+
+        // 旧流程（命运选择 / 旧存档弹珠包）：一次发射至多 selectionReq 颗弹珠。
+        const queue = allQueue.slice(0, CONFIG.gameplay.selectionReq || 3);
         this.gatheringSessions = [];
         this.currentSession = null;
         this.activeMarbleIndex = 0;
@@ -1816,8 +1802,9 @@ phase_gathering_getRandomPegType() {
             // 原阈值 0.4 仅覆盖屏幕上方 40%，导致点击钉盘中下部区域时被错误路由到倾斜模式。
             // 底部手柄区域（height - 40 ± 40px）已在 input_handleInputStart 中提前拦截，无需在此重复判断。
             if (pos.y < this.height * 0.85) {
-                // 上方区域：一次充能最多发射 3 颗弹珠，分别独立收集并在结束时生成子弹列表。
-                this.phase_gathering_launchMarbleBatch(pos);
+                // [REQ-20261022-wave-loop S1] 上方区域：发射当前选中的一批（采集 ×N / 炼成弹珠），每批每次挖掘只能发一次。
+                const digKind = this._digState ? this._digState.selectedKind : null;
+                this.phase_gathering_launchMarbleBatch(pos, digKind);
             } else {
                 // ---  下方区域：进入“抓取倾斜”模式，暂不报错 ---
                 this.isTiltingGrip = true;
@@ -2149,42 +2136,25 @@ phase_gathering_getRandomPegType() {
         // 与 perfect-clear-upgrade 互斥：避免后者在同一帧再次升级 ammoQueue
         this._chargeUpgradeApplied = true;
 
-        const remaining = Array.isArray(this.ammoQueue) ? this.ammoQueue.length : 0;
-        // 抽奖输入：优先使用当前剩余 ammoQueue；若为空（极少数发完才清场），退化到上一回合实际发射的快照
-        let snapshot = (Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0)
-            ? this.ammoQueue.map(r => ({ ...r }))
-            : (Array.isArray(this._lastFiredAmmoSnapshot) ? this._lastFiredAmmoSnapshot.map(r => ({ ...r })) : []);
+        // [REQ-20261022-wave-loop S1 · D7] 围墙清空不再抽奖、不再刷精英援军（不惩罚打得好）。
+        // 未发射的炼成弹回到弹匣；剩余主炮射击作废（主炮无限弹药，下回合重新装填）。
+        const remaining = Array.isArray(this.ammoQueue) ? this.ammoQueue : [];
+        const returnedAlchemy = remaining.filter(r => r && r._shotKind === 'alchemy');
+        if (returnedAlchemy.length > 0) {
+            if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
+            this.alchemyMagazine.push(...returnedAlchemy);
+        }
 
-        // 1. 清空场上所有飞行子弹（projectiles / sonSwords / burstQueue 等）
         if (typeof this.data_clearProjectiles === 'function') {
             this.data_clearProjectiles();
         }
-        // 2. 清空 ammoQueue：让 playerTurnFinished 自然成立，但抽奖标志会阻断敌人回合启动
         this.ammoQueue = [];
+        this._inWallClearLotteryActive = false;
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
-
-        // 3. 标记抽奖暂停，开始老虎机
-        this._inWallClearLotteryActive = true;
-        showToast(`🎰 围墙清空！剩余 ${remaining} 发弹药 → 抽奖加成 +${remaining}`);
-
-        const finishLottery = () => {
-            // 4. 抽奖结束 → 刷新至少 3 排带 jump+haste 的精英援军
-            if (typeof this.spawn_spawnEliteJumperRows === 'function') {
-                this.spawn_spawnEliteJumperRows(3);
-                showToast("⚡ 精英援军入场：跳跃 + 极速！");
-                if (audio && typeof audio.playPowerup === 'function') audio.playPowerup();
-            }
-            // 5. 解除暂停，下一帧 phase_combat_update 会自动进入敌人回合
-            this._inWallClearLotteryActive = false;
-        };
-
-        if (typeof this.sys_runInWallClearLottery === 'function' && snapshot.length > 0) {
-            this.sys_runInWallClearLottery(snapshot, remaining, finishLottery);
-        } else {
-            // 无可抽奖子弹：跳过抽奖动画，直接刷援军并解除暂停
-            finishLottery();
-        }
+        showToast(returnedAlchemy.length > 0
+            ? `围墙清空！${returnedAlchemy.length} 发炼成弹已退回弹匣`
+            : '围墙清空！');
     },
 
 /**
@@ -2270,58 +2240,8 @@ phase_gathering_getRandomPegType() {
         // Math.round 处理浮点误差，/50 是行高，确保归类准确
         const uniqueRows = new Set(activeEnemies.map(e => Math.round(e.pos.y / this.enemyHeight)));
         
-        // 2. 触发条件判定：行数 <= 1 或 总数 <= 5
-        if (uniqueRows.size <= 1 || activeEnemies.length <= 5) {
-            let buffCount = 0;
-            activeEnemies.forEach(e => {
-                if (!e.affixes.includes('haste')) {
-                    e.affixes.push('haste');
-                    buffCount++;
-                    // [视觉] 获得Buff的特效
-                    this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
-                }
-            });
-            
-            if (buffCount > 0) {
-                showToast("⚠️ 敵軍狂暴 (HASTE APPLIED) ⚠️");
-                audio.playPowerup(); // 播放警示音
-            }
-        }
-
-        // 3. [补充行] 结算时存活敌人 ≤5，额外多生成一行，并给原空列的新敌人赋予极速词条
-        // 注意：此处仅在非 Boss 回合且存活敌人 ≤5 时触发（清屏时 activeEnemies.length === 0，不触发）
-        // [issue-2] 改为画面外入场：调用 spawn_spawnEnemyRowOffScreen，新敌人从画面外滑入"队列"位置
-        if (activeEnemies.length > 0 && activeEnemies.length <= 5) {
-            const totalCols = CONFIG.gameplay.enemyCols;
-            // 记录生成前已有敌人的列（用于对比找出原空列）
-            const colsWithEnemiesBefore = new Set(
-                activeEnemies.map(e => e._spawnColIndex).filter(c => c !== undefined)
-            );
-            // 额外生成一行（画面外入场，下回合敌人行动阶段移动进入网格顶部）
-            this.spawn_spawnEnemyRowOffScreen(1);
-            // 找出原本没有敌人的列（生成前的空列）
-            const emptyCols = [];
-            for (let c = 0; c < totalCols; c++) {
-                if (!colsWithEnemiesBefore.has(c)) {
-                    emptyCols.push(c);
-                }
-            }
-            // 给新生成的、位于原空列的敌人赋予极速词条
-            if (emptyCols.length > 0) {
-                const newEnemies = this.enemies.filter(e => e.active && !activeEnemies.includes(e));
-                let hasteCount = 0;
-                newEnemies.forEach(e => {
-                    if (emptyCols.includes(e._spawnColIndex) && !e.affixes.includes('haste')) {
-                        e.affixes.push('haste');
-                        hasteCount++;
-                        this.spawn_createParticle(e.pos.x, e.pos.y, '#facc15', 'spark');
-                    }
-                });
-                if (hasteCount > 0) {
-                    showToast("⚡ 增援部隊！空列敵人獲得極速！");
-                }
-            }
-        }
+        // [REQ-20261022-wave-loop S1 · D7] 已移除「低存活加极速」与「≤5 存活补行 + 空列极速」：
+        // 这两条惩罚打得好、奖励留怪；敌人强度只由波次表决定。
 
         // --- [符文领取] 掉落符文的领取已提前到敌人动作后（phase_claimPendingRunes）执行
         // 仅将库存同步到存档（符文已在 phase_claimPendingRunes 中入库）
@@ -2346,11 +2266,7 @@ phase_gathering_getRandomPegType() {
             const rowCountCurrent = uniqueRows.size;
             let spawnCount = 1;
             if (rowCountCurrent < 4) spawnCount = 3;
-            // [清屏奖励] 上一回合完成清屏，本回合至少推进 3 行敌人
-            if (this._prevRoundCleared && spawnCount < 3) {
-                spawnCount = 3;
-                showToast('⚔️ 清屏反扑：敌军至少推进 3 行');
-            }
+            // [REQ-20261022-wave-loop S1 · D7] 「清屏反扑」已移除。
             // [Feature 2: 围墙非空保证] 本回合清屏 → 下回合若全部从画面外滑入，将出现"围墙范围内
             // 短暂无敌人"的空窗（玩家若仍持有子弹会立刻被 perfect-clear-upgrade 再次结算）。
             // 因此清屏后第一行直接生成在网格顶部（IN-WALL），其余行保留画面外入场演出。
@@ -2367,9 +2283,6 @@ phase_gathering_getRandomPegType() {
                 this.spawn_spawnEnemyRowOffScreen(spawnCount);
             }
         }
-        // [清屏状态] 将本回合清屏结果写入标志位，供下一回合读取
-        this._prevRoundCleared = clearedThisRound;
-
         // 重置倍率
         if (this.nextRoundHpMultiplier > 1) {
             showToast("強敵來襲！HP x" + this.nextRoundHpMultiplier);
@@ -3437,7 +3350,8 @@ phase_gathering_getRandomPegType() {
 
         // [perfect-clear-upgrade] 兜底分支：若新机制未启用（如试炼场或抽奖跳过），
         // 仍然走原蓄能升级流程，将剩余子弹 +1 携带到下回合。
-        if (activeEnemies === 0) {
+        // [REQ-20261022-wave-loop S1] 局内（combat）不再设置 _carryOverAmmo / nextRoundHpMultiplier。
+        if (activeEnemies === 0 && this.phase !== 'combat') {
             const hasLeftoverAmmo = this.ammoQueue.length > 0;
             if (hasLeftoverAmmo && !this._chargeUpgradeApplied) {
                 this._chargeUpgradeApplied = true;
@@ -3718,37 +3632,86 @@ phase_gathering_getRandomPegType() {
         const pendingSessions = sessions.filter(session => session && !session.isFinished);
         if (pendingSessions.length === 0) return;
 
+        const digState = this._digState;
+        const isDigRound = !!digState && isDigMarbleQueue(this.marbleQueue);
+        const alchemyCfg = (CONFIG.gameplay && CONFIG.gameplay.alchemy) || {};
+
         pendingSessions.forEach(session => {
             session.isFinished = true;
             const marbleIndex = Number.isInteger(session.marbleIndex) ? session.marbleIndex : this.activeMarbleIndex;
             const marbleDef = this.marbleQueue[marbleIndex] || session.marbleDef;
             if (!marbleDef) return;
 
+            // [REQ-20261022-wave-loop S1] 采集弹珠只挖能量（能量在能量球到达时已入账），不产出子弹。
+            if (session.role === 'collector') return;
+
+            // [REQ-20261022-wave-loop S1] 炼成弹珠：封顶 3 种 × 3 级 → 1 发炼成弹，伤害炼成时锁定（§5.3）。
+            if (session.role === 'alchemy') {
+                const rawCollected = [...session.collected]
+                    .filter(item => !(item && typeof item === 'object' && item.source === 'rune_slot'));
+                marbleDef.collected = rawCollected;
+                const capped = capAlchemyCollection(rawCollected, alchemyCfg.maxTypes ?? 3, alchemyCfg.maxLevel ?? 3);
+                if (capped.totalLevels <= 0) {
+                    showToast('空瓶：炼成弹珠没有拾取到属性，本次不入匣');
+                    return;
+                }
+                const recipe = this.calc_compileCollectionToRecipe(marbleDef, capped.items, false);
+                recipe.damage = alchemyDamage(capped.totalLevels, alchemyCfg.base ?? 15);
+                recipe.multicast = 0;
+                recipe.finalHits = 0;
+                recipe._shotKind = 'alchemy';
+                recipe._alchemyLevels = capped.totalLevels;
+                recipe._alchemyGroups = capped.groups.map(g => ({ ...g }));
+                if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
+                this.alchemyMagazine.push(recipe);
+                const cap = Math.max(1, Math.floor(alchemyCfg.magazineCap || 3));
+                // S1：满匣直接丢弃最旧一发（S2 改为整备阶段的「替换哪一发 / 丢弃新弹」单选卡）
+                while (this.alchemyMagazine.length > cap) this.alchemyMagazine.shift();
+                const label = capped.groups.map(g => {
+                    const display = CONFIG.ui.attributeDisplay[g.type];
+                    return `${(display && display.name) || g.type}${g.level}`;
+                }).join(' + ');
+                showToast(`炼成弹入匣：${label} · 伤害 ${recipe.damage}`);
+                return;
+            }
+
             marbleDef.collected = [...session.collected]
                 .filter(item => !(item && typeof item === 'object' && item.source === 'rune_slot'));
 
-            const totalMulticast = 1 + session.multicast;
-            if (totalMulticast > 0) {
-                const previousActive = this.activeMarbleIndex;
-                this.activeMarbleIndex = marbleIndex;
-                this.combat_playMulticastTransferEffect(totalMulticast);
-                this.activeMarbleIndex = previousActive;
-            }
-
-            const recipe = this.calc_compileCollectionToRecipe(marbleDef, session.collected, session.multicast > 0);
+            const recipe = this.calc_compileCollectionToRecipe(marbleDef, session.collected, false);
             recipe.finalHits = session.totalHits;
-            recipe.multicast = session.multicast;
+            recipe.multicast = 0;
             recipe._marbleIndex = marbleIndex;
             this.ammoQueue.push(recipe);
 
-            marbleDef.multicast = session.multicast;
+            marbleDef.multicast = 0;
             marbleDef.finalHits = session.totalHits;
         });
 
-        this.activeMarbleIndex = this.marbleQueue.length;
-        this.ui_updateGatheringQueueUI();
         this.pegs.forEach(p => p.resetCooldown());
         this.currentSession = null;
+
+        if (isDigRound) {
+            this.ui_updateGatheringQueueUI();
+            this.ui_renderRecipeHUD();
+            // 两批都发射完、且全部落定后才进入战斗；否则等待玩家发射另一批。
+            if (!digState.launched.collector || !digState.launched.alchemy) {
+                if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
+                return;
+            }
+            if (digState.completed) return;
+            digState.completed = true;
+            this.gatheringSessions = [];
+            this.activeMarbleIndex = this.marbleQueue.length;
+            this._digDoneRound = this.round;
+            if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
+            if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+            setTimeout(() => this.phase_startCombatPhase(), 500);
+            return;
+        }
+
+        this.activeMarbleIndex = this.marbleQueue.length;
+        this.ui_updateGatheringQueueUI();
         this.gatheringSessions = [];
 
         if (this.ammoQueue.length === 0) return;
@@ -3765,7 +3728,7 @@ phase_gathering_getRandomPegType() {
             setTimeout(() => this.phase_startCombatPhase(), 500);
         }
     },
-    
+
 // Gathering Phase Update
     /**
      * @method updateGathering
@@ -4081,8 +4044,11 @@ phase_gathering_getRandomPegType() {
                         if (session) session.activeBalls++;
                         showToast("分裂!");
                     } else if (result.slotType === 'relic') {
-                        // 調用遺物選擇
-                        this.ui_showRelicSelection(); 
+                        // [REQ-20261022-wave-loop S1] 遗物只在开局与 Boss 击杀时获得；钉板遗物槽改为给能量。
+                        const relicSlotEnergy = Math.max(0, Math.floor(((CONFIG.gameplay.dig || {}).relicSlotEnergy) ?? 20));
+                        this.energy = (this.energy || 0) + relicSlotEnergy;
+                        this.spawn_createFloatingText(ball.pos.x, ball.pos.y - 20, `+${relicSlotEnergy} ⚡`, '#facc15', 16);
+                        if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud({ pulse: true });
                         
                         // 將彈珠移除
                         this.dropBalls.splice(i, 1);

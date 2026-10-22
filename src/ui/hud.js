@@ -719,6 +719,9 @@ export const hud_system = {
                 // --- [继承加成] 显示符文基础属性、词条加成与全局额外伤害/击杀加成 ---
                 const inheritCard = this._buildInheritanceCard();
                 if (inheritCard) combatHud.appendChild(inheritCard);
+
+                // [REQ-20261022-wave-loop S1] 炼成弹匣按钮行
+                this.ui_renderAlchemyMagazine(combatHud);
             }
         }
         else {
@@ -735,6 +738,8 @@ export const hud_system = {
             if (gatheringHud && this.phase === 'gathering') {  // [Mixin 正常用法：读取 Game 实例状态]
                 gatheringHud.innerHTML = ''; 
                 this.marbleQueue.forEach((item, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
+                    // [REQ-20261022-wave-loop S1] 采集弹珠不拾取属性，只展示炼成弹珠的配方卡
+                    if (item && item.role === 'collector') return;
                     const isActive = idx === this.activeMarbleIndex;  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
                 }); 
@@ -870,116 +875,156 @@ export const hud_system = {
     },
 
     _hud_renderSessionChargeStack() {
+        // [REQ-20261022-wave-loop S1] 「0/15 命中充能 → 多重施法」已删除（§5.1），逐弹珠充能面板不再渲染。
+        // 保留函数名供 UI_HIT_PROGRESS / spawn_createHitFeedback 等旧调用点安全调用；始终隐藏并返回 false。
         const stack = document.getElementById('session-charge-stack');
-        if (!stack) return false;
-
-        const models = this._hud_getGatheringSessionViewModels ? this._hud_getGatheringSessionViewModels() : [];
-        const shouldShow = this.phase === 'gathering' && models.length > 1;
-        stack.classList.toggle('hidden', !shouldShow);
-        stack.classList.toggle('gathering-ammo-panel-grid', shouldShow);
-
-        const phaseEl = document.getElementById('phase-gathering');
-        if (phaseEl) phaseEl.classList.toggle('has-ammo-panels', shouldShow);
-
-        const gaugeEl = document.getElementById('hero-gauge-container');
-        if (gaugeEl) gaugeEl.classList.toggle('has-session-panels', shouldShow);
-
-        const legacyShell = document.getElementById('gauge-shell');
-        const legacyMulticast = document.getElementById('multicast-ui');
-        if (legacyShell) legacyShell.classList.toggle('hidden', shouldShow);
-        if (legacyMulticast) legacyMulticast.classList.toggle('hidden', shouldShow);
-
-        if (!shouldShow) {
+        if (stack) {
+            stack.classList.add('hidden');
+            stack.classList.remove('gathering-ammo-panel-grid');
             stack.innerHTML = '';
-            return false;
         }
+        const phaseEl = document.getElementById('phase-gathering');
+        if (phaseEl) phaseEl.classList.remove('has-ammo-panels');
+        const gaugeEl = document.getElementById('hero-gauge-container');
+        if (gaugeEl) gaugeEl.classList.remove('has-session-panels');
+        return false;
+    },
 
-        stack.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-        models.slice(0, 3).forEach(model => {
-            const pct = model.target > 0 ? Math.max(0, Math.min(100, (model.currentHits / model.target) * 100)) : 0;
-            const name = model.marble && model.marble.getName ? model.marble.getName() : `#${model.index + 1}`;
-            const rawColor = model.marble && typeof model.marble.getColor === 'function'
-                ? model.marble.getColor()
-                : (model.marble && model.marble.color) || '#e2e8f0';
-            const isGradient = typeof rawColor === 'string' && rawColor.includes('gradient');
-            const accent = isGradient ? '#facc15' : rawColor;
-
-            const panel = document.createElement('div');
-            panel.className = `gathering-ammo-panel${model.active ? ' is-active' : ''}${pct >= 99 ? ' is-full' : ''}${model.finished ? ' is-finished' : ''}`;
-            panel.dataset.marbleIndex = String(model.index);
-            panel.title = `${name} · ${model.currentHits}/${model.target} · x${1 + model.multicast}`;
-            panel.style.setProperty('--marble-accent', accent);
-            panel.style.setProperty('--marble-bg', rawColor);
-
-            const charge = document.createElement('div');
-            charge.className = 'gathering-ammo-charge';
-            const fill = document.createElement('span');
-            fill.className = 'gathering-ammo-charge-fill';
-            fill.style.width = `${pct}%`;
-            const text = document.createElement('span');
-            text.className = 'gathering-ammo-charge-text';
-            text.textContent = `${model.currentHits}/${model.target}`;
-            charge.append(fill, text);
-
-            const main = document.createElement('div');
-            main.className = 'gathering-ammo-main';
-            const orb = document.createElement('span');
-            orb.className = 'gathering-ammo-orb';
-            const copy = document.createElement('span');
-            copy.className = 'gathering-ammo-copy';
-            const label = document.createElement('span');
-            label.className = 'gathering-ammo-label';
-            label.textContent = `弹 ${model.index + 1}`;
-            const nameEl = document.createElement('span');
-            nameEl.className = 'gathering-ammo-name';
-            nameEl.textContent = name;
-            copy.append(label, nameEl);
-            main.append(orb, copy);
-
-            const stats = document.createElement('div');
-            stats.className = 'gathering-ammo-stats';
-            const counts = new Map();
-            for (const item of model.collection || []) {
-                const type = typeof item === 'string' ? item : (item && item.type);
-                if (!type || !CONFIG.ui.attributeDisplay[type]) continue;
-                const amount = Math.max(1, Math.floor((item && typeof item === 'object' && item.level) ? item.level : 1));
-                counts.set(type, (counts.get(type) || 0) + amount);
+    /**
+     * @method ui_updateResourceHud
+     * @description [REQ-20261022-wave-loop S1] 刷新顶栏资源胶囊（能量 ⚡ / 晶核 💎）。
+     *   仅在挖掘 / 战斗阶段显示；options.pulse 为 true 时给能量胶囊一个短暂高亮。
+     */
+    ui_updateResourceHud(options = {}) {
+        if (typeof document === 'undefined') return;
+        const visible = this.phase === 'gathering' || this.phase === 'combat';
+        const energyPill = document.getElementById('energy-pill');
+        const energyCount = document.getElementById('energy-count');
+        const crystalPill = document.getElementById('crystal-pill');
+        const crystalCount = document.getElementById('crystal-count');
+        const energy = Math.max(0, Math.floor(this.energy || 0));
+        const crystal = Math.max(0, Math.floor(this.crystal || 0));
+        if (energyCount) energyCount.textContent = String(energy);
+        if (crystalCount) crystalCount.textContent = String(crystal);
+        if (energyPill) {
+            energyPill.classList.toggle('is-visible', visible);
+            if (options.pulse) {
+                energyPill.classList.add('is-pulse');
+                clearTimeout(energyPill._pulseTimer);
+                energyPill._pulseTimer = setTimeout(() => energyPill.classList.remove('is-pulse'), 220);
             }
-            if (counts.size === 0) {
-                const empty = document.createElement('span');
-                empty.className = 'gathering-ammo-empty';
-                empty.textContent = '待收集';
-                stats.appendChild(empty);
-            } else {
-                Array.from(counts.entries()).slice(0, 4).forEach(([type, count]) => {
-                    const display = CONFIG.ui.attributeDisplay[type];
-                    const chip = _buildAttributeChip({
-                        key: type,
-                        value: count,
-                        name: display.name || type,
-                        icon: display.icon || '',
-                        color: display.color || '#cbd5e1',
-                    }, 'gathering-ammo-stat-chip');
-                    stats.appendChild(chip);
-                });
-                if (counts.size > 4) {
-                    const more = document.createElement('span');
-                    more.className = 'gathering-ammo-stat-chip is-more';
-                    more.textContent = `+${counts.size - 4}`;
-                    stats.appendChild(more);
-                }
-            }
+        }
+        if (crystalPill) crystalPill.classList.toggle('is-visible', visible && crystal > 0);
+    },
 
-            const multi = document.createElement('span');
-            multi.className = 'gathering-ammo-multicast session-charge-multicast';
-            multi.textContent = `x${1 + model.multicast}`;
+    /**
+     * @method _hud_formatAlchemyLabel
+     * @description 炼成弹按钮文案：属性图标 + 级数，后跟伤害（例：🔥2❄️1 · 75）。
+     */
+    _hud_formatAlchemyLabel(recipe) {
+        if (!recipe) return '';
+        const groups = Array.isArray(recipe._alchemyGroups) ? recipe._alchemyGroups : [];
+        const display = (CONFIG.ui && CONFIG.ui.attributeDisplay) || {};
+        const parts = groups.map(g => `${(display[g.type] && display[g.type].icon) || g.type}${g.level}`);
+        return `${parts.join('') || '炼成'} · ${Math.floor(recipe.damage || 0)}`;
+    },
 
-            panel.append(charge, main, stats, multi);
-            fragment.appendChild(panel);
+    /**
+     * @method ui_renderAlchemyMagazine
+     * @description [REQ-20261022-wave-loop S1] 战斗中在弹药 HUD 内渲染炼成弹匣按钮行：
+     *   每发炼成弹一个按钮，点击把下一发主炮换成该炼成弹（不额外占射击次数）；
+     *   若下一发已是炼成弹，显示「换回主炮」按钮。
+     */
+    ui_renderAlchemyMagazine(container = null) {
+        if (typeof document === 'undefined') return;
+        const host = container || document.getElementById('recipe-hud-container');
+        if (!host) return;
+        const old = host.querySelector('.alchemy-magazine-row');
+        if (old) old.remove();
+        if (this.phase !== 'combat') return;
+        const magazine = Array.isArray(this.alchemyMagazine) ? this.alchemyMagazine : [];
+        const head = Array.isArray(this.ammoQueue) ? this.ammoQueue[0] : null;
+        const headIsAlchemy = !!(head && head._shotKind === 'alchemy');
+        if (magazine.length === 0 && !headIsAlchemy) return;
+
+        const canSwap = typeof this.sys_canSwapAlchemyShot === 'function' ? this.sys_canSwapAlchemyShot() : false;
+        const row = document.createElement('div');
+        row.className = 'alchemy-magazine-row';
+        if (headIsAlchemy) {
+            const back = document.createElement('button');
+            back.type = 'button';
+            back.className = 'alchemy-magazine-btn is-loaded';
+            back.textContent = `已装填 ${this._hud_formatAlchemyLabel(head)} ↩`;
+            back.title = '把下一发换回主炮，炼成弹放回弹匣';
+            back.disabled = !canSwap;
+            back.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.sys_swapNextShotWithAlchemy(-1);
+            });
+            row.appendChild(back);
+        }
+        magazine.forEach((recipe, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'alchemy-magazine-btn';
+            btn.dataset.magazineIndex = String(idx);
+            btn.textContent = this._hud_formatAlchemyLabel(recipe);
+            btn.title = headIsAlchemy ? '先换回主炮再选择其他炼成弹' : '把下一发主炮换成这发炼成弹';
+            btn.disabled = !canSwap || headIsAlchemy;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.sys_swapNextShotWithAlchemy(idx);
+            });
+            row.appendChild(btn);
         });
-        stack.appendChild(fragment);
-        return true;
+        host.appendChild(row);
+    },
+
+    /**
+     * @method ui_renderDigLaunchToggle
+     * @description [REQ-20261022-wave-loop S1] 挖掘阶段发射选择：「采集 ×5」/「炼成弹珠」。
+     *   按钮只切换「下一次点击钉板发射哪一批」，已发射的一批显示为划线且不可再选。
+     */
+    ui_renderDigLaunchToggle() {
+        if (typeof document === 'undefined') return;
+        const host = document.getElementById('phase-gathering');
+        let bar = document.getElementById('dig-launch-toggle');
+        const dig = this._digState;
+        const active = this.phase === 'gathering' && !!dig && !dig.completed;
+        if (!active) {
+            if (bar) bar.style.display = 'none';
+            return;
+        }
+        if (!host) return;
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'dig-launch-toggle';
+            bar.className = 'dig-launch-toggle';
+            host.appendChild(bar);
+        }
+        bar.style.display = 'flex';
+        bar.innerHTML = '';
+        const collectorCount = Math.max(1, (CONFIG.gameplay.dig && CONFIG.gameplay.dig.collectorCount) || 5);
+        const kinds = [
+            { kind: 'collector', label: `采集 ×${collectorCount}` },
+            { kind: 'alchemy', label: '炼成弹珠' },
+        ];
+        kinds.forEach(({ kind, label }) => {
+            const launched = !!(dig.launched && dig.launched[kind]);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `dig-launch-btn${dig.selectedKind === kind && !launched ? ' is-selected' : ''}${launched ? ' is-launched' : ''}`;
+            btn.textContent = launched ? `${label} ✓` : label;
+            btn.disabled = launched;
+            btn.title = launched ? '本次挖掘已发射' : '选择后点击钉板上方区域发射';
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (launched || !this._digState) return;
+                this._digState.selectedKind = kind;
+                this.ui_renderDigLaunchToggle();
+            });
+            bar.appendChild(btn);
+        });
     },
 
     _hud_updateLegacyHitProgress(val, target) {

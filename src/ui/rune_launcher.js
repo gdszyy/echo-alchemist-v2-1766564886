@@ -73,6 +73,11 @@ export const rune_launcher_system = {
      * 打开符文发射器面板
      */
     ui_openRuneLauncher() {
+        // [REQ-20261022-wave-loop S1] 新循环纵切片不接符文（设计 §5.1）：局内入口下线，试炼场保留；符文数据不删除。
+        if (this.phase !== 'training') {
+            showToast('符文发射器暂未开放（新循环试玩中）');
+            return;
+        }
         const panel = document.getElementById('phase-rune-launcher');
         const isPCMode = document.body.classList.contains('pc-mode');
         // [DEBUG-LOG] 每次点击时记录 phase-rune-launcher 面板的完整状态快照

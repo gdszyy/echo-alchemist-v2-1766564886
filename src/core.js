@@ -366,7 +366,12 @@ class Game {
         this.pendingFusions = [];
 
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
+        // [REQ-20261022-wave-loop S1] 局内碎片并入「能量」：runFragments 是 energy 的别名（见文件末尾访问器）。
         this.runFragments = 0;
+        this.crystal = 0;                 // 晶核（稀有资源，S1 仅 Boss 击杀 +3）
+        this.alchemyMagazine = [];        // 炼成弹匣（上限 CONFIG.gameplay.alchemy.magazineCap）
+        this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
+        this._digDoneRound = null;        // 本回合是否已完成挖掘（§3：每波只挖一次）
         this.runShopInventory = [];
         this.runShopRefreshes = 0;
         this._runShopOpenedRound = -1;
@@ -530,6 +535,12 @@ class Game {
         this.eventBus.on('boss:defeated', (data) => {
             // [波次循环] 真理之书演示等共用全局事件总线：不属于本局的 Boss 不得改动本局 Boss 波排期
             if (data && data.boss && Array.isArray(this.enemies) && !this.enemies.includes(data.boss)) return;
+            // [REQ-20261022-wave-loop S1] Boss 击杀：晶核 +3，并在下一回合开始结算一次遗物三选一。
+            this.crystal = (this.crystal || 0) + 3;
+            if (typeof this.sys_queueRoundStartReward === 'function') {
+                this.sys_queueRoundStartReward({ type: 'relic', source: 'boss_kill', round: this.round });
+            }
+            if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
             this.postBossMultiplier = 1.3;
             this.postBossSurgeRoundsLeft = 3;
             // [Task C.2] 战后高压期：3 回合内双词缀精英概率临时提升 25%
@@ -575,6 +586,15 @@ class Game {
         pixiDestroy();
     }
 }
+
+// [REQ-20261022-wave-loop S1] 局内碎片并入能量：保留 runFragments 读写口（约 31 处调用点，商店/掉落/结算），
+// 实际存储在 this.energy。TODO(S2)：调用点统一改名为 energy 后删除本访问器。
+Object.defineProperty(Game.prototype, 'runFragments', {
+    configurable: true,
+    enumerable: false,
+    get() { return this.energy || 0; },
+    set(value) { this.energy = Math.max(0, Number(value) || 0); },
+});
 
 // [Task 3.3] 已移除 Object.assign(Game.prototype, ...) Mixin 模式。
 // 各子系统方法现在通过构造函数中的 bind(this) 注入为实例方法（组合模式）。

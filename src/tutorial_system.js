@@ -98,68 +98,26 @@ const TUTORIAL_STEPS = [
         position: 'bottom-fixed',   // 特殊值：固定在屏幕底部，不跟随高亮元素
         noOverlay: true,            // 不遮罩，让玩家能点击遗物
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
-        // [开局命运选择修复] 遗物选完后进入的是命运时刻选择阶段（chaos_essence），
-        // 此时 isFateMomentPhase() 返回 true，必须允许该条件通过才能推进到弹珠选择步骤。
-        waitForEventFilter: (data) => data && data.to === 'selection',
-        autoAdvance: true,
-        actionLabel: null,
-        actionFn: null,
-    },
-    // ── 第 3 步：弹珠选择 ──────────────────────────────────────────────────────────────────────────────────────
-    // 选中3枚弹珠后自动推进，无「下一步」按鈕
-    {
-        id: 'marble_selection',
-        phase: 'selection',
-        targetId: 'phase-selection',
-        highlightSelector: '#marble-selection-grid',
-        title: '选择你的弹珠',
-        content: `
-            <p><strong>弹珠</strong>是你的主要攻击单位，每种弹珠有独特的属性和技能。</p>
-            <p class="mt-2">选择 <strong>3 枚弹珠</strong>组成本局弹药库，选齐后教程自动继续。</p>
-            <p class="mt-2 text-cyan-300/80 text-xs">💡 点击弹珠可预览详细属性，再次点击选中</p>
-        `,
-        position: 'bottom',
-        noOverlay: false,
-        waitForEvent: 'tutorial:marbles_ready',
-        waitForEventFilter: null,
-        autoAdvance: true,
-        actionLabel: null,
-        actionFn: null,
-    },
-    // ── 第 4 步：确认选择 ──────────────────────────────────────────────────────────────────────────────────────
-    {
-        id: 'confirm_selection',
-        phase: 'selection',
-        targetId: 'phase-selection',
-        highlightSelector: '#confirm-selection-btn',
-        title: '确认选择，开始研磨！',
-        content: `
-            <p>选好 3 枚弹珠后，点击高亮的「<strong>開始練金</strong>」按鈕进入研磨阶段。</p>
-            <p class="mt-2">研磨阶段中，你的弹珠将在钉盘中弹跳，装载战斗子弹。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方按鈕，教程自动继续</p>
-        `,
-        position: 'top',
-        noOverlay: false,
-        waitForEvent: EVENT_TYPES.PHASE_CHANGED,
+        // [REQ-20261022-wave-loop S1] 遗物选完后直接进入每波挖掘（gathering），不再经过弹珠选择。
         waitForEventFilter: (data) => data && data.to === 'gathering',
         autoAdvance: true,
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 5 步：研磨阶段说明 ─────────────────────────────────────────────────
+    // ── 第 3 步：挖掘阶段说明 ─────────────────────────────────────────────────
     // 取消遮罩，让玩家能直接操作钉板
     {
         id: 'gathering_intro',
         phase: 'gathering',
         targetId: null,
         highlightSelector: null,
-        title: '研磨阶段',
+        title: '挖掘阶段',
         content: `
-            <p>点击<strong>钉板上方区域</strong>投入弹珠，让它在钉盘中弹跳。</p>
-            <p class="mt-2">每枚弹珠会根据碰撞到的钉子属性，<strong>装载对应的子弹效果</strong>。</p>
-            <p class="mt-2"><strong>💡 提示：左右倾斜手机可以让弹珠向左或向右移动。</strong></p>
-            <p class="mt-2">三枚弹珠全部装载完毕后，自动进入<strong>战斗阶段</strong>！</p>
-            <p class="mt-2 text-amber-300/80 text-xs">👆 现在试着点击上方区域投入弹珠吧！</p>
+            <p>每一波开始前先挖一次，共<strong>两次发射</strong>，先发哪批由你决定：</p>
+            <p class="mt-2">⚡ <strong>采集 ×5</strong>：5 颗采集弹珠从同一位置落下，每碰一次钉子获得<strong>能量</strong>。</p>
+            <p class="mt-2">🧪 <strong>炼成弹珠</strong>：只有它会拾取钉子上的属性（最多 3 种 × 3 级），落地后炼成 1 发强力<strong>炼成弹</strong>放进弹匣。</p>
+            <p class="mt-2">用右下角按钮切换要发射的那一批，再点击<strong>钉板上方区域</strong>发射。两批都落定后自动进入战斗。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 战斗中点击弹匣里的炼成弹，可以把下一发主炮换成它。</p>
         `,
         position: 'bottom-fixed',   // 固定在底部，不遮挡钉板
         noOverlay: true,            // 取消遮罩，让玩家能操作
@@ -169,7 +127,7 @@ const TUTORIAL_STEPS = [
         actionLabel: null,          // 纯等待玩家投入弹珠
         actionFn: null,
     },
-    // ── 第 6 步：战斗阶段 ─────────────────────────────────────────────────────
+    // ── 第 4 步：战斗阶段 ─────────────────────────────────────────────────────
     // noOverlay: true  → 不遮挡界面，玩家可直接操作
     // position: 'bottom-fixed' → 固定在底部，不遮挡战斗区域
     // waitForEvent: UI_AMMO_FIRED → 等玩家真正发射一颗子弹后自动推进
@@ -194,7 +152,7 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 7 步：教程完成 ─────────────────────────────────────────────────────
+    // ── 第 5 步：教程完成 ─────────────────────────────────────────────────────
     {
         id: 'tutorial_complete',
         phase: null,

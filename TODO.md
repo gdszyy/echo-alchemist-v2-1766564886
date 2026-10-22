@@ -11,6 +11,13 @@
 
 ---
 
+## 2026-10-22 挖 → 守 核心循环 S1「循环骨架」（REQ-20261022-wave-loop）
+
+- `done`（S1，未提交、待验收）：每波挖一次（采集 ×5 → 能量，炼成弹珠 ×1 → 炼成弹匣 ≤3）、Boss 波只挖一次；主炮每回合 2 发无限弹药 + 「下一发换炼成弹」；能量/晶核顶栏胶囊；Boss 血量按波次固定；删除低存活极速 / 补行 / 清屏反扑 / 围墙清空抽奖援军；技能 SP、局内符文入口、弹珠包、普通敌人遗物掉落下线。设计：[`docs/design/dig_build_defend_loop_v1.md`](docs/design/dig_build_defend_loop_v1.md) §12；规范：[`.cursor/rules/game_phase.md`](.cursor/rules/game_phase.md) §1.1；回归：`node tests/validate_dig_loop_s1.mjs`。
+- `debt`（S2）：整备阶段与主炮三轨升级、设施位、满匣替换单选卡、桶倍率重抽（S1 恒 ×1）、真实盘面热条、`runFragments` → `energy` 改名、能量数值调参。
+
+---
+
 ## 2026-07-01 多 Codex 并行与 Worktree 隔离入口
 
 为解决多个 Codex 并行导致根 checkout 长期 dirty 的问题，项目规范已补齐“一个需求一个隔离工作区”的硬约束：

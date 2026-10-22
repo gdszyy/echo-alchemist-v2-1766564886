@@ -1,9 +1,9 @@
 # src\game_system.js 函数索引
 
-> 自动生成于 2026-10-22 | 总行数: 3625 | 函数数: 66 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 3716 | 函数数: 69 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
-**巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
+**巨型函数警告**: 本文件包含 5 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
 
 ## 函数列表
 
@@ -21,7 +21,7 @@
 | sys_getCombatBounds | method | `sys_getCombatBounds()` |  |
 | sys_getCombatColumnCenterX | method | `sys_getCombatColumnCenterX(col, spanCols = 1)` |  |
 | sys_initGameStart | method | `sys_initGameStart()` |  |
-| sys_resetGame | method | `sys_resetGame()` |  |
+| sys_resetGame | method | `sys_resetGame()` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_loadSaveData | method | `sys_loadSaveData()` |  |
 | sys_saveData | method | `sys_saveData()` |  |
 | sys_setPerfQuality | method | `sys_setPerfQuality(level)` |  |
@@ -37,6 +37,9 @@
 | sys_queueRoundStartReward | method | `sys_queueRoundStartReward(reward = {})` |  |
 | sys_rollMarblePackTypes | method | `sys_rollMarblePackTypes(packId = 'mixed', count = CONFIG.gameplay.selectionReq || 3)` |  |
 | sys_startMarblePackGrind | method | `sys_startMarblePackGrind(reward = {})` |  |
+| sys_startDigPhase | method | `sys_startDigPhase()` |  |
+| sys_canSwapAlchemyShot | method | `sys_canSwapAlchemyShot()` |  |
+| sys_swapNextShotWithAlchemy | method | `sys_swapNextShotWithAlchemy(i)` |  |
 | sys_grantRunResourcePack | method | `sys_grantRunResourcePack(reward = {})` |  |
 | sys_determineEnemyReward | method | `sys_determineEnemyReward(enemy, isRowRepresentative = false)` | ⚠️ 巨型函数，见 @section 导航 |
 | sys_preCalcEnemyRewardType | method | `sys_preCalcEnemyRewardType(enemy)` |  |
@@ -79,6 +82,10 @@
 | _calcDesperationMult | method | `_calcDesperationMult()` |  |
 
 ## 巨型函数内部节点 (@section 标记)
+
+### sys_resetGame
+
+> **缺少 @section 标记**：此巨型函数内部没有节点标记，建议添加以提升导航精度。
 
 ### sys_determineEnemyReward
 

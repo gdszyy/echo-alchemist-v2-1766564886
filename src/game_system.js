@@ -23,6 +23,7 @@ import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDest
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
 import { getBossDisplayName, getBossPreviewInfo, getBossShortName, getWaveInfo } from './utils/boss_schedule_utils.js';
+import { buildCannonShots, shouldDigThisRound } from './utils/dig_loop_utils.js';
 import { getBossPreviewIconSrc } from './bitmap_icons.js';
 import {
     addModuleComponentToInventory,
@@ -458,8 +459,7 @@ export const game_system = {
 
         // 新局首个遗物也走 round-start resolver，避免再依赖固定入口。
         this.sys_queueRoundStartReward({ type: 'relic', source: 'run_start', round: this.round });
-        // 开局直接给一次杂色弹珠包，作为本局第一次研磨入口；精华奖励不再参与主循环。
-        this.sys_queueRoundStartReward({ type: 'marble_pack', packId: 'mixed', source: 'run_start', round: this.round });
+        // [REQ-20261022-wave-loop S1 · D1] 不再开局送弹珠包：resolver 结算完遗物后由 shouldDigThisRound 进入每波挖掘。
         this.sys_startRoundStartResolver();
     },
 
@@ -647,7 +647,13 @@ export const game_system = {
         this.pendingFusions = [];
 
         // ==================== [v2 局内商店 + 符文碎片经济] ====================
-        this.runFragments = 0;          // 局内当前持有符文碎片
+        // [REQ-20261022-wave-loop S1] runFragments 是 energy 的别名（core.js 访问器）
+        this.runFragments = 0;          // 局内能量（原符文碎片）
+        this.crystal = 0;               // 晶核
+        this.alchemyMagazine = [];      // 炼成弹匣
+        this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
+        this._digDoneRound = null;
+        this._digState = null;
         this.runShopInventory = [];     // 当前刷新结果
         this.runShopRefreshes = 0;      // 已刷新次数
         this._runShopOpenedRound = -1;  // 防止同回合重复打开
@@ -660,6 +666,7 @@ export const game_system = {
         this.runShopStarterBoostDamageAmount = 0;
         this.runShopStarterBoostDamageRounds = 0;
         this._runShopInventoryGeneratedForRound = 0;
+        if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
     },
 
     /**
@@ -1511,6 +1518,82 @@ export const game_system = {
         }
     },
 
+    /**
+     * @method sys_startDigPhase
+     * @description [REQ-20261022-wave-loop S1] 每波挖掘入口（§3 / §6）：采集弹珠 ×N（只挖能量）+ 炼成弹珠 ×1。
+     *   两批各发射一次，全部落定后由 phase_gathering_attemptComplete 进入战斗并记 _digDoneRound。
+     */
+    sys_startDigPhase() {
+        const digCfg = (CONFIG.gameplay && CONFIG.gameplay.dig) || {};
+        const collectorCount = Math.max(1, Math.floor(digCfg.collectorCount || 5));
+        const queue = [];
+        for (let i = 0; i < collectorCount; i++) {
+            const def = new MarbleDefinition('white');
+            def.role = 'collector';
+            queue.push(def);
+        }
+        const alchemyDef = new MarbleDefinition('white');
+        alchemyDef.role = 'alchemy';
+        queue.push(alchemyDef);
+
+        this.selectionMode = 'standard';
+        this.pendingSelectionMode = null;
+        this.fateMomentContext = null;
+        this.selectionInjectedRune = null;
+        this.replaceAmmoContext = null;
+        this._chargedAmmoQueue = null;
+        this.marbleQueue = queue;
+        this.marblesPool = queue.slice();
+        this.selectedMarbles = queue.map((_, idx) => idx);
+        this._digState = null; // phase_startGatheringPhase 按 marbleQueue 重建挖掘状态
+
+        if (typeof this.ui_hideRunShop === 'function') this.ui_hideRunShop();
+        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        if (typeof this.phase_startGatheringPhase === 'function') this.phase_startGatheringPhase();
+        if (typeof this.sys_showRoundStartBanner === 'function') {
+            this.sys_showRoundStartBanner({ enterCombat: false, protectCombat: false });
+        }
+    },
+
+    /**
+     * @method sys_canSwapAlchemyShot
+     * @description [REQ-20261022-wave-loop S1] 能否在当前时刻把下一发主炮换成炼成弹：
+     *   仅玩家战斗回合、非回合开始横幅期间、场上没有飞行中的子弹。
+     */
+    sys_canSwapAlchemyShot() {
+        if (this.phase !== 'combat' || this.gameOver || this.isPaused) return false;
+        if (this.isEnemyTurn || this._roundStartBannerActive) return false;
+        if ((this.projectiles || []).length > 0 || (this.burstQueue || []).length > 0) return false;
+        return Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0;
+    },
+
+    /**
+     * @method sys_swapNextShotWithAlchemy
+     * @description [REQ-20261022-wave-loop S1] 把下一发主炮替换为弹匣中第 i 发炼成弹（不额外占射击次数，§5.3）。
+     *   若下一发已经是炼成弹，则把它退回弹匣并恢复一发主炮（i 被忽略）。
+     * @param {number} i - alchemyMagazine 下标
+     * @returns {boolean} 是否发生替换
+     */
+    sys_swapNextShotWithAlchemy(i) {
+        if (!this.sys_canSwapAlchemyShot()) return false;
+        if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
+        const head = this.ammoQueue[0];
+        const cannonCfg = (CONFIG.gameplay && CONFIG.gameplay.cannon) || {};
+        const cannonDamage = (cannonCfg.damage || 10) + ((CONFIG.gameplay.baseDamage || 1) - 1);
+        if (head && head._shotKind === 'alchemy') {
+            this.alchemyMagazine.push(head);
+            this.ammoQueue[0] = buildCannonShots(1, cannonDamage, cannonCfg.bounce || 0)[0];
+        } else {
+            if (!Number.isInteger(i) || i < 0 || i >= this.alchemyMagazine.length) return false;
+            if (head && head._shotKind !== 'cannon') return false;
+            const [shot] = this.alchemyMagazine.splice(i, 1);
+            this.ammoQueue[0] = shot;
+        }
+        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
+        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
+        return true;
+    },
+
     sys_grantRunResourcePack(reward = {}) {
         const cfg = CONFIG.gameplay || {};
         const amount = Math.max(1, Math.floor(Number(reward.fragmentAmount || cfg.runResourcePackFragments || 48)));
@@ -1524,7 +1607,7 @@ export const game_system = {
             this.runRuneFragmentsGained = (this.runRuneFragmentsGained || 0) + amount;
         }
         if (typeof showToast === 'function') {
-            showToast(`资源包 +${amount} 局内碎片。你有一大笔钱，等着去商店消费。`);
+            showToast(`资源包 +${amount} ⚡ 能量`);
         }
         if (typeof this.ui_updateRunShopScheduleUI === 'function') this.ui_updateRunShopScheduleUI();
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
@@ -1774,6 +1857,8 @@ export const game_system = {
      *              否则重新计算（兼容未经预计算的敌人，如分身）。
      */
     sys_tryQueueEnemyRoundReward(enemy) {
+        // [REQ-20261022-wave-loop S1] 遗物只在开局与 Boss 击杀时获得（§5.5），普通敌人默认不再掉遗物线索。
+        if (!(CONFIG.gameplay && CONFIG.gameplay.enemyRelicDropsEnabled)) return null;
         if (!enemy || enemy.type === 'boss' || enemy._roundStartRewardQueued) return null;
         enemy._roundStartRewardQueued = true;
 
@@ -2010,9 +2095,9 @@ export const game_system = {
             const rewardLabel = rewardType === 'relic'
                 ? '遗物线索'
                 : rewardType === 'marble_pack'
-                    ? '杂色弹珠包'
+                    ? '能量补给'
                 : rewardType === 'run_resource_pack'
-                    ? '局内资源包'
+                    ? '能量补给'
                 : rewardType === 'pure_essence'
                     ? '纯净精华'
                     : '混沌精华';
@@ -2046,36 +2131,8 @@ export const game_system = {
                 return;
             }
 
-            if (rewardType === 'marble_pack') {
-                const startPackGrind = () => {
-                    this._roundStartResolverActive = false;
-                    eventBus.emit(EVENT_TYPES.ROUND_START_RESOLUTION_FINISHED, {
-                        round: this.round || 1,
-                        pendingCount: this.pendingRoundStartRewards.length,
-                        totalCount: totalRewards,
-                        resolvedCount: currentRewardIndex,
-                        currentRewardType: rewardType,
-                    });
-                    this._roundStartResolverTotalCount = 0;
-                    if (typeof this.sys_startMarblePackGrind === 'function') this.sys_startMarblePackGrind(reward);
-                };
-                if (reward.dropX !== undefined && reward.dropY !== undefined && typeof this.ui_playLootToCardAnimation === 'function') {
-                    if (this.fieldLootItems) {
-                        const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
-                        if (item) item.active = false;
-                    }
-                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, startPackGrind);
-                } else if (typeof this.ui_playLootToCardAnimation === 'function') {
-                    const x = (this.width || 400) / 2;
-                    const y = Math.max(90, (this.height || 700) * 0.34);
-                    this.ui_playLootToCardAnimation(x, y, rewardType, startPackGrind);
-                } else {
-                    startPackGrind();
-                }
-                return;
-            }
-
-            if (rewardType === 'run_resource_pack') {
+            // [REQ-20261022-wave-loop S1] 旧存档里的杂色弹珠包与局内资源包一样折算为能量（每波都挖，弹珠包下线）。
+            if (rewardType === 'run_resource_pack' || rewardType === 'marble_pack') {
                 const grantPack = () => {
                     if (typeof this.sys_grantRunResourcePack === 'function') this.sys_grantRunResourcePack(reward);
                     if (typeof this.sys_continueRoundStartResolver === 'function') this.sys_continueRoundStartResolver();
@@ -2093,11 +2150,11 @@ export const game_system = {
                         const item = this.fieldLootItems.find(i => i.id === reward.lootItemId);
                         if (item) item.active = false;
                     }
-                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, rewardType, grantPack);
+                    this.ui_playLootToCardAnimation(reward.dropX, reward.dropY, 'run_resource_pack', grantPack);
                 } else if (typeof this.ui_playLootToCardAnimation === 'function') {
                     const x = (this.width || 400) / 2;
                     const y = Math.max(90, (this.height || 700) * 0.34);
-                    this.ui_playLootToCardAnimation(x, y, rewardType, grantPack);
+                    this.ui_playLootToCardAnimation(x, y, 'run_resource_pack', grantPack);
                 } else {
                     grantPack();
                 }
@@ -2183,6 +2240,11 @@ export const game_system = {
         });
         // [tsk-f35c6d10] 队列为空时不再进入普通命运选择，改为显示回合开始提示后直接进入战斗阶段
         if (this.sys_maybeOfferRunShopBeforeRoundStart()) return;
+        // [REQ-20261022-wave-loop S1 · §3] 每波挖一次：普通波每回合挖；Boss 波只在 Boss 登场回合挖，Boss 存活的后续回合直接战斗。
+        if (shouldDigThisRound(this)) {
+            this.sys_startDigPhase();
+            return;
+        }
         this.sys_showRoundStartBanner();
     },
 
@@ -3080,6 +3142,13 @@ export const game_system = {
                 pendingFusions: (this.pendingFusions || []).map(f => ({ ...f })),
                 // 局内商店经济
                 runFragments: this.runFragments || 0,
+                // [REQ-20261022-wave-loop S1] 新循环资源与状态
+                loopVersion: 2,
+                energy: this.energy || 0,
+                crystal: this.crystal || 0,
+                alchemyMagazine: (this.alchemyMagazine || []).map(r => JSON.parse(JSON.stringify(r))),
+                cannonShotsPerTurn: this.cannonShotsPerTurn || 0,
+                _digDoneRound: Number.isFinite(this._digDoneRound) ? this._digDoneRound : null,
                 runShopInventory: this.runShopInventory ? JSON.parse(JSON.stringify(this.runShopInventory)) : [],
                 runShopRefreshes: this.runShopRefreshes || 0,
                 _runShopOpenedRound: this._runShopOpenedRound || -1,
@@ -3300,7 +3369,15 @@ export const game_system = {
                 }
             }
             this.pendingFusions = (state.pendingFusions || []).map(f => ({ ...f }));
-            this.runFragments = state.runFragments || 0;
+            // [REQ-20261022-wave-loop S1] 能量（旧存档的局内碎片直接并入能量）
+            this.energy = Math.max(0, Number(state.energy ?? state.runFragments ?? 0) || 0);
+            this.crystal = Math.max(0, Math.floor(Number(state.crystal) || 0));
+            this.alchemyMagazine = Array.isArray(state.alchemyMagazine)
+                ? state.alchemyMagazine.filter(Boolean).map(r => ({ ...r }))
+                : [];
+            this.cannonShotsPerTurn = Math.max(1, Math.floor(Number(state.cannonShotsPerTurn)
+                || (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2));
+            this._digDoneRound = Number.isFinite(state._digDoneRound) ? state._digDoneRound : null;
             this.runShopInventory = state.runShopInventory ? JSON.parse(JSON.stringify(state.runShopInventory)) : [];
             this.runShopRefreshes = state.runShopRefreshes || 0;
             this._runShopOpenedRound = state._runShopOpenedRound || -1;
@@ -3484,6 +3561,19 @@ export const game_system = {
             this.gatheringSessions = [];
             this.currentSession = null;
 
+            // [REQ-20261022-wave-loop S1] 旧循环存档（loopVersion < 2）迁移：丢弃替换弹药 / 充能弹药 / 待定选择 / 弹珠队列，
+            // 待结算奖励只保留遗物；弹珠包、资源包已在上方折算为能量。命运选择恢复分支保留（试炼场与测试仍依赖）。
+            if (!(Number(state.loopVersion) >= 2)) {
+                this.replaceAmmoContext = null;
+                this._chargedAmmoQueue = null;
+                this.pendingSelectionMode = null;
+                this.marbleQueue = [];
+                this.pendingRoundStartRewards = (this.pendingRoundStartRewards || []).filter(item => item && item.type === 'relic');
+                // 偏离说明：旧的命运选择上下文依赖已删除的弹珠队列，一并清空，让恢复走 round-start resolver → 挖掘。
+                this.fateMomentContext = null;
+                this.selectionMode = 'standard';
+            }
+
             // --- 恢复 pegs（通过 initPachinko 重建，然后覆盖 type/level/frozenTurns）---
             // 先初始化钉盘（生成正确数量的钉子）
             this.phase_gathering_initPachinko(false);
@@ -3506,6 +3596,7 @@ export const game_system = {
             // --- 更新 UI ---
             document.getElementById('round-num').innerText = this.round;
             this.sys_updateWaveHud();
+            if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
             this.ui_updateRuneCountDisplay();
             this.ui_updateMetaCurrency();
 

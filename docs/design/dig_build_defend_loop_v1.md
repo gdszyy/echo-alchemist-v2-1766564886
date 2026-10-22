@@ -341,6 +341,20 @@
 | D6 | 资源两种（能量 + 晶核） | 是 | 采纳 |
 | D7 | 移除「清屏反扑」和「低存活补行加极速」 | 是 | 采纳 |
 
+### S1 实现状态（2026-10-22，循环骨架，未提交待验收）
+
+| 决定 | S1 落地 | 锚点 |
+|---|---|---|
+| D1 每波都挖 | resolver 结算完奖励后 `shouldDigThisRound` → `sys_startDigPhase`；开局不再送弹珠包，商店弹珠包下架 | `src/utils/dig_loop_utils.js`、`src/game_system.js` `sys_startRoundStartResolver` / `sys_startDigPhase` |
+| D2 两次发射 | 采集 ×5（同一 x，只挖能量）+ 炼成弹珠 ×1；挖掘页右下角「采集 ×5 / 炼成弹珠」切换下一批 | `src/game_phase.js` `phase_gathering_launchMarbleBatch(pos, kind)` / `phase_gathering_attemptComplete` |
+| D3 技能 SP 下线 | 局内技能池恒空、技能充能 no-op、SP 面板与符文入口隐藏（试炼场保留，数据不删） | `src/combat_system.js` `combat_recomputeActiveSkills`、`src/ui/rune_launcher.js` `ui_openRuneLauncher` |
+| D4 Boss 血量按波次 | `floor(模板血量 × waveFixedMult 0.5)`，不读玩家 DPS | `src/spawn_system.js` `spawn_calculateBossHP` |
+| D6 两种资源 | 局内碎片并入能量（`runFragments` 为 `energy` 别名）；晶核仅 Boss 击杀 +3 | `src/core.js`、顶栏 `#resource-strip` |
+| D7 删惩罚规则 | 低存活极速、补行、清屏反扑、围墙清空抽奖 + 精英援军均删除 | `src/game_phase.js` `phase_finalizeRound` / `phase_inWallClearTrigger` |
+| §5.1 主炮 / §5.3 炼成弹 | 主炮每回合 2 发（伤害 10、反弹 2）；炼成弹 3 种 × 3 级、伤害 15×(2+级数)、弹匣 3；战斗中可把下一发主炮换成炼成弹 | `CONFIG.gameplay.cannon / alchemy / dig` |
+
+S1 未做（留 S2+）：整备阶段、主炮三轨与分支、设施、道具、挖矿升级、满匣替换单选卡（S1 满匣丢最旧）、桶倍率重抽（S1 恒 ×1）、真实盘面热条、晶脉。数值仍是夹具；**未做试玩，不声明好玩或平衡**。
+
 ---
 
 ## 13. 独立复核记录（v1 → v1.1）

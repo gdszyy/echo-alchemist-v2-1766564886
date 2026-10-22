@@ -18,7 +18,7 @@ graph TD
 
 ## 0. 波次循环 (Wave Cycle，2026-10-22 起)
 参考 Dome Keeper 的「挖 → 守」节奏：**每回合 = 1 波**；界面上研磨（钉板）阶段标为「挖掘」、战斗阶段标为「守卫」。
-- **现状注意**：钉板目前只在开局与购买「杂色弹珠包」时进入，普通回合由横幅直接进战斗；「每回合都挖」属于待定的核心循环重设计（`docs/design/dig_build_defend_loop_v1.md`），尚未实现。
+- **每波都挖（S1 已实现，2026-10-22）**：按 `docs/design/dig_build_defend_loop_v1.md` §3，每个普通波开局先挖一次（采集弹珠 ×5 只挖能量 + 炼成弹珠 ×1 炼成 1 发炼成弹入弹匣），再进入战斗；Boss 波只在 Boss 登场回合挖一次，Boss 存活的后续回合由横幅直接进战斗（拖 Boss 不能刷挖矿）。判定：`shouldDigThisRound()`（`src/utils/dig_loop_utils.js`）。战斗用主炮（每回合 2 发，无限弹药），可把下一发换成弹匣里的炼成弹。弹珠包、命运选择、技能 SP、局内符文入口已下线。回归：`node tests/validate_dig_loop_s1.mjs`。
 - 一个循环 = 3 个普通波 + 1 个 Boss 波（`CONFIG.balance.waveCycle.normalWavesPerBoss`）；首个 Boss 波在 Round 4。
 - Boss 波持续到 Boss 被击杀；击杀于第 K 回合 → 下一个 Boss 波在 Round K+4。
 - 钉板阶段不设实时倒计时（用户已确认）；进入钉板阶段时左下角显示本波「来袭 N · 精英 M / Boss 来袭」。发射次数预算属于待定重设计。

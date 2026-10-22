@@ -9,6 +9,14 @@ globs: ["src/game_phase.js"]
 - 阶段流转由 `game_phase.js` 统一管理。
 - 严禁跨阶段直接调用生命周期方法，必须通过标准状态机接口切换。
 
+### 1.1 现行主循环：挖 → 守（REQ-20261022-wave-loop S1，2026-10-22 起，覆盖下文与之冲突的旧描述）
+- **每波挖一次**：resolver 清空奖励后调用 `shouldDigThisRound(this)`（`src/utils/dig_loop_utils.js`）：`_digDoneRound === round` 不挖；Boss 存活且不是本回合登场（`_lastBossSpawnRound !== round`）不挖；否则 `sys_startDigPhase()` 进入 `gathering`。不挖的回合走 `sys_showRoundStartBanner()` → `combat`。
+- **挖掘（gathering）**：`marbleQueue` = `collectorCount`（默认 5）颗 `role:'collector'` + 1 颗 `role:'alchemy'`（同为 `white`）。`_digState = { launched, selectedKind, completed }`；`#dig-launch-toggle`（「采集 ×5 / 炼成弹珠」）只切换下一次点击钉板发射哪一批，`phase_gathering_launchMarbleBatch(pos, kind)` 追加会话、每批只发一次。采集弹珠不触发钉子同化、不拾取属性，能量球到达时 `energy += energyPerPegHit × 桶倍率(S1 恒 1)`；炼成弹珠落定后 `capAlchemyCollection`（3 种 × 3 级）→ 编译 → `damage = alchemyDamage(总级数)`，`_shotKind:'alchemy'` 入 `alchemyMagazine`（上限 3，S1 满匣丢最旧）；空集合提示「空瓶」不入匣。两批都发射且全部落定才记 `_digDoneRound` 并进入战斗。钉板遗物槽改为给能量。
+- **战斗（combat）**：`phase_startCombatPhase()` 用 `buildCannonShots(cannonShotsPerTurn, cannon.damage + baseDamage − 1, cannon.bounce)` 重建 `ammoQueue`（`multicast:0`），不再从弹珠编译子弹；`sys_swapNextShotWithAlchemy(i)`（仅玩家回合、非横幅、无飞行子弹）把下一发主炮换成炼成弹，再点一次换回。
+- **结算**：`phase_finalizeRound()` 已删除「低存活加极速」「≤5 存活补行 + 空列极速」「清屏反扑」；清屏后首行仍生成在围墙内。`phase_inWallClearTrigger()` 只把未发射炼成弹退回弹匣并作废剩余主炮，不抽奖、不刷精英援军；完美清场蓄能升级不在局内设置 `_carryOverAmmo` / `nextRoundHpMultiplier`。
+- **奖励**：遗物只在开局与 Boss 击杀（`boss:defeated` → 晶核 +3 + 排一次 `relic` / `boss_kill`）时获得；普通敌人遗物掉落由 `CONFIG.gameplay.enemyRelicDropsEnabled`（默认 false）关闭；旧存档 `marble_pack` / `run_resource_pack` 在 resolver 中折算为能量。Boss 血量 = `floor(模板血量 × bossHpFormula.waveFixedMult)`。
+- **下线（数据保留）**：技能 4 槽 + SP（局内技能池恒空、技能充能 no-op，试炼场保留）、局内符文发射器入口、商店弹珠包 / 技能 / 符文商品、0/15 命中充能与多重施法、连射槽。命运选择 / 替换弹药分支代码保留给试炼场与读档测试，主循环不再进入。
+
 ## 2. 各阶段职责与出入口条件
 
 ### 2.0 研磨阶段点击发射规范（防坑）

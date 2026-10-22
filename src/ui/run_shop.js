@@ -1,7 +1,8 @@
 /**
  * run_shop.js - [v2] 局内商店
  *
- * 玩家用局内累计的符文碎片 (game.runFragments) 购买：
+ * 玩家用局内能量 (game.energy；game.runFragments 为其别名，见 core.js) 购买：
+ * [REQ-20261022-wave-loop S1] 杂色弹珠包、主动技能、单个符文已下架（每波都挖 / 技能 SP 下线 / 纵切片不接符文）。
  *   - 钉盘组件（购买单个可拆装的组件实例）
  *   - 单个符文（按稀有度定价）
  *   - 模块槽位扩张（一次性 +1）
@@ -17,16 +18,8 @@
  *   - 局结束时未消费的 runFragments 按比例转换为 saveData.runeFragments
  */
 
-import { CONFIG, SKILL_DB } from '../config.js';
-import { RUNE_DB } from '../rune_config.js';
+import { CONFIG } from '../config.js';
 import { MODULE_DEFS, addModuleComponentToInventory, getModuleMetaSummary } from '../pinboard_modules.js';
-
-const RUNE_PRICE_BY_RARITY = {
-    common: 18,
-    rare: 40,
-    epic: 80,
-    legendary: 140,
-};
 
 const SLOT_EXPAND_PRICE = 100;
 
@@ -34,9 +27,9 @@ const SLOT_EXPAND_PRICE = 100;
 const SLOT_UNLOCK_PRICE = 60;
 const SLOT_COUNT_PRICE = 50;
 const STARTER_BOOST_ID = 'starter_aid_bundle';
+// [REQ-20261022-wave-loop S1] 连射槽随「多重施法」一起删除，不再出售。
 const SLOT_TYPE_META = {
     recall:    { name: '解鎖回溯槽',  icon: '⏳', desc: '加入「回溯」特殊槽到鑒池。' },
-    multicast: { name: '解鎖連射槽',  icon: '♊', desc: '加入「連射」特殊槽到鑒池。' },
     split:     { name: '解鎖分裂槽',  icon: '☢️', desc: '加入「分裂」特殊槽到鑒池。' },
 };
 
@@ -85,22 +78,9 @@ function createStarterBoostItem() {
         boostId: STARTER_BOOST_ID,
         name: '商人应急包',
         icon: '✦',
-        desc: `免费：获得 ${shield} 层护盾、基础伤害 +${damage}（${damageRounds} 回合），并补给 ${fragments} 局内碎片。`,
+        desc: `免费：获得 ${shield} 层护盾、基础伤害 +${damage}（${damageRounds} 回合），并补给 ${fragments} 能量。`,
         price: 0,
         rarity: 'rare',
-    };
-}
-
-function createMixedMarblePackItem() {
-    const cfg = CONFIG.gameplay || {};
-    return {
-        kind: 'marble_pack',
-        packId: 'mixed',
-        name: '杂色弹珠包',
-        icon: '🔮',
-        desc: '购买后立即开启 3 枚随机弹珠并进入研磨结算；不触发命运选择。',
-        price: cfg.runShopMixedMarblePackPrice || 18,
-        rarity: 'common',
     };
 }
 
@@ -109,7 +89,7 @@ function createMixedMarblePackItem() {
  */
 function generateInventory(game, count) {
     const cfg = CONFIG.gameplay || {};
-    const items = [createMixedMarblePackItem()];
+    const items = [];
 
     // 1. 构筑组件：购买得到的是单个组件实例，不是无限使用的模板解锁。
     const modulePool = Object.values(MODULE_DEFS).filter(d => d.price > 0 && !d.isAttrPin);
@@ -129,21 +109,7 @@ function generateInventory(game, count) {
         addModuleItem(forceShowcase && Math.random() < MODULE_SHOWCASE_PRIORITY);
     }
 
-    // 1.5 [技能来源扩展] 主动技能商品：出售 source:'shop' 的技能，每局每个技能仅售一次。
-    const purchasedSkillSet = new Set(game.purchasedSkillIds || []);
-    const skillPool = (SKILL_DB || []).filter(s => s && s.source === 'shop' && !purchasedSkillSet.has(s.id));
-    const skillItem = takeRandom(skillPool);
-    if (skillItem && items.length < count) {
-        items.push({
-            kind: 'skill_unlock',
-            skillId: skillItem.id,
-            name: skillItem.name,
-            icon: skillItem.icon,
-            desc: `${skillItem.desc}（释放需消耗 ${skillItem.cost} SP）`,
-            price: skillItem.shopPrice || 80,
-            rarity: 'epic',
-        });
-    }
+    // 1.5 [REQ-20261022-wave-loop S1] 主动技能商品已下架（技能 4 槽 + SP 下线，D3）。
 
     // 2. 结构扩展：槽位扩张 / 特殊槽解锁 / 特殊槽数量，三者最多出现一个。
     const totalSlots = (cfg.moduleCols || 4) * (cfg.moduleRows || 3);
@@ -164,13 +130,7 @@ function generateInventory(game, count) {
     const utility = takeRandom(utilityItems);
     if (utility && items.length < count) items.push(utility);
 
-    // 3. 符文商品：保底至少一个，其余按缺口补齐到目标数量。
-    const allRunes = (RUNE_DB || []).filter(r => r && r.id);
-    while (items.length < count && allRunes.length > 0) {
-        const r = allRunes[Math.floor(Math.random() * allRunes.length)];
-        const price = RUNE_PRICE_BY_RARITY[r.rarity] || 25;
-        items.push({ kind: 'rune', runeId: r.id, name: r.name || r.id, icon: r.icon || '🔮', desc: r.desc || `${r.element} 符文`, price, rarity: r.rarity });
-    }
+    // 3. [REQ-20261022-wave-loop S1] 符文商品已下架（纵切片不接符文，§5.1）；空位由钉盘组件补齐。
     while (items.length < count && addModuleItem()) {}
 
     return items;
@@ -214,7 +174,7 @@ function applyStarterBoost(game) {
     game.runFragments = (game.runFragments || 0) + fragments;
     game.runShopStarterBoostClaimed = true;
     if (window.showToast) {
-        window.showToast(`首访援助：防线屏障 +${shield} / 伤害 +${damage}（${damageRounds} 回合） / 碎片 +${fragments}`);
+        window.showToast(`首访援助：防线屏障 +${shield} / 伤害 +${damage}（${damageRounds} 回合） / 能量 +${fragments}`);
     }
 }
 
@@ -282,7 +242,7 @@ export const run_shop = {
                 <div style="font-size:18px;font-weight:bold;color:#c084fc;margin-bottom:6px;">局内商人</div>
                 <div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:12px;">${reasonText}</div>
                 <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-bottom:14px;">
-                    <span>持有 <b style="color:#fbbf24;">${fragments} 🔮</b></span>
+                    <span>持有 <b style="color:#fbbf24;">${fragments} ⚡</b></span>
                     <span>可购买 <b style="color:${affordableCount > 0 ? '#86efac' : '#f87171'};">${affordableCount}</b> 件</span>
                 </div>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -348,7 +308,7 @@ export const run_shop = {
                 it.rarity === 'epic' ? '#a855f7' :
                     it.rarity === 'rare' ? '#3b82f6' : '#94a3b8';
             const metaHtml = it.meta ? `<div style="font-size:9px;color:${rarityColor};line-height:1.35;text-transform:uppercase;">${it.meta}</div>` : '';
-            const priceLabel = (it.price || 0) <= 0 ? '免费' : `${it.price} 🔮`;
+            const priceLabel = (it.price || 0) <= 0 ? '免费' : `${it.price} ⚡`;
             return `<div data-item-idx="${i}" class="run-shop-item" style="cursor:${cursor};opacity:${opacity};background:rgba(30, 41, 59, 0.7);border:1px solid ${rarityColor};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:all 0.15s;">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <div style="font-size:22px;">${it.icon}</div>
@@ -364,13 +324,13 @@ export const run_shop = {
             <div style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 12px; padding: 18px; max-width: 760px; width: 100%; max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 14px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(168, 85, 247, 0.3);padding-bottom:10px;">
                     <div style="font-size:18px;font-weight:bold;color:#c084fc;">局内商店</div>
-                    <div style="font-size:13px;">持有: <span style="color:#fbbf24;font-weight:bold;">${fragments} 🔮</span></div>
+                    <div style="font-size:13px;">持有: <span style="color:#fbbf24;font-weight:bold;">${fragments} ⚡</span></div>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:10px;">
                     ${itemsHtml || '<div style="color:#64748b;font-size:12px;">商店为空</div>'}
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(168, 85, 247, 0.3);padding-top:10px;">
-                    <button id="run-shop-refresh-btn" style="padding:6px 12px;background:rgba(56, 189, 248, 0.4);color:#fff;border:1px solid rgba(56, 189, 248, 0.7);border-radius:6px;cursor:pointer;font-size:12px;">刷新 (${refreshCost} 🔮)</button>
+                    <button id="run-shop-refresh-btn" style="padding:6px 12px;background:rgba(56, 189, 248, 0.4);color:#fff;border:1px solid rgba(56, 189, 248, 0.7);border-radius:6px;cursor:pointer;font-size:12px;">刷新 (${refreshCost} ⚡)</button>
                     <button id="run-shop-close-btn" style="padding:8px 18px;background:rgba(34, 197, 94, 0.55);color:#fff;border:1px solid rgba(34, 197, 94, 0.8);border-radius:6px;cursor:pointer;font-weight:bold;">离开商店</button>
                 </div>
             </div>
@@ -386,7 +346,7 @@ export const run_shop = {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
                 if ((this.runFragments || 0) < refreshCost) {
-                    if (window.showToast) window.showToast('碎片不足');
+                    if (window.showToast) window.showToast('能量不足');
                     return;
                 }
                 this.runFragments -= refreshCost;
@@ -415,7 +375,7 @@ export const run_shop = {
         const it = inventory[idx];
         if (!it) return;
         if ((this.runFragments || 0) < it.price) {
-            if (window.showToast) window.showToast('碎片不足');
+            if (window.showToast) window.showToast('能量不足');
             return;
         }
         const cfg = CONFIG.gameplay || {};
@@ -442,25 +402,19 @@ export const run_shop = {
             if (!Array.isArray(this.runeInventory)) this.runeInventory = [];
             this.runeInventory.push({ id: it.runeId, level: 1 });
             if (window.showToast) window.showToast(`获得符文: ${it.name}`);
-        } else if (it.kind === 'skill_unlock') {
-            // [技能来源扩展] 购买主动技能：写入 purchasedSkillIds 并重算技能并集
-            if (!Array.isArray(this.purchasedSkillIds)) this.purchasedSkillIds = [];
-            if (!this.purchasedSkillIds.includes(it.skillId)) this.purchasedSkillIds.push(it.skillId);
-            if (typeof this.combat_recomputeActiveSkills === 'function') this.combat_recomputeActiveSkills();
-            if (window.showToast) window.showToast(`习得技能: ${it.name}`);
-        } else if (it.kind === 'marble_pack') {
-            this.runFragments -= it.price;
+        } else if (it.kind === 'marble_pack' || it.kind === 'skill_unlock') {
+            // [REQ-20261022-wave-loop S1] 旧存档货架里的弹珠包 / 技能已下架：移除且不扣能量
             inventory.splice(idx, 1);
+            if (window.showToast) window.showToast('该商品已下架');
             if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-            if (typeof this.sys_startMarblePackGrind === 'function') {
-                this.sys_startMarblePackGrind({ packId: it.packId || 'mixed', source: 'run_shop_purchase', round: this.round || 1 });
-            }
+            this.ui_renderRunShop();
             return;
         }
         this.runFragments -= it.price;
         // 售出后从商店列表移除
         inventory.splice(idx, 1);
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
+        if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
         this.ui_renderRunShop();
     },
 

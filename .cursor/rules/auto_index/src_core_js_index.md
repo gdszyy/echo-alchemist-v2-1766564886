@@ -1,6 +1,6 @@
 # src\core.js 函数索引
 
-> 自动生成于 2026-10-22 | 总行数: 586 | 函数数: 7 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 606 | 函数数: 9 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -17,6 +17,8 @@
 | constructor | method | `constructor()` | ⚠️ 巨型函数，见 @section 导航 |
 | _setupEventListeners | method | `_setupEventListeners()` |  |
 | destroy | method | `destroy()` |  |
+| get | method | `get()` |  |
+| set | method | `set(value)` |  |
 | getMusic | function | `getMusic()` |  |
 
 ## 巨型函数内部节点 (@section 标记)

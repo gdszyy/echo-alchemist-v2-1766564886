@@ -8,6 +8,7 @@ import {
     rotateTowards, adjustColorBrightness, lerpColor, lerp, hexToRgba 
 } from './entities.js';
 import { getThemeSegment } from './utils/math_utils.js';
+import { getDigBucketMultiplier } from './utils/dig_loop_utils.js';
 import { UIManager, TrainingGround, TruthBook, TRUTH_BOOK_DATA } from './systems.js';
 import { audio } from './audio.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
@@ -1126,8 +1127,9 @@ export const spawn_system = {
         }
         if (typeof this.spawn_createFloatingText === 'function') {
             const fontSize = isResourcePack ? 20 : (isBoss ? 18 : (isElite ? 15 : 13));
-            this.spawn_createFloatingText(x, y - 22, `+${count} 🔮`, sparkColor, fontSize);
+            this.spawn_createFloatingText(x, y - 22, `+${count} ⚡`, sparkColor, fontSize);
         }
+        if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
     },
 
 /**
@@ -2308,8 +2310,15 @@ export const spawn_system = {
         const panelTarget = targetPanel && typeof this.ui_getCanvasPointForElement === 'function'
             ? this.ui_getCanvasPointForElement(targetPanel)
             : null;
-        let targetX = panelTarget ? panelTarget.x : this.uiCache.x;
-        let targetY = panelTarget ? panelTarget.y : this.uiCache.y;
+        // [REQ-20261022-wave-loop S1] 采集弹珠的能量球飞向顶栏能量胶囊
+        const energyPill = chargeSession && chargeSession.role === 'collector'
+            ? document.getElementById('energy-pill')
+            : null;
+        const energyTarget = energyPill && typeof this.ui_getCanvasPointForElement === 'function'
+            ? this.ui_getCanvasPointForElement(energyPill)
+            : null;
+        let targetX = energyTarget ? energyTarget.x : (panelTarget ? panelTarget.x : this.uiCache.x);
+        let targetY = energyTarget ? energyTarget.y : (panelTarget ? panelTarget.y : this.uiCache.y);
 
         // [核心修复]：兜底检测
         // 如果缓存坐标是 0 (说明上次获取时 UI 可能被隐藏了)，强制重算
@@ -2368,47 +2377,17 @@ export const spawn_system = {
         delete orbOptions.secondary;
 
         this.energyOrbs.push(new EnergyOrb(x, y, targetX, targetY, color, initVel, () => {
-            if(chargeSession) { 
-                chargeSession.currentHits++;
-                chargeSession.totalHits++; 
-                
-                // [已移除] runCurrency 累积：符文碎片改为合成时直接获取，不再通过局内货币结算
-                
-                // 音效
-                const progress = Math.min(1, chargeSession.currentHits / chargeSession.nextTriggerThreshold);
-                if (chargeSession.currentHits < chargeSession.nextTriggerThreshold) {
-                    // @section:energy_orb_collect_audio - 能量球收集进度音效（500~750Hz 随进度升调，营造蓄力感）
-                if (Math.random() < 0.5) audio.playTone(500 * (1.0 + progress * 0.5), 'triangle', 0.05, 0.2); 
+            // [REQ-20261022-wave-loop S1] 采集弹珠碰钉 → 能量；旧「0/15 命中充能 → 多重施法升级」已删除（§5.1）。
+            if (chargeSession && chargeSession.role === 'collector' && !options.secondary) {
+                const digCfg = (CONFIG.gameplay && CONFIG.gameplay.dig) || {};
+                const gain = Math.max(0, Math.round((digCfg.energyPerPegHit ?? 1) * getDigBucketMultiplier(this, x)));
+                if (gain > 0) {
+                    this.energy = (this.energy || 0) + gain;
+                    if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud({ pulse: true });
                 }
-
-                // 更新 UI
-                this.combat_updateHitProgress(chargeSession.currentHits, chargeSession.nextTriggerThreshold); 
-                
-                const pulseLayer = this.uiCache.pulseLayer; // 使用缓存 DOM
-                if (pulseLayer) {
-                    pulseLayer.style.setProperty('--pulse-color', color);
-                    if (!pulseLayer.classList.contains('pulse-active')) {
-                        pulseLayer.classList.add('pulse-active');
-                        setTimeout(() => pulseLayer.classList.remove('pulse-active'), 700);
-                    }
-                }
-
-                // 震动节流
-                const now = Date.now();
-                if (this.uiCache.el && (!this.lastUiShakeTime || now - this.lastUiShakeTime > 100)) {
-                    this.lastUiShakeTime = now;
-                    const panel = Number.isInteger(chargeSession.marbleIndex)
-                        ? document.querySelector(`.gathering-ammo-panel[data-marble-index="${chargeSession.marbleIndex}"]`)
-                        : null;
-                    const el = panel || this.uiCache.el;
-                    const pulseClass = panel ? 'is-charge-pulse' : 'gauge-shake';
-                    el.classList.remove(pulseClass);
-                    void el.offsetWidth;
-                    el.classList.add(pulseClass);
-                    clearTimeout(el._chargePulseTimer);
-                    el._chargePulseTimer = setTimeout(() => el.classList.remove(pulseClass), panel ? 260 : 240);
-                }
-                
+                if (Math.random() < 0.5) audio.playTone(520, 'triangle', 0.05, 0.2);
+            }
+            if (chargeSession) {
                 // 粒子
                 for(let i=0; i<3; i++) {
                     const p = new Particle(targetX, targetY, color, 'spark');
@@ -2416,10 +2395,6 @@ export const spawn_system = {
                     // [限制] 收集粒子受全局粒子上限约束
                     this.spawn_pushParticleWithLimit(p);
                 }
-
-                if (chargeSession.currentHits >= chargeSession.nextTriggerThreshold) {
-                    this.spawn_triggerLevelUpEvent(targetX, targetY, chargeSession); 
-                } 
             }
             this.phase_gathering_attemptComplete();
         }, orbOptions));
@@ -2570,87 +2545,27 @@ export const spawn_system = {
      * @method spawn_calculateBossHP
      * @description 计算 Boss 血量。
      *
-     * 后期公式: BossHP = (templateHP * 0.5) + (recentDPS * expectedKillRounds * 0.5)
-     * 前期公式: BossHP = (templateHP * 0.15) + (recentDPS * expectedKillRounds * 0.85)
-     * 保底: Math.max(BossHP, templateHP * floorMultiplier)
-     *
-     * 前期保护机制（Early-Game Protection）:
-     * - 在 [earlyRound, lateRound] 区间内，动态权重和保底倍率均进行线性插展
-     * - 前期高动态权重：血量更贴近玩家实时战力，避免模板血量过高卡死新手
-     * - 前期低保底倍率：降低保底下限，使血量更自由地跟随玩家战力浮动
-     *
-     * Boss 倍率梯度调整（Mult Gradient）:
-     * - 在 [earlyRound, lateRound] 前期区间，根据玩家实时战力与模板预期的比値动态缩放 bossMult
-     * - 当玩家战力偏弱时，前期模板血量自动降低，避免前几个 Boss 血量就已远超玩家战力
-     * - 缩放上限为 1.0（不超过原倍率），下限为 bossMultGradientMin（默认 0.5）
+     * [REQ-20261022-wave-loop S1 · D4] Boss 血量按波次固定，不再随玩家 DPS 涨（DPS 跟随等于惩罚投资）：
+     *   BossHP = floor(templateHP × waveFixedMult)
+     *   templateHP = (enemyBaseHp + r × enemyHpPerRound) × hpExponent^max(0, r−5) × (bigBossMult | miniBossMult)
+     * 旧的动态 DPS 权重 / 前期保护 / 倍率梯度均已移除（注意旧代码 `f.dynamicWeight || 0.5`，仅把权重设 0 无法关闭）。
      *
      * @param {boolean} isBigBoss - 是否为大 Boss
      * @returns {number} 最终 Boss 血量
      */
     spawn_calculateBossHP(isBigBoss) {
         const b = CONFIG.balance;
-        const f = b.bossHpFormula;
+        const f = b.bossHpFormula || {};
         // [爽游模式] 新手教程局：始终按第 10 回合强度计算 Boss 血量
         const r = this._isTutorialRun ? 10 : this.round;
 
-        // 1. 计算基础模板血量（使用原始 bossMult，后续梯度调整）
         const hpExponent = b.hpExponent || 1.12;
         const exponentialFactor = Math.pow(hpExponent, Math.max(0, r - 5));
         const rawBossMult = isBigBoss ? f.bigBossMult : f.miniBossMult;
         const templateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * rawBossMult;
+        const waveFixedMult = Number.isFinite(f.waveFixedMult) ? f.waveFixedMult : 0.5;
 
-        // 2. 获取玩家战力：使用近3回合滑动平均，无历史时回落到实时期望伤害
-        const recentDPS = this.calc_getRecentAverageDamage(3);
-        const currentDPS = this.combat_calculatePlayerExpectedDamage();
-        const effectiveDPS = recentDPS > 0 ? recentDPS : currentDPS;
-
-        // 3. 计算动态血量
-        const expectedTurns = isBigBoss ? f.bigBossKillRounds : f.miniBossKillRounds;
-        const dynamicHP = effectiveDPS * expectedTurns;
-
-        // 4. 前期保护：根据回合数对动态权重和保底倍率进行线性插展
-        const earlyRound = f.earlyRound || 5;
-        const lateRound  = f.lateRound  || 20;
-        // t = 0 表示完全前期，t = 1 表示完全后期
-        const t = Math.max(0, Math.min(1, (r - earlyRound) / (lateRound - earlyRound)));
-
-        const earlyDynW  = f.earlyDynamicWeight  || 0.85;
-        const lateDynW   = f.dynamicWeight        || 0.5;
-        const earlyFloor = f.earlyFloorMultiplier || 0.45;
-        const lateFloor  = f.floorMultiplier       || 0.7;
-
-        // 线性插展得到当前回合的实际权重
-        const effectiveDynW   = earlyDynW  + (lateDynW  - earlyDynW)  * t;
-        const effectiveTplW   = 1 - effectiveDynW;
-        const effectiveFloor  = earlyFloor + (lateFloor - earlyFloor)  * t;
-
-        // 5. Boss 倍率梯度调整（Mult Gradient）
-        //    前期区间（t < 1）根据玩家实时战力与模板预期的比値，动态缩放 bossMult
-        //    比値 ratio = effectiveDPS / (templateHP / rawBossMult)
-        //      ratio 越小表示玩家远弱于模板预期，应降低 bossMult
-        //      ratio 越大表示玩家超过预期，不超过原始倍率
-        //    后期（t = 1）完全使用原始 rawBossMult，不做梯度调整
-        let effectiveBossMult = rawBossMult;
-        if (t < 1 && effectiveDPS > 0) {
-            // 模板单位血量：去掉 bossMult 后的每单位血量（即普通指数线性血量）
-            const unitHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor;
-            // 玩家战力对应的「应当能打多少倍率的 Boss」
-            const playerImpliedMult = (effectiveDPS * expectedTurns) / unitHP;
-            // 将比値限制在 [gradientMin, 1.0] 区间，再与 rawBossMult 相乘
-            const gradientMin = f.bossMultGradientMin || 0.5;
-            const multRatio = Math.max(gradientMin, Math.min(1.0, playerImpliedMult / rawBossMult));
-            // 前期梯度与后期原始倍率线性插展
-            effectiveBossMult = rawBossMult * (multRatio + (1.0 - multRatio) * t);
-        }
-
-        // 用梯度调整后的 effectiveBossMult 重新计算模板血量
-        const adjustedTemplateHP = (b.enemyBaseHp + r * b.enemyHpPerRound) * exponentialFactor * effectiveBossMult;
-
-        // 6. 混合计算 + 保底
-        const mixedHP = (adjustedTemplateHP * effectiveTplW) + (dynamicHP * effectiveDynW);
-        const finalHP = Math.max(adjustedTemplateHP * effectiveFloor, mixedHP);
-
-        return Math.floor(finalHP);
+        return Math.max(1, Math.floor(templateHP * waveFixedMult));
     },
 
     /**

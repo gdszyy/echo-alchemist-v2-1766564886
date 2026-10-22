@@ -648,6 +648,9 @@ const CONFIG = {
 
         /** Boss 血量公式参数 */
         bossHpFormula: {
+            // [REQ-20261022-wave-loop S1 · D4] Boss 血量按波次固定：floor(模板血量 × waveFixedMult)，
+            // 不再随玩家 DPS 涨。下方 dynamic/early/gradient 参数仅为历史保留，spawn_calculateBossHP 已不读取。
+            waveFixedMult: 0.5,
             templateWeight: 0.4,         // 模板血量权重（降低算式系数）
             dynamicWeight: 0.6,          // 动态血量权重（增加每回合伤害占比）
             miniBossKillRounds: 2.5,     // Mini-Boss 期望击杀回合数
@@ -926,6 +929,25 @@ const CONFIG = {
 	        initWindPegs: 0,
 	        initSwordPegs: 0,
 	        baseDamage: 1,
+        // ==================== [REQ-20261022-wave-loop S1] 挖 → 守 循环（数值为夹具，待调参）====================
+        // 伤害单位与 recipe.damage 1:1（每次命中扣 HP）；主炮单发 = cannon.damage + (baseDamage - 1)，发射时另加 flatDamageBonus。
+        dig: {
+            collectorCount: 5,      // 每次挖掘的采集弹珠数（同一 x 一批发射）
+            energyPerPegHit: 1,     // 采集弹珠每次碰钉（能量球到达）获得的能量
+            relicSlotEnergy: 20,    // 钉板遗物槽改为给能量（遗物只在开局与 Boss 击杀时获得）
+        },
+        cannon: {
+            shotsPerTurn: 2,        // 主炮每个战斗回合的射击次数（无限弹药，限射速）
+            damage: 10,             // 主炮单发基础伤害
+            bounce: 2,              // 主炮基础反弹次数
+        },
+        alchemy: {
+            base: 15,               // 炼成弹伤害 = base × (2 + 属性总级数)，炼成时锁定
+            maxTypes: 3,            // 炼成弹最多 3 种属性
+            maxLevel: 3,            // 每种属性最多 3 级
+            magazineCap: 3,         // 炼成弹匣上限（S1：满匣丢弃最旧一发）
+        },
+        enemyRelicDropsEnabled: false, // [S1] 普通敌人不再掉遗物线索（遗物只在开局与 Boss 击杀时获得）
         potionAlchemyFailRefundRatio: 0.35,
         greedyWheelChance: 0.75,
         greedyWheelIntervalFrames: 24,
@@ -1000,8 +1022,7 @@ const CONFIG = {
         runShopRefreshCost: 10,        // 刷新一次商店消耗碎片
         runShopItemsPerOffer: 5,       // 每次刷新提供的商品数
         runShopRunesRatio: 0.6,        // 商品中符文占比
-        runShopMixedMarblePackPrice: 18, // 杂色弹珠包：购买后立即进入 3 弹珠研磨
-        runResourcePackFragments: 48,  // 旧存档兜底资源包：仅兼容旧奖励，不作为新主循环入口
+        runResourcePackFragments: 48,  // 旧存档兜底资源包：仅兼容旧奖励，S1 起折算为能量
         runShopEndOfRunFragmentSettle: 0.3, // 局结束时未消费碎片转换为 saveData 的比例
         enemyDropFragmentChance: 0.30, // 普通敌人击杀掉落碎片基础概率
         enemyDropFragmentBaseAmount: 1,
@@ -1753,6 +1774,7 @@ const RELIC_DB = [
         desc: '每次命运抉择可刷新一次弹珠候选。刷新会清空当前已选弹珠。',
         rarity: 'rare',
         effect: 'selection_reroll',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         maxStacks: 1,
         recommended: true,
         tags: ['选择优化', '弹珠刷新'],
@@ -1780,6 +1802,7 @@ const RELIC_DB = [
         desc: '解锁主动技能【引力坍缩】：消耗 SP 将所有敌人拉离防线并造成伤害。',
         rarity: 'epic',
         effect: 'unlock_skill',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         skillId: 'skill_gravity_well',
         maxStacks: 1,
         tags: ['主动技能', '控场'],
@@ -1792,6 +1815,7 @@ const RELIC_DB = [
         desc: '解锁主动技能【时滞冻结】：消耗 SP 冻结全场并返还 1 点 SP。',
         rarity: 'legendary',
         effect: 'unlock_skill',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         skillId: 'skill_chrono_freeze',
         maxStacks: 1,
         tags: ['主动技能', '控场'],
@@ -1804,6 +1828,7 @@ const RELIC_DB = [
         desc: '解锁主动技能【不死鸟祝福】：消耗 SP 获得防线屏障并灼烧全场。',
         rarity: 'epic',
         effect: 'unlock_skill',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         skillId: 'skill_phoenix_blessing',
         maxStacks: 1,
         tags: ['主动技能', '防线'],
@@ -1816,6 +1841,7 @@ const RELIC_DB = [
         desc: '解锁炼金台的药剂炼成。消耗符文调制一次性药剂法术；药剂不消耗 SP、无冷却，只消耗装药量。',
         rarity: 'legendary',
         effect: 'unlock_potion_alchemy',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         maxStacks: 1,
         tags: ['药剂炼成', '符文转化'],
         recommendTip: '把多余符文炼成不耗 SP 的备用法术，适合把失配符文转化为临场解法。'
@@ -1829,6 +1855,7 @@ const RELIC_DB = [
         desc: '立即获得 2 个随机普通符文。',
         rarity: 'common',
         effect: 'grant_runes',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         grantRarity: 'common',
         grantCount: 2,
         maxStacks: 3,
@@ -1843,6 +1870,7 @@ const RELIC_DB = [
         desc: '立即获得 2 个随机稀有符文。',
         rarity: 'rare',
         effect: 'grant_runes',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         grantRarity: 'rare',
         grantCount: 2,
         maxStacks: 2
@@ -1854,6 +1882,7 @@ const RELIC_DB = [
         desc: '立即获得 2 个随机史诗符文。',
         rarity: 'epic',
         effect: 'grant_runes',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         grantRarity: 'epic',
         grantCount: 2,
         maxStacks: 1
@@ -1865,6 +1894,7 @@ const RELIC_DB = [
         desc: '立即获得 2 个随机传说符文。',
         rarity: 'legendary',
         effect: 'grant_runes',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         grantRarity: 'legendary',
         grantCount: 2,
         maxStacks: 1
@@ -1963,6 +1993,7 @@ const RELIC_DB = [
         desc: '获得后立刻将本回合弹药队列中伤害最高的子弹复制一份，加入队列末尾。',
         rarity: 'rare',
         effect: 'mirror_magazine',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         maxStacks: 2
     },
     // 末日计时器：每回合开始时，场上随机一个敌人受到 round×5 的固定伤害；若击杀则补触发，主触发每 5 次补触发上限 +1
@@ -1996,6 +2027,7 @@ const RELIC_DB = [
         desc: '获得后立刻删除本回合弹药队列中最强和最弱的两颗子弹，剩下那颗子弹的所有属性层数翻倍。',
         rarity: 'epic',
         effect: 'element_injector',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         maxStacks: 1
     },
     // 属性协议：弹药配方含 4 种以上不同属性时，所有子弹基础伤害 +{该子弹携带属性种类数}
@@ -2042,6 +2074,7 @@ const RELIC_DB = [
         desc: '【诅咒】无法进行研磨阶段，获得精华只能选择跳过。【收益】立刻获得 3 个随机稀有符文，所有子弹伤害永久 ×2。',
         rarity: 'cursed',
         effect: 'chaos_pact',
+        deprecated: true, // [REQ-20261022-wave-loop S1] 新循环下线（技能/SP、弹药队列、命运选择、符文、药剂）
         maxStacks: 1
     },
     // 贪婪轮盘（诅咒）：发射时 multicast 折算为伤害（每层 +damage×0.5），每发 75% 概率进入连续续转

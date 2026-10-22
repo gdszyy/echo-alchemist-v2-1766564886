@@ -1,6 +1,6 @@
 # src\ui\run_shop.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 520 | 函数数: 18 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 474 | 函数数: 17 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 ## 函数列表
@@ -14,7 +14,6 @@
 | countAffordable | function | `countAffordable(items, fragments)` |  |
 | isStarterBoostVisit | function | `isStarterBoostVisit(game)` |  |
 | createStarterBoostItem | function | `createStarterBoostItem()` |  |
-| createMixedMarblePackItem | function | `createMixedMarblePackItem()` |  |
 | generateInventory | function | `generateInventory(game, count)` |  |
 | generateInventoryForCurrentVisit | function | `generateInventoryForCurrentVisit(game, count)` |  |
 | getRunShopVisitKey | function | `getRunShopVisitKey(game)` |  |

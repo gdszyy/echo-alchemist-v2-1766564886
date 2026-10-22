@@ -1,6 +1,6 @@
 # src\game_phase.js 函数索引
 
-> 自动生成于 2026-10-22 | 总行数: 4362 | 函数数: 41 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 4328 | 函数数: 42 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 4 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -20,7 +20,8 @@
 | makeBottomRewardBarrier | function | `makeBottomRewardBarrier(x, y1, y2, rewardType)` |  |
 | buildBottomRewardZones | function | `buildBottomRewardZones(game, maxPegY, canvasWidth, canvasHeight)` |  |
 | drawBottomRewardZones | function | `drawBottomRewardZones(ctx, zones)` |  |
-| buildFallbackMarbleQueue | function | `buildFallbackMarbleQueue(game)` |  |
+| buildDigMarbleQueue | function | `buildDigMarbleQueue()` |  |
+| isDigMarbleQueue | function | `isDigMarbleQueue(queue)` |  |
 | phase_advanceWave | method | `phase_advanceWave()` |  |
 | phase_switchPhase | method | `phase_switchPhase(newPhase)` |  |
 | phase_startGatheringPhase | method | `phase_startGatheringPhase()` |  |
@@ -31,7 +32,7 @@
 | phase_gathering_getRandomPegType | method | `phase_gathering_getRandomPegType()` |  |
 | phase_startCombatPhase | method | `phase_startCombatPhase()` |  |
 | phase_gathering_createSession | method | `phase_gathering_createSession(marbleDef, marbleIndex)` |  |
-| phase_gathering_launchMarbleBatch | method | `phase_gathering_launchMarbleBatch(pos)` |  |
+| phase_gathering_launchMarbleBatch | method | `phase_gathering_launchMarbleBatch(pos, kind = null)` |  |
 | phase_handleInputStart | method | `phase_handleInputStart(pos)` |  |
 | phase_calcVenomEffectiveStacks | method | `phase_calcVenomEffectiveStacks(rawStacks)` |  |
 | phase_playThawFeedback | method | `phase_playThawFeedback(enemy)` |  |

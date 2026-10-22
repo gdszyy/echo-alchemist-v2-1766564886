@@ -2726,11 +2726,6 @@ class DropBall {
                         this.portalCooldown = 40; 
                         if (slot.type === 'recall') {
                             this.pos.y = 80; this.vel.y = 2; this.portalCooldown = 60; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotRecall); showToast("時空回溯！");
-                        } else if (slot.type === 'multicast') {
-                            if (this.session.multicastAdded.indexOf(slot) === -1) { 
-                                this.session.multicast += 2; audio.playPowerup(); game.spawn_createSlotBurst(slot.x, slot.y, CONFIG.colors.slotMulticast); showToast("連續發射+2！");
-                                    game.combat_updateMulticastDisplay(2);
-                            }
                         } else if (slot.type === 'split') {
                             if (this.canTriggerSplitSlot) {
                                 this.active = false; 
@@ -3094,17 +3089,11 @@ class DropBall {
                             
                         }
 
-                        if (this.session.currentHits >= this.session.nextTriggerThreshold) {
-                            this.session.currentHits = 0;
-                            this.session.multicast++;
-                          // 增加阈值
-                            this.session.nextTriggerThreshold = this.session.nextTriggerThreshold + CONFIG.gameplay.nextTriggerThresholdIncrease;
-                            // 同步更新 Game 类的持久变量，确保下一颗球能继承这个数值
-                            game.persistentThreshold = this.session.nextTriggerThreshold;
-                              showToast(`充能！下一次: ${this.session.nextTriggerThreshold}`); audio.playPowerup();
-                        }
+                        // [REQ-20261022-wave-loop S1] 「命中充能 → 多重施法」已删除（§5.1）。
+                        // 采集弹珠只挖能量：不触发钉子同化/突变，也不拾取属性（见下方 attribute_collection）。
+                        const isCollectorBall = !!(this.session && this.session.role === 'collector');
 
-                        if (peg.type !== 'pink') {
+                        if (peg.type !== 'pink' && !isCollectorBall) {
                             this.handlePegInteraction(peg, game); // 传入 game
                         }
 
@@ -3182,7 +3171,7 @@ class DropBall {
                         // --- [triangle] 漏斗共鸣 ---
                         // 弹珠碰撞任意钉子时，20% 概率额外再收集一次该钉子的属性
                         // 模拟弹珠在收窄通道中被多次反弹的物理效果
-                        if (boardLayout === 'triangle' && peg.type !== 'normal' && peg.type !== 'pink') {
+                        if (boardLayout === 'triangle' && !isCollectorBall && peg.type !== 'normal' && peg.type !== 'pink') {
                             if (Math.random() < 0.20) {
                                 const bonusItem = { type: peg.type, level: peg.level || 1 };
                                 this.session.collected.push(bonusItem);
@@ -3199,15 +3188,7 @@ class DropBall {
                             const rowQ1 = Math.floor(totalRows * 0.25);
                             const rowQ3 = Math.floor(totalRows * 0.75);
                             if (peg.row !== undefined && peg.row >= rowQ1 && peg.row <= rowQ3) {
-                                this.session.currentHits++;
-                                if (this.session.currentHits >= this.session.nextTriggerThreshold) {
-                                    this.session.currentHits = 0;
-                                    this.session.multicast++;
-                                    this.session.nextTriggerThreshold += CONFIG.gameplay.nextTriggerThresholdIncrease;
-                                    game.persistentThreshold = this.session.nextTriggerThreshold;
-                                    game.spawn_createFloatingText(peg.pos.x, peg.pos.y - 24, '中段爆发!', '#a78bfa');
-                                    audio.playPowerup();
-                                }
+                                // [REQ-20261022-wave-loop S1] 「中段爆发」充能计数随多重施法删除，仅保留裂变回响虚影。
 
                                 // ==================== [菱形裂变回响] 生成虚影钉子 ====================
                                 // 中段属性钉子被碰撞时，30% 概率在对角方向裂变出虚影钉子
@@ -3244,7 +3225,7 @@ class DropBall {
                         // --- [wide_narrow] 边缘共振 ---
                         // 弹珠碰撞偶数行（宽行）的边缘钉子（列号 0/1 或倒数 0/1）时
                         // 65% 概率额外收集一次该钉子属性
-                        if (boardLayout === 'wide_narrow' && peg.type !== 'normal' && peg.type !== 'pink') {
+                        if (boardLayout === 'wide_narrow' && !isCollectorBall && peg.type !== 'normal' && peg.type !== 'pink') {
                             const isWideRow = (peg.row !== undefined && peg.row % 2 === 0);
                             if (isWideRow) {
                                 const rowPegs = pegs.filter(p => p.row === peg.row);
@@ -3260,7 +3241,7 @@ class DropBall {
                             }
                         }
 
-                        if (peg.type !== 'normal' && peg.type !== 'pink') { 
+                        if (peg.type !== 'normal' && peg.type !== 'pink' && !isCollectorBall) {
                             // @section:attribute_collection - 属性收集逻辑与实时合成判断
                             // --- [新增/修改] 实时合成逻辑 ---
                             let finalType = peg.type;

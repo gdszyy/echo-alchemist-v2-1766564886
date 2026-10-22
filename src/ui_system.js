@@ -1900,6 +1900,9 @@ export const ui_system = {
         this.ui_updateMetaCurrency();
         this.ui_updateRuneCountDisplay();
         this.ui_updateShieldPill();
+        // [REQ-20261022-wave-loop S1] 顶栏能量/晶核胶囊 + 挖掘发射选择
+        if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud();
+        if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
         if (typeof this.ui_updateRunShopScheduleUI === 'function') {
             this.ui_updateRunShopScheduleUI();
         }
@@ -1929,7 +1932,8 @@ export const ui_system = {
         const pcLeftSidebar = document.getElementById('pc-left-sidebar');
         const pcRightSidebar = document.getElementById('pc-right-sidebar');
         if (pcLeftSidebar) pcLeftSidebar.style.display = pcSidebarVisible ? 'flex' : 'none';
-        if (pcRightSidebar) pcRightSidebar.style.display = pcSidebarVisible ? 'flex' : 'none';
+        // [REQ-20261022-wave-loop S1] 符文发射器入口下线：右侧栏仅试炼场保留
+        if (pcRightSidebar) pcRightSidebar.style.display = (pcSidebarVisible && this.phase === 'training') ? 'flex' : 'none';
 
         // 4. 底部面板：仅在收集阶段且非 PC 模式下显示
         const bottomPanel = document.querySelector('.bottom-panel');
@@ -1972,10 +1976,10 @@ export const ui_system = {
         }
         this.ui_updateIncomingWavePreview();
 
-        // 8. 战斗技能充能 UI
+        // 8. 战斗技能充能 UI：[REQ-20261022-wave-loop S1 · D3] 技能 4 槽 + SP 下线，始终隐藏
         const runeChargeUi = document.getElementById('combat-rune-charge-ui');
         if (runeChargeUi) {
-            runeChargeUi.style.display = (this.phase === 'combat') ? 'flex' : 'none';
+            runeChargeUi.style.display = 'none';
         }
     },
 
@@ -2018,11 +2022,12 @@ export const ui_system = {
         const rightSidebar = document.getElementById('pc-right-sidebar');
         const sidebarPhaseActive = ['gathering', 'combat', 'selection'].includes(this.phase);
         if (leftSidebar) leftSidebar.style.display = (isPC && sidebarPhaseActive) ? 'flex' : 'none';
-        if (rightSidebar) rightSidebar.style.display = (isPC && sidebarPhaseActive) ? 'flex' : 'none';
+        // [REQ-20261022-wave-loop S1] 符文发射器入口下线：局内不再常驻右侧栏（试炼场仍可用）
+        const keepRuneLauncherSidebar = isPC && this.phase === 'training';
+        if (rightSidebar) rightSidebar.style.display = keepRuneLauncherSidebar ? 'flex' : 'none';
 
-        // [PC 布局恢复 #3] 实际把右侧符文发射器、左侧 info-drawer / 收集队列 / 配方 HUD
-        // 迁移到 PC 侧边栏；离开 PC 模式时再迁回原始位置。
-        this._ui_migrateRuneLauncherToSidebar(isPC);
+        // [PC 布局恢复 #3] 左侧 info-drawer / 收集队列 / 配方 HUD 迁移到 PC 侧边栏；离开 PC 模式时再迁回原始位置。
+        this._ui_migrateRuneLauncherToSidebar(keepRuneLauncherSidebar);
         this._ui_migrateDrawerToLeftSidebar(isPC);
         this._ui_migrateHUDToLeftSidebar(isPC);
         this._ui_updateLeftSidebarContent(this.phase, wasPC);
@@ -2091,11 +2096,15 @@ export const ui_system = {
     },
 
     _ui_migrateRuneLauncherToSidebar(toSidebar) {
+        const launcher = document.getElementById('phase-rune-launcher');
+        const wasInSidebar = !!(launcher && launcher.closest && launcher.closest('#pc-right-sidebar'));
         this._ui_movePanelTo('phase-rune-launcher', 'pc-right-rune-mount', toSidebar);
         // PC 模式下符文发射器常驻显示
-        const launcher = document.getElementById('phase-rune-launcher');
         if (launcher && toSidebar) {
             launcher.style.display = 'flex';
+        } else if (launcher && wasInSidebar) {
+            // [REQ-20261022-wave-loop S1] 迁回原位时收起，避免常驻样式泄漏到局内
+            launcher.style.display = 'none';
         }
     },
 
