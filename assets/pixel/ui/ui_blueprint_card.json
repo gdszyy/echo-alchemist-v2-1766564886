@@ -1,0 +1,46 @@
+{
+  "asset": "ui_blueprint_card",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 32,
+  "frame_h": 44,
+  "frames": [
+    {
+      "index": 0,
+      "label": "common",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "rare",
+      "x": 32,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "epic",
+      "x": 64,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "legendary",
+      "x": 96,
+      "y": 0
+    }
+  ],
+  "icon_area": [
+    4,
+    4,
+    24,
+    24
+  ],
+  "cost_area": [
+    3,
+    31,
+    26,
+    10
+  ]
+}

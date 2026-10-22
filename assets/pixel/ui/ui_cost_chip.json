@@ -1,0 +1,75 @@
+{
+  "asset": "ui_cost_chip",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 22,
+  "frame_h": 12,
+  "frames": [
+    {
+      "index": 0,
+      "label": "power",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "fire",
+      "x": 22,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "ice",
+      "x": 44,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "lightning",
+      "x": 66,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "crystal",
+      "x": 88,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "power_short",
+      "x": 110,
+      "y": 0
+    },
+    {
+      "index": 6,
+      "label": "fire_short",
+      "x": 132,
+      "y": 0
+    },
+    {
+      "index": 7,
+      "label": "ice_short",
+      "x": 154,
+      "y": 0
+    },
+    {
+      "index": 8,
+      "label": "lightning_short",
+      "x": 176,
+      "y": 0
+    },
+    {
+      "index": 9,
+      "label": "crystal_short",
+      "x": 198,
+      "y": 0
+    }
+  ],
+  "digit_origin": [
+    13,
+    4
+  ],
+  "font": "ui_font_3x5"
+}

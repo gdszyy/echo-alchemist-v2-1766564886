@@ -1,0 +1,40 @@
+{
+  "asset": "device_expansion_platform",
+  "kind": "device",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "frames": [
+    {
+      "index": 0,
+      "label": "powered_idle",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "deploying",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "unpowered",
+      "x": 48,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "unlock",
+      "x": 72,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "unlock_flash",
+      "x": 96,
+      "y": 0
+    }
+  ]
+}

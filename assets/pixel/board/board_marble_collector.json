@@ -1,0 +1,16 @@
+{
+  "asset": "board_marble_collector",
+  "kind": "board",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 6,
+  "frame_h": 6,
+  "frames": [
+    {
+      "index": 0,
+      "label": "collector",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

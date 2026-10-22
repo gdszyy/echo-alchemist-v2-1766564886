@@ -1,0 +1,34 @@
+{
+  "asset": "board_special_slots",
+  "kind": "icon",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 12,
+  "frame_h": 12,
+  "frames": [
+    {
+      "index": 0,
+      "label": "recall",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "multicast",
+      "x": 12,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "split",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "relic",
+      "x": 36,
+      "y": 0
+    }
+  ]
+}

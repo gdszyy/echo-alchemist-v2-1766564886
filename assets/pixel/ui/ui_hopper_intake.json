@@ -1,0 +1,35 @@
+{
+  "asset": "ui_hopper_intake",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 8,
+  "frame_h": 8,
+  "frames": [
+    {
+      "index": 0,
+      "label": "left",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "mid",
+      "x": 8,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "mid_active",
+      "x": 16,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "right",
+      "x": 24,
+      "y": 0
+    }
+  ],
+  "tiling": "left + mid*n + right along the strip top edge"
+}

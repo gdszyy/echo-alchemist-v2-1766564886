@@ -1,0 +1,22 @@
+{
+  "asset": "board_marble_alchemy",
+  "kind": "board",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 6,
+  "frame_h": 6,
+  "frames": [
+    {
+      "index": 0,
+      "label": "alchemy_a",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "alchemy_b",
+      "x": 6,
+      "y": 0
+    }
+  ]
+}

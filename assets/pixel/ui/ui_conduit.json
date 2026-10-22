@@ -1,0 +1,53 @@
+{
+  "asset": "ui_conduit",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 8,
+  "frame_h": 6,
+  "frames": [
+    {
+      "index": 0,
+      "label": "powered_a",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "powered_b",
+      "x": 8,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "unpowered",
+      "x": 16,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "end_left_powered",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "end_right_powered",
+      "x": 32,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "end_left_unpowered",
+      "x": 40,
+      "y": 0
+    },
+    {
+      "index": 6,
+      "label": "end_right_unpowered",
+      "x": 48,
+      "y": 0
+    }
+  ],
+  "tiling": "horizontal; powered_a/b alternate at ~6 fps"
+}

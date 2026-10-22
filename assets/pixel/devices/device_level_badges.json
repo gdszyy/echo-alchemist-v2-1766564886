@@ -1,0 +1,29 @@
+{
+  "asset": "device_level_badges",
+  "kind": "overlay",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "frames": [
+    {
+      "index": 0,
+      "label": "lv1",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "lv2",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "lv3",
+      "x": 48,
+      "y": 0
+    }
+  ],
+  "anchor": "same 24x24 origin as the device frame"
+}

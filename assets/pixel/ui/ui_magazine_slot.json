@@ -1,0 +1,40 @@
+{
+  "asset": "ui_magazine_slot",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 14,
+  "frame_h": 14,
+  "frames": [
+    {
+      "index": 0,
+      "label": "empty",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "fire",
+      "x": 14,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "ice",
+      "x": 28,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "lightning",
+      "x": 42,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "next_fire",
+      "x": 56,
+      "y": 0
+    }
+  ]
+}

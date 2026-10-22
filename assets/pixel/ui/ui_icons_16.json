@@ -1,0 +1,40 @@
+{
+  "asset": "ui_icons_16",
+  "kind": "icon",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 16,
+  "frame_h": 16,
+  "frames": [
+    {
+      "index": 0,
+      "label": "power",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "fire",
+      "x": 16,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "ice",
+      "x": 32,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "lightning",
+      "x": 48,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "crystal",
+      "x": 64,
+      "y": 0
+    }
+  ]
+}

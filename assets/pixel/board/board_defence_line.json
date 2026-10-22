@@ -1,0 +1,29 @@
+{
+  "asset": "board_defence_line",
+  "kind": "board",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 6,
+  "frame_h": 1,
+  "frames": [
+    {
+      "index": 0,
+      "label": "idle",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "danger",
+      "x": 6,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "barrier",
+      "x": 12,
+      "y": 0
+    }
+  ],
+  "tiling": "repeat horizontally; barrier N layers = N stacked lines 2px apart"
+}

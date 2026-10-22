@@ -1,0 +1,22 @@
+{
+  "asset": "board_bg_tile",
+  "kind": "background",
+  "layer": "background",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 16,
+  "frame_h": 16,
+  "frames": [
+    {
+      "index": 0,
+      "label": "tile_a",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "tile_b",
+      "x": 16,
+      "y": 0
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "asset": "ui_button_fight",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 32,
+  "frame_h": 16,
+  "frames": [
+    {
+      "index": 0,
+      "label": "normal",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "pressed",
+      "x": 32,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "disabled",
+      "x": 64,
+      "y": 0
+    }
+  ],
+  "nine_slice": {
+    "left": 5,
+    "right": 5,
+    "top": 4,
+    "bottom": 5
+  },
+  "label": "开战 (runtime text)"
+}

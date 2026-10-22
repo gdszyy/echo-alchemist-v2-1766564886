@@ -1,0 +1,152 @@
+{
+  "asset": "elite_deflector_2x1",
+  "schema": "echo-alchemist/pixel-sheet@1",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 50,
+  "frame_h": 24,
+  "order": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen",
+    "burning",
+    "death_1",
+    "death_2",
+    "barrier_full",
+    "barrier_broken"
+  ],
+  "frames": {
+    "idle_a": {
+      "x": 0,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "idle_b": {
+      "x": 50,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "hit_flash": {
+      "x": 100,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "hp_75": {
+      "x": 150,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "hp_50": {
+      "x": 200,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "hp_25": {
+      "x": 250,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "frozen": {
+      "x": 300,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "burning": {
+      "x": 350,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "death_1": {
+      "x": 400,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "death_2": {
+      "x": 450,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "barrier_full": {
+      "x": 500,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    },
+    "barrier_broken": {
+      "x": 550,
+      "y": 0,
+      "w": 50,
+      "h": 24
+    }
+  },
+  "kind": "enemy",
+  "grid": [
+    2,
+    1
+  ],
+  "archetype": "deflector",
+  "collision": {
+    "shape": "polygon",
+    "vertices_canvas": [
+      [
+        0.0,
+        19.2
+      ],
+      [
+        10.0,
+        1.2
+      ],
+      [
+        40.0,
+        1.2
+      ],
+      [
+        50.0,
+        19.2
+      ],
+      [
+        40.0,
+        24.0
+      ],
+      [
+        10.0,
+        24.0
+      ]
+    ]
+  },
+  "collision_box_px": [
+    50,
+    24
+  ],
+  "collision_mapping": "w,h = canvas (cols*26-2, rows*26-2), origin at canvas centre",
+  "polygon_check_frames": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen"
+  ],
+  "mechanic_states": [
+    "barrier_full",
+    "barrier_broken"
+  ],
+  "notes": {
+    "mechanic": "deflectionWard: barrier (10% HP) absorbs bounce/pierce damage; idle = barrier up"
+  },
+  "source": "src/spawn_system.js spawn_applyArchetypeShape"
+}

@@ -1,0 +1,35 @@
+{
+  "asset": "board_hopper",
+  "kind": "board",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 20,
+  "frame_h": 14,
+  "frames": [
+    {
+      "index": 0,
+      "label": "x1",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "x2",
+      "x": 20,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "x3",
+      "x": 40,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "x3_near_leak",
+      "x": 60,
+      "y": 0
+    }
+  ],
+  "rule": "multiplier rises toward the leak; the bucket next to the leak uses x3_near_leak"
+}

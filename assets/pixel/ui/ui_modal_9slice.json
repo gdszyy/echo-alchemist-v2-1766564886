@@ -1,0 +1,22 @@
+{
+  "asset": "ui_modal_9slice",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "frames": [
+    {
+      "index": 0,
+      "label": "modal",
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nine_slice": {
+    "left": 8,
+    "right": 8,
+    "top": 8,
+    "bottom": 8
+  }
+}

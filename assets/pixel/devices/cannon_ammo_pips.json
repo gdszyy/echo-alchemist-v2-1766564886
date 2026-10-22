@@ -1,0 +1,47 @@
+{
+  "asset": "cannon_ammo_pips",
+  "kind": "overlay",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 32,
+  "frame_h": 32,
+  "frames": [
+    {
+      "index": 0,
+      "label": "ammo_0",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "ammo_1",
+      "x": 32,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "ammo_2",
+      "x": 64,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "ammo_3",
+      "x": 96,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "ammo_4",
+      "x": 128,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "ammo_5",
+      "x": 160,
+      "y": 0
+    }
+  ],
+  "anchor": "same 32x32 origin as cannon_main"
+}

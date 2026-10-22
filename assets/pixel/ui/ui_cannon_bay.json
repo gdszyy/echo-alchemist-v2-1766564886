@@ -1,0 +1,26 @@
+{
+  "asset": "ui_cannon_bay",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 36,
+  "frame_h": 36,
+  "frames": [
+    {
+      "index": 0,
+      "label": "idle",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "active",
+      "x": 36,
+      "y": 0
+    }
+  ],
+  "device_offset": [
+    2,
+    2
+  ]
+}

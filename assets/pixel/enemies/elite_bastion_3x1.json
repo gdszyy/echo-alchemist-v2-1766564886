@@ -1,0 +1,101 @@
+{
+  "asset": "elite_bastion_3x1",
+  "schema": "echo-alchemist/pixel-sheet@1",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 76,
+  "frame_h": 24,
+  "order": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen",
+    "burning",
+    "death_1",
+    "death_2"
+  ],
+  "frames": {
+    "idle_a": {
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "idle_b": {
+      "x": 76,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "hit_flash": {
+      "x": 152,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "hp_75": {
+      "x": 228,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "hp_50": {
+      "x": 304,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "hp_25": {
+      "x": 380,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "frozen": {
+      "x": 456,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "burning": {
+      "x": 532,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "death_1": {
+      "x": 608,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    },
+    "death_2": {
+      "x": 684,
+      "y": 0,
+      "w": 76,
+      "h": 24
+    }
+  },
+  "kind": "enemy",
+  "grid": [
+    3,
+    1
+  ],
+  "archetype": "bastion",
+  "collision": {
+    "shape": "aabb"
+  },
+  "collision_box_px": [
+    76,
+    24
+  ],
+  "collision_mapping": "w,h = canvas (cols*26-2, rows*26-2), origin at canvas centre",
+  "polygon_check_frames": [],
+  "mechanic_states": [],
+  "notes": {
+    "mechanic": "heavyArmor: 2x HP, moves every 2 turns; seams between slabs read as weak points"
+  },
+  "source": "src/spawn_system.js spawn_applyArchetypeShape"
+}

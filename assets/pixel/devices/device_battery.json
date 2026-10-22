@@ -1,0 +1,52 @@
+{
+  "asset": "device_battery",
+  "kind": "device",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "frames": [
+    {
+      "index": 0,
+      "label": "charge_0",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "charge_25",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "charge_50",
+      "x": 48,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "charge_75",
+      "x": 72,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "charge_100",
+      "x": 96,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "charging",
+      "x": 120,
+      "y": 0
+    },
+    {
+      "index": 6,
+      "label": "unpowered",
+      "x": 144,
+      "y": 0
+    }
+  ]
+}

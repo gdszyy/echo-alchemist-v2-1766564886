@@ -1,0 +1,16 @@
+{
+  "asset": "board_hopper_divider",
+  "kind": "board",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 3,
+  "frame_h": 14,
+  "frames": [
+    {
+      "index": 0,
+      "label": "divider",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

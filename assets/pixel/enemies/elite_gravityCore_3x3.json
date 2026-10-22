@@ -1,0 +1,123 @@
+{
+  "asset": "elite_gravityCore_3x3",
+  "schema": "echo-alchemist/pixel-sheet@1",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 76,
+  "frame_h": 76,
+  "order": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen",
+    "burning",
+    "death_1",
+    "death_2",
+    "pull_aura"
+  ],
+  "frames": {
+    "idle_a": {
+      "x": 0,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "idle_b": {
+      "x": 76,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "hit_flash": {
+      "x": 152,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "hp_75": {
+      "x": 228,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "hp_50": {
+      "x": 304,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "hp_25": {
+      "x": 380,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "frozen": {
+      "x": 456,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "burning": {
+      "x": 532,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "death_1": {
+      "x": 608,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "death_2": {
+      "x": 684,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    },
+    "pull_aura": {
+      "x": 760,
+      "y": 0,
+      "w": 76,
+      "h": 76
+    }
+  },
+  "kind": "enemy",
+  "grid": [
+    3,
+    3
+  ],
+  "archetype": "gravityCore",
+  "collision": {
+    "shape": "arc",
+    "radius": 34.2,
+    "center_canvas": [
+      38.0,
+      38.0
+    ]
+  },
+  "collision_box_px": [
+    76,
+    76
+  ],
+  "collision_mapping": "w,h = canvas (cols*26-2, rows*26-2), origin at canvas centre",
+  "polygon_check_frames": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen"
+  ],
+  "mechanic_states": [
+    "pull_aura"
+  ],
+  "notes": {
+    "mechanic": "gravityWell: pulls bullets within 220px; 'pull_aura' shows the pull direction at sprite scale, runtime draws the full radius"
+  },
+  "source": "src/spawn_system.js spawn_applyArchetypeShape"
+}

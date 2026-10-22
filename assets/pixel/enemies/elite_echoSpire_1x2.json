@@ -1,0 +1,140 @@
+{
+  "asset": "elite_echoSpire_1x2",
+  "schema": "echo-alchemist/pixel-sheet@1",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 50,
+  "order": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen",
+    "burning",
+    "death_1",
+    "death_2",
+    "link"
+  ],
+  "frames": {
+    "idle_a": {
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "idle_b": {
+      "x": 24,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "hit_flash": {
+      "x": 48,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "hp_75": {
+      "x": 72,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "hp_50": {
+      "x": 96,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "hp_25": {
+      "x": 120,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "frozen": {
+      "x": 144,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "burning": {
+      "x": 168,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "death_1": {
+      "x": 192,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "death_2": {
+      "x": 216,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    },
+    "link": {
+      "x": 240,
+      "y": 0,
+      "w": 24,
+      "h": 50
+    }
+  },
+  "kind": "enemy",
+  "grid": [
+    1,
+    2
+  ],
+  "archetype": "echoSpire",
+  "collision": {
+    "shape": "polygon",
+    "vertices_canvas": [
+      [
+        12.0,
+        0.0
+      ],
+      [
+        19.2,
+        10.0
+      ],
+      [
+        21.6,
+        47.5
+      ],
+      [
+        2.4,
+        47.5
+      ],
+      [
+        4.8,
+        10.0
+      ]
+    ]
+  },
+  "collision_box_px": [
+    24,
+    50
+  ],
+  "collision_mapping": "w,h = canvas (cols*26-2, rows*26-2), origin at canvas centre",
+  "polygon_check_frames": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen"
+  ],
+  "mechanic_states": [
+    "link"
+  ],
+  "notes": {
+    "mechanic": "echoRelay: forwards neighbour affixes; 'link' = resonance arcs reaching both neighbours"
+  },
+  "source": "src/spawn_system.js spawn_applyArchetypeShape"
+}

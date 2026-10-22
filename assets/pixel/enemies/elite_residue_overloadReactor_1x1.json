@@ -1,0 +1,100 @@
+{
+  "asset": "elite_residue_overloadReactor_1x1",
+  "schema": "echo-alchemist/pixel-sheet@1",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "order": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen",
+    "burning",
+    "death_1",
+    "death_2"
+  ],
+  "frames": {
+    "idle_a": {
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "idle_b": {
+      "x": 24,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "hit_flash": {
+      "x": 48,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "hp_75": {
+      "x": 72,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "hp_50": {
+      "x": 96,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "hp_25": {
+      "x": 120,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "frozen": {
+      "x": 144,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "burning": {
+      "x": 168,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "death_1": {
+      "x": 192,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    },
+    "death_2": {
+      "x": 216,
+      "y": 0,
+      "w": 24,
+      "h": 24
+    }
+  },
+  "kind": "enemy",
+  "grid": [
+    1,
+    1
+  ],
+  "affix": "overloadReactor",
+  "collision": {
+    "shape": "aabb",
+    "w": 24,
+    "h": 24
+  },
+  "fill_ratio_frames": [
+    "idle_a",
+    "idle_b"
+  ],
+  "overlay_sheet": "elite_residue_overloadReactor_1x1_overlay.png",
+  "composite_rule": "base enemy_residue_1x1 frame (same label; extra states use idle_a) + overlay frame",
+  "overlay_exact": true,
+  "overlay_erased_px": 0
+}

@@ -1,0 +1,41 @@
+assets: 38
+    background-only colours OK: ['bg_0', 'bg_1', 'bg_2', 'steel_1']
+  [OK] board_bg_tile: 2 x 16x16  isolated-px=0 
+  [OK] board_defence_line: 3 x 6x1  isolated-px=0 
+  [OK] board_defence_post: 3 x 3x5  isolated-px=0 
+  [OK] board_hopper: 4 x 20x14  isolated-px=0 
+  [OK] board_hopper_divider: 1 x 3x14  isolated-px=0 
+  [OK] board_marble_alchemy: 2 x 6x6  isolated-px=0 
+  [OK] board_marble_collector: 1 x 6x6  isolated-px=0 
+  [OK] board_pegs: 6 x 9x9  isolated-px=12 
+  [OK] board_special_slots: 4 x 12x12  isolated-px=0 
+  [OK] cannon_ammo_pips: 6 x 32x32  isolated-px=0 
+  [OK] cannon_main: 7 x 32x32  isolated-px=1 
+  [OK] device_ammo_workshop: 4 x 24x24  isolated-px=0 
+  [OK] device_battery: 7 x 24x24  isolated-px=0 
+  [OK] device_expansion_platform: 5 x 24x24  isolated-px=1 
+  [OK] device_frost_tower: 3 x 24x24  isolated-px=10 
+  [OK] device_generator: 3 x 24x24  isolated-px=2 
+  [OK] device_level_badges: 3 x 24x24  isolated-px=0 
+  [OK] device_lightning_synthesizer: 5 x 24x24  isolated-px=0 
+  [OK] device_lightning_tower: 3 x 24x24  isolated-px=3 
+  [OK] device_shield_generator: 3 x 24x24  isolated-px=0 
+  [OK] device_turret: 3 x 24x24  isolated-px=0 
+  [OK] ui_blueprint_card: 4 x 32x44  isolated-px=0 
+  [OK] ui_button_fight: 3 x 32x16  isolated-px=0 
+  [OK] ui_cannon_bay: 2 x 36x36  isolated-px=0 
+  [OK] ui_conduit: 7 x 8x6  isolated-px=0 
+  [OK] ui_cost_chip: 10 x 22x12  isolated-px=0 
+  [OK] ui_damage_frames: 6 x 9x9  isolated-px=0 
+  [OK] ui_font_3x5: 13 x 3x5  isolated-px=13 
+  [OK] ui_hopper_intake: 4 x 8x8  isolated-px=0 
+  [OK] ui_icons_10: 5 x 10x10  isolated-px=0 
+  [OK] ui_icons_16: 5 x 16x16  isolated-px=0 
+  [OK] ui_item_icons_16: 4 x 16x16  isolated-px=0 
+  [OK] ui_magazine_slot: 5 x 14x14  isolated-px=0 
+  [OK] ui_modal_9slice: 1 x 24x24  isolated-px=0 
+  [OK] ui_power_bar: 6 x 4x8  isolated-px=0 
+  [OK] ui_slot_frames: 4 x 28x28  isolated-px=0 
+  [OK] ui_strip_9slice: 1 x 24x24  isolated-px=0 
+  [OK] ui_topbar_9slice: 1 x 24x17  isolated-px=0 
+RESULT: PASS

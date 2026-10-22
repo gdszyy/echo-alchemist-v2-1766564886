@@ -1,0 +1,57 @@
+{
+  "asset": "ui_damage_frames",
+  "kind": "ui",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 9,
+  "frame_h": 9,
+  "frames": [
+    {
+      "index": 0,
+      "label": "cannon_normal",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "cannon_big",
+      "x": 9,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "facility_normal",
+      "x": 18,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "facility_big",
+      "x": 27,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "alchemy_normal",
+      "x": 36,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "alchemy_big",
+      "x": 45,
+      "y": 0
+    }
+  ],
+  "nine_slice": {
+    "left": 3,
+    "right": 3,
+    "top": 3,
+    "bottom": 3
+  },
+  "digit_colour": {
+    "cannon": "white",
+    "facility": "lightning_5",
+    "alchemy": "white"
+  }
+}

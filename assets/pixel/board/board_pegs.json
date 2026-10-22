@@ -1,0 +1,47 @@
+{
+  "asset": "board_pegs",
+  "kind": "board",
+  "layer": "interactable",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 9,
+  "frame_h": 9,
+  "frames": [
+    {
+      "index": 0,
+      "label": "plain",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "plain_hit",
+      "x": 9,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "fire",
+      "x": 18,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "fire_hit",
+      "x": 27,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "ice",
+      "x": 36,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "ice_hit",
+      "x": 45,
+      "y": 0
+    }
+  ],
+  "note": "no lightning peg by design (factory_resource_v2 F1)"
+}

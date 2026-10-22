@@ -1,0 +1,110 @@
+{
+  "asset": "elite_hive_2x3",
+  "schema": "echo-alchemist/pixel-sheet@1",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 50,
+  "frame_h": 76,
+  "order": [
+    "idle_a",
+    "idle_b",
+    "hit_flash",
+    "hp_75",
+    "hp_50",
+    "hp_25",
+    "frozen",
+    "burning",
+    "death_1",
+    "death_2",
+    "about_to_hatch"
+  ],
+  "frames": {
+    "idle_a": {
+      "x": 0,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "idle_b": {
+      "x": 50,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "hit_flash": {
+      "x": 100,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "hp_75": {
+      "x": 150,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "hp_50": {
+      "x": 200,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "hp_25": {
+      "x": 250,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "frozen": {
+      "x": 300,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "burning": {
+      "x": 350,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "death_1": {
+      "x": 400,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "death_2": {
+      "x": 450,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    },
+    "about_to_hatch": {
+      "x": 500,
+      "y": 0,
+      "w": 50,
+      "h": 76
+    }
+  },
+  "kind": "enemy",
+  "grid": [
+    2,
+    3
+  ],
+  "archetype": "hive",
+  "collision": {
+    "shape": "aabb"
+  },
+  "collision_box_px": [
+    50,
+    76
+  ],
+  "collision_mapping": "w,h = canvas (cols*26-2, rows*26-2), origin at canvas centre",
+  "polygon_check_frames": [],
+  "mechanic_states": [
+    "about_to_hatch"
+  ],
+  "notes": {
+    "mechanic": "hive: hatches a minion every 2 turns; pips = countdown, 'about_to_hatch' = bottom egg cracking"
+  },
+  "source": "src/spawn_system.js spawn_applyArchetypeShape"
+}
