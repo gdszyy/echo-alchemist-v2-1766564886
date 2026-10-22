@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>布局线框 v2</title>
+<style>
+:root{--bg:#14121c;--panel:#221f30;--line:#4a4560;--ink:#e8e6f0;--dim:#8f8aa6;--fire:#e2643a;--ice:#4aa8e0;--bolt:#f0c63c;--gem:#b06ae0;--pow:#7fe07a}
+*{box-sizing:border-box}body{margin:0;background:#0b0a10;color:var(--ink);font:12px/1.35 "Microsoft YaHei",monospace;padding:16px}
+h1{font-size:15px;margin:0 0 4px}.sub{color:var(--dim);margin:0 0 14px}
+.row{display:flex;gap:18px;align-items:flex-start}
+.phone{width:375px;height:700px;background:var(--bg);border:2px solid var(--line);display:flex;flex-direction:column;position:relative}
+.cap{width:375px;text-align:center;margin-bottom:6px;font-weight:bold}
+.top{height:34px;display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:2px solid var(--line);background:#1a1726}
+.pill{padding:1px 6px;border:1px solid var(--line);border-radius:2px;white-space:nowrap}
+.f{color:var(--fire)}.i{color:var(--ice)}.b{color:var(--bolt)}.g{color:var(--gem)}.p{color:var(--pow)}
+.main{flex:1;position:relative;border-bottom:2px solid var(--line);overflow:hidden}
+.label{position:absolute;left:8px;top:6px;color:var(--dim)}
+.peg{position:absolute;width:6px;height:6px}
+.hop{position:absolute;bottom:0;height:22px;border:1px solid var(--line);border-bottom:none;font-size:10px;text-align:center;color:var(--dim);padding-top:3px}
+.factory{height:150px;background:#1c1a28;padding:6px;display:flex;flex-direction:column;gap:5px}
+.slots{display:flex;gap:4px;align-items:flex-end;height:76px}
+.slot{flex:1;height:64px;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:var(--dim)}
+.slot.on{border:2px solid #6c668a;background:#2a2640;color:var(--ink)}.slot.off{border:2px solid #3a3550;background:#191724;color:#5a5570}
+.cannon{flex:1.3;height:76px;border:2px solid #9a8f5a;background:#2e2a1c;display:flex;align-items:center;justify-content:center;font-size:11px}
+.bar{display:flex;gap:6px;align-items:center;font-size:11px}
+.meter{flex:1;height:8px;border:1px solid var(--line);position:relative}.meter i{position:absolute;inset:0 auto 0 0;background:var(--pow)}
+.btn{height:34px;margin:6px;background:#e0b43c;color:#1a1408;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px}
+.enemy{position:absolute;width:44px;height:44px;border:2px solid #8a5a5a;background:#3a2226;font-size:9px;display:flex;align-items:center;justify-content:center;color:#d9a0a0}
+.shot{position:absolute;width:2px;background:#f0e0a0}
+.list{padding:6px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+.card{border:2px solid var(--line);background:var(--panel);padding:5px 6px;display:flex;justify-content:space-between;gap:6px}
+.card .t{font-weight:bold}.card.lock{opacity:.45}
+.note{width:375px;color:var(--dim);font-size:11px;margin-top:6px}
+.dl{position:absolute;left:0;right:0;bottom:16px;border-top:2px dashed #c05050;color:#c05050;font-size:10px;padding-left:6px}
+</style></head><body>
+<h1>布局线框 v2 · 挖掘 / 工厂 / 守卫</h1>
+<p class="sub">灰框 = 区域；底部「工厂带」三个阶段都在同一位置。只表达信息层级与位置，不代表最终美术。</p>
+<div class="row">
+
+<!-- DIG -->
+<div><div class="cap">① 挖掘（钉板）</div>
+<div class="phone">
+ <div class="top"><span class="pill">波 2/3</span><span class="pill p">🔋 18/30</span><span class="pill f">🔥7</span><span class="pill i">❄3</span><span class="pill b">⚡1</span><span class="pill g">💎0</span></div>
+ <div class="main" id="dig"><div class="label">钉板 · 本波元素分布已重排：左火多、右冰多</div>
+  <div class="hop" style="left:0;width:20%">料斗×1</div><div class="hop" style="left:20%;width:20%">×2</div><div class="hop" style="left:40%;width:20%">炼成口</div><div class="hop" style="left:60%;width:20%">×2</div><div class="hop" style="left:80%;width:20%">×3·近漏口</div>
+ </div>
+ <div class="factory">
+  <div class="bar"><span>本次收获</span><span class="f">+🔥4</span><span class="i">+❄1</span><span class="p">+🔋9</span><span style="margin-left:auto">采集 ✔ · 炼成弹珠 待发</span></div>
+  <div class="slots"><div class="slot on">炮台<br>Lv1</div><div class="slot on">发电机</div><div class="cannon">主炮<br>2 发</div><div class="slot">空位</div><div class="slot off">未扩建</div></div>
+  <div class="bar"><span>炼成弹匣</span><span class="pill">火2·冰1</span><span class="pill" style="color:var(--dim)">空</span><span class="pill" style="color:var(--dim)">空</span></div>
+ </div>
+</div>
+<div class="note">材料从钉板底部料斗「掉进」工厂带，资源有了去处；顶栏常驻 5 个资源数；工厂带显示本次收获。</div></div>
+
+<!-- FACTORY -->
+<div><div class="cap">② 工厂（原整备）</div>
+<div class="phone">
+ <div class="top"><span class="pill">波 2/3</span><span class="pill p">🔋 27/30</span><span class="pill f">🔥11</span><span class="pill i">❄4</span><span class="pill b">⚡1</span><span class="pill g">💎0</span></div>
+ <div class="main" style="flex:1">
+  <div class="list">
+   <div class="bar"><span>本波电力</span><div class="meter"><i style="width:63%"></i></div><span>耗 17 / 可用 27</span></div>
+   <div class="card"><span><span class="t">炮台</span> 打最前敌人·伤害6</span><span><span class="f">🔥3</span> · 耗电2</span></div>
+   <div class="card"><span><span class="t">冰霜塔</span> 每3回合冻结前排</span><span><span class="i">❄3</span>+<span class="f">🔥1</span> · 耗电3</span></div>
+   <div class="card"><span><span class="t">电池</span> 容量 +10</span><span><span class="i">❄2</span></span></div>
+   <div class="card lock"><span><span class="t">融合炉</span> 🔥+❄→⚡ 自动</span><span>第3波图纸</span></div>
+   <div class="bar" style="margin-top:4px"><span>主炮</span><span class="pill">伤害 <span class="f">🔥2</span></span><span class="pill">射速 <span class="b">⚡3</span></span><span class="pill">弹道 <span class="i">❄2</span></span></div>
+   <div class="bar"><span style="color:var(--dim)">点空位 → 选设备放入；长按设备 → 升级 / 拆除 / 停机优先级</span></div>
+  </div>
+ </div>
+ <div class="factory" style="height:150px">
+  <div class="slots"><div class="slot on">炮台<br>Lv1</div><div class="slot on">发电机</div><div class="cannon">主炮</div><div class="slot" style="border-color:#e0b43c;color:#e0b43c">+ 放置</div><div class="slot off">扩建</div></div>
+  <div class="bar"><span>下一波</span><span class="pill">敌 14 · 精英 1</span><span class="pill" style="margin-left:auto">Boss 还有 1 波</span></div>
+ </div>
+ <div class="btn">开 战</div>
+</div>
+<div class="note">工厂带向上展开即工厂界面：配方按元素着色，缺什么一眼可见；电力预算条在最上方；不再有设施位解锁、商店、挖矿升级四项。</div></div>
+
+<!-- DEFEND -->
+<div><div class="cap">③ 守卫（战斗）</div>
+<div class="phone">
+ <div class="top"><span class="pill">波 2/3</span><span class="pill p">🔋 10/30</span><span class="pill f">🔥8</span><span class="pill i">❄1</span><span class="pill b">⚡1</span><span class="pill g">💎0</span></div>
+ <div class="main" id="fight"><div class="label">战场 · 敌人自上而下推进</div>
+  <div class="dl">防线 · 护盾 2</div>
+ </div>
+ <div class="factory">
+  <div class="slots"><div class="slot on">炮台 ▲<br>冷却 ■□</div><div class="slot on">发电机<br>运转</div><div class="cannon">主炮 ▲<br>剩 2 发</div><div class="slot on">冰霜塔 ▲<br>■■□</div><div class="slot off">未扩建</div></div>
+  <div class="bar"><span>弹匣</span><span class="pill">火2·冰1 · 点击替换下一发</span><span class="pill" style="margin-left:auto">道具：炸弹</span></div>
+ </div>
+</div>
+<div class="note">设备就在它所在的空位上朝上开火；没电的设备熄灭；主炮居中。旧的华丽发射器面板、技能格、子弹卡全部取消。</div></div>
+</div>
+<script>
+// pegs: element distribution left fire / right ice
+const dig=document.getElementById('dig');const W=375,H=dig.clientHeight;
+for(let r=0;r<9;r++){for(let c=0;c<11;c++){const x=18+c*32+(r%2?16:0);if(x>W-12)continue;const y=34+r*40;const p=document.createElement('div');p.className='peg';
+const lr=x/W;let col='#5a5570';const rnd=Math.sin(r*7.3+c*3.1);
+if(lr<0.4&&rnd>-0.1)col='var(--fire)';else if(lr>0.6&&rnd>-0.1)col='var(--ice)';else if(rnd>0.75)col='var(--bolt)';
+if(r===4&&c===5)col='var(--gem)';p.style.cssText=`left:${x}px;top:${y}px;background:${col}`;dig.appendChild(p);}}
+const f=document.getElementById('fight');
+[[20,40,'词条:甲'],[80,40,''],[140,40,'精英'],[230,40,''],[290,40,''],[50,96,''],[170,96,'疾'],[260,96,'']].forEach(([x,y,t])=>{const e=document.createElement('div');e.className='enemy';e.style.left=x+'px';e.style.top=(y+30)+'px';e.textContent=t||'敌';f.appendChild(e);});
+[[60,330,140],[187,300,170],[260,330,140]].forEach(([x,y,h])=>{const s=document.createElement('div');s.className='shot';s.style.left=x+'px';s.style.top=(y-h)+'px';s.style.height=h+'px';f.appendChild(s);});
+const only=new URLSearchParams(location.search).get('only');
+if(only!==null){document.querySelector('h1').style.display='none';document.querySelector('.sub').style.display='none';document.body.style.padding='0';
+ [...document.querySelectorAll('.row > div')].forEach((d,i)=>{if(String(i)!==only)d.style.display='none';});}
+</script>
+</body></html>
