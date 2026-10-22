@@ -19,6 +19,8 @@
 import { Vec2, lerp } from '../utils/math_utils.js';
 import { sb as _sb } from '../utils/perf.js';
 import { pixiIsActive } from '../render/pixi_bridge.js';
+import { canRenderPixelText, getDamageTier, parseDamageValue, getPixelTextBitmap, getPixelBumpOffset } from '../render/pixel_font.js';
+import { getActivePixelScale } from '../render/pixel_scale.js';
 import {
     iceWave_pixiCreate, iceWave_pixiSync, iceWave_pixiDestroy,
     collectionBeam_pixiCreate, collectionBeam_pixiSync, collectionBeam_pixiDestroy,
@@ -1420,6 +1422,25 @@ class FloatingText {
         this._quickExit = false;
         this._quickExitProgress = 0;
         this._pixi = null; // [PixiJS 迁移]
+        // [R1] 伤害数字走像素位图字体（§4.3 档位）；中文等非数字文本保持原渲染
+        this.pixelTier = (this.isDamageNumber && !iconImg && canRenderPixelText(text))
+            ? getDamageTier(parseDamageValue(text))
+            : null;
+    }
+
+    /**
+     * [R1] 像素数字的位图与左上角位置（CSS px，已吸附到美术像素格）。
+     * @returns {{bitmap:object, x:number, y:number, w:number, h:number, artPerCss:number}|null}
+     */
+    getPixelTextPlacement() {
+        if (!this.pixelTier) return null;
+        const bitmap = getPixelTextBitmap(this.text, this.color, this.pixelTier);
+        if (!bitmap) return null;
+        const a = getActivePixelScale().artPerCss;
+        const bump = getPixelBumpOffset(this.pixelTier, 1 - this.life);
+        const left = Math.round(this.pos.x * a - bitmap.w / 2);
+        const top = Math.round(this.pos.y * a - bitmap.h / 2) - bump;
+        return { bitmap, x: left / a, y: top / a, w: bitmap.w / a, h: bitmap.h / a, artPerCss: a };
     }
 
     update(timeScale) {
@@ -1454,6 +1475,16 @@ class FloatingText {
         if (pixiIsActive()) {
             if (!this._pixi) this._pixi = floatingText_pixiCreate(this);
             if (this._pixi) { floatingText_pixiSync(this, this._pixi); return; }
+        }
+        // @perf-impact: [R1] 像素伤害数字：缓存位图 1:1 贴进低清缓冲（无 fillText/strokeText）
+        const placement = this.getPixelTextPlacement();
+        if (placement) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, this.life) * 0.92;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(placement.bitmap.canvas, placement.x, placement.y, placement.w, placement.h);
+            ctx.restore();
+            return;
         }
         ctx.save();
         ctx.globalAlpha = Math.max(0, this.life) * (this.isDamageNumber ? 0.92 : 1);

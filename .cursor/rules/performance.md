@@ -303,6 +303,28 @@ if avgFps > fpsThresholdUp (55):
 | Sprite 对象池 | 动态增长（上限 ~200） | 复用已创建的 `PIXI.Sprite`，避免频繁 `new` |
 | 特效适配器函数 | 19 组 × 3 函数 | 每组 `_pixiCreate` / `_pixiSync` / `_pixiDestroy`（+MuzzleFlashV2/FiringBurst） |
 
+### 5.12 R1 像素底座：低清缓冲 + 整数放大（`src/render/pixel_scale.js` / `src/game_system.js`）
+
+规格见 `docs/design/art_vfx_ui_direction_v1.md` §2.1 / §7 R1（A1：1 美术像素 ≈ 2 CSS px）。
+
+| 环节 | 位置 | 说明 |
+|---|---|---|
+| 比例模型 | `pixel_scale.js` → `computePixelScale({cssW, cssH, dpr})` | `k = max(2, round(2·DPR))`；逻辑分辨率 `floor(CSS·DPR/k)`；backing = 逻辑 × k；CSS = backing / DPR |
+| 低清缓冲 | `core.js` 构造函数 | `this.ctx` = 逻辑分辨率离屏缓冲 ctx（世界 pass 全部画这里）；`this.screenCtx` = `#gameCanvas` 主画布 ctx（只做最终 blit） |
+| 尺寸同步 | `game_system.js` → `sys_resize` | `this.width/height` 仍为 CSS px（= 主画布实际 CSS 尺寸，比容器小 < k 个设备像素）；改 canvas.width 会重置上下文，**每次 resize 后重设 `imageSmoothingEnabled = false`** |
+| 世界变换 | `sys_loop` | 每帧 `this.ctx.setTransform(artPerCss,0,0,artPerCss,0,0)`，震动偏移吸附到美术像素格 |
+| 全屏 blit | `sys_blitPixelBuffer` | 每帧 1 次 `drawImage(buffer → screen, backingW×backingH)`，关闭平滑、`copy` 合成 |
+| Pixi 层 | `pixi_bridge.js` → `pixiInit` / `pixiResize` / `_applyPixelViewSize` | renderer = 逻辑分辨率、`resolution 1`、`autoDensity false`；`stage.scale = artPerCss`；CSS 尺寸 = 主画布 CSS 尺寸 + `image-rendering: pixelated`；纹理默认 NEAREST、`ROUND_PIXELS` |
+| 伤害数字 | `pixel_font.js` + `FloatingText.getPixelTextPlacement` + `floatingText_pixiCreate` | 3×5 / 5×7 位图字体，按 文本×颜色×档位 缓存（LRU 160），Pixi 侧共享 NEAREST 纹理（引用计数） |
+
+**性能实测（2026-10-22，桌面 Chromium 模拟 375×812 DPR2，combat 8 敌人，手动泵帧）**：`sys_loop` 平均 1.82 ms（blit 关）→ 2.08–2.28 ms（blit 开）；`sys_blitPixelBuffer` 单独 CPU 侧约 0.004 ms（GPU 合成）。世界 pass 填充像素从 375×667 降到 187×333（约 1/4），Pixi backing 从 DPR² 倍降到逻辑分辨率（DPR2 下约 1/16）。真机未测。
+
+**防坑**：
+- 不要在渲染代码里 `setTransform(1,0,0,1,0,0)` / `resetTransform()` 世界 ctx——会丢掉 artPerCss 缩放；需要局部变换请 `save/restore`。
+- 需要「屏幕 CSS 宽高」时读 `game.width/height`，**不要读 `canvas.width`**（现为设备像素 backing）；`ctx.canvas` 是低清缓冲，CSS 尺寸见 `ctx.canvas.cssWidth/cssHeight`。
+- 新 Pixi 纹理不要显式写 `SCALE_MODES.LINEAR`（`tests/validate_pixel_render.mjs` 有契约）。
+- 三档 `high/medium/low` 预算不变：低清缓冲与 blit 不随档位变化（固定 1 次/帧），各档粒子/特效上限仍由 `CONFIG.performance` 控制。
+
 ---
 
 ## 6. 修改指南（Agent 防坑）

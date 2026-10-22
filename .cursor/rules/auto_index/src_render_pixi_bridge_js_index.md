@@ -1,6 +1,6 @@
 # src\render\pixi_bridge.js 函数索引
 
-> 自动生成于 2026-06-27 | 总行数: 935 | 函数数: 18 | 语言: javascript
+> 自动生成于 2026-10-22 | 总行数: 977 | 函数数: 20 | 语言: javascript
 > **本文件由 code-indexer 脚本自动生成，严禁手动编辑。**
 
 **巨型函数警告**: 本文件包含 1 个超过 200 行的函数，建议优先通过 `@section` 标记进行内部导航。
@@ -26,7 +26,9 @@
 | pixiGetParticleTexture | function | `pixiGetParticleTexture(name)` |  |
 | pixiInit | function | `pixiInit()` |  |
 | pixiTick | function | `pixiTick(shakeX, shakeY)` |  |
-| pixiResize | function | `pixiResize(w, h)` |  |
+| pixiResize | function | `pixiResize(w, h, scale)` |  |
+| _applyPixelViewSize | function | `_applyPixelViewSize(s)` |  |
+| _applyPixelArtDefaults | function | `_applyPixelArtDefaults()` |  |
 | pixiSetVisibility | function | `pixiSetVisibility(hidden)` |  |
 | pixiDestroy | function | `pixiDestroy()` |  |
 

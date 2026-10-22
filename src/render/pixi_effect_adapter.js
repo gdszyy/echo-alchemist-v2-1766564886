@@ -20,6 +20,7 @@
  */
 
 import { pixiGetEffectContainer, pixiGetEffectTexture, pixiGetParticleTexture, pixiCssColor, pixiIsActive, pixiReleaseParticleSprite } from './pixi_bridge.js';
+import { isPixelTextCached } from './pixel_font.js';
 
 // ─── IceWave 适配器 ────────────────────────────────────────────
 
@@ -1668,6 +1669,21 @@ export function floatingText_pixiCreate(ft) {
     const container = pixiGetEffectContainer();
     if (!container) return null;
 
+    // @perf-impact: [R1] 像素伤害数字：共享缓存画布纹理（NEAREST），不再每条数字生成 PIXI.Text 纹理
+    const placement = typeof ft.getPixelTextPlacement === 'function' ? ft.getPixelTextPlacement() : null;
+    if (placement) {
+        const entry = placement.bitmap;
+        if (!entry.texture) {
+            entry.texture = new PIXI.Texture(PIXI.BaseTexture.from(entry.canvas, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
+        }
+        entry.refCount = (entry.refCount || 0) + 1;
+        const sprite = new PIXI.Sprite(entry.texture);
+        sprite.blendMode = PIXI.BLEND_MODES.NORMAL;
+        sprite.roundPixels = true;
+        container.addChild(sprite);
+        return { text: sprite, iconSprite: null, iconImg: null, fontSize: ft.fontSize, pixelEntry: entry };
+    }
+
     const style = new PIXI.TextStyle({
         fontFamily: ft.isDamageNumber ? 'Cinzel, serif' : 'sans-serif',
         fontWeight: ft.isDamageNumber ? '700' : 'bold',
@@ -1699,6 +1715,18 @@ export function floatingText_pixiSync(ft, pixi) {
     const { text, iconSprite } = pixi;
     if (!text) return;
 
+    if (pixi.pixelEntry) {
+        // [R1] 像素数字：整数美术像素放置，1 纹理像素 = 1 美术像素（stage 已缩放 artPerCss）
+        const placement = ft.getPixelTextPlacement();
+        if (placement) {
+            text.x = placement.x;
+            text.y = placement.y;
+            text.scale.set(1 / placement.artPerCss);
+        }
+        text.alpha = Math.max(0, ft.life) * 0.92;
+        return;
+    }
+
     text.x = ft.pos.x;
     text.y = ft.pos.y;
     const renderScale = typeof ft.getRenderScale === 'function' ? ft.getRenderScale() : 1;
@@ -1723,6 +1751,16 @@ export function floatingText_pixiDestroy(pixi) {
     if (!pixi) return;
     if (pixi.text) { pixi.text.destroy(); pixi.text = null; }
     if (pixi.iconSprite) { pixi.iconSprite.destroy(); pixi.iconSprite = null; }
+    if (pixi.pixelEntry) {
+        // [R1] 共享像素数字纹理：引用计数归零且已被 LRU 淘汰时才销毁
+        const entry = pixi.pixelEntry;
+        pixi.pixelEntry = null;
+        entry.refCount = Math.max(0, (entry.refCount || 0) - 1);
+        if (entry.refCount === 0 && entry.texture && !isPixelTextCached(entry)) {
+            entry.texture.destroy(true);
+            entry.texture = null;
+        }
+    }
 }
 
 // ─── RewardDropEffect 适配器 ─────────────────────────────────────

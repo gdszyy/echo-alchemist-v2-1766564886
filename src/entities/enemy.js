@@ -8332,8 +8332,9 @@ class Enemy {
                     const flashAlpha = (this._rotationFlashTimer / 8) * 0.3; // 从 0.3 快速衰减
                     ctx.save();
                     // 在本地坐标系中绘制全屏盖盖（使用 ctx.canvas 尺寸）
-                    const cw = ctx.canvas ? ctx.canvas.width : 400;
-                    const ch = ctx.canvas ? ctx.canvas.height : 700;
+                    // [R1] 低清缓冲的 width 是美术像素，优先取其 CSS 尺寸（cssWidth/cssHeight）
+                    const cw = ctx.canvas ? (ctx.canvas.cssWidth || ctx.canvas.width) : 400;
+                    const ch = ctx.canvas ? (ctx.canvas.cssHeight || ctx.canvas.height) : 700;
                     ctx.globalCompositeOperation = 'lighter';
                     ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
                     ctx.fillRect(-this.pos.x, -(this.pos.y + this.bumpOffsetY), cw, ch);

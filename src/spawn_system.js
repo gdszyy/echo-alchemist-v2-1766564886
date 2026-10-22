@@ -138,8 +138,8 @@ export const spawn_system = {
         const py = rect.y + Math.random() * rect.h;
         
         // 强制使用全屏延伸位置（如果是风道）
-        const finalPx = type === 'tunnel' && isHorizontal ? (Math.random() * this.canvas.width) : px;
-        const finalPy = type === 'tunnel' && !isHorizontal ? (Math.random() * this.canvas.height) : py;
+        const finalPx = type === 'tunnel' && isHorizontal ? (Math.random() * this.width) : px;
+        const finalPy = type === 'tunnel' && !isHorizontal ? (Math.random() * this.height) : py;
         
         const p = this.spawn_createParticle(finalPx, finalPy, '#f0fdf4', 'line');
         if (!p) return;

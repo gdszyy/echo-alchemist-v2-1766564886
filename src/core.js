@@ -209,6 +209,10 @@ class Game {
         this.isWheelSpinning = false;
         this.canvas = document.getElementById('gameCanvas'); 
         this.ctx = this.canvas.getContext('2d');
+        // @perf-impact: [R1 像素底座] 世界先画进逻辑分辨率低清缓冲（this.ctx），每帧由 sys_blitPixelBuffer 最近邻放大到主画布（this.screenCtx）
+        this.screenCtx = this.ctx;
+        this.pixelBufferCanvas = document.createElement('canvas');
+        this.ctx = this.pixelBufferCanvas.getContext('2d');
         // [PixiJS 迁移] 初始化 WebGL 渲染管线（双层 Canvas Overlay）
         this._pixiReady = pixiInit();
         this.boardTilt = { current: { x: 0, y: 0 }, target: { x: 0, y: 0 }, enabled: false };
@@ -438,7 +442,8 @@ class Game {
         // 确保页面首次渲染后（CSS aspect-ratio 计算完成）canvas 尺寸能被正确设置。
         if (!this._resizeObserver) {
             this._resizeObserver = new ResizeObserver(() => {
-                if (this.canvas.width !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
+                // [R1] canvas.width 现为设备像素 backing，改比对上次 resize 读到的容器 CSS 宽
+                if (this._resizeCssW !== Math.round(document.getElementById('game-container').getBoundingClientRect().width)) {
                     this.sys_resize();
                 }
             });
