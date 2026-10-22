@@ -55,3 +55,52 @@ Branch / worktree: `codex/REQ-20261022-wave-loop` @ `../echo-alchemist-REQ-20261
 - `boss:defeated` 后「接下来 3 回合高压反扑」会覆盖整个下一轮普通波，与 Dome Keeper 的喘息节奏冲突 → M4 处理。
 - 难度曲线、THEME_SEGMENTS 回合区间仍按旧节奏，Boss 平均提前约 1 回合 → M4 复核。
 - 挖掘阶段顶栏中部归商人旅程 dock；顶栏拥挤属 M2 视觉层级问题。
+
+
+## 暂停交接（2026-10-23，用户因预算暂停）
+
+**分支**：`codex/REQ-20261022-wave-loop`（worktree `../echo-alchemist-REQ-20261022-wave-loop`），全部已提交，未推送。
+**测试部署**：Railway 项目 giving-youth / 服务 `echo-alchemist-wave-loop`（https://echo-alchemist-wave-loop-production.up.railway.app），内容为 S2 + R1。旧服务未动。
+
+**已完成并提交**：
+- M1 波次循环（3 普通波 + 1 Boss 波）
+- S1 每波挖矿 + 炼成弹匣 + 无限主炮
+- S2 整备界面与经济（将被工厂方案替换）
+- R1 像素渲染底座
+- 素材管线 + MiniMax 提示词包
+- 原生像素美术：
+  - 样张（用户已认可画风）
+  - 敌人批次 54 张
+  - 设备 / UI / 钉板批次 38 张，主炮与空位设备已明确区分
+- 设计文档：
+  - `docs/design/factory_resource_v2.md`（元素资源 + 工厂，已确认）
+  - `docs/design/factory_line_plan_v1.md`（工厂线方案，D1–D7 已决策）
+  - `docs/art/redraw_requirements_v1.md`
+  - `docs/design/concepts/layout_wireframe_v2.html`
+
+**用户已确认的关键决策**：
+- 钉板只有火钉、冰钉；雷只能由火冰叠冲或电力合成。
+- 电力 = 每波预算 + 电池。
+- 每波后图纸三选一，含改装件。
+- 4 个战斗空位 + 中央主炮；后勤设备进格子工厂区（传送带）。
+- 设备全局打最近目标。
+- 布局：底部工厂带常驻、料斗进料。
+- 画风按样张批量；主炮与空位设备必须明显区分；整体风格统一。
+
+**未完成 / 恢复顺序**：
+1. 出「格子工厂区 + 传送带」方案给用户决策（见 factory_line_plan_v1.md §10）。
+2. S3 实现。实现计划已由规划代理产出，要点：
+   - element_economy_utils / factory_utils / frame_layout / sprite_registry；
+   - 采集弹珠的「收获」在弹珠离场时按料斗倍率结算；
+   - 钉板清洗只保留普通 / 火 / 冰；
+   - 新布局：画布画工厂带，DOM 叠加文字和按钮；
+   - 敌人改用新像素精灵。
+   需按 D1 / D2 修订：去掉列线，后勤设备移至工厂区。
+3. Boss 像素美术（8 个，4×3 格），后勤设备的格子版美术与传送带素材。
+4. 像素破碎血量接入、特效像素化、调参与试玩。
+
+**已知问题**：
+- `src/music_clip_packs.js` 未入库（根目录未提交文件），worktree 仅本地副本。
+- 17 个音效样本未入库。
+- `.railwayignore` 排除了 `docs/`；若运行时要读 `docs/art/samples`，需镜像到 `assets/pixel/_samples/`。
+- 数据冲突待定：敌人解锁回合、Boss 网格元数据、两个 Boss 的弱点定义、狂暴阈值。
