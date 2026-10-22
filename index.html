@@ -403,6 +403,12 @@
             z-index: 1; /* 确保 Canvas 在基础背景之上，但低于 UI 覆盖层 */
             pointer-events: auto;
         }
+        /* [R1 像素底座] 主画布与 Pixi 层整数倍最近邻放大（JS 设定精确 CSS 尺寸，这里兜底关闭平滑） */
+        #gameCanvas,
+        #game-container canvas.pixi-pixel-layer {
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
 
         @keyframes shake-hard {
             0% { transform: translate(0, 0); }
@@ -5955,7 +5961,8 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 
 // --- CRT 状态 ---
-let isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false';
+// [R1 / A4] CRT 扫描线默认关闭：仅当玩家显式开启（'true'）时生效
+let isCrtOn = localStorage.getItem('ea_crt_enabled') === 'true';
 function updateCrtVisuals() {
     const badge = document.getElementById('crt-badge');
     const item = document.getElementById('crt-item');

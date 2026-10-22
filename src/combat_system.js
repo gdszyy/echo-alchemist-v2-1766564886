@@ -2618,7 +2618,7 @@ export const combat_system = {
                         }
 
                         p.life = 1.0;
-                        const distance = isHorizontal ? this.canvas.width : this.canvas.height;
+                        const distance = isHorizontal ? this.width : this.height;
                         const framesNeeded = (distance + 100) / speed;
                         p.decay = 1.0 / (framesNeeded * 1.2);
                     }
@@ -2791,8 +2791,8 @@ export const combat_system = {
                 const rayDir = dir;
                 // [优化] 发射起点（使用配置参数）
                 const cfg = CONFIG.wind_system.butterfly;
-                const tX = rayDir.x > 0 ? (this.canvas.width + cfg.launchOffset - center.x) / rayDir.x : (-cfg.launchOffset - center.x) / rayDir.x;
-                const tY = rayDir.y > 0 ? (this.canvas.height + cfg.launchOffset - center.y) / rayDir.y : (-cfg.launchOffset - center.y) / rayDir.y;
+                const tX = rayDir.x > 0 ? (this.width + cfg.launchOffset - center.x) / rayDir.x : (-cfg.launchOffset - center.x) / rayDir.x;
+                const tY = rayDir.y > 0 ? (this.height + cfg.launchOffset - center.y) / rayDir.y : (-cfg.launchOffset - center.y) / rayDir.y;
                 const t = Math.min(tX, tY);
                 startPos = center.add(rayDir.mult(t));
 
@@ -2834,8 +2834,8 @@ export const combat_system = {
             
             // [优化] 检查是否飞出屏幕（使用配置参数）
             const cfg = CONFIG.wind_system.butterfly;
-            if (blade.pos.x < -cfg.deleteOffset || blade.pos.x > this.canvas.width + cfg.deleteOffset ||
-                blade.pos.y < -cfg.deleteOffset || blade.pos.y > this.canvas.height + cfg.deleteOffset) {
+            if (blade.pos.x < -cfg.deleteOffset || blade.pos.x > this.width + cfg.deleteOffset ||
+                blade.pos.y < -cfg.deleteOffset || blade.pos.y > this.height + cfg.deleteOffset) {
                 this.butterflyBlades.splice(i, 1);
                 continue;
             }
@@ -2929,7 +2929,7 @@ export const combat_system = {
                 const pOffset = (i / particleCount) * Math.PI * 2 + blade.angle * 1.5;
                 const pScale = Math.cos(pOffset);
                 const pY = pScale * blade.size * 1.2;
-                const pAlpha = (0.2 + Math.abs(pScale) * 0.4) * (1 - blade.pos.dist(new Vec2(this.canvas.width/2, this.height/2)) / 1000);
+                const pAlpha = (0.2 + Math.abs(pScale) * 0.4) * (1 - blade.pos.dist(new Vec2(this.width/2, this.height/2)) / 1000);
                 
                 ctx.save();
                 ctx.translate(blade.pos.x, blade.pos.y);

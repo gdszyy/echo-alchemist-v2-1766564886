@@ -19,6 +19,7 @@ import { audio } from './audio.js';
 import { loot_calcRuneDrop } from './loot_system.js';
 import { RUNE_DB } from './rune_config.js';
 import { pixiTick, pixiResize, pixiSetVisibility } from './render/pixi_bridge.js';
+import { computePixelScale, setActivePixelScale } from './render/pixel_scale.js';
 import { pixiCleanupAllEffects, fireWave_pixiDestroy, greedyWheelEffect_pixiDestroy, doomsdayClock_pixiDestroy } from './render/pixi_effect_adapter.js';
 import { eventBus, EVENT_TYPES } from './event_bus.js';
 import { calcCombatLauncherGeometryToTarget } from './utils/emitter_geometry.js';
@@ -197,6 +198,16 @@ export const game_system = {
             if (hf.duration <= 0) this._shakeHighFreq = null;
         }
 
+        // @perf-impact: [R1 像素底座] 世界绘制进低清缓冲：基变换 = artPerCss 缩放（CSS px → 美术像素），
+        // 震动偏移吸附到美术像素格，2D 与 Pixi 两层同步。
+        const _pixelScale = this.pixelScale;
+        if (_pixelScale) {
+            const _a = _pixelScale.artPerCss;
+            this.ctx.setTransform(_a, 0, 0, _a, 0, 0);
+            shakeX = Math.round(shakeX * _a) / _a;
+            shakeY = Math.round(shakeY * _a) / _a;
+        }
+
         this.ctx.save();
 
         // 应用震动偏移
@@ -273,7 +284,26 @@ export const game_system = {
 
         // 10. 下一帧请求
         this.ctx.restore();
+        this.sys_blitPixelBuffer();
         this._rafId = requestAnimationFrame(() => this.sys_loop());
+    },
+
+    /**
+     * @method sys_blitPixelBuffer
+     * @description [R1 像素底座] 把逻辑分辨率低清缓冲一次性最近邻放大 ×k 到主画布。
+     * @perf-impact: 每帧 1 次全屏 drawImage（logicalW×logicalH → backingW×backingH，关闭平滑）
+     */
+    sys_blitPixelBuffer() {
+        const screen = this.screenCtx;
+        const buffer = this.pixelBufferCanvas;
+        if (!screen || !buffer || screen === this.ctx || !this.pixelScale) return;
+        const { backingW, backingH } = this.pixelScale;
+        screen.setTransform(1, 0, 0, 1, 0, 0);
+        screen.imageSmoothingEnabled = false;
+        screen.globalAlpha = 1;
+        screen.globalCompositeOperation = 'copy';
+        screen.drawImage(buffer, 0, 0, backingW, backingH);
+        screen.globalCompositeOperation = 'source-over';
     },
 
     /**
@@ -324,12 +354,35 @@ export const game_system = {
         // [BUGFIX] 若 rect.width/height 为 0（CSS 布局未完成），跳过本次 resize，
         // 等待下一帧由 ResizeObserver 或 window.resize 重新触发。
         if (!rect.width || !rect.height) return;
-        this.width = this.canvas.width = Math.round(rect.width);
-        this.height = this.canvas.height = Math.round(rect.height);
+        // @perf-impact: [R1 像素底座] 主画布 backing = 逻辑分辨率 × k（设备像素），低清缓冲 = 逻辑分辨率；
+        // this.width/height 仍是 CSS px（= 主画布实际 CSS 尺寸，比容器最多小 k-1 个设备像素），游戏逻辑单位不变。
+        this._resizeCssW = Math.round(rect.width);
+        const pixelScale = computePixelScale({
+            cssW: Math.round(rect.width),
+            cssH: Math.round(rect.height),
+            dpr: window.devicePixelRatio || 1,
+        });
+        this.pixelScale = pixelScale;
+        setActivePixelScale(pixelScale);
+        this.width = pixelScale.cssW;
+        this.height = pixelScale.cssH;
+        this.canvas.width = pixelScale.backingW;
+        this.canvas.height = pixelScale.backingH;
+        this.canvas.style.width = `${pixelScale.cssW}px`;
+        this.canvas.style.height = `${pixelScale.cssH}px`;
+        if (this.pixelBufferCanvas) {
+            this.pixelBufferCanvas.width = pixelScale.logicalW;
+            this.pixelBufferCanvas.height = pixelScale.logicalH;
+            this.pixelBufferCanvas.cssWidth = pixelScale.cssW;
+            this.pixelBufferCanvas.cssHeight = pixelScale.cssH;
+        }
+        // 改 width 会重置 2D 上下文状态：每次 resize 后重设关闭平滑
+        if (this.screenCtx) this.screenCtx.imageSmoothingEnabled = false;
+        if (this.ctx) this.ctx.imageSmoothingEnabled = false;
 
         // [PixiJS 迁移] 同步 WebGL canvas 尺寸
         if (this._pixiReady) {
-            pixiResize(this.width, this.height);
+            pixiResize(this.width, this.height, pixelScale);
         }
 
         // 动态调整失败判定线
@@ -2565,8 +2618,8 @@ export const game_system = {
         this.ctx.save();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         this.ctx.lineWidth = 2;
-        const canvasW = this.canvas.width;
-        const canvasH = this.canvas.height;
+        const canvasW = this.width;
+        const canvasH = this.height;
         if (isHorizontal) {
             for (let x = -80; x < canvasW + 80; x += 40) {
                 this.ctx.beginPath();

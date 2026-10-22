@@ -1555,8 +1555,11 @@ export const hud_system = {
                         const canvas = document.getElementById('gameCanvas');
                         if (canvas && lootX != null && lootY != null) {
                             const canvasRect = canvas.getBoundingClientRect();
-                            const scaleX = canvasRect.width  / (canvas.width  || canvasRect.width);
-                            const scaleY = canvasRect.height / (canvas.height || canvasRect.height);
+                            // [R1] canvas.width 为设备像素 backing；世界坐标宽高以 game.width/height（CSS px）为准
+                            const worldW = (this && this.width) || canvasRect.width;
+                            const worldH = (this && this.height) || canvasRect.height;
+                            const scaleX = canvasRect.width  / worldW;
+                            const scaleY = canvasRect.height / worldH;
                             startX = canvasRect.left + lootX * scaleX;
                             startY = canvasRect.top  + lootY * scaleY;
                         } else {

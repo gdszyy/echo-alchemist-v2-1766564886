@@ -23,6 +23,7 @@
 
 import { CONFIG } from '../config.js';
 import { filterUpdateAll, filterDestroyAll } from './pixi_filter_manager.js';
+import { computePixelScale } from './pixel_scale.js';
 
 // ─── 模块级状态 ────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ function _bakeGlowTexture(mode, size, color, edgeColor) {
     g.fill();
 
     const baseTexture = PIXI.BaseTexture.from(canvas, {
-        scaleMode: PIXI.SCALE_MODES.LINEAR,
+        scaleMode: PIXI.SCALE_MODES.NEAREST,
         resolution: 1,
     });
     const tex = new PIXI.Texture(baseTexture);
@@ -98,7 +99,7 @@ function _bakeShardTexture(size) {
     g.fill();
 
     const baseTexture = PIXI.BaseTexture.from(canvas, {
-        scaleMode: PIXI.SCALE_MODES.LINEAR,
+        scaleMode: PIXI.SCALE_MODES.NEAREST,
         resolution: 1,
     });
     const tex = new PIXI.Texture(baseTexture);
@@ -128,7 +129,7 @@ function _initBakedTextures() {
         grad.addColorStop(1,   'rgba(249,115,22,0)');
         g.fillStyle = grad;
         g.beginPath(); g.arc(half, half, half, 0, Math.PI * 2); g.fill();
-        _bakedTextures.ember = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _bakedTextures.ember = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
     // mist: 柔和冷色调发光
     _bakeGlowTexture('mist',  64, 'rgba(207,250,254,0.8)', 'rgba(165,243,252,0)');
@@ -143,7 +144,7 @@ function _initBakedTextures() {
         grad.addColorStop(1,   'rgba(22,101,52,0)');
         g.fillStyle = grad;
         g.beginPath(); g.arc(half, half, half, 0, Math.PI * 2); g.fill();
-        _bakedTextures.venom = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _bakedTextures.venom = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
     _bakeShardTexture(48);
     _bakeGlowTexture('smoke',  64, 'rgba(120,120,120,0.4)', 'rgba(60,60,60,0)');
@@ -166,7 +167,7 @@ function _initBakedTextures() {
         g.quadraticCurveTo(cx, cy + h * 0.35, 2, cy);
         g.closePath();
         g.fill();
-        _bakedTextures.wind_slash = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _bakedTextures.wind_slash = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
     // [T2.7] line: 细长水平线（匹配 Canvas 2D 的 round-cap lineTo）
     {
@@ -186,7 +187,7 @@ function _initBakedTextures() {
         g.moveTo(4, cy);
         g.lineTo(w - 4, cy);
         g.stroke();
-        _bakedTextures.line = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _bakedTextures.line = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
     // [Trail V2] 拖尾段纹理：64×16，水平高斯衰减 + 垂直柔和轮廓
     // 用于 GPU 批渲染的拖尾线段替代 Canvas 2D 逐段 stroke
@@ -214,7 +215,7 @@ function _initBakedTextures() {
         g.globalCompositeOperation = 'destination-in';
         g.fillStyle = grV;
         g.fillRect(0, 0, w, h);
-        _bakedTextures.trail = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _bakedTextures.trail = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 }
 
@@ -520,7 +521,7 @@ function _initEffectTextures() {
         gr.addColorStop(0.7,  'rgba(255,255,255,0.2)');
         gr.addColorStop(1,    'rgba(255,255,255,0)');
         g.fillStyle = gr; g.beginPath(); g.arc(h, h, h, 0, Math.PI * 2); g.fill();
-        _effectTextures.muzzleCore = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.muzzleCore = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // muzzleFlare: 方向性光锥（沿 X 轴拉长的锥形光焰）
@@ -543,7 +544,7 @@ function _initEffectTextures() {
         g.quadraticCurveTo(w * 0.3, ht, 0, cy);
         g.closePath();
         g.fill();
-        _effectTextures.muzzleFlare = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.muzzleFlare = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // muzzleSpark: 火星小圆点（16×16 明亮白点）
@@ -557,7 +558,7 @@ function _initEffectTextures() {
         gr.addColorStop(0.7, 'rgba(255,255,255,0.4)');
         gr.addColorStop(1,   'rgba(255,255,255,0)');
         g.fillStyle = gr; g.beginPath(); g.arc(h, h, h, 0, Math.PI * 2); g.fill();
-        _effectTextures.muzzleSpark = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.muzzleSpark = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // ─── [弹道光照] bulletGlow: 子弹环境光纹理 ──────────────────
@@ -573,7 +574,7 @@ function _initEffectTextures() {
         gr.addColorStop(0.55, 'rgba(255,255,255,0.15)');
         gr.addColorStop(1,    'rgba(255,255,255,0)');
         g.fillStyle = gr; g.beginPath(); g.arc(h, h, h, 0, Math.PI * 2); g.fill();
-        _effectTextures.bulletGlow = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.bulletGlow = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // ─── [元素视觉] 6 张元素专属纹理 ──────────────────────────────
@@ -601,7 +602,7 @@ function _initEffectTextures() {
                 g.stroke();
             }
         }
-        _effectTextures.frostHex = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.frostHex = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // electricArc: 短弧段，白色中心→紫色边缘，用于 Lightning 电弧碎片
@@ -622,7 +623,7 @@ function _initEffectTextures() {
         g.moveTo(2, h2 + 2);
         g.quadraticCurveTo(w2, h2 - 6, s - 2, h2 + 1);
         g.stroke();
-        _effectTextures.electricArc = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.electricArc = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // venomDrip: 泪滴形绿色渐变，用于 Venom 持续效果滴落
@@ -641,7 +642,7 @@ function _initEffectTextures() {
         g.quadraticCurveTo(s - 4, h2, h2, s - 4); // 右侧弧线
         g.quadraticCurveTo(4, h2, h2, 2); // 左侧弧线
         g.fill();
-        _effectTextures.venomDrip = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.venomDrip = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // windVortex: 环形翡翠弧线辐射，用于 Wind 持续效果风场标记
@@ -668,7 +669,7 @@ function _initEffectTextures() {
         gr.addColorStop(1, 'rgba(52, 211, 153, 0)');
         g.fillStyle = gr;
         g.beginPath(); g.arc(h2, h2, h2 * 0.3, 0, Math.PI * 2); g.fill();
-        _effectTextures.windVortex = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.windVortex = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // starBurst: 四角金色辐射线，用于 Scatter 命中星爆
@@ -702,7 +703,7 @@ function _initEffectTextures() {
             g.lineTo(h2 + Math.cos(a) * h2 * 0.5, h2 + Math.sin(a) * h2 * 0.5);
             g.stroke();
         }
-        _effectTextures.starBurst = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.starBurst = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 
     // echoRipple: 3 圈蓝色同心圆波纹，用于 Echo 回响触发
@@ -719,7 +720,7 @@ function _initEffectTextures() {
             g.arc(h2, h2, radii[i], 0, Math.PI * 2);
             g.stroke();
         }
-        _effectTextures.echoRipple = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.LINEAR }));
+        _effectTextures.echoRipple = new PIXI.Texture(PIXI.BaseTexture.from(c, { scaleMode: PIXI.SCALE_MODES.NEAREST }));
     }
 }
 
@@ -779,15 +780,19 @@ export function pixiInit() {
         const rect = container.getBoundingClientRect();
         const w = Math.round(rect.width) || 480;
         const h = Math.round(rect.height) || 854;
+        // @perf-impact: [R1 像素底座] Pixi 层按逻辑分辨率（美术像素）渲染：resolution 1、关闭 autoDensity、
+        // stage 缩放 artPerCss（CSS px → 美术像素，与 2D 低清缓冲同一变换），CSS 再整数倍最近邻放大。
+        _applyPixelArtDefaults();
+        const scale = computePixelScale({ cssW: w, cssH: h, dpr: window.devicePixelRatio || 1 });
 
         pixiApp = new PIXI.Application({
-            width: w,
-            height: h,
+            width: scale.logicalW,
+            height: scale.logicalH,
             backgroundAlpha: 0,           // 透明背景，叠加在主 Canvas 上
             antialias: false,              // 粒子渲染不需要抗锯齿
             autoStart: false,             // 手动 tick 驱动，不启用 PixiJS 内部 rAF
-            autoDensity: true,            // 自动适配 devicePixelRatio
-            resolution: window.devicePixelRatio || 1,
+            autoDensity: false,           // [R1] backing 固定为逻辑分辨率，CSS 尺寸由 _applyPixelViewSize 设定
+            resolution: 1,
             powerPreference: 'high-performance',
         });
 
@@ -798,6 +803,8 @@ export function pixiInit() {
         view.style.left = '0';
         view.style.pointerEvents = 'none';
         view.style.zIndex = '1';         // 高于主 canvas(0)，低于 DOM UI
+        view.style.imageRendering = 'pixelated';
+        view.classList.add('pixi-pixel-layer');
         container.appendChild(view);
 
         // 游戏根容器（屏幕震动偏移目标）
@@ -806,6 +813,7 @@ export function pixiInit() {
         pixiApp.stage.addChild(gameContainer);
         // 让 stage 不响应交互事件
         pixiApp.stage.eventMode = 'none';
+        _applyPixelViewSize(scale);
 
         // 预烘焙发光纹理
         _initBakedTextures();
@@ -832,7 +840,7 @@ export function pixiInit() {
 export function pixiTick(shakeX, shakeY) {
     if (!_active || !pixiApp) return;
 
-    // 同步屏幕震动到 PixiJS 根容器（与 ctx.translate 保持一致）
+    // 同步屏幕震动到 PixiJS 根容器（与 ctx.translate 保持一致；sys_loop 已把偏移吸附到美术像素格）
     if (gameContainer) {
         gameContainer.x = shakeX || 0;
         gameContainer.y = shakeY || 0;
@@ -848,12 +856,46 @@ export function pixiTick(shakeX, shakeY) {
  * [T1.3] 响应窗口 / Canvas 尺寸变化，同步 PixiJS renderer 尺寸。
  * 由 sys_resize() 在 canvas.width/height 设置之后调用。
  *
- * @param {number} w 新宽度
- * @param {number} h 新高度
+ * @param {number} w 新宽度（CSS px）
+ * @param {number} h 新高度（CSS px）
+ * @param {object} [scale] computePixelScale 结果（缺省按 w/h + DPR 计算）
+ * @perf-impact: [R1] renderer backing = 逻辑分辨率（≈ CSS/2），WebGL 填充像素约为原 DPR 渲染的 1/(4·DPR²)
  */
-export function pixiResize(w, h) {
+export function pixiResize(w, h, scale) {
     if (!_active || !pixiApp) return;
-    pixiApp.renderer.resize(w, h);
+    const s = scale || computePixelScale({ cssW: w, cssH: h, dpr: window.devicePixelRatio || 1 });
+    pixiApp.renderer.resize(s.logicalW, s.logicalH);
+    _applyPixelViewSize(s);
+}
+
+/**
+ * [R1] 设定 Pixi 层的像素放大：stage 缩放 artPerCss，CSS 尺寸 = 主画布 CSS 尺寸（整数 k 倍最近邻放大）。
+ * @param {object} s computePixelScale 结果
+ */
+function _applyPixelViewSize(s) {
+    if (!pixiApp) return;
+    pixiApp.stage.scale.set(s.artPerCss);
+    const view = pixiApp.view;
+    if (view && view.style) {
+        view.style.width = `${s.cssW}px`;
+        view.style.height = `${s.cssH}px`;
+    }
+}
+
+/**
+ * [R1] Pixi 全局像素风默认：纹理默认 NEAREST、精灵顶点取整（按 7.x API 做特性检测）。
+ */
+function _applyPixelArtDefaults() {
+    const nearest = PIXI.SCALE_MODES && PIXI.SCALE_MODES.NEAREST;
+    if (nearest === undefined) return;
+    if (PIXI.BaseTexture && PIXI.BaseTexture.defaultOptions) {
+        PIXI.BaseTexture.defaultOptions.scaleMode = nearest;
+    } else if (PIXI.settings && 'SCALE_MODE' in PIXI.settings) {
+        PIXI.settings.SCALE_MODE = nearest;
+    }
+    if (PIXI.settings && 'ROUND_PIXELS' in PIXI.settings) {
+        PIXI.settings.ROUND_PIXELS = true;
+    }
 }
 
 /**

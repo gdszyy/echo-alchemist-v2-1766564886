@@ -252,6 +252,13 @@
 | R5 特效像素化 | §4 的四条检查、元素合并、四档数值、反馈清单 | R1 | 敌人框内命中后 >2 帧无色相变化的机检 |
 | R6 正式素材 | 提示词包 → 用户 MiniMax 生成 → 管线 → 人工修 | R3 | 敌人契约机检 + 人工评审 |
 
+### R1 实现状态（2026-10-22，分支 `codex/REQ-20261022-render-r1`，待验收）
+
+- **已落地**：`src/render/pixel_scale.js`（`k = max(2, round(2·DPR))`，DPR 1 时也保持 2 CSS px/美术像素）；`this.ctx` 改为逻辑分辨率低清缓冲、`this.screenCtx` 为主画布，`sys_loop` 每帧 `setTransform(artPerCss)` + `sys_blitPixelBuffer` 一次最近邻放大；每次 resize 重设 `imageSmoothingEnabled = false`；Pixi 改逻辑分辨率 + `stage.scale(artPerCss)` + NEAREST + `ROUND_PIXELS`；`#gameCanvas` / Pixi 层 `image-rendering: pixelated`；CRT 默认关（仅 `ea_crt_enabled === 'true'` 时开，开关仍可用）；`src/render/pixel_font.js` 伤害数字位图字体 + `getDamageTier` 四档（T1 3×5；T2 5×7；T3 3×5×2 + 粗描边；T4 同 T3 + 弹跳）。
+- **坐标**：游戏逻辑仍是 CSS px；`game.width/height` = 主画布实际 CSS 尺寸（比容器小 < k 个设备像素，右/下留边），输入映射与 DOM→画布换算比例恰为 1。
+- **验证**：DPR 1 / 2 / 2.625 / 3 下主画布 backing 全部 k×k 块均匀（采集与战斗阶段各抽检 62271 块，0 例外）；2D 缓冲与 Pixi 层同坐标标记像素级对齐；Pixi 伤害数字逐像素等于位图（196/196）；`tests/validate_pixel_render.mjs` 231 条。
+- **未完成 / 已知差距**：中文等非数字浮动文字仍是 fillText（在低清缓冲里栅格化，块状但字形粗糙）；位图素材仍是涂抹风（下采样用最近邻，细节会有噪点），待 R3 管线；伤害数字边框区分来源、同敌叠加显示、T3/T4 每帧爆发预算属 R5；真机帧时间未测。
+
 ---
 
 ## 8. 用户拍板记录（2026-10-22，全部采纳建议项）

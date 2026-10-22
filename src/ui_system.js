@@ -2442,7 +2442,7 @@ export const ui_system = {
         if (dmgRow) showDmgNum ? dmgRow.classList.add('active') : dmgRow.classList.remove('active');
 
         // 同步 CRT 状态
-        const isCrtOn = localStorage.getItem('ea_crt_enabled') !== 'false';
+        const isCrtOn = localStorage.getItem('ea_crt_enabled') === 'true'; // [R1 / A4] 默认关闭
         const crtBadge = document.getElementById('pause-crt-badge');
         const crtRow = document.getElementById('pause-crt-row');
         if (crtBadge) {
