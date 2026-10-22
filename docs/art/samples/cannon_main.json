@@ -1,0 +1,27 @@
+{
+  "asset": "cannon_main",
+  "kind": "device",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 32,
+  "frame_h": 32,
+  "frames": [
+    {
+      "index": 0,
+      "label": "idle",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "loaded",
+      "x": 32,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "firing",
+      "x": 64,
+      "y": 0
+    }
+  ]
+}

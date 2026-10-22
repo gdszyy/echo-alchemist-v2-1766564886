@@ -1,0 +1,75 @@
+{
+  "asset": "enemy_residue_1x1",
+  "kind": "enemy",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "frames": [
+    {
+      "index": 0,
+      "label": "idle_a",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "idle_b",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "hit_flash",
+      "x": 48,
+      "y": 0
+    },
+    {
+      "index": 3,
+      "label": "hp_75",
+      "x": 72,
+      "y": 0
+    },
+    {
+      "index": 4,
+      "label": "hp_50",
+      "x": 96,
+      "y": 0
+    },
+    {
+      "index": 5,
+      "label": "hp_25",
+      "x": 120,
+      "y": 0
+    },
+    {
+      "index": 6,
+      "label": "frozen",
+      "x": 144,
+      "y": 0
+    },
+    {
+      "index": 7,
+      "label": "burning",
+      "x": 168,
+      "y": 0
+    },
+    {
+      "index": 8,
+      "label": "death_1",
+      "x": 192,
+      "y": 0
+    },
+    {
+      "index": 9,
+      "label": "death_2",
+      "x": 216,
+      "y": 0
+    }
+  ],
+  "fill_ratio_frames": [
+    "idle_a",
+    "idle_b"
+  ],
+  "protected": "face + core sockets (dilated 1px) never removed by damage stages",
+  "damage_seed": 20261022
+}

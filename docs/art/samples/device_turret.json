@@ -1,0 +1,27 @@
+{
+  "asset": "device_turret",
+  "kind": "device",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 24,
+  "frames": [
+    {
+      "index": 0,
+      "label": "powered_idle",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "index": 1,
+      "label": "firing",
+      "x": 24,
+      "y": 0
+    },
+    {
+      "index": 2,
+      "label": "unpowered",
+      "x": 48,
+      "y": 0
+    }
+  ]
+}

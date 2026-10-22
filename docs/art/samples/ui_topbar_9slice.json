@@ -1,0 +1,21 @@
+{
+  "asset": "ui_topbar_9slice",
+  "kind": "ui",
+  "palette": "docs/art/pixel_pipeline/palette.json",
+  "frame_w": 24,
+  "frame_h": 17,
+  "frames": [
+    {
+      "index": 0,
+      "label": "topbar_9slice",
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nine_slice": {
+    "left": 6,
+    "right": 6,
+    "top": 1,
+    "bottom": 4
+  }
+}
