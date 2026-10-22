@@ -1,0 +1,32 @@
+# Railway `railway up` upload filter (gitignore syntax).
+# The repo is ~740MB, mostly design docs and 1248px source images; the upload
+# endpoint rejects that (413). Keep only what the static game loads at runtime.
+
+# Design docs, except the music clip pack the runtime fetches
+docs/*
+!docs/architecture/
+docs/architecture/*
+!docs/architecture/music_processing/
+
+# Dev-only folders
+tests/
+scripts/
+tools/
+artifacts/
+tmp/
+assets_src/
+architecture-graph/
+tasks/
+skills/
+.cursor/
+
+# Source / raw images (runtime only loads assets/sprites/bosses/raw/*_idle_raw.png)
+**/*_raw*.png
+!assets/sprites/bosses/raw/*_raw.png
+**/archive/
+
+# Unreferenced intermediates (verified: no runtime path mentions these)
+**/source_ai/
+**/drafts/
+**/*_chroma.png
+**/*_alpha_full.png
