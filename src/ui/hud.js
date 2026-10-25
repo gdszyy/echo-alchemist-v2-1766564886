@@ -1017,8 +1017,10 @@ export const hud_system = {
      * @description 常显读数：本波弹药剩 N 发 · 打空即换波。发数直接读 this.ammoQueue.length
      *   （ammoQueue[0] 是当前这一发，故队列长度就是本波剩余发数），不另算一份。
      *   N === 0 时追加一行「本波结束 → 下一波在整备页换弹后按开战」，回答「我现在该做什么」。
+     * @param {boolean} measureLayout 是否重新量 dock / 守卫 HUD 高度来定位。逐帧调用方传 false，
+     *   自己按每 30 帧一次的节奏传 true；其它调用方（渲染入口、换波事件）用默认 true 即可。
      */
-    _hud_renderWaveReadout() {
+    _hud_renderWaveReadout(measureLayout = true) {
         if (typeof document === 'undefined') return null;
         const host = this._hud_ensureWaveReadout();
         if (!host) return null;
@@ -1028,13 +1030,16 @@ export const hud_system = {
             host.textContent = '';
             return null;
         }
-        const dock = document.getElementById('combat-bottom-dock');
-        // defend_hud.js 也用 `dock.offsetHeight + 4` 抬升守卫 HUD，两处若同值就会叠在一起压住读数；
-        // 守卫 HUD 有设施时占位，读数再往上让一档（hidden 时 offsetHeight === 0，不占位）。
-        const defendHud = document.getElementById('defend-hud');
-        const defendH = defendHud && !defendHud.hidden && defendHud.offsetHeight > 0 ? defendHud.offsetHeight + 6 : 0;
-        const bottomPx = dock && dock.offsetHeight > 0 ? `${dock.offsetHeight + 4 + defendH}px` : '';
-        if (bottomPx && host.style.bottom !== bottomPx) host.style.bottom = bottomPx;
+        // 读 offsetHeight 会触发一次强制同步布局；逐帧调用时只每 30 帧量一次（尺寸只随断点/守卫 HUD 变）。
+        if (measureLayout) {
+            const dock = document.getElementById('combat-bottom-dock');
+            // defend_hud.js 也用 `dock.offsetHeight + 4` 抬升守卫 HUD，两处若同值就会叠在一起压住读数；
+            // 守卫 HUD 有设施时占位，读数再往上让一档（hidden 时 offsetHeight === 0，不占位）。
+            const defendHud = document.getElementById('defend-hud');
+            const defendH = defendHud && !defendHud.hidden && defendHud.offsetHeight > 0 ? defendHud.offsetHeight + 6 : 0;
+            const bottomPx = dock && dock.offsetHeight > 0 ? `${dock.offsetHeight + 4 + defendH}px` : '';
+            if (bottomPx && host.style.bottom !== bottomPx) host.style.bottom = bottomPx;
+        }
 
         const left = Math.max(0, Math.floor((this.ammoQueue || []).length));  // [Mixin 正常用法：读取 Game 实例状态]
         const sig = String(left);
@@ -1201,7 +1206,9 @@ export const hud_system = {
             if (e.pos && (e.pos.y + shiftY) > lineY) wave.leakedRefs.add(e);
         });
         wave.alive = alive;
-        this._hud_renderWaveReadout();
+        wave.tick = (wave.tick || 0) + 1;
+        // 逐帧只更新文本；布局测量每 30 帧一次（避免每帧强制同步布局）
+        this._hud_renderWaveReadout((wave.tick % 30) === 1);
         return true;
     },
 
