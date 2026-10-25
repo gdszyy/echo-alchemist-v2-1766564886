@@ -495,7 +495,9 @@ export const build_screen_system = {
         root.appendChild(scroll);
 
         // ---------- 本波弹药（现有料 / 预演发数 / 弹药配方 / 本波将扣料） ----------
-        // 放在最前：这四块解释「这一波为什么只打得出 N 发」，而下面各面板正是改变这四条上限的杠杆。
+        // 这四块解释「这一波为什么只打得出 N 发」，而设施 / 工厂网格正是改变这四条上限的杠杆之一。
+        // [首屏顺序 2026-10-26] 本块**先构建、后落位**：真落位在网格面板之后的统一 append 处，
+        //   因为教程第 9 步要求「建造一座设施」，而改造前本块占满首屏、建造面落在折叠线以下。
         // 任何异常都只让这一块降级为占位，整备屏其余面板照常渲染。
         let ammoPanel = null;
         try {
@@ -503,13 +505,14 @@ export const build_screen_system = {
         } catch (err) {
             ammoPanel = null;
         }
+        let ammoBlock;
         if (ammoPanel) {
-            scroll.appendChild(ammoPanel);
+            ammoBlock = ammoPanel;
         } else {
-            scroll.appendChild(createPanel({
+            ammoBlock = createPanel({
                 title: '本波弹药', hint: '料 → 弹 · 每发扣料', id: 'build-ammo',
                 children: [el('p', 'build-locked-note', { text: PREVIEW_UNAVAILABLE_TEXT })],
-            }));
+            });
         }
 
         // ---------- 主炮 ----------
@@ -551,7 +554,8 @@ export const build_screen_system = {
             });
             branchRow.appendChild(opts);
         }
-        scroll.appendChild(createPanel({ title: '主炮', hint: '无限弹药 · 限射速', children: [...tracks, branchRow], id: 'build-cannon' }));
+        // [首屏顺序 2026-10-26] 先构建、后落位（落位在网格面板之后的统一 append 处）。
+        const cannonBlock = createPanel({ title: '主炮', hint: '无限弹药 · 限射速', children: [...tracks, branchRow], id: 'build-cannon' });
 
         // ---------- 设施 ----------
         // 面板按「**有没有已解锁的设施**」决定渲染，不按 `'slots'`：
@@ -631,7 +635,8 @@ export const build_screen_system = {
             });
             facPanelChildren.push(grid);
         }
-        scroll.appendChild(createPanel({ title: '设施', hint: '敌人回合前按冷却自动触发', children: facPanelChildren, id: 'build-facilities' }));
+        // [首屏顺序 2026-10-26] 先构建、后落位（落位在网格面板之后的统一 append 处）。
+        const facilityBlock = createPanel({ title: '设施', hint: '敌人回合前按冷却自动触发', children: facPanelChildren, id: 'build-facilities' });
 
         // ---------- 工厂网格（[批次 2] 只读盘面 ＋ [批次 3] 扩建一行） ----------
         // 每一格只看「谁在哪一格」：`buildGrid.cells[i].slot` → `state.facilities[slot]`。
@@ -708,7 +713,18 @@ export const build_screen_system = {
         // `--build-grid-cols` 设在 `#build-grid` 上，`.build-grid` 子容器继承（列数只此一处来源）。
         // 用 setAttribute 写内联自定义属性：真实 DOM 与测试夹具（只有 setAttribute，没有 style 对象）都能落地。
         gridPanel.setAttribute('style', `--build-grid-cols: ${buildGrid.cols};`);
-        scroll.appendChild(gridPanel);
+        // ---------- 面板落位顺序（首屏优先放建造面） ----------
+        // 2026-10-26 修：改造前面板按「本波弹药 → 主炮 → 设施 → 工厂网格 → 道具 → 挖矿 → 弹匣」落位，
+        //   而教程第 9 步（`build_facility`）要求的动作是「建造一座设施」⇒ 玩家首屏看不到任何建造入口，
+        //   得先自己想到往下滚（实测 1280×800 首屏可视 646px，`#build-facilities` 在 885、`#build-grid` 在 1155）。
+        //   另一条路（把设施提成滚动区之上的常驻块）已实测否决：375×812 下滚动区被压到 225px、滚动比 3:1 → 5.84:1，
+        //   扩建按钮又落回折叠线以下（y≈873），属于把走查 C-5 换个形式重演。
+        // 这里只调**顺序**，不动字号 / 行高 / 内边距 —— 不靠挤压换空间（同屏的「目标」行已被挤过一次，见走查 R-3）。
+        //   「本波弹药」仍紧跟在两处建造面之后：它解释「这一波为什么只打得出 N 发」，
+        //   而设施（工坊 / 发电机）正是改变那四条上限的杠杆之一，因果相邻、不拆开。
+        [facilityBlock, gridPanel, ammoBlock, cannonBlock].forEach(node => {
+            if (node) scroll.appendChild(node);
+        });
 
         // ---------- 道具 ----------
         const itemsCfg = cfg().items || {};

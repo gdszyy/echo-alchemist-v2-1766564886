@@ -176,7 +176,7 @@ const TUTORIAL_STEPS = [
         narrowDock: '#build-fight-btn',
         // [教程卡片避让高亮目标] 整备屏这两步都要求玩家点「开战」/选弹药配方，
         // 卡片一律不许压它们（build_facility 没有高亮框，靠这份清单兜住）。
-        keepOutSelectors: ['#build-fight-btn', '#build-ammo button[data-recipe]'],
+        keepOutSelectors: ['#build-fight-btn', '#build-ammo button[data-recipe]', '#build-facilities .build-slot__btn'],
         noOverlay: true,
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         waitForEventFilter: (data) => data && data.to === 'combat',
@@ -259,7 +259,7 @@ const TUTORIAL_STEPS = [
         narrowDock: '#build-fight-btn',
         // [教程卡片避让高亮目标] 整备屏这两步都要求玩家点「开战」/选弹药配方，
         // 卡片一律不许压它们（build_facility 没有高亮框，靠这份清单兜住）。
-        keepOutSelectors: ['#build-fight-btn', '#build-ammo button[data-recipe]'],
+        keepOutSelectors: ['#build-fight-btn', '#build-ammo button[data-recipe]', '#build-facilities .build-slot__btn'],
         noOverlay: true,
         // 进到第 2 波整备才显示
         preWaitEvent: EVENT_TYPES.PHASE_CHANGED,
@@ -275,31 +275,29 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 5 步：教程完成 ─────────────────────────────────────────────────────
-    // [ux-20261025 P0-3] 完成卡延到「第 2 波整备」。玩家点开战进第 2 波时自动收尾，
-    // 不让完成卡跟着盖到战斗屏上。
-    {
-        id: 'tutorial_complete',
-        phase: null,
-        targetId: null,
-        highlightSelector: null,
-        title: '教程完成！',
-        content: `
-            <p>你已掌握《回声炼金师》的基础循环：<strong>挖 → 整备 → 守</strong>。</p>
-            <p class="mt-2">后面每一波都重复这套；敌人越靠下越危险，尽量在它们到底之前清掉。</p>
-            <p class="mt-3 text-amber-400 font-bold text-center">祝你炼金愉快！⚗️</p>
-        `,
-        position: 'center',
-        noOverlay: false,
-        // 进第 2 波战斗即自动收尾（玩家没点完成卡也不会挡住战斗屏）
-        autoEndEvent: EVENT_TYPES.PHASE_CHANGED,
-        autoEndFilter: (data) => !!(data && data.to === 'combat'),
-        waitForEvent: null,
-        autoAdvance: false,
-        actionLabel: null,
-        actionFn: null,
-    },
 ];
+
+/**
+ * 教程完成提示（**不在编号序列里**，不参与 `Step N / total` 计数）。
+ *
+ * 2026-10-26 修（走查 C-4）：这一项原先是 `TUTORIAL_STEPS` 的第 10 项，于是进度条承诺「/ 10」，
+ *   而两条收尾路径里只有「真造了设施」会走到它 —— 玩家在第 9 步直接点「开战」时教程当场收尾
+ *   （`build_facility` 的 `waitEndsTutorial` + `waitForEvent → combat`），第 10 步一次都不显示，
+ *   现场读数就是「进度条写着 9/10，我点了开战，教程就没了」。
+ * 只把 `total` 减一同样是错的：真造了设施的玩家会看到「Step 10 / 9」。
+ * 所以把完成卡从编号序列里拆出来：`TUTORIAL_STEPS` 只剩 9 个真正的引导步骤（分母与事实一致），
+ *   完成提示改由 `_tutorial_showCompleteNotice()` 在**任何**收尾路径上单独弹一次。
+ * 保留原来的标题与正文：文案本身没有「进度」含义，不需要改写。
+ */
+const TUTORIAL_COMPLETE_NOTICE = {
+    id: 'tutorial_complete',
+    title: '教程完成！',
+    content: `
+        <p>你已掌握《回声炼金师》的基础循环：<strong>挖 → 整备 → 守</strong>。</p>
+        <p class="mt-1">后面每一波都重复这套；敌人越靠下越危险，尽量在它们到底之前清掉。</p>
+        <p class="mt-1 text-amber-400 font-bold">祝你炼金愉快！⚗️</p>
+    `,
+};
 
 // ==================== 教程子系统 ====================
 export const tutorial_system = {
@@ -319,6 +317,9 @@ export const tutorial_system = {
     // [教程卡片避让高亮目标] 视口尺寸变化后重算落位（卡片定位是「视口高度相关」的）
     _tutorialResizeHandler: null,
     _tutorialResizeRaf: null,
+    // [2026-10-26] 完成提示（不在编号序列里）：元素与自动收起定时器
+    _tutorialNoticeEl: null,
+    _tutorialNoticeTimer: null,
 
     // ==================== 公开 API ====================
 
@@ -422,6 +423,10 @@ export const tutorial_system = {
         if (markCompleted) {
             this.saveData.tutorialCompleted = true;
             this.sys_saveData();
+            // [2026-10-26] 完成提示不参与编号序列，改为这里单独弹一次：
+            // 两条收尾路径（真造了设施 / 直接点开战）都走本方法，所以两条都只说一次、不重复。
+            // `markCompleted === false` 是「重开 / 重放 / 局作用域清理」这类中止路径，不弹。
+            this._tutorial_showCompleteNotice();
         }
     },
 
@@ -445,6 +450,74 @@ export const tutorial_system = {
      */
     tutorial_skipAll() {
         this.tutorial_end(true);
+    },
+
+    /**
+     * @method _tutorial_showCompleteNotice
+     * @description 教程收尾后单独弹一次「教程完成」提示（不参与 `Step N / total` 计数）。
+     *   任何收尾路径（真造了设施 / 直接点开战 / 跳过）都只走这里一次。
+     *   **绝不拦输入**：容器 `pointer-events: none`、且不带任何按钮 —— 它既不能挡住整备屏的
+     *   「开战」，也不能挡住战斗里的拖拽发射。（旧版完成卡是居中模态，正因为会盖住战斗屏才被挪走。）
+     *   挂在常驻的 `#game-container` 上（与 `.combat-wave-summary` 同一挂法），这样整备屏 / 战斗屏
+     *   两种收尾现场都能显示，且随容器一起被裁，不会自己造出水平滚动。
+     * @private
+     */
+    _tutorial_showCompleteNotice() {
+        if (typeof document === 'undefined') return;
+        // 收起上一条（同一局内只该有一条；重放教程后再次收尾也要能重弹）
+        const stale = document.getElementById('tutorial-complete-notice');
+        if (stale) stale.remove();
+        if (this._tutorialNoticeTimer) {
+            clearTimeout(this._tutorialNoticeTimer);
+            this._tutorialNoticeTimer = null;
+        }
+        const host = document.getElementById('game-container') || document.body;
+        if (!host) return;
+        const box = document.createElement('div');
+        box.id = 'tutorial-complete-notice';
+        box.setAttribute('role', 'status');
+        // 顶部信息栏高 54px（`#unified-top-bar`）⇒ 贴在它下面，不进底部的弹药舱 / 操作区。
+        // 左右各留 8px、`box-sizing: border-box`：宽度由 left/right 定，不产生横向溢出。
+        box.style.cssText = `
+            position: absolute;
+            top: 62px;
+            left: 8px;
+            right: 8px;
+            box-sizing: border-box;
+            z-index: 8500;
+            pointer-events: none;
+            padding: 10px 12px;
+            border: 1px solid rgba(245, 158, 11, 0.55);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #e2e8f0;
+            font-family: 'Noto Serif TC', serif;
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+            transition: opacity 0.45s ease;
+            opacity: 1;
+        `;
+        box.innerHTML = `
+            <div style="font-family:'Cinzel',serif;font-size:13px;color:#fbbf24;letter-spacing:0.06em;margin-bottom:4px;">${TUTORIAL_COMPLETE_NOTICE.title}</div>
+            <div>${TUTORIAL_COMPLETE_NOTICE.content}</div>
+        `;
+        host.appendChild(box);
+        this._tutorialNoticeEl = box;
+        // 停 6 秒后淡出再摘掉：够读完三行，又不至于长期占着上半屏。
+        const HOLD_MS = 6000;
+        this._tutorialNoticeTimer = setTimeout(() => {
+            this._tutorialNoticeTimer = null;
+            const el = document.getElementById('tutorial-complete-notice');
+            if (!el) return;
+            el.style.opacity = '0';
+            setTimeout(() => {
+                const gone = document.getElementById('tutorial-complete-notice');
+                if (gone) gone.remove();
+            }, 500);
+        }, HOLD_MS);
     },
 
     // ==================== 内部方法 ====================
@@ -800,7 +873,10 @@ export const tutorial_system = {
 
         const total = TUTORIAL_STEPS.length;
         const progress = ((index + 1) / total) * 100;
-        const isLast = index === total - 1;
+        // [2026-10-26] 没有 isLast 了：完成卡已移出编号序列（见 TUTORIAL_COMPLETE_NOTICE），
+        // 每个编号步骤都由自己的 waitForEvent / 「下一步」推进。
+        // 若仍按 `index === total - 1` 判，第 9 步（build_facility）会变成末项，
+        // 被塞上「开始游戏 🎮」按钮而绕过它自己的等待条件（原 10 项时末项是完成卡，才没有这个问题）。
 
         const indicator = document.getElementById('tutorial-step-indicator');
         if (indicator) indicator.textContent = `Step ${index + 1} / ${total}`;
@@ -824,14 +900,7 @@ export const tutorial_system = {
         nextBtn.onmouseover = () => { nextBtn.style.transform = 'scale(1.05)'; };
         nextBtn.onmouseout = () => { nextBtn.style.transform = 'scale(1)'; };
 
-        if (isLast) {
-            // 最后一步：完成教程
-            nextBtn.textContent = '开始游戏 🎮';
-            nextBtn.style.background = 'linear-gradient(135deg, #059669, #10b981)';
-            nextBtn.style.display = 'inline-block';
-            nextBtn.onclick = () => this.tutorial_end(true);
-
-        } else if (step.actionLabel) {
+        if (step.actionLabel) {
             // 需要玩家操作游戏：显示操作提示按钮
             // 按钮点击时调用对应游戏方法（如 meta_startRun），但不推进教程
             // 教程由 waitForEvent 事件自动推进
