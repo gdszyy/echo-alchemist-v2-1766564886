@@ -34,7 +34,9 @@ import { eventBus, EVENT_TYPES } from './event_bus.js';
  *   highlightSelector: string|null,// 优先使用的 CSS 选择器（覆盖 targetId）
  *   title: string,                 // 步骤标题
  *   content: string,               // 步骤说明文本（支持 HTML）
- *   position: string,              // 提示卡片位置：'top' | 'bottom' | 'center'
+ *   position: string,              // 卡片位置**偏好**：'top' | 'bottom' | 'center' | 'bottom-fixed' | 'narrow-safe'
+ *                                  //   有高亮目标 / keepOutSelectors 时偏好可被推翻，见 _tutorial_positionCard
+ *   keepOutSelectors: string[],    // 本步要求玩家点击、卡片绝不允许盖住的控件（可多选；无高亮框的步骤用它）
  *   noOverlay: boolean,            // 是否禁用遮罩（研磨阶段等需要玩家直接操作）
  *   waitForEvent: string|null,     // 等待某个 EventBus 事件后才自动前进
  *   waitForEventFilter: Function|null, // 过滤事件数据
@@ -63,7 +65,8 @@ const TUTORIAL_STEPS = [
         actionFn: null,
     },
     // ── 第 1 步：开始游戏按鈕 ─────────────────────────────────────────────────────
-    // 高亮「開始練成」按鈕，卡片固定在屏幕底部，不遮挡按钮，教程等待事件自动前进
+    // 高亮「開始練成」按鈕。position 只是**偏好**（优先贴底），实际落位由 _tutorial_positionCard 按
+    // 目标矩形避让决定：硬贴底在 1280×800 会把按钮压住 54px、1254×700 直接整颗盖掉（B-1）。
     {
         id: 'start_run',
         phase: 'meta',
@@ -73,7 +76,7 @@ const TUTORIAL_STEPS = [
         content: `
             <p>点击高亮的「<strong>開始練成</strong>」按鈕，开始新的一局冒险。</p>
             <p class="mt-2">每一局都是独立的旅程，你需要收集弹珠、击败敌人。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">↑ 直接点击上方高亮按鈕，教程自动继续</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 直接点击高亮按鈕，教程自动继续</p>
         `,
         position: 'bottom-fixed',
         noOverlay: false,
@@ -171,6 +174,9 @@ const TUTORIAL_STEPS = [
         // [ux-20261025 P0-2] 窄屏：卡片贴在「开战」按钮上方，不压开战
         narrowAnchor: 'above-dock',
         narrowDock: '#build-fight-btn',
+        // [教程卡片避让高亮目标] 整备屏这两步都要求玩家点「开战」/选弹药配方，
+        // 卡片一律不许压它们（build_facility 没有高亮框，靠这份清单兜住）。
+        keepOutSelectors: ['#build-fight-btn', '#build-ammo button[data-recipe]'],
         noOverlay: true,
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         waitForEventFilter: (data) => data && data.to === 'combat',
@@ -251,6 +257,9 @@ const TUTORIAL_STEPS = [
         position: 'narrow-safe',
         narrowAnchor: 'above-dock',
         narrowDock: '#build-fight-btn',
+        // [教程卡片避让高亮目标] 整备屏这两步都要求玩家点「开战」/选弹药配方，
+        // 卡片一律不许压它们（build_facility 没有高亮框，靠这份清单兜住）。
+        keepOutSelectors: ['#build-fight-btn', '#build-ammo button[data-recipe]'],
         noOverlay: true,
         // 进到第 2 波整备才显示
         preWaitEvent: EVENT_TYPES.PHASE_CHANGED,
@@ -307,6 +316,9 @@ export const tutorial_system = {
     _tutorialOverlayEl: null,
     _tutorialCardEl: null,
     _tutorialHighlightEl: null,
+    // [教程卡片避让高亮目标] 视口尺寸变化后重算落位（卡片定位是「视口高度相关」的）
+    _tutorialResizeHandler: null,
+    _tutorialResizeRaf: null,
 
     // ==================== 公开 API ====================
 
@@ -552,6 +564,7 @@ export const tutorial_system = {
         `;
         document.body.appendChild(card);
         this._tutorialCardEl = card;
+        this._tutorial_installResizeReposition();
     },
 
     /**
@@ -563,6 +576,14 @@ export const tutorial_system = {
             const el = document.getElementById(id);
             if (el) el.remove();
         });
+        if (this._tutorialResizeRaf) {
+            cancelAnimationFrame(this._tutorialResizeRaf);
+            this._tutorialResizeRaf = null;
+        }
+        if (this._tutorialResizeHandler) {
+            window.removeEventListener('resize', this._tutorialResizeHandler);
+            this._tutorialResizeHandler = null;
+        }
         this._tutorialOverlayEl = null;
         this._tutorialHighlightEl = null;
         this._tutorialCardEl = null;
@@ -941,8 +962,10 @@ export const tutorial_system = {
     /**
      * @method _tutorial_positionCard
      * @description 定位教程卡片。
-     * 支持 position: 'bottom-fixed'，将卡片固定在屏幕底部中央，
-     * 适用于遗物选择、研磨阶段等需要玩家操作整个屏幕的步骤。
+     * 两条优先级：
+     *   ① 本步有「卡片不许压的东西」（高亮目标 / keepOutSelectors）→ 走 _tutorial_placeCardAvoiding，
+     *      position 降级为偏好；卡片**永不覆盖当前步骤要求玩家点击的控件**。
+     *   ② 没有禁压区 → 沿用旧语义（'bottom-fixed' 贴底 / 'center' 居中 / 窄屏 narrowAnchor / 'top'、'bottom'）。
      * @private
      */
     _tutorial_positionCard(step) {
@@ -956,12 +979,18 @@ export const tutorial_system = {
         // 窄屏先压缩卡片自身占位，再按控件避让定位
         this._tutorial_applyCardMetrics();
 
-        // 重置
+        // 重置（含高度限制：上一步可能为了塞进窄缝压过正文并开了内部滚动）
         card.style.left = '';
         card.style.right = '';
         card.style.top = '';
         card.style.bottom = '';
         card.style.transform = '';
+        card.style.width = '';
+        this._tutorial_resetCardHeight();
+
+        // [教程卡片避让高亮目标] 有禁压区就先避让：硬贴底 / 硬居中都会在「视口高度」变化时压住目标
+        // （1280×800 压按钮 54px、1254×700 整颗盖掉），所以落位必须按实测矩形算，不能靠固定偏移。
+        if (this._tutorial_placeCardAvoiding(step, card, vw, vh, cardWidth)) return;
 
         // [ux-20261025 P0-2] 窄屏专属排法：375 宽下列表/按钮全在屏幕下半，
         // 「居中 + 底对齐」的卡片必然压住玩家要点的控件，所以改为按控件避让。
@@ -970,7 +999,7 @@ export const tutorial_system = {
             return;
         }
 
-        // 固定在屏幕底部中央（遗物选择、研磨阶段使用）
+        // 固定在屏幕底部中央（遗物选择、研磨阶段使用；这些步骤没有禁压区）
         if (step.position === 'bottom-fixed') {
             card.style.left = `${(vw - cardWidth) / 2}px`;
             card.style.bottom = '16px';
@@ -1018,6 +1047,223 @@ export const tutorial_system = {
             card.style.left = `${(vw - cardWidth) / 2}px`;
             card.style.top = `${(vh - 320) / 2}px`;
         }
+    },
+
+    /**
+     * @method _tutorial_installResizeReposition
+     * @description [教程卡片避让高亮目标] 落位是「视口尺寸相关」的：窗口一改（含 700↔800 切换、旋转屏），
+     * 上一帧算好的位置可能正好压住目标。resize 后按当前步骤重算一次（rAF 合并连续抖动）。
+     * @private
+     */
+    _tutorial_installResizeReposition() {
+        if (this._tutorialResizeHandler) return;
+        this._tutorialResizeHandler = () => {
+            if (!this._tutorialActive) return;
+            if (this._tutorialResizeRaf) return;
+            this._tutorialResizeRaf = requestAnimationFrame(() => {
+                this._tutorialResizeRaf = null;
+                const step = TUTORIAL_STEPS[this._tutorialStepIndex];
+                if (!step || !this._tutorialCardEl) return;
+                this._tutorial_updateHighlight(step);
+                this._tutorial_positionCard(step);
+            });
+        };
+        window.addEventListener('resize', this._tutorialResizeHandler);
+    },
+
+    /**
+     * @method _tutorial_getHighlightTarget
+     * @description 取当前步骤的高亮目标元素；不存在 / 没有实测尺寸时返回 null。
+     * @private
+     */
+    _tutorial_getHighlightTarget(step) {
+        const selector = step.highlightSelector || (step.targetId ? `#${step.targetId}` : null);
+        if (!selector) return null;
+        const el = document.querySelector(selector);
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        return (rect.width > 0 && rect.height > 0) ? el : null;
+    },
+
+    /**
+     * @method _tutorial_collectKeepouts
+     * @description 收集「卡片绝不允许压住」的矩形。两类来源：
+     *   ① 当前步骤的高亮目标（highlightSelector / targetId）——压住它，玩家就点不到教程让他点的东西；
+     *   ② 步骤显式声明的 keepOutSelectors——没有高亮框、但同属本步要求玩家点击的控件
+     *      （例：整备屏的「开战」与三条弹药配方）。
+     * 只收实测宽高 > 0 的元素：display:none 的占位不参与，否则会把卡片挤到屏幕外。
+     * @private
+     */
+    _tutorial_collectKeepouts(step) {
+        const out = [];
+        const push = (label, el) => {
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            if (!(rect.width > 0 && rect.height > 0)) return;
+            out.push({ label, rect });
+        };
+        push('highlight', this._tutorial_getHighlightTarget(step));
+        const selectors = Array.isArray(step.keepOutSelectors) ? step.keepOutSelectors : [];
+        selectors.forEach((sel) => {
+            let list = [];
+            try { list = Array.from(document.querySelectorAll(sel)); } catch (e) { list = []; }
+            list.forEach((el, idx) => push(`${sel}#${idx}`, el));
+        });
+        return out;
+    },
+
+    /**
+     * @method _tutorial_rectsOverlap
+     * @description 两矩形是否真重叠（贴边不算重叠）。
+     * @private
+     */
+    _tutorial_rectsOverlap(a, b) {
+        return Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0
+            && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0;
+    },
+
+    /**
+     * @method _tutorial_resetCardHeight
+     * @description 清掉上一步留下的高度限制，恢复卡片自然高度。
+     * @private
+     */
+    _tutorial_resetCardHeight() {
+        const card = this._tutorialCardEl;
+        if (!card) return;
+        card.style.maxHeight = '';
+        card.style.overflowY = '';
+        const contentEl = document.getElementById('tutorial-content');
+        if (contentEl) {
+            contentEl.style.maxHeight = '';
+            contentEl.style.overflowY = '';
+            contentEl.style.paddingRight = '';
+        }
+    },
+
+    /**
+     * @method _tutorial_limitCardHeight
+     * @description [教程卡片避让高亮目标] 上下都塞不下整张卡片时，把卡片压进可用高度，
+     * 并让**正文区**内部滚动——标题、跳过、下一步始终可见。
+     * 明确不做：缩字号糊过去、干脆不显示卡片。
+     * @param {number} availableH 允许的卡片最大高度（px）
+     * @returns {number} 压缩后的实测卡片高度
+     * @private
+     */
+    _tutorial_limitCardHeight(availableH) {
+        const card = this._tutorialCardEl;
+        if (!card) return 0;
+        this._tutorial_resetCardHeight();
+        const naturalH = card.getBoundingClientRect().height;
+        const limit = Math.max(120, Math.floor(availableH));
+        if (naturalH <= limit) return naturalH;
+
+        const contentEl = document.getElementById('tutorial-content');
+        const contentH = contentEl ? contentEl.getBoundingClientRect().height : 0;
+        const chromeH = naturalH - contentH;          // 步骤行 / 进度条 / 按钮行 / 内边距
+        const contentRoom = limit - chromeH;
+        card.style.maxHeight = `${limit}px`;
+        if (contentH > 0 && contentRoom >= 72) {
+            contentEl.style.maxHeight = `${Math.floor(contentRoom)}px`;
+            contentEl.style.overflowY = 'auto';
+            contentEl.style.paddingRight = '6px';     // 给滚动条让位，避免压字
+        } else {
+            card.style.overflowY = 'auto';
+        }
+        return card.getBoundingClientRect().height;
+    },
+
+    /**
+     * @method _tutorial_placeCardAvoiding
+     * @description [教程卡片避让高亮目标] 按实测矩形落位，保证卡片不覆盖本步要求玩家点击的控件。
+     * 顺序：
+     *   ① 目标在下半屏 ⇒ 放上方；目标在上半屏 ⇒ 放下方（与任务定义一致）；上下都塞得下才用自然高度；
+     *   ② 上下都不够 → 退到目标左右两侧空白；
+     *   ③ 侧边也没有（窄屏必然如此）→ 贴到不重叠的一侧，把卡片压进那一侧可用高度，正文内部滚动；
+     *   ④ 最后兜底：取上下空间较大的一侧，压到该侧可用量（宁压内容不压目标）。
+     * @returns {boolean} true = 已落位；false = 本步没有禁压区 / 卡片当前不可量，交回既有分支
+     * @private
+     */
+    _tutorial_placeCardAvoiding(step, card, vw, vh, cardWidth) {
+        const keepouts = this._tutorial_collectKeepouts(step);
+        if (!keepouts.length) return false;
+
+        const GAP = 16;       // 卡片与目标之间的间距
+        const MARGIN = 8;     // 视口安全边距
+        const rects = keepouts.map(k => k.rect);
+        const union = {
+            left: Math.min(...rects.map(r => r.left)),
+            top: Math.min(...rects.map(r => r.top)),
+            right: Math.max(...rects.map(r => r.right)),
+            bottom: Math.max(...rects.map(r => r.bottom)),
+        };
+        union.height = union.bottom - union.top;
+
+        // 1) 先清掉上一步的压缩，再量自然高度（卡片隐藏时高度≈0，交回既有分支）
+        this._tutorial_resetCardHeight();
+        card.style.width = `${Math.min(cardWidth, vw - MARGIN * 2)}px`;
+        const naturalH = card.getBoundingClientRect().height;
+        if (naturalH < 20) return false;
+
+        const w = Math.min(cardWidth, vw - MARGIN * 2);
+        const clampLeft = (left) => Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
+        const conflicts = (left, top, h) => {
+            const probe = { left, top, right: left + w, bottom: top + h };
+            return rects.some(r => this._tutorial_rectsOverlap(probe, r));
+        };
+        const inViewport = (left, top, h) =>
+            left >= MARGIN - 0.5 && top >= MARGIN - 0.5
+            && left + w <= vw - MARGIN + 0.5 && top + h <= vh - MARGIN + 0.5;
+        const place = (left, top) => {
+            card.style.left = `${Math.round(left)}px`;
+            card.style.top = `${Math.round(top)}px`;
+            card.style.right = '';
+            card.style.bottom = '';
+        };
+        const candidateFor = (dir, h) => {
+            if (dir === 'above') return { left: clampLeft(union.left), top: union.top - GAP - h };
+            if (dir === 'below') return { left: clampLeft(union.left), top: union.bottom + GAP };
+            if (dir === 'left') return { left: union.left - GAP - w, top: union.top };
+            return { left: union.right + GAP, top: union.top };
+        };
+
+        // 2) 方向偏好：目标主体在下半屏 ⇒ 卡片放上方；在上半屏 ⇒ 放下方
+        const targetMidY = union.top + union.height / 2;
+        const DIRS = (targetMidY > vh / 2)
+            ? ['above', 'below', 'right', 'left']
+            : ['below', 'above', 'left', 'right'];
+
+        // 3) 自然高度整张卡片
+        for (const dir of DIRS) {
+            const c = candidateFor(dir, naturalH);
+            if (inViewport(c.left, c.top, naturalH) && !conflicts(c.left, c.top, naturalH)) {
+                place(c.left, c.top);
+                return true;
+            }
+        }
+
+        // 4) 压进可用高度 + 正文内部滚动：可用空间从大到小择优
+        const rooms = [
+            { dir: 'above', room: union.top - GAP - MARGIN },
+            { dir: 'below', room: vh - MARGIN - (union.bottom + GAP) },
+        ].filter(s => s.room >= 150).sort((a, b) => b.room - a.room);
+        for (const s of rooms) {
+            const h = this._tutorial_limitCardHeight(s.room);
+            const c = candidateFor(s.dir, h);
+            if (inViewport(c.left, c.top, h) && !conflicts(c.left, c.top, h)) {
+                place(c.left, c.top);
+                return true;
+            }
+        }
+
+        // 5) 兜底：上下空间较大的一侧，压到该侧可用量（宁压内容、不压目标）
+        const aboveRoom = union.top - GAP - MARGIN;
+        const belowRoom = vh - MARGIN - (union.bottom + GAP);
+        const dir = aboveRoom >= belowRoom ? 'above' : 'below';
+        const room = Math.max(120, Math.max(aboveRoom, belowRoom));
+        const h = Math.min(this._tutorial_limitCardHeight(room), room);
+        const c = candidateFor(dir, h);
+        place(c.left, Math.max(MARGIN, Math.min(c.top, vh - MARGIN - h)));
+        return true;
     },
 
     /**
