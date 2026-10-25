@@ -4,7 +4,8 @@
   "description": "Echo Alchemist deployed via Railway",
   "main": "index.js",
   "scripts": {
-    "start": "npx serve . -l 3002"
+    "prestart": "node scripts/build_public.mjs",
+    "start": "npx serve public -l 3002"
   },
   "dependencies": {
     "serve": "^14.2.4"

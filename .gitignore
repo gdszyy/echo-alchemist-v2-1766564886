@@ -1,4 +1,5 @@
 node_modules/
+public/
 .codex_tmp/
 .tmp-serve-*.log
 tmp/
