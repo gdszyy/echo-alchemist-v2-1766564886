@@ -653,3 +653,140 @@
     flex-wrap: wrap;
     gap: var(--s1) var(--s2);
 }
+
+/* ==================== [REQ-20261022-wave-loop S3] 战斗态波次读数 / 换波结论 ====================
+ * 读数 .combat-wave-readout 挂在 #phase-combat 内（只在战斗态有意义）；
+ * 结论 .combat-wave-summary 挂在常驻的 #game-container（换波时战斗层已隐藏，挂里面看不到）。
+ * 两块都是绝对定位、pointer-events:none，不进 #combat-bottom-dock 的布局，
+ * 因此不改 dock / #recipe-hud-container 的几何（教程窄屏卡片靠 narrowDock 定位，不能被动到）。
+ * 读数底部偏移由 JS 按 dock.offsetHeight（+ 守卫 HUD 占位）覆写，与 defend_hud.js 同法但避开它的位置。
+ * 移动端红线：不出现水平滚动——行内用 flex-wrap 换行 + max-width，不写 overflow:auto/scroll，
+ * 也不靠裁切；数字走像素字体，正文走正文字体。 */
+.combat-wave-readout {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 108px;                 /* JS 覆写：dock.offsetHeight + 4 */
+    z-index: var(--z-hud);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s1);
+    max-width: min(30ch, 92%);
+    padding: var(--s1) var(--s3);
+    border: var(--px) solid var(--c-outline);
+    background: var(--c-bg-1);
+    color: var(--c-text);
+    font-family: var(--font-body);
+    font-size: var(--fs-xs);
+    line-height: 1.25;
+    pointer-events: none;
+}
+.combat-wave-readout.is-visible { display: flex; }
+.combat-wave-readout__main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: var(--s1);
+}
+.combat-wave-readout__kicker { color: var(--c-text-dim); }
+.combat-wave-readout__value {
+    color: var(--c-energy);
+    font-family: var(--font-pixel);
+    white-space: nowrap;
+}
+.combat-wave-readout__value b { font-size: var(--fs-sm); }
+.combat-wave-readout__sep { color: var(--c-text-locked); }
+.combat-wave-readout__rule { color: var(--c-text); }
+.combat-wave-readout.is-empty { border-color: var(--c-energy-dark); }
+.combat-wave-readout.is-empty .combat-wave-readout__value { color: var(--c-danger); }
+.combat-wave-readout__next {
+    color: var(--c-energy);
+    font-size: var(--fs-xs);
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* 换波结论挂在常驻的 #game-container 上（不是 #phase-combat）：ui:round_num_update 发出时战斗层
+ * 已 display:none，挂在战斗层里等于永远看不见（实测 rect 全 0）。定位取中上带，避开顶部信息栏
+ * （高 ~76px）与底部两页各自不同的操作区，因此不按 dock 高度算偏移。 */
+.combat-wave-summary {
+    position: absolute;
+    left: 50%;
+    top: 26%;
+    transform: translate(-50%, -50%);
+    z-index: var(--z-hud);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s1);
+    min-width: 168px;
+    max-width: min(34ch, 88%);
+    padding: var(--s2) var(--s3);
+    border: var(--px) solid var(--c-outline);
+    background: var(--c-bg-0);
+    box-shadow: inset 0 0 0 var(--px) rgba(245, 197, 66, 0.22), 0 0 0 var(--px) rgba(0, 0, 0, 0.55);
+    color: var(--c-text);
+    font-family: var(--font-body);
+    font-size: var(--fs-xs);
+    line-height: 1.25;
+    pointer-events: none;
+}
+.combat-wave-summary.is-visible { display: flex; }
+.combat-wave-summary__head {
+    color: var(--c-energy);
+    letter-spacing: 0.08em;
+}
+.combat-wave-summary__nums {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--s4);
+}
+.combat-wave-summary__cell {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s1);
+    white-space: nowrap;
+}
+.combat-wave-summary__label { color: var(--c-text-dim); }
+.combat-wave-summary__value {
+    font-family: var(--font-pixel);
+    font-size: var(--fs-sm);
+}
+.combat-wave-summary__cell.is-kill .combat-wave-summary__value { color: var(--c-ok); }
+.combat-wave-summary__cell.is-leak .combat-wave-summary__value { color: var(--c-danger); }
+.combat-wave-summary__cell.is-alive .combat-wave-summary__value { color: var(--c-energy); }
+.combat-wave-summary__rule {
+    color: var(--c-text-dim);
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* 弹药空态：bitmap_ui.css 的 .combat-ammo-empty-state 是单行居中，这里改成两行卡片式
+ * （标题「本波最後 N 發 / 彈藥已打空」+ 一行「打完即換波 / 本波結束」），仍是同一个类名与热区。 */
+#combat-bottom-dock .combat-ammo-empty-state {
+    flex-direction: column;
+    gap: var(--s1);
+    text-align: center;
+    line-height: 1.2;
+    min-width: 0;
+    padding: 0 var(--s1);
+    overflow-wrap: anywhere;
+}
+#combat-bottom-dock .combat-ammo-empty-title {
+    color: var(--c-energy);
+    font-size: 11px;
+    line-height: 1.15;
+}
+#combat-bottom-dock .combat-ammo-empty-step {
+    color: var(--c-text-dim);
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}

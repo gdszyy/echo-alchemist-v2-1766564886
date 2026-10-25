@@ -628,10 +628,8 @@ export const hud_system = {
                 combatHud.dataset.queueCount = String(upcomingRecipes.length);
 
                 if (upcomingRecipes.length === 0) {
-                    const empty = document.createElement('div');
-                    empty.className = 'combat-ammo-empty-state';
-                    empty.textContent = 'NO QUEUE';
-                    combatHud.appendChild(empty);
+                    // [REQ-20261022-wave-loop S3] 空态不再只有 NO QUEUE：要说清「还剩几发 / 到哪一步了」
+                    combatHud.appendChild(this._hud_buildAmmoEmptyState(recipes.length));
                 } else {
                     const nextRecipe = upcomingRecipes[0];
                     const nextProfile = getAmmoReadabilityProfile(nextRecipe);
@@ -722,6 +720,9 @@ export const hud_system = {
 
                 // [REQ-20261022-wave-loop S1] 炼成弹匣按钮行
                 this.ui_renderAlchemyMagazine(combatHud);
+
+                // [REQ-20261022-wave-loop S3] 本波弹药读数（常显：剩 N 发 · 打空即换波）
+                this._hud_renderWaveReadout();
             }
         }
         else {
@@ -984,6 +985,244 @@ export const hud_system = {
             row.appendChild(btn);
         });
         host.appendChild(row);
+    },
+
+    // ==================== [REQ-20261022-wave-loop S3] 本波弹药读数 + 换波结论 ====================
+    // 目的：把「本回合的结束条件是玩家弹药打空，不是敌人清完」这条规则显性化。
+    // 数据只读既有状态（this.ammoQueue / this.enemies / this.defeatLineY），不改任何结算判定。
+
+    /**
+     * @method _hud_ensureWaveReadout
+     * @description 惰性创建战斗态读数容器（挂在 #phase-combat 内、底部弹药舱上沿之上）。
+     *   绝对定位 + pointer-events:none，不参与 dock 布局 ⇒ 不改 #combat-bottom-dock /
+     *   #recipe-hud-container 的几何（教程窄屏卡片靠 narrowDock 定位，不能被动到）。
+     */
+    _hud_ensureWaveReadout() {
+        if (typeof document === 'undefined') return null;
+        let host = document.getElementById('combat-wave-readout');
+        if (host) return host;
+        const phaseEl = document.getElementById('phase-combat');
+        if (!phaseEl) return null;
+        host = document.createElement('div');
+        host.id = 'combat-wave-readout';
+        host.className = 'combat-wave-readout';
+        host.setAttribute('role', 'status');
+        host.setAttribute('aria-live', 'polite');
+        phaseEl.appendChild(host);
+        return host;
+    },
+
+    /**
+     * @method _hud_renderWaveReadout
+     * @description 常显读数：本波弹药剩 N 发 · 打空即换波。发数直接读 this.ammoQueue.length
+     *   （ammoQueue[0] 是当前这一发，故队列长度就是本波剩余发数），不另算一份。
+     *   N === 0 时追加一行「本波结束 → 下一波在整备页换弹后按开战」，回答「我现在该做什么」。
+     */
+    _hud_renderWaveReadout() {
+        if (typeof document === 'undefined') return null;
+        const host = this._hud_ensureWaveReadout();
+        if (!host) return null;
+        if (this.phase !== 'combat' && this.phase !== 'training') {  // [Mixin 正常用法：读取 Game 实例状态]
+            host.classList.remove('is-visible');
+            host.dataset.signature = '';
+            host.textContent = '';
+            return null;
+        }
+        const dock = document.getElementById('combat-bottom-dock');
+        // defend_hud.js 也用 `dock.offsetHeight + 4` 抬升守卫 HUD，两处若同值就会叠在一起压住读数；
+        // 守卫 HUD 有设施时占位，读数再往上让一档（hidden 时 offsetHeight === 0，不占位）。
+        const defendHud = document.getElementById('defend-hud');
+        const defendH = defendHud && !defendHud.hidden && defendHud.offsetHeight > 0 ? defendHud.offsetHeight + 6 : 0;
+        const bottomPx = dock && dock.offsetHeight > 0 ? `${dock.offsetHeight + 4 + defendH}px` : '';
+        if (bottomPx && host.style.bottom !== bottomPx) host.style.bottom = bottomPx;
+
+        const left = Math.max(0, Math.floor((this.ammoQueue || []).length));  // [Mixin 正常用法：读取 Game 实例状态]
+        const sig = String(left);
+        if (host.dataset.signature !== sig) {
+            host.dataset.signature = sig;
+            host.textContent = '';
+
+            const main = document.createElement('div');
+            main.className = 'combat-wave-readout__main';
+
+            const kicker = document.createElement('span');
+            kicker.className = 'combat-wave-readout__kicker';
+            kicker.textContent = '本波彈藥';
+
+            const value = document.createElement('span');
+            value.className = 'combat-wave-readout__value';
+            const num = document.createElement('b');
+            num.textContent = String(left);
+            const unit = document.createElement('span');
+            unit.textContent = ' 發';
+            value.append(num, unit);
+
+            const sep = document.createElement('span');
+            sep.className = 'combat-wave-readout__sep';
+            sep.setAttribute('aria-hidden', 'true');
+            sep.textContent = '·';
+
+            const rule = document.createElement('span');
+            rule.className = 'combat-wave-readout__rule';
+            rule.textContent = '打空即換波';
+
+            main.append(kicker, value, sep, rule);
+            host.appendChild(main);
+
+            if (left === 0) {
+                const next = document.createElement('div');
+                next.className = 'combat-wave-readout__next';
+                next.textContent = '本波結束 → 下一波在整備頁換彈後按「開戰」';
+                host.appendChild(next);
+                host.classList.add('is-empty');
+            } else {
+                host.classList.remove('is-empty');
+            }
+        }
+        host.classList.add('is-visible');
+        return left;
+    },
+
+    /**
+     * @method _hud_ensureWaveSummary
+     * @description 惰性创建「换波结论」容器。
+     *   挂载点必须是换波后仍然可见的层：#phase-combat 在 phase_finalizeRound 发 ui:round_num_update
+     *   时已经 display:none（实测 rect 全 0，结论在截图上看不到），所以挂到常驻的 #game-container。
+     *   #game-container 是 position:relative + overflow:hidden，绝对定位不会产生水平滚动。
+     */
+    _hud_ensureWaveSummary() {
+        if (typeof document === 'undefined') return null;
+        let host = document.getElementById('combat-wave-summary');
+        if (host) return host;
+        const root = document.getElementById('game-container') || document.body;
+        if (!root) return null;
+        host = document.createElement('div');
+        host.id = 'combat-wave-summary';
+        host.className = 'combat-wave-summary';
+        host.setAttribute('role', 'status');
+        host.setAttribute('aria-live', 'polite');
+        host.hidden = true;
+        root.appendChild(host);
+        return host;
+    },
+
+    /**
+     * @method _hud_renderWaveSummary
+     * @description 换波瞬间的结论：击破 X / 漏过 Y / 未清 Z，并再点一次规则（打空即换波，没清完不算输）。
+     *   三数全部由 UI 层按帧累积（_hud_waveTick + enemy:killed），不写任何结算链。
+     */
+    _hud_renderWaveSummary(stats = {}) {
+        if (typeof document === 'undefined') return null;
+        const host = this._hud_ensureWaveSummary();
+        if (!host) return null;
+        const killed = Math.max(0, Math.floor(stats.killed || 0));
+        const leaked = Math.max(0, Math.floor(stats.leaked || 0));
+        const alive = Math.max(0, Math.floor(stats.alive || 0));
+
+        // 位置由 CSS 常驻在中上带（挂 #game-container，与底部 dock 无关）：换波时画面已切到
+        // gathering/build，这两页的底部操作区高度与战斗 dock 不同，按 dock 算偏移会在换页后错位。
+        host.textContent = '';
+        host.dataset.killed = String(killed);
+        host.dataset.leaked = String(leaked);
+        host.dataset.alive = String(alive);
+        host.dataset.round = String(Math.max(1, Math.floor(stats.round || this.round || 1)));  // [Mixin 正常用法：读取 Game 实例状态]
+
+        const head = document.createElement('div');
+        head.className = 'combat-wave-summary__head';
+        head.textContent = '本波結算';
+        const nums = document.createElement('div');
+        nums.className = 'combat-wave-summary__nums';
+        const cells = [
+            ['擊破', killed, 'is-kill'],
+            ['漏過', leaked, 'is-leak'],
+            ['未清', alive, 'is-alive'],
+        ];
+        cells.forEach(([label, value, cls]) => {
+            const cell = document.createElement('span');
+            cell.className = `combat-wave-summary__cell ${cls}`;
+            const lab = document.createElement('span');
+            lab.className = 'combat-wave-summary__label';
+            lab.textContent = label;
+            const val = document.createElement('b');
+            val.className = 'combat-wave-summary__value';
+            val.textContent = String(value);
+            cell.append(lab, val);
+            nums.appendChild(cell);
+        });
+        const rule = document.createElement('div');
+        rule.className = 'combat-wave-summary__rule';
+        rule.textContent = alive > 0
+            ? '彈藥打空即換波：沒清完不算輸'
+            : '彈藥打空即換波：本波清空';
+        host.append(head, nums, rule);
+
+        host.hidden = false;
+        host.classList.add('is-visible');
+        if (host._hideTimer) clearTimeout(host._hideTimer);
+        host._hideTimer = setTimeout(() => {
+            host.classList.remove('is-visible');
+            host.hidden = true;
+        }, 4200);
+        return { killed, leaked, alive };
+    },
+
+    /**
+     * @method _hud_waveTick
+     * @description 逐帧（由 sys_loop 调用）累积本波读数：存活敌人数 + 越过击破线的敌人（与
+     *   input_checkDefeat 同口径：pos.y + 视角偏移 > defeatLineY）。同时刷新常显读数。
+     *   只读状态，不写回任何游戏数据。
+     */
+    _hud_waveTick() {
+        if (typeof document === 'undefined') return false;
+        if (this.phase !== 'combat' && this.phase !== 'training') {  // [Mixin 正常用法：读取 Game 实例状态]
+            const stale = document.getElementById('combat-wave-readout');
+            if (stale && stale.classList.contains('is-visible')) this._hud_renderWaveReadout();
+            return false;
+        }
+        const round = Math.max(1, Math.floor(this.round || 1));  // [Mixin 正常用法：读取 Game 实例状态]
+        if (!this._hudWave || this._hudWave.round !== round) {
+            this._hudWave = { round, killed: 0, leakedRefs: new Set(), alive: 0 };
+            // 进入新一波：上一波的结论卡立刻收掉（别让它压在新一波的战场上）
+            const staleSummary = document.getElementById('combat-wave-summary');
+            if (staleSummary && staleSummary.classList.contains('is-visible')) {
+                if (staleSummary._hideTimer) clearTimeout(staleSummary._hideTimer);
+                staleSummary.classList.remove('is-visible');
+                staleSummary.hidden = true;
+            }
+        }
+        const wave = this._hudWave;
+        const shiftY = (this.boardTilt && this.boardTilt.current) ? (this.boardTilt.current.y * -20) : 0;
+        const lineY = Number.isFinite(this.defeatLineY) ? this.defeatLineY : (this.height - 120);
+        const enemies = Array.isArray(this.enemies) ? this.enemies : [];  // [Mixin 正常用法：读取 Game 实例状态]
+        let alive = 0;
+        enemies.forEach(e => {
+            if (!e || !e.active || e.isDead || !(e.hp > 0)) return;
+            alive++;
+            if (e.pos && (e.pos.y + shiftY) > lineY) wave.leakedRefs.add(e);
+        });
+        wave.alive = alive;
+        this._hud_renderWaveReadout();
+        return true;
+    },
+
+    /**
+     * @method _hud_buildAmmoEmptyState
+     * @description 弹药空态：不再只有 NO QUEUE，要回答「还剩几发 / 现在是什么阶段 / 下一步去哪」。
+     *   remaining 取 this.ammoQueue.length（空态触发条件是「没有后续两发」，队列仍可能剩当前 1 发）。
+     */
+    _hud_buildAmmoEmptyState(remaining) {
+        const left = Math.max(0, Math.floor(remaining || 0));
+        const wrap = document.createElement('div');
+        wrap.className = 'combat-ammo-empty-state';
+        wrap.dataset.ammoRemaining = String(left);
+        const title = document.createElement('b');
+        title.className = 'combat-ammo-empty-title';
+        title.textContent = left > 0 ? `本波最後 ${left} 發` : '彈藥已打空';
+        const step = document.createElement('span');
+        step.className = 'combat-ammo-empty-step';
+        step.textContent = left > 0 ? '打完即換波' : '本波結束 · 敵人行動中';
+        wrap.append(title, step);
+        return wrap;
     },
 
     /**
@@ -1264,6 +1503,29 @@ export const hud_system = {
      *   在游戏初始化时调用（sys_initGame 或 sys_resetGame 中）。
      */
       hud_initEventListeners() {
+        // @section:hud_wave_readout - [REQ-20261022-wave-loop S3] 波次读数 / 换波结论
+        // 击破数：复用既有 enemy:killed 事件（只累加，不改任何结算链）
+        eventBus.on(EVENT_TYPES.COMBAT_ENEMY_KILLED, () => {
+            if (this.phase !== 'combat' && this.phase !== 'training') return;  // [Mixin 正常用法：读取 Game 实例状态]
+            const wave = this._hudWave;
+            const round = Math.max(1, Math.floor(this.round || 1));  // [Mixin 正常用法：读取 Game 实例状态]
+            if (wave && wave.round === round) wave.killed += 1;
+        });
+        // 换波结论：复用既有 ui:round_num_update（phase_finalizeRound 在 round++ 后发出这一次）。
+        // 注意：事件发出时新一波的敌人已经生成，所以「未清」取的是上一帧采样值（见 _hud_waveTick）。
+        eventBus.on(EVENT_TYPES.UI_ROUND_NUM_UPDATE, () => {
+            const wave = this._hudWave;
+            if (!wave) return;
+            const stats = {
+                round: wave.round,
+                killed: wave.killed,
+                leaked: wave.leakedRefs ? wave.leakedRefs.size : 0,
+                alive: wave.alive,
+            };
+            this._hudWave = null;
+            this._hud_renderWaveSummary(stats);
+            this._hud_renderWaveReadout();
+        });
         // @section:hud_multicast_listeners - 连射倍率显示与飞行特效事件监听器
         // ── 连射倍率显示 ────────────────────────────────────────────
         eventBus.on(EVENT_TYPES.UI_MULTICAST_UPDATE, ({ total, bonusAmount }) => {

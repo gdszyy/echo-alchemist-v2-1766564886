@@ -277,6 +277,12 @@ export const game_system = {
             this.ui_updateCombatStatusPanel();
         }
 
+        // [REQ-20261022-wave-loop S3] 本波弹药读数 / 换波结论的逐帧累积（纯 UI 层读取，
+        // 不写回任何战局状态；非战斗阶段内部直接返回 false）。
+        if (typeof this._hud_waveTick === 'function') {
+            this._hud_waveTick();
+        }
+
         // 6. 战场掉落物更新与渲染
         // [BUGFIX] fieldLootItems 已移入 phase_combat_update 的 LAYER 2（实体层）内渲染，
         // 原因：此处无阶段限制，会导致宝石在 selection 等非战斗阶段泄漏显示。
