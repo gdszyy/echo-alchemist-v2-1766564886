@@ -1113,8 +1113,8 @@ export const hud_system = {
 
     /**
      * @method _hud_renderWaveSummary
-     * @description 换波瞬间的结论：击破 X / 漏过 Y / 未清 Z，并再点一次规则（打空即换波，没清完不算输）。
-     *   三数全部由 UI 层按帧累积（_hud_waveTick + enemy:killed），不写任何结算链。
+     * @description 换波瞬间的结论：击破 X / 未清 Z，并再点一次规则（打空即换波，没清完不算输）。
+     *   两个数全部由 UI 层按帧累积（_hud_waveTick + enemy:killed），不写任何结算链。
      */
     _hud_renderWaveSummary(stats = {}) {
         if (typeof document === 'undefined') return null;
@@ -1139,7 +1139,10 @@ export const hud_system = {
         nums.className = 'combat-wave-summary__nums';
         const cells = [
             ['擊破', killed, 'is-kill'],
-            ['漏過', leaked, 'is-leak'],
+            // [2026-10-26 走查] 「漏過」栏删掉：它**结构上恒为 0** —— 无护盾时敌人越过击破线即判负
+            //   （input_checkDefeat 返回 true → gameOver → phase 切 gameover，phase_finalizeRound 不再执行），
+            //   于是本卡真正渲染出来的那一刻 leaked 必然是 0；有护盾时越线是「屏障拦截」也不算漏过。
+            //   数字仍写进 host.dataset.leaked 供探针 / 验收读取，只是不再作为一个永远写 0 的栏位上屏。
             ['未清', alive, 'is-alive'],
         ];
         cells.forEach(([label, value, cls]) => {
