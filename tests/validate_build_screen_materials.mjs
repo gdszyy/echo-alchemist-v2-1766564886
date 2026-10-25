@@ -1037,8 +1037,20 @@ const readoutFull = { pyro: 9, cryo: 9, beast: 4, spent: { pyro: 3, cryo: 0 }, s
     const scroll = root.querySelector('.build-scroll');
     check(!!scroll, '冒烟：渲染出 .build-scroll');
     const panels = scroll ? scroll.collect().filter(n => String(n.className).split(/\s+/).includes('ui-panel')) : [];
-    check(panels[0] && panels[0].id === 'build-ammo', '冒烟：「本波弹药」是滚动区第一块（在「主炮」之上）');
-    check(panels[1] && panels[1].id === 'build-cannon', '冒烟：其后紧跟既有「主炮」块（未打乱原顺序）');
+    // 2026-10-26 改（第 2 步收口）：原断言是 `panels[0].id === 'build-ammo'` 与 `panels[1].id === 'build-cannon'`，
+    //   它守的真实意图是「新增的『本波弹药』块不许被挤到既有『主炮』之下」。本轮整备屏首屏重排
+    //   （依据 `src/ui/build_screen.js:716-727`：落位改为「设施 → 工厂网格 → 本波弹药 → 主炮」）把这个
+    //   **索引前提**改掉了 —— `build-ammo` 不再排第 0；而收集用的是深度优先 `collect()`，嵌套或置顶容器都绕不开，
+    //   所以旧断言与新顺序结构性互斥，只能改写法、不能弱化意图。
+    //   改为断言**精确 id 全序**：同守「弹药块紧随两处建造面、不落到主炮之下」，且更严 ——
+    //   任意两块互换、或中间插进 / 少掉任何一块都会红；下面再单独留一条相对序断言把意图写死。
+    const panelIds = panels.map(n => n.id).join(',');
+    check(panelIds === 'build-facilities,build-grid,build-ammo,build-cannon,build-items,build-mining,build-magazine',
+        `冒烟：滚动区面板全序为「设施→工厂网格→本波弹药→主炮→道具→挖矿→弹匣」（实测：${panelIds}）`);
+    const ammoAt = panels.findIndex(n => n.id === 'build-ammo');
+    const cannonAt = panels.findIndex(n => n.id === 'build-cannon');
+    check(ammoAt >= 0 && cannonAt >= 0 && ammoAt < cannonAt,
+        `冒烟：「本波弹药」仍在「主炮」之上（本波弹药 #${ammoAt}、主炮 #${cannonAt}）`);
     check(root.textContent.includes('本波弹药') && root.textContent.includes('主炮'), '冒烟：新旧两块都在屏上');
     check(root.textContent.includes('料只够装 2 发'), '冒烟：预演原因串进到整屏');
     check(root.textContent.includes('3 料'), '冒烟：本波已扣料读数进到整屏');
