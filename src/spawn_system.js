@@ -445,12 +445,40 @@ export const spawn_system = {
     // [issue-2] options.offScreenEntrance: 新敌人在画面外（dropTargetY 上方一行）出现，
     // 通过 pos.y 与 dropTargetY 之差驱动 Enemy.update() 的下落动画，并设置 hasActedThisTurn=true
     // 让本回合扫描波跳过它们，由后续回合的扫描波正常触发。
+    /**
+     * @method spawn_getEnemyFillBudget
+     * @description [REQ-20261022-wave-loop 难度断崖] 本回合填盘的**剩余额度**。
+     *   目标敌量随回合渐进（`CONFIG.gameplay.enemyFill` = `{ start, perRound, cap }`）：
+     *   目标 = min(cap, start + (round − 1) × perRound)；额度 = 目标 − 场上普通敌人。
+     *   依据：`docs/review/gameplay-20261025.md` §3.2 —— 波 1 = 11 只 / 87 血（净需 3.3 回合、包络 6.1），
+     *   波 2 一步填到 20 只 / 154 血（净需 5.9 > 包络 5.1）⇒ 第 1→2 波是断崖而不是斜坡。
+     *   **Boss 不计入**：Boss 占格但不吃填盘预算，否则 Boss 波会连带把随从一起压没。
+     *   参数一律从配置读，本文件不写死数字；缺配置段时用同一组缺省值（11 / 2 / 15），保证旧环境仍可跑。
+     * @returns {{ target:number, onBoard:number, remaining:number }}
+     */
+    spawn_getEnemyFillBudget() {
+        const conf = (CONFIG.gameplay && CONFIG.gameplay.enemyFill) || {};
+        const int = (v, fallback) => (Number.isFinite(Number(v)) ? Math.floor(Number(v)) : fallback);
+        const start = int(conf.start, 11);
+        const perRound = int(conf.perRound, 2);
+        const cap = int(conf.cap, 15);
+        const round = Math.max(1, int(this.round, 1));
+        const target = Math.min(cap, start + (round - 1) * perRound);
+        const list = Array.isArray(this.enemies) ? this.enemies : [];
+        const onBoard = list.filter(e => e && e.active && e.type !== 'boss').length;
+        return { target, onBoard, remaining: Math.max(0, target - onBoard) };
+    },
+
     spawn_spawnEnemyRowAt(yPos, options = {}) {
         const b = CONFIG.balance;
         
         // --- [优化] 动态血量修正逻辑 (V2: 指数膨胀) ---
-        // [爽游模式] 新手教程局：始终按第 10 回合的强度生成敌人
-        const effectiveRound = this._isTutorialRun ? 10 : this.round;
+        // [REQ-20261022-wave-loop 节奏标定] 原来这里是 `this._isTutorialRun ? 10 : this.round`，
+        //   即教程局一律按第 10 回合强度生成普通怪。教程局本该更轻（爽游），这条实际是把难度乘到第 10 波；
+        //   又因为 `_isTutorialRun` 是局级残留旗标（tutorial_system.js:232 置真、tutorial_end 不清），
+        //   它会漏进正常局。改为一律用真实回合数；教程局的差异只保留在
+        //   「首个 Boss 提前到第 2 回合 + 强制大 Boss」（spawn_scheduleNextBoss / spawn_checkBossRoundFor）。
+        const effectiveRound = this.round;
         // 1. [修改] 引入指数曲线
         // 设定一个基础膨胀率（从 config 读取，默认 1.12 即 12%），随回合数呈指数级放大
         // 前5回合保护期不膨胀，Math.max(0, ...) 确保前期不会变成小数
@@ -754,16 +782,22 @@ export const spawn_system = {
             [freeCols[i], freeCols[j]] = [freeCols[j], freeCols[i]];
         }
 
+        // [REQ-20261022-wave-loop 难度断崖] 本行填盘受「本回合目标敌量」约束（见 spawn_getEnemyFillBudget）：
+        //   额度用尽即停，不再**一步把棋盘填满**（原实现波 2 会填到 20 只，而波 1 只有 11 只）。
+        //   本行已由导演 / 模板生成的（`pendingSpawns`）先占掉额度——它们是主角，填盘只补缺口，
+        //   这样「总敌量 ≤ 目标」不依赖导演有没有掷中，也不改导演的行为。
+        const fillBudget = this.spawn_getEnemyFillBudget();
+        let fillRemaining = Math.max(0, fillBudget.remaining - pendingSpawns.length);
         // 开始填充
         for (let c of freeCols) {
             const centerX = this.sys_getCombatColumnCenterX
                 ? this.sys_getCombatColumnCenterX(c)
                 : c * w + w / 2;
             
-            // 基础生成判定
+            // 基础生成判定（`fillRemaining > 0` 是本回合目标敌量的硬上限：额度用尽就不再补格）
             let shouldSpawn = false;
             
-            if (currentCount < minEnemies || Math.random() < b.spawnProb) shouldSpawn = true;
+            if (fillRemaining > 0 && (currentCount < minEnemies || Math.random() < b.spawnProb)) shouldSpawn = true;
 
             if (shouldSpawn && !this.calc_isAreaOccupied(centerX, yPos, w * 0.8, this.enemyHeight * 0.8)) {
                 
@@ -816,6 +850,7 @@ export const spawn_system = {
                 if (typeof e.initSprite === 'function') e.initSprite();
                 this.enemies.push(e);
                 currentCount++;
+                fillRemaining = Math.max(0, fillRemaining - 1);
 			}
         }
               // =========================================
@@ -2385,6 +2420,16 @@ export const spawn_system = {
                     this.energy = (this.energy || 0) + gain;
                     if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud({ pulse: true });
                 }
+                // [REQ-20261022-wave-loop 料闭环] 碰钉**只累积计数**（primaryHits / coloredHits），不入料：
+                // 料在波末由 build_system.sys_onDigComplete → mat_settleWaveMaterials 一次结算
+                // （M = FLOOR + floor(coloredHits / perHitsPerMaterial)，冻结单 v3 §13-1）。
+                // 副球判据照抄上面这条能量回调：外层 `!options.secondary` 已排除副球，账本层再按同一判据兜底一次。
+                // 产料钉 = pegWeights 点名了料桶的钉，盘上是三色口径：点名 pyro / cryo 的是盘料钉（造弹 / 升容量 / 铸符），
+                // 点名 bounce 的供第三色料 beast（只用于建设）；normal 等未点名的钉只产电，无默认桶兜底。
+                // 入账只累加、不设存量上限（Owner 2026-10-24 23:34），无 clip / 销毁判断（纯函数见 material_economy_utils.js）。
+                if (typeof this.mat_recordPegHit === 'function') {
+                    this.mat_recordPegHit(type, !!(options && options.secondary));
+                }
                 if (Math.random() < 0.5) audio.playTone(520, 'triangle', 0.05, 0.2);
             }
             if (chargeSession) {
@@ -2556,8 +2601,11 @@ export const spawn_system = {
     spawn_calculateBossHP(isBigBoss) {
         const b = CONFIG.balance;
         const f = b.bossHpFormula || {};
-        // [爽游模式] 新手教程局：始终按第 10 回合强度计算 Boss 血量
-        const r = this._isTutorialRun ? 10 : this.round;
+        // [REQ-20261022-wave-loop 节奏标定] 原来这里是 `this._isTutorialRun ? 10 : this.round`。
+        //   第 2 波的 Boss 因此拿到第 10 波的模板：(5 + 10×4) × 1.08^5 × 28 × 0.5 = 925 血，
+        //   而玩家单回合整轮输出只有 20 点（A=2 × 10）⇒ 46 个回合才打死，不可通关。
+        //   改为用真实回合数：第 2 波大 Boss = (5 + 2×4) × 28 × 0.5 = 182 血（见 tests/validate_combat_pacing.mjs）。
+        const r = this.round;
 
         const hpExponent = b.hpExponent || 1.12;
         const exponentialFactor = Math.pow(hpExponent, Math.max(0, r - 5));

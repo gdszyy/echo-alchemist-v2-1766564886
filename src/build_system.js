@@ -12,6 +12,8 @@
 import { CONFIG } from './config.js';
 import { showToast, LightningBolt } from './entities.js';
 import { audio } from './audio.js';
+// 缺料一句话（`缺 火料 4`）与三色中文名走 `shot_recipe_utils` 的唯一真源：整备屏与运行期 toast 同一句。
+import { formatMaterialShortfall } from './utils/shot_recipe_utils.js';
 import {
     BRANCH_SHOT_PROPS,
     computeCannonStats,
@@ -29,23 +31,120 @@ const PURCHASE_FAIL_TEXT = {
     maxed: '已达上限',
     energy: '能量不足',
     crystal: '晶核不足',
+    // `materials` 只是**没有价格明细时**的兜底三字（取不到 price / 取不到料账本）。
+    // 有明细时一律走 `materialsFailText`，屏上给「料不足：缺 火料 4」——差额 = 需要 − 现有。
+    materials: '料不足',
     branch_set: '分支已选定，不可更换',
     slot_closed: '设施位未开放',
     slot_full: '该设施位已占用',
     slot_empty: '该设施位为空',
-    unique: '收集器全局只能建 1 座',
     items_full: '道具位已满',
     invalid: '无法购买',
 };
 
 export const FACILITY_LABELS = {
     turret: '炮台', lightning: '雷击塔', frost: '冰霜塔', shieldGen: '结界发生器', collector: '炼金收集器',
+    workshop: '弹药工坊', generator: '发电机', battery: '电池',
 };
 export const ITEM_LABELS = { bomb: '炸弹', timestop: '时停', shield: '急救结界', extraDig: '加挖' };
 export const BRANCH_LABELS = { pierce: '穿透', scatter: '散射', fire: '元素·火', ice: '元素·冰', lightning: '元素·雷' };
 
+/**
+ * `unique` 失败的**通用**尾句（不带设施名）：只在取不到设施名时降级用，避免把 `undefined` 拼进句子。
+ * 量词订正（2026-10-25）：旧句是「全局只能建 1 座」，而 8 件设施里只有 `collector` / `workshop` /
+ * `generator` / `battery` 标了 `unique: true`（`config.js:975-982`），不点名时读起来像对所有设施都成立。
+ * 现在改成「每局」＝一局之内，且**一律点名**（见 `uniqueFacilityText`）。
+ */
+const UNIQUE_FAIL_TEXT_GENERIC = '每局只能建 1 座';
+
+/**
+ * @function uniqueFacilityText
+ * @description `unique`（每局 1 座）失败文案：**一律点名设施**，供运行期 toast 与整备弹层共用同一句
+ *   （两个入口各写一句就是「同一规则两句话」，2026-10-25 验收 P1-5 的同类问题）。
+ *   - 设施键登记在 `FACILITY_LABELS`：`<中文名>每局只能建 1 座`（如「弹药工坊每局只能建 1 座」）。
+ *   - 取不到 / 没登记：降级成通用尾句（不带设施名），不抛错、不拼 `undefined`。
+ *   ——旧实现对 `collector` 逐字沿用「收集器全局只能建 1 座」；本轮到 `collector` 也走同一条拼装，
+ *   屏上从「收集器」变「炼金收集器」，是**刻意统一**，不是笔误（弹层/运行期必须同源同措辞）。
+ */
+export function uniqueFacilityText(facility) {
+    const label = (facility && Object.prototype.hasOwnProperty.call(FACILITY_LABELS, facility))
+        ? FACILITY_LABELS[facility]
+        : null;
+    return label ? `${label}${UNIQUE_FAIL_TEXT_GENERIC}` : UNIQUE_FAIL_TEXT_GENERIC;
+}
+
+/**
+ * @function materialsFailText
+ * @description 缺料失败文案：`料不足：缺 火料 4`（差额 = 需要 − 现有，中文名取自 `MATERIAL_LABELS`）。
+ *   `price.materials` 是逐料需求、`ledger` 是当前料账本；任一缺失/为空 ⇒ 回落兜底三字，绝不猜数。
+ */
+function materialsFailText(price, ledger) {
+    const need = (price && typeof price === 'object' && price.materials) ? price.materials : null;
+    const have = ledger && typeof ledger === 'object' ? ledger : null;
+    if (!need || !have) return PURCHASE_FAIL_TEXT.materials;
+    const detail = formatMaterialShortfall(need, have);
+    return detail ? `${PURCHASE_FAIL_TEXT.materials}：${detail}` : PURCHASE_FAIL_TEXT.materials;
+}
+
+/**
+ * @function purchaseFailText
+ * @description 购买失败 ⇒ 玩家可见文案。`unique` 要点名设施、`materials` 要给差额，故各走一次现拼；
+ *   其余 reason 仍查 `PURCHASE_FAIL_TEXT` 表，表里没有则回落到「无法购买」。
+ *   `ledger` 是当前料账本（`materials` 用；缺它只影响差额，不影响兜底三字）。
+ */
+function purchaseFailText(res, action, ledger) {
+    if (!res) return '无法购买';
+    if (res.reason === 'unique') return uniqueFacilityText(action && action.facility);
+    if (res.reason === 'materials') return materialsFailText(res.price, ledger);
+    return PURCHASE_FAIL_TEXT[res.reason] || '无法购买';
+}
+
 function buildCfg() {
     return (CONFIG.gameplay && CONFIG.gameplay.build) || {};
+}
+
+/** 主炮三条轨的中文名（成功提示用；与整备屏的轨名同口径）。 */
+const CANNON_TRACK_LABELS = { dmg: '伤害', rate: '射速', bounce: '弹道' };
+
+/**
+ * @function purchaseOkText
+ * @description 成交后的一句确认（2026-10-25 验收 P1-6：成功分支此前完全没有反馈）。
+ *   逐动作给具体名字与结果，让「盖上了 / 升级了 / 选定分支了」有事件感：
+ *   建 / 升级设施点名，主炮写轨名 + 新等级，分支写选定的分支名。
+ *   取不到名字时回落「已建成」，**不编造**名字也不抛错。
+ * @param {{type:string, track?:string, facility?:string, item?:string, branch?:string, slot?:number}} action
+ * @param {{facilities?:Array, cannonLevels?:object}} state - `res.state`（已应用的新状态）
+ */
+function purchaseOkText(action, state) {
+    const a = (action && typeof action === 'object') ? action : {};
+    const s = (state && typeof state === 'object') ? state : {};
+    const facilities = Array.isArray(s.facilities) ? s.facilities : [];
+    const facilityAt = idx => (Number.isInteger(idx) && facilities[idx]) ? facilities[idx] : null;
+    if (a.type === 'build') {
+        const label = FACILITY_LABELS[a.facility];
+        return label ? `已建成：${label}` : '已建成';
+    }
+    if (a.type === 'upgrade') {
+        const f = facilityAt(a.slot);
+        const label = f ? FACILITY_LABELS[f.type] : null;
+        return label ? `${label}升到 Lv${f.level}` : '已升级';
+    }
+    if (a.type === 'cannon') {
+        const lv = s.cannonLevels ? s.cannonLevels[a.track] : null;
+        const label = CANNON_TRACK_LABELS[a.track];
+        return (label && Number.isFinite(Number(lv))) ? `主炮${label}升到 Lv${Number(lv)}` : '主炮已升级';
+    }
+    if (a.type === 'branch') {
+        const label = BRANCH_LABELS[a.branch];
+        return label ? `分支已选定：${label}` : '分支已选定';
+    }
+    if (a.type === 'item') {
+        const label = ITEM_LABELS[a.item];
+        return label ? `已获得：${label}` : '已获得道具';
+    }
+    if (a.type === 'mining') return '采集升级完成';
+    if (a.type === 'slot') return `设施位已开放 ${Number(s.facilitySlotsOpen) || 0} 个`;
+    return '已建成';
 }
 
 export const build_system = {
@@ -146,6 +245,10 @@ export const build_system = {
      * @description 挖掘两批都落定后调用（phase_gathering_attemptComplete）：digCount++、收集器按挖掘付款、进入整备。
      */
     sys_onDigComplete() {
+        // [REQ-20261022-wave-loop 料闭环] 波末结算料入（冻结单 v3 §13-1 / §13-13 的消费点）：
+        // M = FLOOR(basicFloorPerWave) + floor(coloredHits / perHitsPerMaterial)。本波只在这里入一次账；
+        // 同一 round 由 mat_settleWaveMaterials 内部去重。
+        if (typeof this.mat_settleWaveMaterials === 'function') this.mat_settleWaveMaterials();
         this.digCount = (this.digCount || 0) + 1;
         const payout = getCollectorPayout(this.facilities, buildCfg());
         if (payout > 0) {
@@ -182,13 +285,22 @@ export const build_system = {
      */
     sys_buildPurchase(action) {
         if (this.phase !== 'build') return { ok: false, reason: 'invalid' };
-        const res = tryPurchase(this.sys_getBuildState(), action, buildCfg(), this.sys_getBuildReveal());
+        // 料账本：工坊 / 发电机 / 电池是 `cost: 0` 的料付设施，`tryPurchase` 要按料扣费。
+        // 账本可能尚未初始化（读档 / 直接进整备的路径）⇒ 先按运行时既有入口建一份，不自己造形状。
+        if (!this.materialLedger && typeof this.sys_initMaterialLedger === 'function') this.sys_initMaterialLedger();
+        const res = tryPurchase(this.sys_getBuildState(), action, buildCfg(), this.sys_getBuildReveal(), this.materialLedger);
         if (!res.ok) {
-            showToast(PURCHASE_FAIL_TEXT[res.reason] || '无法购买');
+            // `unique` 要按设施点名、`materials` 要给差额（见 purchaseFailText）；其余 reason 仍查表。
+            showToast(purchaseFailText(res, action, this.materialLedger));
             return { ok: false, reason: res.reason };
         }
         this.sys_applyBuildState(res.state);
+        // 扣料后的账本写回运行时（只在成交且拿到新账本时写；失败路径绝不改账本）。
+        if (res.ledger) this.materialLedger = res.ledger;
         try { if (audio && typeof audio.playEffect === 'function') audio.playEffect('bump'); } catch (e) { /* 音效可缺省 */ }
+        // 成功也要有事件感（2026-10-25 验收 P1-6：本分支此前只有 pulse，全分支无一句确认）。
+        // 文案按动作分三种，全部用已登记的中文名；取不到名字就不编，回落成不带名字的「已建成」。
+        showToast(purchaseOkText(action, res.state));
         if (typeof this.ui_renderBuildScreen === 'function') this.ui_renderBuildScreen();
         if (typeof this.ui_updateResourceHud === 'function') this.ui_updateResourceHud({ pulse: true });
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();

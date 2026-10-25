@@ -38,6 +38,33 @@ function _getNormalWavesPerBoss() {
     return CONFIG.balance?.waveCycle?.normalWavesPerBoss;
 }
 
+/**
+ * 设施位开局格数（`build.slots.openAtStart`）—— 存档侧兜底/迁移的**唯一**来源，**不许写死数字**：
+ * 写死 1 会在下次改配置时再漂一次（`src/config.js:967` 已由 1 → 2 就是上一次漂移）。
+ * 配置缺键 ⇒ 按 1 并 `console.warn` 留痕：静默会把「配置没接上」藏成「开局 1 格」，正是要防的形态。
+ */
+function _slotsOpenAtStart() {
+    const build = (CONFIG.gameplay && CONFIG.gameplay.build) || {};
+    const raw = build.slots && build.slots.openAtStart;
+    const n = Math.floor(Number(raw));
+    if (!Number.isFinite(n) || n < 1) {
+        console.warn('[build] CONFIG.gameplay.build.slots.openAtStart 缺失或非正整数，设施位兜底按 1 处理 | value=', String(raw));
+        return 1;
+    }
+    return n;
+}
+
+/**
+ * 设施位兜底的**旧档迁移**语义（不是重置）：
+ * 只有「非正整数 / 小于 openAtStart」才抬到 openAtStart；玩家合法的更大值（未来靠晶核开出来的第 3 格）原样保留，
+ * **绝不往下压**——压下去等于把已付费的格子收走。新开局与旧档因此走同一条下限，不再出现「同一款游戏两种开局」。
+ */
+function _liftFacilitySlotsOpen(value) {
+    const floor = _slotsOpenAtStart();
+    const cur = Math.floor(Number(value));
+    return (Number.isFinite(cur) && cur >= floor) ? cur : floor;
+}
+
 /** 当前波次信息（波次循环唯一口径，见 utils/boss_schedule_utils.js getWaveInfo） */
 export function sys_getWaveInfo(game) {
     return getWaveInfo(game, _getNormalWavesPerBoss());
@@ -642,6 +669,10 @@ export const game_system = {
         this._isTutorialRunCleared = false;
         // [爽游模式] 重置爽游局标志（新开一局时始终清除，在 sys_initGameStart 中根据 _tutorialActive 重新设置）
         this._isTutorialRun = false;
+        // [ux-20261025 P0-3] 爽游通关窗口旗标必须与 _isTutorialRun 同步清：game_phase.js 回合结算读它判
+        //   「第 6 回合爽游通关」，若留着新局，在 PHASE_CHANGED→relic 监听重估之前存在一个仍为 true 的窗口期。
+        //   置 true 只在 tutorial_system.js（tutorial_start / _tutorial_installRunScopeWatcher），此处不新增语义。
+        this._isTutorialBuffRun = false;
         // [爽游模式] 重置教程局钉子数量临时字段
         this._tutorialInitWindPegs = 0;
         this._tutorialInitSwordPegs = 0;
@@ -710,6 +741,8 @@ export const game_system = {
         this._digState = null;
         // [REQ-20261022-wave-loop S2] 整备状态（主炮三轨 / 设施 / 道具 / 挖矿升级 / digCount）
         if (typeof this.sys_initBuildState === 'function') this.sys_initBuildState();
+        // [料闭环] 料账本随新局归零（料不落存档，本轮不做存档兼容）
+        if (typeof this.sys_initMaterialLedger === 'function') this.sys_initMaterialLedger();
         this.runShopInventory = [];     // 当前刷新结果
         this.runShopRefreshes = 0;      // 已刷新次数
         this._runShopOpenedRound = -1;  // 防止同回合重复打开
@@ -2308,6 +2341,17 @@ export const game_system = {
             this.sys_startBuildPhase();
             return;
         }
+        // [REQ-20261022-wave-loop 步 6] 干回合（本回合不挖 ⇒ 零收入）：保底 +3 在此发放。
+        // 挂点依据：订正件附录 C-1 条文 2「干回合分支显式调用它：入口是 `src/game_system.js:2314-2318`
+        // 中 `shouldDigThisRound(this)` 为假的那条路」——就是这里，按「不挖」条件收窄。
+        // 发放走 `mat_grantFloorOnly`（第 1 步 `grantFloorOnly` + 本 round 去重），不读任何命中计数；
+        // 战斗侧（`phase_freezeWaveRecord`）据此沿用上一波冻结的 N、不扣料、不重复发保底。
+        // 放在「挖」判定之前而不是两条分支之间：下方那条 `if (shouldDigThisRound(this)) { …挖… return; }`
+        // 紧跟 `this.sys_showRoundStartBanner();` 是既有链路（先挖 → 后横幅），`shouldDigThisRound`
+        // 是纯读（`src/utils/dig_loop_utils.js:115-120`），此处多求值一次不会改变结果。
+        if (!shouldDigThisRound(this) && typeof this.mat_grantFloorOnly === 'function') {
+            this.mat_grantFloorOnly();
+        }
         // [REQ-20261022-wave-loop S1 · §3] 每波挖一次：普通波每回合挖；Boss 波只在 Boss 登场回合挖，Boss 存活的后续回合直接战斗。
         if (shouldDigThisRound(this)) {
             this.sys_startDigPhase();
@@ -3222,7 +3266,10 @@ export const game_system = {
                 cannonLevels: { ...(this.cannonLevels || {}) },
                 cannonBranch: this.cannonBranch || null,
                 facilities: (this.facilities || []).map(f => (f ? { ...f } : null)),
-                facilitySlotsOpen: this.facilitySlotsOpen || 1,
+                // [旧档迁移] 兜底值从 CONFIG 读（`build.slots.openAtStart`），不再写死 1：写死会在下次改配置时再漂一次。
+                // 语义是**迁移不是重置**——旧档里存着 `facilitySlotsOpen = 1` 时抬到 openAtStart（与新开局同一起点）；
+                // **只抬不压**：合法更大值（未来晶核开出的第 3 格）原样保留，压下去等于收走已付费的格子。
+                facilitySlotsOpen: _liftFacilitySlotsOpen(this.facilitySlotsOpen),
                 items: (this.items || []).slice(),
                 miningLevels: { ...(this.miningLevels || {}) },
                 _extraDigPending: this._extraDigPending || 0,
@@ -3241,6 +3288,15 @@ export const game_system = {
                 runShopStarterBoostDamageAmount: this.runShopStarterBoostDamageAmount || 0,
                 runShopStarterBoostDamageRounds: this.runShopStarterBoostDamageRounds || 0,
                 _runShopInventoryGeneratedForRound: this._runShopInventoryGeneratedForRound || 0,
+                // [REQ-20261022-wave-loop S5] 料账本与弹药配方选择入档（旧档缺这些字段 ⇒ 读档按 0 / null 起）
+                materialLedger: this.materialLedger ? JSON.parse(JSON.stringify(this.materialLedger)) : null,
+                _materialLoadRound: Number.isFinite(this._materialLoadRound) ? this._materialLoadRound : null,
+                _selectedRecipeId: typeof this._selectedRecipeId === 'string' ? this._selectedRecipeId : null,
+                _materialFrozenRecord: this._materialFrozenRecord ? JSON.parse(JSON.stringify(this._materialFrozenRecord)) : null,
+                // [REQ-20261022-wave-loop 步 6] 两个 round 去重标记入档：读档后若重跑 `sys_onDigComplete`（补调路径）
+                // 或重入干回合分支，同一 round 不得二次结算 / 二次发保底。旧档缺这两键 ⇒ 读档按 null 起。
+                _materialSettleRound: Number.isFinite(this._materialSettleRound) ? this._materialSettleRound : null,
+                _materialFloorRound: Number.isFinite(this._materialFloorRound) ? this._materialFloorRound : null,
                 // 技能
                 skillPoints: this.skillPoints || 0,
                 activeSkills: (this.activeSkills || []).map(sk => sk.id || sk),
@@ -3490,6 +3546,19 @@ export const game_system = {
             this.runShopStarterBoostDamageRounds = state.runShopStarterBoostDamageRounds || 0;
             this._runShopInventoryGeneratedForRound = state._runShopInventoryGeneratedForRound || 0;
             if (typeof this.sys_updateRunShopScheduleForRound === 'function') this.sys_updateRunShopScheduleForRound();
+
+            // [REQ-20261022-wave-loop S5] 料账本与弹药配方选择恢复（必须在上面 sys_resetGame 的归零之后）。
+            // 旧档缺这些字段 ⇒ 三余额 0 / _selectedRecipeId null / _materialFrozenRecord null，不抛错、不落 undefined。
+            // [步 6] 两个 round 去重标记（结算 / 保底）由 mat_applyPersistState 一并按档恢复。
+            if (typeof this.mat_applyPersistState === 'function') {
+                this.mat_applyPersistState(state);
+            } else if (typeof this.sys_initMaterialLedger === 'function') {
+                this.sys_initMaterialLedger();
+                this._selectedRecipeId = null;
+                this._materialFrozenRecord = null;
+                this._materialSettleRound = null;
+                this._materialFloorRound = null;
+            }
 
             // --- 恢复技能 ---
             this.skillPoints = state.skillPoints || 0;

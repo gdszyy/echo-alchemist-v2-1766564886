@@ -830,8 +830,20 @@ class Enemy {
             const dt = Math.min((nowMs - this._spriteLastMs) / 1000, 0.1); // 限制最大帧时间差
             this._spriteLastMs = nowMs;
 
-            // 冰冻时：定格精灵动画，不再推进帧（_spriteLastMs 已更新，解冻后不会跳帧）
-            if (!this.isFrozen) {
+            // === [pixel-sheet] 像素 sheet 状态帧同步（仅像素渲染器）===
+            // 像素 sheet 用状态帧（idle / hit_flash / hp 三档 / frozen / burning）表达状态，
+            // 与旧位图的 actionPhase 动画名不是一套语义，因此独立一条分支，
+            // 旧位图链路（含 Boss）仍走下面的原逻辑，行为不变。
+            if (this._spriteRenderer.isPixelSheet === true) {
+                this._spriteRenderer.setOwnerState({
+                    hpRatio: this.maxHp > 0 ? this.hp / this.maxHp : 1,
+                    hit: this.hitTimer > 0,
+                    frozen: this.isFrozen,
+                    burning: this.temp >= 34,
+                });
+                this._spriteRenderer.update(dt * timeScale);
+            } else if (!this.isFrozen) {
+                // 冰冻时：定格精灵动画，不再推进帧（_spriteLastMs 已更新，解冻后不会跳帧）
                 // 根据 actionPhase 和 hitTimer 映射到动画名称
                 let targetAnim = 'idle';
                 if (this.hitTimer > 0 && this._spriteRenderer.hasAnim('hit')) {
@@ -6703,7 +6715,12 @@ class Enemy {
             // 避免 min(w,h) 把 3×1 装甲横梁压成中央小方块；小型敌人保留原行为。
             const isLargeV2 = !!this.baseArchetype && ((this.gridCols || 1) > 1 || (this.gridRows || 1) > 1);
             ctx.save();
-            if (isLargeV2) {
+            // [pixel-sheet] 像素 sheet 的绘制框用整格占位，长宽比由 sheet 的
+            // collision_mapping 口径（cols*26-2 : rows*26-2）在 renderer 内部等比居中，
+            // 因此这里不加 pad（pad 会让像素被非等比拉伸）。alpha=1 保证像素不糊。
+            if (this._spriteRenderer.isPixelSheet === true) {
+                this._spriteRenderer.draw(ctx, -w/2, -h/2, w, h, 1);
+            } else if (isLargeV2) {
                 const padX = 6, padY = 6;
                 this._spriteRenderer.draw(ctx, -w/2 + padX, -h/2 + padY, w - padX*2, h - padY*2, 0.92);
             } else if (this._usesEliteGolemAffixComboSprite) {

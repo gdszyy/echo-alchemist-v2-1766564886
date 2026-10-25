@@ -531,7 +531,9 @@ const CONFIG = {
         
         // 特殊敌人血量倍率
         eliteHpMult: 7,     // 精英怪是普通怪的多少倍
-        bossHpMult: 25,     // Boss是普通怪的多少倍
+        // [REQ-20261022-wave-loop 标定] bossHpMult 是**死键**：全仓无读取点（Boss 血量实际由下方
+        //   bossHpFormula + spawn_system.js:2566-2579 决定）。改这个值不改变任何数值，不要再拿它当旋钮。
+        bossHpMult: 25,     // 死键，无读取点；数值保留不动
         
         // 敌人生成概率
         spawnProb: 0.42,     // 普通格子生成敌人的概率
@@ -959,15 +961,241 @@ const CONFIG = {
                 branchCrystal: 1,                   // 分支（击败第 1 个 Boss 后解锁）价格（💎），选定不可换
                 branches: ['pierce', 'scatter', 'fire', 'ice', 'lightning'],
             },
-            slots: { total: 3, openAtStart: 1, openCrystal: 2 }, // 设施位：开局 1 个，另 2 个各 2💎
+            // 设施位：开局 2 个（炮台 + 工坊各占一格），第 3 个 2💎 + `reveal[2]` 的 `'slots'`。
+            // [提案] 开局为什么必须是 2 而不是 1：晶核的**唯一来源**是 Boss 击杀 +3（`src/core.js:553`），
+            //   而开一个设施位要 2💎 ⇒ 只开 1 格时，前几波玩家**不可能同时拥有炮台与工坊**；
+            //   而「塔吃电 还是 工坊造弹」这条取舍（每发耗电 2、工坊自身耗电 4、电池底容量 15，见 `build.power`）
+            //   **至少需要两格才成立**——一格时它根本不会发生。第 3 格仍需 2💎 + `reveal[2]` 的 `'slots'`，节奏不变。
+            slots: { total: 3, openAtStart: 2, openCrystal: 2 },
             facilities: {
                 turret:    { cost: 40, upCost: [40, 40], cd: 1, dmg: [6, 9, 13] },            // 炮台：最前敌人单体
                 lightning: { cost: 50, upCost: [50, 50], cd: 2, dmg: 7, targets: [3, 4, 5] },  // 雷击塔：连锁 N 目标
                 frost:     { cost: 50, upCost: [50, 50], cd: 3, count: [1, 2, 3] },            // 冰霜塔：冻结前排最高血 N 个
                 shieldGen: { cost: 45, upCost: [45, 45], cd: 2, cap: [3, 4, 5] },              // 结界发生器：+1 护盾（上限）
                 collector: { cost: 60, upCost: [60, 60], perDig: [8, 12, 16], unique: true },  // 炼金收集器：每次挖掘 +⚡
+                // —— 以下三件为「料付」设施（energy = 0，用料买）：Owner 硬前提「料是发电器一类设施的建造材料」——
+                // 价格形状：`materials` 是逐料需求（三色全收，`beast` 收）；`upMaterials[i]` 对应 Lv(i+1)→Lv(i+2)。
+                // `unique: true` ⇒ 全局最多一座（旧五件里的 collector 已是此形态），因此多座求和口径不存在，等级即唯一维度。
+                // 价格全部 `[提案]`，不是平衡定稿；调参交资源与战斗调参专家。
+                // ---- [REQ-20261025 兽料出口] 下列三件料付设施加收 beast：这是兽料**唯一的物理出口** ----
+                // ① 为什么必须有：Owner 硬前提「一料两用」——料既要能产、也要能花。此前三件设施的料单里 beast 需求全为 0，
+                //    而 `build.power.materials.pegWeights.bounce = { beast: 1 }`（本文件 `power.materials` 段）在产 beast ⇒ 玩家会捡到花不掉的兽料，
+                //    物理出口数 = 0。本段把兽料接进建造出口，**收入侧未动**（beast 怎么产出是另一件事）。
+                // ② 语义边界：兽料**只用于建设、不参与造弹**。造弹侧拒绝 beast 是刻意的不对称，`material_loadout_utils.js:88-89` /
+                //    `:107-108` 保持原样；建造侧三色全收的理由见 `material_economy_utils.js:424-425`。别去「统一」它。
+                // ③ 数值是 `[提案]`，不是平衡定稿。已知余量如实记（不许用抬价假装解决囤积）：加出口后 8 波末仍会囤 14~44 beast，
+                //    只吃掉 24%~50% —— 净囤积 ≤ 0 需要建造速率 ≈1.7 笔/波，现实只有 0.4~1.2 笔/波（被 pyro 剩余与均价卡死）。
+                //    三档兽料小计：工坊 3/3/6 = 12、发电机 2/2/5 = 9、电池 2/2/4 = 8，合计 29 个出口。
+                // ④ 工坊 Lv1 兽料价刻意 ≤ 4（此处取 3）：`tests/validate_build_materials.mjs:463` 的成交夹具是 beast 4，
+                //    超过它，「料足 ⇒ 成交」的用例会退化成「料不足」，等于把断言测反。
+                workshop:  { cost: 0, materials: { pyro: 4, cryo: 2, beast: 3 },            upCost: [0, 0], upMaterials: [{ pyro: 6, cryo: 3, beast: 3 }, { pyro: 8, cryo: 5, beast: 6 }],  unique: true },  // 弹药工坊：无它则手工造弹（料耗 ×2）
+                generator: { cost: 0, materials: { pyro: 3, cryo: 3, beast: 2 },            upCost: [0, 0], upMaterials: [{ pyro: 5, cryo: 4, beast: 2 }, { pyro: 8, cryo: 6, beast: 5 }],  unique: true },  // 发电机：每波发电，见 power.generate.generator
+                battery:   { cost: 0, materials: { pyro: 2, cryo: 4, beast: 2 },            upCost: [0, 0], upMaterials: [{ pyro: 3, cryo: 6, beast: 2 }, { pyro: 5, cryo: 9, beast: 4 }],  unique: true },  // 电池：抬高本波可用电力上限，见 power.battery
+                // 雷能合成器 `synth` 本轮**不开放**，故不进本表：`:1010-1015` 的 `electricPerUnit: [5,4,3] × capPerWave: [2,3,4]` 算出每波耗电
+                //   10/12/12，而自身只产 2/3/4⚡ ⇒ **净产出恒为负**，属上游数值口径自相矛盾，接线只会造出一个「建了必然变差」的设施。
+                //   因此 `synth` 不进 `facilities`、不进 `FACILITY_IDS`（下一批改），`power.synth` 段保持原样留作记录（数值修好后再接）。
                 lv3Crystal: 1,                      // 任一设施升到 Lv3 另需 1💎
             },
+            // ==================== [REQ-20261022-wave-loop S3] 工厂网格 · 耗电与材料口径（设计稿 §6 分件 11）====================
+            // 键名与 docs/design/factory_grid_line_v1.md §6 分件 11 逐字一致，不得另起别名；位置与 facilities 同段族，便于并排读。
+            // 标注：[盘上]＝代码现值 ／ [提案]＝设计稿新给的夹具价（不是平衡，调参交资源与战斗调参专家）。
+            // 注意：本段是**配置**；存档里的 power{capacity,reserve,buildSeqNext} 是**运行时状态**（见 src/utils/build_grid_utils.js）。
+            power: {
+                draw: {
+                    // 每波耗电。数组长度必须 = 该设备 upCost.length + 1 = 3。
+                    // 取整规则（设计稿定死）：Lv_n = ceil(基础值 × [1,1.5,2][n-1])，耗电只许更贵、不许更便宜。
+                    turret:    [4, 6, 8],   // 炮台：基础值 4 [提案]
+                    frost:     [6, 9, 12],  // 冰霜塔：基础值 6 [提案]
+                    lightning: [6, 9, 12],  // 雷击塔：基础值 6 [提案]（初稿误写 8/12/16，已按 ×1/×1.5/×2 取整修正）
+                    shieldGen: [4, 6, 8],   // 结界发生器：基础值 4 [提案]（初稿误写 3/4/5）
+                    workshop:  [4, 6, 8],   // 弹药工坊：基础值 4 [提案]（该设施尚未落 facilities，先只给耗电键）
+                    generator: 0,           // 后勤设备不耗电：明写 0 而不是省略，让「设施键 ↔ 耗电键」一一齐全
+                    battery:   0,
+                    // 雷能合成器**不进 draw**：它的每波耗电 = synth.electricPerUnit[n-1] × 本波实产数（唯一口径）。
+                },
+                generate: {
+                    generator: [10, 15, 20],   // 发电机每波发电 [提案]
+                },
+                // 每造 1 发主炮弹要花几度电（`E = floor(可用电力 / powerPerShot)`，算式见 src/utils/material_loadout_utils.js 的 computePowerShots）。
+                // [提案] 定 2 的算术依据：电池底容量 15 − 工坊 Lv1 耗电 4 = 11 ⇒ 无发电机时 E = 5（不构成削弱）；
+                //   两座塔 Lv1 共耗 8 ⇒ 剩 3 ⇒ E = 1（塔与弹抢电，这才是这条轴的玩法）。
+                powerPerShot: 2,
+                battery: {
+                    baseCapacity: 15,          // 开局底容量（不建电池就有 15）[Owner] D7
+                    capacity: [15, 25, 40],    // **单座在该等级的容量增量，不是绝对值**：总容量 = baseCapacity + Σ 各座贡献
+                    // 单座 Lv1 → 15+15=30、Lv2 → 15+25=40、Lv3 → 15+40=55。把 capacity 当绝对值读 = Lv1 电池不增容，全表崩。
+                },
+                synth: {
+                    electricPerUnit: [5, 4, 3],   // 每产 1⚡ 的耗电 [提案]
+                    capPerWave: [2, 3, 4],        // 每波产量上限 [提案]
+                    // 每波耗电 = electricPerUnit[n-1] × 本波实产数 → Lv1 5×2=10 / Lv2 4×3=12 / Lv3 3×4=12。
+                    // Lv3 与 Lv2 同为 12 是刻意的（单位耗电更低 × 上限更高相乘打平），属 D7「后期耗电更高」的已知例外。
+                },
+                materials: {
+                    // 每 N 次**产料钉**命中给 1 料（本键取值下限是 1：分母 1 = 每次命中都算 1 料）。
+                    // [提案] 2 → 1（2026-10-25 料经济标定，非平衡定稿）：实测每波产料钉命中只有 12~15 次
+                    //   （`tools/verify/readings/20261025-132905` 的 state.json 与 run.log）。p=2 时每波只落 6~7 个单位，
+                    //   再按命中占比分桶 ⇒ pyro 入 5（第 1 波 5、第 2 波起 5），而建工坊后每发仍要 3 pyro
+                    //   ⇒ 每波只打得出 1 发（无工坊 0 发），第二发直接断，这正是「料收支算术上不成立」的根因
+                    //   （整局表见 `tests/validate_material_economy_balance.mjs`）。p=1 把每波单位数抬到 12~15、
+                    //   pyro 入 8（第 1 波）/ 7（第 2 波起），建工坊后可负担 4~6 发、扣掉参考射速 2→3 发后
+                    //   每波余 1~3 料给建设。再往上只能抬保底或改分桶规则，那两条都会削掉「挖矿→料」的动机，
+                    //   故收入侧先动本键。
+                    perHitsPerMaterial: 1,
+                    // ----- [REQ-20261022-wave-loop 料闭环] 本键为本轮新增，不在 §6 分件 11 的清单内 -----
+                    materialPerShot: 3,      // 每发主炮弹耗钉盘料 [冻结单 v3 §3.3]（只扣 pyro+cryo，beast 不参与造弹）
+                    // 每波保底料 FLOOR（落 `FLOOR_BUCKET` = pyro）：保证**每波至少打得出 1 发**，不挖也有一点底。
+                    // [判定：本键**不动**，值仍是 3] 2026-10-25 料经济标定里试过 3 → 6（= 2 发 × 3 pyro，与基础射速对齐），
+                    //   实测那样 A1~A3 全绿、余量更宽（建工坊后可负担 5~12 发），**但已回退**，因为它破一条更强的不变量：
+                    //   冻结单 v3 §3.1 的 `FLOOR := c`（c = `materialPerShot` = 3），改成 6 会让「保底 = 1 发的料价」失效，
+                    //   而这条是所有「保底够打一发 / C10 成本上限」推论的基座。收入侧只留 `perHitsPerMaterial` 一处改动。
+                    //   代价如实记：FLOOR 留在 3 时，第 7~8 波「可负担 − 参考射速」只剩 +1（薄），且第 5 波起本波入料只够 2 发、
+                    //   第 3 发靠前 4 波余料 —— 这是刻意的稀缺，不是缺口（第 8 波仍 4 ≥ 3）。
+                    // 落点是波末 `M = FLOOR + floor(coloredHits / perHitsPerMaterial)` 的加数，消费点 src/build_system.js sys_onDigComplete()。
+                    basicFloorPerWave: 3,
+                    // 料的**存量不设上限**（Owner 2026-10-24 23:34「要人玩的爽就别设置材料上限了」）：本段刻意没有容量键，
+                    // 账本只做累加、不截断。原 `materialCapShots: 3`（容量 = 本键 × 3 = 9）已整体作废，也不许用 999 / 9999 之类冒充无限。
+                    pegWeights: {            // 钉类型 → 账本权重（任何钉不再一律给 1 电）
+                        gray: { energy: 1 },
+                        pyro: { pyro: 1 },
+                        cryo: { cryo: 1 },
+                        // ----- [REQ-20261022-wave-loop 料→建造] 第三色料 beast 的产料钉接线（键位与理由，后来人必读）-----
+                        // ① `lightning` 是死键：`src/utils/peg_type_pool.js:20` 的 `RANDOMIZABLE_PEG_TYPES = ['normal','pyro','cryo','bounce']`
+                        //    不含它 ⇒ 钉盘根本不刷该钉型，给它写权重等于给一个不存在的钉配料。实机第三色料恒为 `beast: 0`，根因即此（不是账本问题）。
+                        // ② `gray`（以及走 `white` 权重基准的 `normal`）只产电：`bucketForPegType` 只认 `MATERIAL_KEYS` 三色（pyro/cryo/beast），
+                        //    **没有默认桶兜底**，未点名的钉一律返回 null ⇒ 不产料。
+                        // ③ `bounce` 是盘上**真实会刷出**的钉型（`CONFIG.probabilities.bounce = 18`，见本文件 `:1296`），
+                        //    且此前没有任何料桶接线 ⇒ 由它供 `beast`，第三色料才真正产得出。
+                        bounce: { beast: 1 },   // 第三色料 beast（只用于建设、不参与造弹）
+                    },
+                },
+                grid: {
+                    cols: 3,            // 3 列（与落料口 3 个一一对齐）
+                    rowsStart: 1,       // 起手 1 行 = 3 格
+                    rowsMax: 5,         // 上限 5 行 = 15 格（扩建 4 级，每级 +1 行）
+                    expandCost: [       // 扩建 4 级（💎 + 料）；扩建与行带不可拆、不返料 [提案]
+                        { crystal: 1, pyro: 3, cryo: 3 },
+                        { crystal: 1, pyro: 6, cryo: 6 },
+                        { crystal: 2, pyro: 9, cryo: 9 },
+                        { crystal: 2, pyro: 12, cryo: 12 },
+                    ],
+                },
+            },
+            // ==================== [REQ-20261022-wave-loop 料→建造] 弹药工坊产能（`U` 轴）与手工造弹溢价 ====================
+            // 位置：`src/game_phase.js:1668` 读的就是 `build.workshop.capacityByLevel`（不是 `build.power.workshop`），键位不得改。
+            workshop: {
+                // 每波最多造得出几发（`U` 轴）。数组长度 3，逐级递增，对应 Lv1/Lv2/Lv3。
+                // [盘上] 取值域来自 `src/utils/material_loadout_utils.js:64-68`：`WORKSHOP_CAPACITY_MIN = 1`、
+                //   `WORKSHOP_CAPACITY_MAX = 5`、`WORKSHOP_CAPACITY_INITIAL_MAX = 4`（初始值必须 < 5）。
+                //   越界不是「数值偏大」这种小事，是**整张表被 `validateCapacityTable` 判红、建工坊即抛 `RangeError`**
+                //   （`phase_wavePreviewCore → pickWorkshop → validateCapacityTable`；上一版 `[4,6,8]` 就是这么崩的）。
+                // [提案] Lv1 = 3 的依据：默认 `A` = 2（`gameplay.cannon.shotsPerTurn: 2`，`src/config.js:940`），
+                //   3 > 2 ⇒ 默认打法不构成削弱。
+                // [提案] Lv2 = 4 / Lv3 = 5 的依据：`A` 上限是 5（`shotsPerTurn: 2` + `ratePrices` 三级）⇒
+                //   工坊必须升到 Lv3 才刚好覆盖满射速轨；玩家若先把射速轨升到 4 或 5 而工坊停在 Lv1，就会被产能卡住
+                //   —— 这正是这条轴的存在感。
+                capacityByLevel: [3, 4, 5],
+                // 没建工坊时只能「手工造弹」：每发料耗 = 配方原价 × 本倍率。建了工坊恢复原价。
+                // 这是工坊的**正面收益**（省一半料），不是削弱——没有这条，建工坊只会引入两道新上限，等于纯亏。
+                manualMaterialMultiplier: 2,
+            },
+            // ==================== [REQ-20261022-wave-loop 开局可打] 新局启动料（首波不再 0 发）====================
+            // **这是什么**：新局 / 重开局时料账本的三色初值。落点 `src/material_system.js` 的 `sys_initMaterialLedger()`
+            //   → `createMaterialLedger(init)`（`src/utils/material_economy_utils.js`）。
+            // **只在新局 / 重开局生效**：读档路径不经过本键 —— `sys_loadRunState()` 在 `sys_resetGame()` 之后调
+            //   `mat_applyPersistState(state)`，用存档里的账本整体覆盖（`normalizeLedger(src.materialLedger)`）。
+            //   因此存档玩家不会被"悄悄补料"，新局玩家也不会"明明配了却没料"。
+            // **为什么必须有本键**（实测病根，不是估算）：真机第一波账本 `{ pyro: 5, cryo: 4, beast: 1 }`
+            //   （读数 `tools/verify/readings/20261025-132905/state.json` 的 `materialLedger` [实测]）对上默认弹药配方
+            //   `ammo_pyro_single`（原价 `{ pyro: 3 }`，本文件 `:1102`）⇒ 未建工坊时每发 `3 × manualMaterialMultiplier 2 = 6`
+            //   ⇒ `floor(5 / 6) = 0` 发；改去建工坊要 `{ pyro: 4, cryo: 2 }`（本文件 `:978`），建完只剩 1 pyro、
+            //   每发回到原价 3 ⇒ 仍是 `floor(1 / 3) = 0` 发。**两条路全堵**，违反硬前提「不存在装填失败／打不满」。
+            // **数值怎么来的**（三条算例，发数口径 `N = min(A, U, E, M)`，M 为逐料 `floor(存量 / 每发需求)`）：
+            //   ① 不建工坊：`floor(10 / (3 × 2)) = floor(10 / 6) = 1` 发。
+            //   ② 建工坊（扣 `{ pyro: 4, cryo: 2 }`，剩 pyro 6 / cryo 4）：`floor(6 / 3) = 2` 发，
+            //      正好等于默认 `A` = 2（`gameplay.cannon.shotsPerTurn: 2`，本文件 `:940` 附近）。
+            //   ③ ⇒ 开局第一次取舍当场有感：建工坊立刻多打 1 发，且此后每波省一半料。
+            // **为什么不再给多**（不要 12 / 8）：那会让"不建工坊也能打 2 发"，工坊在开局就失去诱因，
+            //   等于把这条取舍废掉 —— 给到"刚好差一发"才是它该在的位置。
+            // **beast 为什么是 0**：beast 只用于建设、不参与造弹（`build.power.materials.pegWeights` 里由 `bounce` 钉产出），
+            //   保留"要 beast 得自己去挖"；白送会让第三色料失去挖掘动机。
+            // 标注：[提案] `pyro: 10` / `cryo: 6` / `beast: 0` 是本轮决策（依据即上面三条算例 + 上面那条 [实测] 账本），
+            //   不是平衡定稿；键名 `startMaterials` 本轮新增，盘上此前没有同义键。调参交资源与战斗调参专家。
+            startMaterials: { pyro: 10, cryo: 6, beast: 0 },
+            // ==================== [REQ-20261022-wave-loop 经济接线 v2 · 步 2] 弹药配方表（结构已定；`cost` 已定稿，`elements` 层数与解锁节奏仍 [提案]；单发倍率字段已删，见下方「倍率字段为什么删」）====================
+            // 位置依据：[盘上] `src\config.js:972` 既有约定原文「键名与 docs/design/factory_grid_line_v1.md §6 分件 11 逐字一致，不得另起别名；位置与 facilities 同段族，便于并排读。」
+            //   本段紧随 `power`，与 `facilities` / `power` 同段族（订正件附录 C-2「存放位置」）。
+            // 命名纪律（订正件附录 C-2「命名风险」——属实现纪律，不能靠注释解决，Code Review 必查）：
+            //   ① 配置键一律写全 `CONFIG.gameplay.build.recipes`（带 `build.` 前缀），不许简写；
+            //   ② 正文与 UI 文案说「弹药配方」，不说裸「配方」；
+            //   ③ 盘上 `src\ui\hud.js:623` 的 `recipes`（`const recipes = this.ammoQueue || [];`）与
+            //      `src\ui_system.js:1559` 的 `recipes`（`const makeRow = (recipes, startIdx, headerText, headerColor) => {`）
+            //      指的是**单发子弹对象**，与本段无关；
+            //   ④ 本段是**配置**；`_selectedRecipeId`、随 `round` 冻结的记录（`{ round, recipeId, N, bound, ties, 已扣料 }`）
+            //      是**运行时状态**，不在本段、也不许挂到这里。
+            // 数值纪律：`cost` 已**定稿**（2026-10-25，标定读数 + 算术复核），结构照附录 C-2（**现为五字段**）；
+            //   `elements` 层数与解锁节奏**仍是 `[提案]`**，本轮不定稿。
+            //   每条数值的取值依据分开标，不许互相冒充：
+            //     · `cost`（`{ pyro: 3 }` / `{ pyro: 2, cryo: 2 }` / `{ pyro: 1, cryo: 3 }`）= `[设计稿]` 定稿值；
+            //     · `[实测]` 只用来**支撑**这套取值（整备时点分布 pyro p50 = 7 / cryo p50 = 84，出处见下面 ④ 与 `tools/measure/readings/_calib_20261025_1140/calib_pool.json`），不构成数值本身。
+            //   **仍是「非平衡定稿」**：数值过得了结构校验，但收入侧的 `pyro : cryo` 配比未调，已知缺口见下面 ④，登记为可玩版交付之后第一项平衡项。
+            //   唯一带约束来源的是最低档 `cost.pyro` 的上限：C10 [约束] ≤ `basicFloorPerWave`（`3` [盘上]，本文件 :1008）。
+            // 倍率字段为什么删（2026-10-25 决定，依据 `docs/review/gameplay-20261025.md` C-1）：
+            //   原来的单发倍率（`damageMult` 1 / 1.25 / 1.25）**全仓零战斗读取点**——战斗侧吃的是单发子弹对象的
+            //   `recipe.damage`（`src/combat/collision.js:355-357`），配方表里这个字段只出现在结构校验与界面显示里。
+            //   结果就是「多付 1 料不加伤、屏上却写 ×1.25」：界面在说一件战斗里不成立的事，比缺功能更糟。
+            //   ⇒ 字段、它的结构校验、界面倍率三样一并删掉；料只决定「打几发」。
+            //   **不许以任何形式加回来**：`validateRecipeTable()` 见到该字段即判 `REMOVED_FIELD`
+            //   （`src/utils/shot_recipe_utils.js` 的 `REMOVED_RECIPE_FIELDS`），不靠注释约束。
+            // 档位规则（v2 §5.2 `:221`）：档位只有「用几种料」一个维度；同档内允许的差异只有 `elements`（元素层数）
+            //   与 `blueprintRequired`（要不要设计图）；**跨档成本必须同向抬高**（料多一档，单发成本也涨）。
+            //   这两条由 `validateRecipeTable()` 强制（FLOOR_TIER_VIOLATION / COST_MULT_NOT_ALIGNED），不靠注释约束。
+            // 逐条判定请用 `src/utils/shot_recipe_utils.js` 的 `validateRecipeTable()`，不要在 UI 或运行时里另写一份校验。
+            recipes: [
+                {   // 档：单料（cost 的正数料键数 = 1）—— 最低档，恒可选、恒付得起 1 发（C10）
+                    id: 'ammo_pyro_single',
+                    displayName: '单料·熔火弹',
+                    cost: { pyro: 3 },                          // [设计稿] 定稿：只在 FLOOR_BUCKET(pyro) 上 ≤ 3（C10 [约束]）；不写 cryo/lightning 键 = 0 需求，不是写 0
+                    elements: { pyro: 1, cryo: 0, lightning: 0 }, // [提案] 元素初始层数，0 层也显式写（六键并排读）
+                    blueprintRequired: false,                   // [提案] 最低档必须恒可选，不挂设计图
+                },
+                {   // 档：双料（cost 的正数料键数 = 2）—— 常规档
+                    id: 'ammo_pyro_cryo_dual',
+                    displayName: '双料·熔霜弹',
+                    cost: { pyro: 2, cryo: 2 },                 // [设计稿] 定稿：总量 4 > 单料 3（§5.2「料多一档，单发成本也涨」）；与重冰那条总量相同、配比不同
+                    elements: { pyro: 1, cryo: 1, lightning: 0 }, // [提案]
+                    blueprintRequired: false,                   // [提案]
+                },
+                // 为什么两条双料能并列存在（同档同成本总量 4，第二条凭什么存在）—— 依据换成下面三条；旧说法「pyro 富 / cryo 紧时某条更抗」的前提已被实测推翻：
+                //   ① 同档同总量：两条 `cost` 总量都是 4（`pyro 2 + cryo 2` / `pyro 1 + cryo 3`），
+                //      差异只在**料配比**、`elements` 层数与 `blueprintRequired`——在档位维度上两条严格同档，不比高低。
+                //   ② 两条都不在所有料况下更优：M = min over m where cost[m] > 0 of floor(stock[m] / cost[m]) 是**逐料取最小** [推导]，
+                //      所以配比只决定「抗哪一种料短缺」的方向：cryo 紧时 `{ pyro: 2, cryo: 2 }` 的 M 更高，pyro 紧时 `{ pyro: 1, cryo: 3 }` 更高。
+                //   ③ 单料档为什么不被支配（口径是**每单位料打几发**，因为伤害不再由配方决定）：单料 1 / 3 ≈ 0.3333 发/料，
+                //      双料 1 / 4 = 0.25 发/料 [推导] ⇒ 单料在「每单位料的发数」这一维度上**不被支配**；
+                //      双料多付的那 1 料买到的是「按另一桶料出弹」这条**料况适配**（②），不是更高伤害——两个维度分居，两条双料才都不是死档。
+                //   ④ 已知平衡缺口（**已知、已接受、不靠改这两个数字解决**）：整备时点实测 pyro p50 = 7 / cryo p50 = 84 [实测]
+                //      （`tools/measure/readings/_calib_20261025_1140/calib_pool.json` 的 `bucketBalance`，fallback_400x600 / T1 1row 5slots / collectors 5 / A=2），
+                //      cryo 存量约为 pyro 的 12 倍 ⇒ **pyro 是紧桶、cryo 长期富余**。
+                //      改造前的后果（2026-10-25 之前的默认挑法是「按标价最低挑」，`pickDefaultRecipe`）：一律落 `{ pyro: 3 }` 单料档，
+                //      **cryo 从来没被消耗过**——`tools/verify/readings/20261025-164859/` 真机三波账本 cryo 19 → 27 → 32 单调上涨、
+                //      `spent.cryo` 恒 0（第一波读数 `"spent":{"pyro":12,"cryo":0}`），挖出来的冰料等于白挖。
+                //      **现在的挑法**：`shot_recipe_utils.pickRecipeByYield`（`src/utils/shot_recipe_utils.js:454`）按「这堆料能打几发最多」挑、
+                //      并列按 id 字典序；运行时 `phase_waveRecipe` 与整备屏共用同一条 ⇒ 配比自动适配：pyro 紧就挑对 pyro 需求更低的，
+                //      cryo 紧才轮到重冰那条。所以「默认一律压到单料档、cryo 白挖」这条失真不再成立，但**收入比仍然倾斜**。
+                //      根治办法是调产出入的 `pyro : cryo` **收入比**，**不是改配方成本**——压这两条成本会把「每单位料发数」的天平一起打歪。
+                //      登记为可玩版交付之后的**第一项平衡项**。
+                // id 刻意保持 `ammo_pyro_cryo_heavy` 不变：`pickRecipeByYield` 在**同样发数**并列时按 id 字典序兜底，
+                //   若改名让它排到 `ammo_pyro_cryo_dual` 前面，这条解锁后一旦两条 yield 打平就会默认切到「cryo 需求 3」的重冰配方，
+                //   而玩家最紧的那个桶（现为 pyro）一短缺就会看到默认配方突然打不出弹。保持现 id ⇒ 平手时兜底恒落在均衡那条。
+                {   // 档：双料（cost 的正数料键数 = 2）—— 同档同成本总量，差异只在料配比、元素层数与设计图解锁
+                    id: 'ammo_pyro_cryo_heavy',
+                    displayName: '双料·霜重弹',
+                    cost: { pyro: 1, cryo: 3 },                 // [设计稿] 定稿：与同档那条成本总量同为 4、但配比不同：这条吃 pyro 1 / cryo 3（重冰）
+                    elements: { pyro: 1, cryo: 2, lightning: 0 }, // [提案] 冰层更重（比同档那条多 1 层 cryo）；lightning 仍为 0——它是元素层数、不是料键（C6 不放开第三种料）
+                    blueprintRequired: true,                    // [提案] 需设计图解锁；解锁节奏 [待标定]
+                },
+            ],
             items: {
                 slots: 2,                           // 道具位（一次性，战斗中使用）
                 bomb: { cost: 20, dmg: 30, radius: 100 },
@@ -978,8 +1206,8 @@ const CONFIG = {
             mining: { collector: { prices: [50, 90, 140] } }, // 挖矿升级：采集弹珠 +1（S2 只开这一项，其余 3 项 S3）
             // 逐波解锁（§8）：键为第几次挖掘（= 第几波）；boss1 = 击败第 1 个 Boss 后。累计生效。
             reveal: {
-                1: ['dmg'],
-                2: ['rate', 'bounce', 'slots', 'turret', 'shieldGen'],
+                1: ['dmg', 'workshop', 'generator'],                       // [提案] 第 1 波就能看见料付设施（当波买不起，第 2 波凑够）
+                2: ['rate', 'bounce', 'slots', 'turret', 'shieldGen', 'battery'],
                 3: ['crystal', 'items', 'bomb', 'shield', 'mining'],
                 boss1: ['branch', 'lightning', 'frost', 'collector', 'timestop', 'extraDig'],
             },
@@ -1005,6 +1233,13 @@ const CONFIG = {
         spacingY: 32,      // 钉子垂直间距
         startRows: 3,       // [难度调低] 原 4 -> 初始生成3行敌人，减少第1关压力
         spawnMin: 2,        // [难度调低] 原 3 -> 每波最少生成2个，降低前期压力
+        // [REQ-20261022-wave-loop 难度断崖] 填盘**目标敌量**（不是每行下限）：本回合场上普通敌人上限 =
+        //   min(cap, start + (round − 1) × perRound)。原实现只按行随机填，第 2 波会一步填到 20 只
+        //   （实测 20 总 / 17 活 / 154 血，`tools\verify\readings\20261025-150003\combat-probe-wave2.json`），
+        //   而第 1 波只有 11 只 ⇒ 第 1→2 波是断崖。改成随回合渐进后：波 1 = 11（与实测一致）、波 2 = 13、波 3 起 = 15。
+        //   这里只改**敌量**：不动每回合发数（`cannon.shotsPerTurn` = 2），也不动 `enemyHpPerRound`——
+        //   依据 `docs/review/gameplay-20261025.md` §7-② 的 C 选项（「压敌量，不抬发数」）。
+        enemyFill: { start: 11, perRound: 2, cap: 15 },
         selectionCount: 6,  // 选卡阶段提供多少张卡
         selectionReq: 3,     // 需要选择多少张卡
         assimilationDoubleMultiplier: 2,

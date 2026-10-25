@@ -1227,6 +1227,36 @@
         #phase-gathering #hero-gauge-container {
             display: none !important;
         }
+        /* [ux-20261025 P0-1] 挖掘投放引导语：原来这段字在 .ui-overlay 里（z-index:auto），
+           被 z-index:1 的 #gameCanvas 盖住 ⇒ 玩家看不到「点哪里投放」。
+           这里把它抬到画布之上（z-index:6），并给一块深色底板让它可读；
+           pointer-events 保持 none：发射输入绑在 #gameCanvas 的 mousedown（src/game_system.js:834），
+           引导若吃掉点击，投放就真的点不动了。 */
+        #phase-gathering .gathering-launch-hint {
+            position: absolute;
+            left: 50%;
+            top: 96px;                  /* 原 .absolute.top-24 = 96px，坐标刻意不变 */
+            transform: translateX(-50%);
+            z-index: 6;
+            pointer-events: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px 14px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.82);
+            border: 1px solid rgba(251, 191, 36, 0.5);
+            color: #fde68a;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+        }
+        /* 两批都发射过（没有「待发射」的批次）⇒ 这句提示已经没有意义，自动收起 */
+        #phase-gathering:not(:has(.dig-launch-btn:not(.is-launched))) .gathering-launch-hint {
+            display: none;
+        }
         /* [REQ-20261022-wave-loop S1] 挖掘发射选择：采集 ×5 / 炼成弹珠 */
         .dig-launch-toggle {
             position: absolute;
@@ -5511,8 +5541,14 @@
 
     <!-- Phase 1: Gathering -->
     <div id="phase-gathering" class="ui-overlay" style="display: none;">
-        <div class="absolute top-24 w-full text-center pointer-events-none">
-            <p class="text-xs text-cyan-100/40">點擊上方區域釋放</p>
+        <!-- [ux-20261025 P0-1] 原样是 <p class="text-xs text-cyan-100/40">點擊上方區域釋放</p>：
+             它所在的 .ui-overlay 是 z-index:auto，而 #gameCanvas 是 z-index:1，
+             于是这段字被画在画布**下面**（elementFromPoint 命中的是 canvas）。
+             现在给它自己的层 + 可读底板，z-index 6 压在画布之上；
+             pointer-events:none 保持不变——发射输入绑在 #gameCanvas 的 mousedown 上
+             （src/game_system.js:834），引导一旦吃掉点击，玩家就真的点不动了。 -->
+        <div id="gathering-launch-hint" class="gathering-launch-hint" aria-hidden="true">
+            <span>點擊上方區域釋放</span>
         </div>
 
         <!-- [REQ-20261022-wave-loop S2] 原 #hero-gauge-container（0/15 充能表）已移除；本次挖掘能量读数，也是能量球飞行兜底目标（hud.js ui_updateUICache） -->

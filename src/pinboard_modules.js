@@ -21,10 +21,9 @@
 
 import { CONFIG } from './config.js';
 import { Peg, SpecialSlot } from './entities.js';
-
-// 与 game_phase.phase_gathering_getRandomPegType 保持一致：
-// 初始随机属性钉只保留纯净弹珠属性；wind 是变异属性，不参与初始化随机刷新。
-const RANDOMIZABLE_PEG_TYPES = ['bounce', 'damage'];
+// [REQ-20261022-wave-loop 料闭环] 随机属性钉取值域收敛到**唯一**共享常量（冻结单 v3 §6.3-3）：
+// 本文件不再持有本地副本，改由 utils/peg_type_pool.js 提供，与 game_phase.phase_gathering_getRandomPegType 同源。
+import { RANDOMIZABLE_PEG_TYPES } from './utils/peg_type_pool.js';
 
 const PEG_RADIUS = CONFIG.physics.pegRadius || 4;
 const MARBLE_RADIUS = CONFIG.physics.marbleRadius || 5.8;

@@ -57,6 +57,8 @@ import { game_over_mixin } from './ui/game_over.js';
 import { build_system } from './build_system.js';
 import { build_screen_system } from './ui/build_screen.js';
 import { defend_hud_system } from './ui/defend_hud.js';
+// [REQ-20261022-wave-loop 料闭环] 料账本运行时（生产 / 容量 / 装填扣料 / 读数出口）
+import { material_system } from './material_system.js';
 import { preloadAllSprites } from './render/sprite_renderer.js'; // [Phase 5B] 预加载所有 Sprite Sheet
 import { preloadUiBitmaps } from './bitmap_icons.js';
 
@@ -176,7 +178,8 @@ class Game {
             game_system, game_phase, combat_system, render_system, spawn_system,
             ui_system, hud_system, shop_system, rune_launcher_system,
             calc_utils, tutorial_system, game_over_mixin,
-            run_shop, build_system, build_screen_system, defend_hud_system
+            run_shop, build_system, build_screen_system, defend_hud_system,
+            material_system
         ];
         for (const subsystem of _subsystems) {
             for (const [key, val] of Object.entries(subsystem)) {
@@ -381,6 +384,7 @@ class Game {
         this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
         this._digDoneRound = null;        // 本回合是否已完成挖掘（§3：每波只挖一次）
         this.sys_initBuildState();        // [S2] 主炮三轨 / 设施 / 道具 / 挖矿升级 / digCount
+        this.sys_initMaterialLedger();    // [料闭环] 料账本（pyro / cryo / beast + 本波产出 / 销毁计数）
         this.runShopInventory = [];
         this.runShopRefreshes = 0;
         this._runShopOpenedRound = -1;

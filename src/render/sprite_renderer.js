@@ -302,12 +302,243 @@ export class SpriteRenderer {
     }
 }
 
+// ─── 像素 sheet 渲染器（pixel-sheet@1）────────────────────────────────────
+/**
+ * PixelSheetSpriteRenderer — 用 `assets/pixel/enemies/*` 的原生像素 sheet 绘制敌人。
+ *
+ * 与旧 SpriteRenderer 的差别：
+ *   - 帧矩形直接来自 sheet JSON 的 `frames[name] = {x,y,w,h}`，
+ *     不是「frameIndex * frameWidth + row * frameHeight」的等宽网格假设。
+ *   - 绘制尺寸按 sheet 的 `collision_mapping` 口径等比适配：
+ *     画布长宽比 = (cols*26-2) : (rows*26-2)，等比居中放到调用方给的框里。
+ *   - 像素美术强制关闭插值（imageSmoothingEnabled=false），避免糊化。
+ *
+ * 接口与 SpriteRenderer 对齐（ready/failed/play/update/draw/hasAnim），
+ * 使 enemy.js 的绘制点无需区分实现；像素 sheet 不可用时自动回退旧位图渲染器。
+ */
+export class PixelSheetSpriteRenderer {
+    /**
+     * @param {{archetype:string, stem:string, jsonPath:string, pngPath:string, cols:number, rows:number}} descriptor
+     * @param {() => (SpriteRenderer|null)} [legacyFactory] 旧位图链路的构造器（失败时回退用）
+     */
+    constructor(descriptor, legacyFactory) {
+        this.descriptor  = descriptor || null;
+        this.archetype   = descriptor ? descriptor.archetype : null;
+        this.stem        = descriptor ? descriptor.stem : null;
+        this.sheetPath   = descriptor ? descriptor.pngPath : null;
+        this.metaPath    = descriptor ? descriptor.jsonPath : null;
+
+        this._meta       = null;
+        this._image      = null;
+        this._canvasSize = null;
+        this._ready      = false;
+        this._failed     = false;
+        this._delegate   = null;
+        this._legacyFactory = typeof legacyFactory === 'function' ? legacyFactory : null;
+
+        this._state        = { hpRatio: 1, hit: false, frozen: false, burning: false, death: false };
+        this._requestedAnim = 'idle';
+        this._frameName    = null;
+        this._idleAlt      = 0;
+        this._elapsed      = 0;
+
+        this._load();
+    }
+
+    /** 像素 sheet 渲染器标记（enemy.js 据此走像素口径的绘制分支；已回退时返回 false） */
+    get isPixelSheet() { return !this._delegate; }
+
+    get ready()  { return this._delegate ? !!this._delegate.ready : this._ready; }
+    get failed() { return this._delegate ? !!this._delegate.failed : this._failed; }
+    get currentAnim() { return this._delegate ? this._delegate.currentAnim : this._requestedAnim; }
+    /** 当前帧名（取证/调试用） */
+    get frameName() { return this._frameName; }
+    /** 当前帧源矩形（取证/调试用） */
+    get frameRect() { return getFrameRect(this._meta, this._frameName); }
+
+    async _load() {
+        if (!this.descriptor) { this._fallback('descriptor 缺失'); return; }
+        try {
+            const meta = await loadPixelSheet(this.stem);
+            if (!meta) { this._fallback('sheet 元数据不可用'); return; }
+            const size = getSheetCanvasSize(meta);
+            if (!size) { this._fallback('画布尺寸不可解'); return; }
+            const img = await _loadImage(this.sheetPath);
+            this._meta       = meta;
+            this._canvasSize = size;
+            this._image      = img;
+            this._frameName  = this._resolveFrameName();
+            this._ready      = true;
+        } catch (e) {
+            this._fallback(e && e.message ? e.message : '未知加载失败');
+        }
+    }
+
+    _fallback(reason) {
+        if (this._delegate) return;
+        console.warn(`[PixelSheet] ${this.stem || '?'} 像素 sheet 不可用（${reason}），回退旧位图链路`);
+        if (this._legacyFactory) {
+            try {
+                const legacy = this._legacyFactory();
+                if (legacy) { this._delegate = legacy; return; }
+            } catch (e) {
+                console.warn(`[PixelSheet] 旧链路回退构造失败: ${e && e.message}`);
+            }
+        }
+        this._failed = true;
+    }
+
+    /** 由 enemy.js 每帧写入的宿主状态（hp 比例 / 受击 / 冰冻 / 燃烧 / 死亡） */
+    setOwnerState(state) {
+        if (this._delegate) return;
+        if (!state) return;
+        this._state = {
+            hpRatio: Number.isFinite(state.hpRatio) ? state.hpRatio : 1,
+            hit: !!state.hit,
+            frozen: !!state.frozen,
+            burning: !!state.burning,
+            death: !!state.death,
+        };
+    }
+
+    /** 兼容 SpriteRenderer 的动画名接口：'idle' | 'hit' | ... */
+    play(name, opts = {}) {
+        if (this._delegate) {
+            if (typeof this._delegate.play === 'function') this._delegate.play(name, opts);
+            return;
+        }
+        if (typeof name === 'string' && name) this._requestedAnim = name;
+        const next = this._resolveFrameName();
+        if (next) this._frameName = next;
+    }
+
+    /** 该状态在当前 sheet 里是否有帧（enemy.js:837 用它决定要不要切 hit） */
+    hasAnim(name) {
+        if (this._delegate) return typeof this._delegate.hasAnim === 'function' ? this._delegate.hasAnim(name) : false;
+        if (!this._meta) return false;
+        if (name === 'idle') {
+            return PIXEL_SHEET_STATE_FRAMES.idle.some(f => !!getFrameRect(this._meta, f));
+        }
+        const candidates = PIXEL_SHEET_STATE_FRAMES[name] || [];
+        return candidates.some(f => !!getFrameRect(this._meta, f));
+    }
+
+    update(dt) {
+        if (this._delegate) return this._delegate.update(dt);
+        if (!this._ready) return;
+        const step = Number.isFinite(dt) ? Math.max(0, dt) : 0;
+        this._elapsed += step;
+
+        const next = this._resolveFrameName();
+        if (!next) return;
+        const isIdle = PIXEL_SHEET_STATE_FRAMES.idle.includes(next);
+        if (!isIdle) {
+            this._frameName = next;
+            this._elapsed = 0;
+            return;
+        }
+        if (this._elapsed >= PIXEL_SHEET_IDLE_FRAME_SEC) {
+            this._elapsed = 0;
+            this._idleAlt++;
+            this._frameName = this._resolveFrameName();
+        }
+    }
+
+    draw(ctx, x, y, w, h, alpha = 1) {
+        if (this._delegate) return this._delegate.draw(ctx, x, y, w, h, alpha);
+        if (!this._ready || !this._image || !this._meta) return false;
+
+        const rect = getFrameRect(this._meta, this._frameName || this._resolveFrameName());
+        if (!rect) return false;
+
+        const box = this._fitBox(w, h);
+        if (!(box.w > 0) || !(box.h > 0)) return false;
+
+        const prevAlpha  = ctx.globalAlpha;
+        const prevSmooth = ctx.imageSmoothingEnabled;
+        ctx.globalAlpha = prevAlpha * alpha;
+        ctx.imageSmoothingEnabled = false;
+        try {
+            ctx.drawImage(
+                this._image,
+                rect.x, rect.y, rect.w, rect.h,
+                x + box.dx, y + box.dy, box.w, box.h
+            );
+        } catch (e) {
+            console.warn('[PixelSheet] drawImage 失败:', e);
+            ctx.globalAlpha = prevAlpha;
+            ctx.imageSmoothingEnabled = prevSmooth;
+            return false;
+        }
+        ctx.globalAlpha = prevAlpha;
+        ctx.imageSmoothingEnabled = prevSmooth;
+        return true;
+    }
+
+    drawRegion() {
+        if (this._delegate && typeof this._delegate.drawRegion === 'function') {
+            return this._delegate.drawRegion.apply(this._delegate, arguments);
+        }
+        return false;
+    }
+
+    getCurrentFrameDimensions() {
+        if (this._delegate && typeof this._delegate.getCurrentFrameDimensions === 'function') {
+            return this._delegate.getCurrentFrameDimensions();
+        }
+        const rect = getFrameRect(this._meta, this._frameName);
+        return rect ? { width: rect.w, height: rect.h } : null;
+    }
+
+    getCurrentFrameAspect() {
+        if (this._delegate && typeof this._delegate.getCurrentFrameAspect === 'function') {
+            return this._delegate.getCurrentFrameAspect();
+        }
+        return this._canvasSize ? this._canvasSize.aspect : 1;
+    }
+
+    /** 当前状态应显示的帧名（含 idle 两帧交替） */
+    _resolveFrameName() {
+        if (!this._meta) return null;
+        const state = { ...this._state };
+        if (this._requestedAnim === 'hit') state.hit = true;
+        // 宿主状态里没有的动画名（cast/move 等）一律退回 idle 帧
+        const picked = pickStateFrame(this._meta, state);
+        if (!picked) return null;
+        if (PIXEL_SHEET_STATE_FRAMES.idle.includes(picked)) {
+            const idleFrames = PIXEL_SHEET_STATE_FRAMES.idle;
+            const alt = idleFrames[this._idleAlt % idleFrames.length];
+            if (getFrameRect(this._meta, alt)) return alt;
+        }
+        return picked;
+    }
+
+    /** 按 sheet 画布长宽比把帧等比居中放进目标框 */
+    _fitBox(w, h) {
+        const aspect = this._canvasSize ? this._canvasSize.aspect : 1;
+        if (!(w > 0) || !(h > 0) || !(aspect > 0)) return { dx: 0, dy: 0, w: 0, h: 0 };
+        let dw = w;
+        let dh = w / aspect;
+        if (dh > h) { dh = h; dw = h * aspect; }
+        return { dx: (w - dw) / 2, dy: (h - dh) / 2, w: dw, h: dh };
+    }
+}
+
 // ─── 全局 Sprite Sheet 注册表 ─────────────────────────────────────────────
 // 游戏启动时预加载所有已知 Sprite Sheet，避免运行时卡顿
 
 import { ENEMY_V2_METADATA, ENEMY_V2_BY_ARCHETYPE } from '../data/enemy_v2_metadata.js';
 import { resolveEnemyVisualAsset, loadEnemyVisualAssetManifest } from '../data/enemy_visual_assets.js';
 import { BOSS_SPRITE_BOSS_IDS, getBossSpriteSheetPath } from '../data/boss_sprite_assets.js';
+import {
+    PIXEL_SHEET_IDLE_FRAME_SEC,
+    PIXEL_SHEET_STATE_FRAMES,
+    getFrameRect,
+    getSheetCanvasSize,
+    loadPixelSheet,
+    pickStateFrame,
+    resolvePixelSheetArchetype,
+} from '../data/pixel_sheet.js';
 
 const SPRITE_REGISTRY = {
     'golem_normal': 'assets/sprites/enemies/golem_normal.png',
@@ -387,6 +618,23 @@ export function createSpriteRenderer(enemyTypeOrEnemy, bossType, baseArchetype) 
         };
     }
 
+    // 0) 像素 sheet@1（原生像素美术）：命中已接线 archetype 时优先走像素渲染器。
+    //    像素 sheet 加载 / 校验失败时，渲染器内部自动回退到下面的旧位图链路。
+    const pixelSheetHit = enemyInfo.type !== 'boss' ? resolvePixelSheetArchetype(enemyInfo) : null;
+    if (pixelSheetHit) {
+        return new PixelSheetSpriteRenderer(pixelSheetHit, () => _createLegacySpriteRenderer(enemyInfo));
+    }
+
+    return _createLegacySpriteRenderer(enemyInfo);
+}
+
+/**
+ * 旧位图链路（`enemy_visual_assets` 清单 → V2 metadata → golem 兜底）。
+ * 像素 sheet 未接线 / 不可用时走这里；行为与接线前完全一致。
+ * @param {object} enemyInfo
+ * @returns {SpriteRenderer|null}
+ */
+function _createLegacySpriteRenderer(enemyInfo) {
     // 0) 资源协议解析（baseArchetype + footprint + affixSet → composite 资源）
     // 对所有非 Boss 敌人（含 1×1 residue）都走 manifest 解析，命中再使用，
     // 未命中再回到下面的 V2 metadata / golem 兜底。

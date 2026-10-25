@@ -104,22 +104,48 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
-    // ── 第 3 步：挖掘阶段说明 ─────────────────────────────────────────────────
-    // 取消遮罩，让玩家能直接操作钉板
+    // ── 第 3a 步：挖掘阶段 — 两批弹珠是什么 ───────────────────────────────────
+    // [ux-20261025 P0-2] 原来挖掘说明是一张 5 段卡片，375 宽下高 435px，把批次按钮
+    //   （y≈580–607）压在自己底下。拆成 3a/3b 两张：3a 只讲「两批是什么」，玩家自己翻页；
+    //   3b 只讲「怎么发」，等挖完自动走。两张都按窄屏安全区定位（见 _tutorial_positionCard）。
+    // noOverlay: true → 不遮挡，玩家可以先自己看钉板
+    {
+        id: 'dig_batches',
+        phase: 'gathering',
+        targetId: null,
+        highlightSelector: null,
+        title: '挖掘阶段 — 两批弹珠',
+        content: `
+            <p>每一波先挖一次，共<strong>两次发射</strong>，先发哪批由你决定。</p>
+            <p class="mt-2">⚡ <strong>采集 ×5</strong>：5 颗弹珠从同一位置落下，每碰一次钉子得<strong>能量</strong>。</p>
+            <p class="mt-2">🧪 <strong>炼成弹珠</strong>：只有它拾取钉子属性（最多 3 种 × 3 级），落地炼成 1 发<strong>炼成弹</strong>。</p>
+        `,
+        position: 'narrow-safe',    // 窄屏：贴在批次按钮上方，不压按钮
+        narrowAnchor: 'above-dock',
+        narrowDock: '.dig-launch-toggle',
+        noOverlay: true,
+        waitForEvent: null,         // 玩家自己点「下一步」翻页
+        autoAdvance: false,
+        actionLabel: null,
+        actionFn: null,
+    },
+    // ── 第 3b 步：挖掘阶段 — 怎么发射 ─────────────────────────────────────────
+    // 保留 id 'gathering_intro'：tests/validate_build_loop_s2.mjs:281 用它锚定「挖掘 → 整备」
     {
         id: 'gathering_intro',
         phase: 'gathering',
         targetId: null,
         highlightSelector: null,
-        title: '挖掘阶段',
+        title: '挖掘阶段 — 怎么发射',
         content: `
-            <p>每一波开始前先挖一次，共<strong>两次发射</strong>，先发哪批由你决定：</p>
-            <p class="mt-2">⚡ <strong>采集 ×5</strong>：5 颗采集弹珠从同一位置落下，每碰一次钉子获得<strong>能量</strong>。</p>
-            <p class="mt-2">🧪 <strong>炼成弹珠</strong>：只有它会拾取钉子上的属性（最多 3 种 × 3 级），落地后炼成 1 发强力<strong>炼成弹</strong>放进弹匣。</p>
-            <p class="mt-2">用右下角按钮切换要发射的那一批，再点击<strong>钉板上方区域</strong>发射。两批都落定后进入<strong>整备</strong>。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">💡 战斗中点击弹匣里的炼成弹，可以把下一发主炮换成它。</p>
+            <p>先点<strong>右下角</strong>的按钮选好要发的那一批，再点<strong>钉板上方区域</strong>发射。</p>
+            <p class="mt-2">两批都落定后进入<strong>整备</strong>。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 战斗中点弹匣里的炼成弹，可把下一发主炮换成它。</p>
         `,
-        position: 'bottom-fixed',   // 固定在底部，不遮挡钉板
+        position: 'narrow-safe',    // 窄屏：贴在投放区下沿，不压批次按钮
+        narrowAnchor: 'below-launch',
+        narrowDock: '.dig-launch-toggle',
+        showLaunchGuide: true,      // 画出「点这里投放」的虚线投放区
         noOverlay: true,            // 取消遮罩，让玩家能操作
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         // [REQ-20261022-wave-loop S2] 挖完先进整备，不再直接进战斗
@@ -142,6 +168,9 @@ const TUTORIAL_STEPS = [
             <p class="mt-2">准备好后点<strong>「开战」</strong>。</p>
         `,
         position: 'top',
+        // [ux-20261025 P0-2] 窄屏：卡片贴在「开战」按钮上方，不压开战
+        narrowAnchor: 'above-dock',
+        narrowDock: '#build-fight-btn',
         noOverlay: true,
         waitForEvent: EVENT_TYPES.PHASE_CHANGED,
         waitForEventFilter: (data) => data && data.to === 'combat',
@@ -163,10 +192,13 @@ const TUTORIAL_STEPS = [
             <p>弹珠装载完毕，进入<strong>战斗阶段</strong>！</p>
             <p class="mt-2"><strong>🎯 如何发射子弹：</strong></p>
             <p class="mt-1 text-cyan-300">在画布上<strong>按住并拖拽</strong>，瞄准敌人后<strong>松手</strong>即可发射。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">💡 拖拽方向决定发射角度，消灭所有敌人后进入下一回合</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 拖拽方向决定发射角度；没清完不算输，别让敌人越过底线</p>
             <p class="mt-1 text-red-300/80 text-xs">⚠️ 若敌人到达底部，游戏结束！</p>
         `,
         position: 'bottom-fixed',
+        // [ux-20261025 P0-2] 窄屏：贴在战斗底部操作区上方，不压弹匣/发射器
+        narrowAnchor: 'above-dock',
+        narrowDock: '#combat-bottom-dock',
         noOverlay: true,
         waitForEvent: EVENT_TYPES.UI_AMMO_FIRED,
         waitForEventFilter: null,
@@ -174,7 +206,69 @@ const TUTORIAL_STEPS = [
         actionLabel: null,
         actionFn: null,
     },
+    // ── 第 4.5 步：击杀 → 掉料 ───────────────────────────────────────────────
+    // [ux-20261025 P0-3] 教程原来在第一发子弹后就收尾，把「料从哪来」整段留空。
+    // 这一步等第一次击杀（COMBAT_ENEMY_KILLED）才推进。
+    {
+        id: 'combat_kill',
+        phase: 'combat',
+        targetId: null,
+        highlightSelector: null,
+        title: '击杀 → 掉料',
+        content: `
+            <p>打倒的敌人会<strong>掉落材料</strong>：火料 / 冰料 / 兽料，三种<strong>互不通用</strong>。</p>
+            <p class="mt-2">料只有两个去处：<strong>造弹</strong>（每发都扣料）和<strong>造设施</strong>。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 这一波打完就进入下一波的挖掘，没清完不算输。</p>
+        `,
+        position: 'narrow-safe',
+        narrowAnchor: 'above-dock',
+        narrowDock: '#combat-bottom-dock',
+        noOverlay: true,
+        // [爽游模式] 教程专属排期/刷怪分支到此为止：与旧版「第一发子弹后清旗标」同一时刻，
+        // 保证 spawn_system / boss_schedule_utils 的 _isTutorialRun 分支不越界（第 2 波不会再被
+        // 强制排成一只大 Boss）。教学本身继续，改用 _isTutorialBuffRun 承接爽游通关窗口。
+        clearTutorialRunFlag: true,
+        waitForEvent: EVENT_TYPES.COMBAT_ENEMY_KILLED,
+        waitForEventFilter: null,
+        autoAdvance: true,
+        actionLabel: null,
+        actionFn: null,
+    },
+    // ── 第 4.6 步：第 2 波整备 — 建造一座设施（教程收尾条件）──────────────────
+    // [ux-20261025 P0-3] 先隐藏卡片，等真正进到「第 2 波整备」再显示（preWaitEvent）。
+    // 收尾判据二选一：①真的建了一座设施（轮询 facilities）；②直接点开战进第 2 波（waitForEvent）。
+    {
+        id: 'build_facility',
+        phase: 'build',
+        targetId: null,
+        highlightSelector: null,
+        title: '第 2 波整备 — 建造一座设施',
+        content: `
+            <p>整备屏里<strong>能量 ⚡</strong>用来升级主炮，<strong>料</strong>用来造设施。</p>
+            <p class="mt-2">点设施卡上的<strong>建造</strong>：造好<strong>这一波就生效</strong>，不用等下一波。</p>
+            <p class="mt-2 text-amber-300/80 text-xs">💡 造完（或直接开战）教程就结束了，后面自己玩。</p>
+        `,
+        position: 'narrow-safe',
+        narrowAnchor: 'above-dock',
+        narrowDock: '#build-fight-btn',
+        noOverlay: true,
+        // 进到第 2 波整备才显示
+        preWaitEvent: EVENT_TYPES.PHASE_CHANGED,
+        preWaitFilter: (data) => !!(data && data.to === 'build' && (window.game ? window.game.round : 0) >= 2),
+        // 走人（进入第 2 波战斗）也算完成，避免卡片盖在战斗屏上
+        waitForEvent: EVENT_TYPES.PHASE_CHANGED,
+        waitForEventFilter: (data) => !!(data && data.to === 'combat'),
+        waitEndsTutorial: true,
+        autoAdvance: true,
+        // 建造成功没有事件（build_system.sys_buildPurchase 成功分支只回 {ok:true}），
+        // 因此在教程侧轮询 facilities 是否已有设施 —— 不改 build_system。
+        watchFacilities: true,
+        actionLabel: null,
+        actionFn: null,
+    },
     // ── 第 5 步：教程完成 ─────────────────────────────────────────────────────
+    // [ux-20261025 P0-3] 完成卡延到「第 2 波整备」。玩家点开战进第 2 波时自动收尾，
+    // 不让完成卡跟着盖到战斗屏上。
     {
         id: 'tutorial_complete',
         phase: null,
@@ -182,12 +276,15 @@ const TUTORIAL_STEPS = [
         highlightSelector: null,
         title: '教程完成！',
         content: `
-            <p>你已掌握《回声炼金师》的基础玩法！</p>
-            <p class="mt-2">继续探索更多遗物、符文词条和弹珠组合，解锁强大的协同效果。</p>
+            <p>你已掌握《回声炼金师》的基础循环：<strong>挖 → 整备 → 守</strong>。</p>
+            <p class="mt-2">后面每一波都重复这套；敌人越靠下越危险，尽量在它们到底之前清掉。</p>
             <p class="mt-3 text-amber-400 font-bold text-center">祝你炼金愉快！⚗️</p>
         `,
         position: 'center',
         noOverlay: false,
+        // 进第 2 波战斗即自动收尾（玩家没点完成卡也不会挡住战斗屏）
+        autoEndEvent: EVENT_TYPES.PHASE_CHANGED,
+        autoEndFilter: (data) => !!(data && data.to === 'combat'),
         waitForEvent: null,
         autoAdvance: false,
         actionLabel: null,
@@ -202,6 +299,11 @@ export const tutorial_system = {
     _tutorialActive: false,
     _tutorialStepIndex: 0,
     _tutorialUnsubscribers: [],
+    _tutorialTimers: [],
+    _tutorialStepToken: 0,
+    _tutorialRunWatchInstalled: false,
+    // [ux-20261025 P0-3] 与 _isTutorialRun 拆开的「爽游通关窗口」旗标（见 tutorial_end 注释）
+    _isTutorialBuffRun: false,
     _tutorialOverlayEl: null,
     _tutorialCardEl: null,
     _tutorialHighlightEl: null,
@@ -213,6 +315,9 @@ export const tutorial_system = {
      * @description 检查是否需要触发新手教程（首次游玩时自动调用）。
      */
     tutorial_checkAndStart() {
+        // [ux-20261025 P0-3] 无论这次要不要起教程，都得先挂上「局作用域」监听：
+        // 它决定新开的一局算不算爽游局（见 _tutorial_installRunScopeWatcher）。
+        this._tutorial_installRunScopeWatcher();
         if (!this.saveData.tutorialCompleted) {
             setTimeout(() => this.tutorial_start(), 800);
         }
@@ -230,8 +335,28 @@ export const tutorial_system = {
         this._tutorialStepIndex = 0;
         // [爽游模式] 标记当前局为新手教程专属爽游局
         this._isTutorialRun = true;
+        // [ux-20261025 P0-3] 与 _isTutorialRun 拆开的第二个旗标（见 tutorial_end 注释）
+        this._isTutorialBuffRun = true;
+        this._tutorial_installRunScopeWatcher();
         this._tutorial_createDOM();
         this._tutorial_showStep(0);
+    },
+
+    /**
+     * @method _tutorial_installRunScopeWatcher
+     * @description [ux-20261025 P0-3] 局作用域判定：新一局从 meta 进「遗物选择」时，
+     * 只有教程正在进行的那一局才算爽游局（_isTutorialBuffRun）。这样：
+     *   ① 教程局整局保留「第 6 回合爽游通关」窗口（不再因教程收尾而丢失）；
+     *   ② 同一页面里后来开的普通局不会继承上一局的爽游通关资格。
+     * 只装一次；不改 game_system.js 的 sys_resetGame（跨写不受权，见交回报告）。
+     */
+    _tutorial_installRunScopeWatcher() {
+        if (this._tutorialRunWatchInstalled) return;
+        this._tutorialRunWatchInstalled = true;
+        eventBus.on(EVENT_TYPES.PHASE_CHANGED, (data) => {
+            if (!data || data.to !== 'relic') return;   // 新一局只会从遗物选择开始
+            this._isTutorialBuffRun = this._tutorialActive === true;
+        });
     },
 
     /**
@@ -268,8 +393,20 @@ export const tutorial_system = {
         this._tutorialActive = false;
         this._tutorial_cleanupListeners();
         this._tutorial_removeDOM();
-        // [爽游模式] 注意：_isTutorialRun 不在此处清除，而是在 sys_resetGame 中清除
-        // 这样可以确保整个 5 回合内爽游配置持续生效，不因教程卡片关闭而失效
+        // [爽游模式] 教程结束即清旗标：爽游待遇只属于「正在看教程」的玩家。
+        // 若不清，整局都会被当成教程局，第 2 波会被强制排入大 Boss（排期错误，玩家打不死）。
+        this._isTutorialRun = false;
+        // 注：此处清旗标不会与 tutorial_start() 冲突 —— 其首行会先走本方法清成 false，
+        // 随后立刻由 tutorial_start 重新置 true，净效果不变。
+        //
+        // [ux-20261025 P0-3] 旗标已按职责拆分，这里是两个旗标的分工：
+        //   _isTutorialRun     = 「本局套用教程专属排期 / 刷怪 / 钉子分支」（spawn_system.js、
+        //                        utils/boss_schedule_utils.js 共 7 处读取点）。
+        //                        教程一离开第 1 波战斗就清（见 combat_kill 步的 clearTutorialRunFlag），
+        //                        时刻与旧版「第一发子弹后 tutorial_end」完全一致 —— 排期行为不变。
+        //   _isTutorialBuffRun = 「本局有第 6 回合爽游通关窗口」（game_phase.js 的回合结算读它）。
+        //                        教程收尾不再清它，因此「爽游通关」画面重新可达；
+        //                        它由 _tutorial_installRunScopeWatcher 在新一局开始时重新判定。
         if (markCompleted) {
             this.saveData.tutorialCompleted = true;
             this.sys_saveData();
@@ -371,9 +508,11 @@ export const tutorial_system = {
                         color: rgba(245,158,11,0.7); letter-spacing: 0.15em; text-transform: uppercase;
                     ">Step 1 / ${TUTORIAL_STEPS.length}</div>
                     <button id="tutorial-skip-btn" onclick="game.tutorial_skipAll()" style="
-                        font-size: 11px; color: rgba(148,163,184,0.7);
-                        background: none; border: none; cursor: pointer; padding: 2px 6px;
-                        border-radius: 4px; transition: color 0.2s;
+                        font-size: 12px; color: rgba(148,163,184,0.7);
+                        background: none; border: none; cursor: pointer; padding: 0 10px;
+                        min-width: 44px; min-height: 44px;
+                        display: inline-flex; align-items: center; justify-content: center;
+                        border-radius: 8px; transition: color 0.2s;
                     " onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='rgba(148,163,184,0.7)'">
                         跳过教程 ✕
                     </button>
@@ -397,7 +536,9 @@ export const tutorial_system = {
                 "></div>
                 <div style="display:flex; justify-content:flex-end; margin-top:18px; gap:8px;">
                     <button id="tutorial-next-btn" style="
-                        padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 700;
+                        padding: 0 18px; border-radius: 8px; font-size: 13px; font-weight: 700;
+                        min-height: 44px; min-width: 44px;
+                        display: inline-flex; align-items: center; justify-content: center;
                         background: linear-gradient(135deg, #d97706, #f59e0b);
                         border: none; color: #0f172a; cursor: pointer;
                         transition: all 0.2s; box-shadow: 0 4px 12px rgba(245,158,11,0.3);
@@ -430,30 +571,127 @@ export const tutorial_system = {
     /**
      * @method _tutorial_showStep
      * @param {number} index
+     * @param {{preSatisfied?: boolean}} [opts]
      * @private
      */
-    _tutorial_showStep(index) {
+    _tutorial_showStep(index, opts = {}) {
         this._tutorialStepIndex = index;
         const step = TUTORIAL_STEPS[index];
         if (!step) return;
 
         this._tutorial_cleanupListeners();
+        // 每一步一个 token：事件 + 轮询可能同时命中，靠它保证「同一步只推进一次」
+        this._tutorialStepToken = (this._tutorialStepToken || 0) + 1;
         // 移除上一步可能残留的钉盘引导框
         const oldGuide = document.getElementById('tutorial-launch-guide');
         if (oldGuide) oldGuide.remove();
+
+        // [爽游模式] 教程专属排期/刷怪分支到这一步为止（见 tutorial_end 的旗标分工注释）
+        if (step.clearTutorialRunFlag) {
+            this._isTutorialRun = false;
+        }
+
+        // [ux-20261025 P0-3] 有些步骤要「先等一个事件，到了才露卡片」：
+        // 例如「第 2 波整备」不能在玩家还在第 1 波战斗时就弹出来讲建造。
+        if (step.preWaitEvent && !opts.preSatisfied) {
+            const card = this._tutorialCardEl;
+            if (card) card.style.display = 'none';
+            const unsubscribe = eventBus.on(step.preWaitEvent, (data) => {
+                if (step.preWaitFilter && !step.preWaitFilter(data)) return;
+                unsubscribe();
+                this._tutorialUnsubscribers = this._tutorialUnsubscribers.filter(fn => fn !== unsubscribe);
+                if (!this._tutorialActive || this._tutorialStepIndex !== index) return;
+                this._tutorial_showStep(index, { preSatisfied: true });
+            });
+            this._tutorialUnsubscribers.push(unsubscribe);
+            return;
+        }
+
+        const card = this._tutorialCardEl;
+        if (card) card.style.display = 'block';
 
         this._tutorial_updateCard(step, index);
         this._tutorial_updateHighlight(step);
         this._tutorial_positionCard(step);
 
         // 研磨阶段引导：在钉盘顶部创建点击引导框
-        if (step.id === 'gathering_intro') {
+        if (step.showLaunchGuide || step.id === 'gathering_intro') {
             this._tutorial_createLaunchGuide();
         }
 
         if (step.waitForEvent) {
             this._tutorial_registerWaitEvent(step);
         }
+        // 收尾型步骤：这个事件一到就直接结束教程（不是「下一步」）
+        if (step.autoEndEvent) {
+            this._tutorial_registerAutoEnd(step);
+        }
+        // 建造成功没有 EventBus 事件（build_system.sys_buildPurchase 成功分支只回 {ok:true}），
+        // 教程侧轮询 facilities 判「建了一座设施」。
+        if (step.watchFacilities) {
+            this._tutorial_watchFacilityBuilt(step);
+        }
+    },
+
+    /**
+     * @method _tutorial_registerAutoEnd
+     * @description 收尾型步骤：事件命中后直接 tutorial_end(true)。
+     * @private
+     */
+    _tutorial_registerAutoEnd(step) {
+        const unsubscribe = eventBus.on(step.autoEndEvent, (data) => {
+            if (step.autoEndFilter && !step.autoEndFilter(data)) return;
+            unsubscribe();
+            this._tutorialUnsubscribers = this._tutorialUnsubscribers.filter(fn => fn !== unsubscribe);
+            if (!this._tutorialActive) return;
+            this.tutorial_end(true);
+        });
+        this._tutorialUnsubscribers.push(unsubscribe);
+    },
+
+    /**
+     * @method _tutorial_watchFacilityBuilt
+     * @description 轮询 game.facilities，已有任意一座设施即前进（成功建造无事件可用）。
+     * @private
+     */
+    _tutorial_watchFacilityBuilt(step) {
+        const token = this._tutorialStepToken;
+        const timer = setInterval(() => {
+            if (!this._tutorialActive || token !== this._tutorialStepToken) {
+                clearInterval(timer);
+                return;
+            }
+            const list = (window.game && Array.isArray(window.game.facilities)) ? window.game.facilities : [];
+            if (!list.some(Boolean)) return;
+            clearInterval(timer);
+            this._tutorialAdvanceFrom(step, token);
+        }, 400);
+        this._tutorialTimers.push(timer);
+    },
+
+    /**
+     * @method _tutorialAdvanceFrom
+     * @description 统一推进入口：同一步骤只生效一次（事件 / 轮询共用）。
+     * @private
+     */
+    _tutorialAdvanceFrom(step, token) {
+        if (!this._tutorialActive) return;
+        if (token !== this._tutorialStepToken) return;
+        this._tutorialStepToken++;   // 吃掉本次 token，后续重复触发一律无效
+        if (!step.autoAdvance) {
+            const nextBtn = document.getElementById('tutorial-next-btn');
+            if (nextBtn) {
+                nextBtn.textContent = '下一步 →';
+                nextBtn.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)';
+                nextBtn.style.color = '#0f172a';
+                nextBtn.style.display = 'inline-block';
+                nextBtn.onclick = () => this.tutorial_nextStep();
+            }
+            return;
+        }
+        setTimeout(() => {
+            if (this._tutorialActive) this.tutorial_nextStep();
+        }, 600);
     },
 
     /**
@@ -672,6 +910,35 @@ export const tutorial_system = {
     },
 
     /**
+     * @method _tutorial_applyCardMetrics
+     * @description [ux-20261025 P0-2] 窄屏压缩卡片自身占位（内边距 / 字号 / 行高），
+     * 让卡片能塞进「投放区」与「批次按钮」之间的空隙，而不是压住控件。
+     * 触控目标不压缩：跳过/下一步仍 ≥44×44。
+     * @private
+     */
+    _tutorial_applyCardMetrics() {
+        const card = this._tutorialCardEl;
+        if (!card) return;
+        const compact = window.innerWidth <= 430;
+        const titleEl = document.getElementById('tutorial-title');
+        const contentEl = document.getElementById('tutorial-content');
+        const indicator = document.getElementById('tutorial-step-indicator');
+
+        card.style.padding = compact ? '12px 14px' : '20px';
+        card.style.borderRadius = compact ? '14px' : '16px';
+        if (titleEl) {
+            titleEl.style.fontSize = compact ? '15px' : '16px';
+            titleEl.style.marginBottom = compact ? '6px' : '10px';
+            titleEl.style.lineHeight = compact ? '1.35' : '1.4';
+        }
+        if (contentEl) {
+            contentEl.style.fontSize = compact ? '12px' : '13px';
+            contentEl.style.lineHeight = compact ? '1.5' : '1.7';
+        }
+        if (indicator) indicator.style.fontSize = compact ? '9px' : '10px';
+    },
+
+    /**
      * @method _tutorial_positionCard
      * @description 定位教程卡片。
      * 支持 position: 'bottom-fixed'，将卡片固定在屏幕底部中央，
@@ -686,12 +953,22 @@ export const tutorial_system = {
         const vh = window.innerHeight;
         const cardWidth = Math.min(340, vw * 0.9);
 
+        // 窄屏先压缩卡片自身占位，再按控件避让定位
+        this._tutorial_applyCardMetrics();
+
         // 重置
         card.style.left = '';
         card.style.right = '';
         card.style.top = '';
         card.style.bottom = '';
         card.style.transform = '';
+
+        // [ux-20261025 P0-2] 窄屏专属排法：375 宽下列表/按钮全在屏幕下半，
+        // 「居中 + 底对齐」的卡片必然压住玩家要点的控件，所以改为按控件避让。
+        if (vw <= 430 && step.narrowAnchor) {
+            this._tutorial_positionCardNarrow(step, card, vw, vh, cardWidth);
+            return;
+        }
 
         // 固定在屏幕底部中央（遗物选择、研磨阶段使用）
         if (step.position === 'bottom-fixed') {
@@ -744,6 +1021,46 @@ export const tutorial_system = {
     },
 
     /**
+     * @method _tutorial_positionCardNarrow
+     * @description [ux-20261025 P0-2] 窄屏（≤430px）按控件避让定位卡片。
+     * 两条锚法：
+     *   - narrowAnchor: 'above-dock'  → 卡片底边贴在 narrowDock 控件上沿 8px（不压控件）
+     *   - narrowAnchor: 'below-launch' → 卡片顶边贴在画布「上方 40% 投放区」下沿 8px
+     * 最后统一夹回视口内；卡片高度按内容自适应，不做滚动容器。
+     * @private
+     */
+    _tutorial_positionCardNarrow(step, card, vw, vh, cardWidth) {
+        const canvas = document.querySelector('#gameCanvas');
+        const canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+        const launchBottom = canvasRect ? canvasRect.top + canvasRect.height * 0.4 : 0;
+        const dock = step.narrowDock ? document.querySelector(step.narrowDock) : null;
+        const dockRect = dock ? dock.getBoundingClientRect() : null;
+        const dockTop = dockRect && dockRect.height > 0 ? dockRect.top : null;
+
+        card.style.left = `${Math.max(8, (vw - cardWidth) / 2)}px`;
+        card.style.width = `${Math.min(cardWidth, vw - 16)}px`;
+
+        // 先按当前内容量高度（字体/内容已在 _tutorial_updateCard 落定）
+        const cardH = card.getBoundingClientRect().height;
+        const gap = 8;
+        let top;
+
+        if (step.narrowAnchor === 'below-launch') {
+            top = launchBottom + gap;
+            if (dockTop !== null && top + cardH > dockTop - gap) {
+                // 放不下就退回到「控件上方」这一档，宁可少吃一点投放区
+                top = dockTop - gap - cardH;
+            }
+        } else {
+            top = dockTop !== null ? dockTop - gap - cardH : (vh - cardH) / 2;
+        }
+
+        top = Math.max(gap, Math.min(top, vh - gap - cardH));
+        card.style.top = `${top}px`;
+        card.style.bottom = '';
+    },
+
+    /**
      * @method _tutorial_registerWaitEvent
      * @description 注册等待 EventBus 事件的监听器。
      * @private
@@ -753,26 +1070,22 @@ export const tutorial_system = {
     },
 
     _tutorial_registerWaitEvent(step) {
+        const token = this._tutorialStepToken;
         const unsubscribe = eventBus.on(step.waitForEvent, (data) => {
             if (step.waitForEventFilter && !step.waitForEventFilter(data)) return;
 
             unsubscribe();
             this._tutorialUnsubscribers = this._tutorialUnsubscribers.filter(fn => fn !== unsubscribe);
 
-            if (step.autoAdvance) {
-                setTimeout(() => {
-                    if (this._tutorialActive) this.tutorial_nextStep();
-                }, 600);
-            } else {
-                const nextBtn = document.getElementById('tutorial-next-btn');
-                if (nextBtn) {
-                    nextBtn.textContent = '下一步 →';
-                    nextBtn.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)';
-                    nextBtn.style.color = '#0f172a';
-                    nextBtn.style.display = 'inline-block';
-                    nextBtn.onclick = () => this.tutorial_nextStep();
-                }
+            // [ux-20261025 P0-3] 「走人即收尾」型步骤：玩家没建造就直接开战也算教程结束，
+            // 不让教程卡跟着盖到战斗屏上。
+            if (step.waitEndsTutorial) {
+                if (!this._tutorialActive || token !== this._tutorialStepToken) return;
+                this._tutorialStepToken++;
+                this.tutorial_end(true);
+                return;
             }
+            this._tutorialAdvanceFrom(step, token);
         });
         this._tutorialUnsubscribers.push(unsubscribe);
     },
@@ -786,6 +1099,11 @@ export const tutorial_system = {
             try { fn(); } catch (e) { /* ignore */ }
         });
         this._tutorialUnsubscribers = [];
+        // [ux-20261025 P0-3] 轮询计时器与监听器同生共死：切步骤/结束教程一律清掉
+        (this._tutorialTimers || []).forEach(timer => {
+            try { clearInterval(timer); } catch (e) { /* ignore */ }
+        });
+        this._tutorialTimers = [];
     },
 
 };

@@ -16,6 +16,7 @@ import {
     getCollectorPayout,
     getPrice,
     getReveal,
+    isActionRevealed,
     normalizeBuildState,
     resolveMagazineOverflow,
     tickFacilities,
@@ -57,7 +58,9 @@ const CFG = {
     items: { slots: 2, bomb: { cost: 20, dmg: 30, radius: 100 }, timestop: { cost: 30 }, shield: { cost: 25, amount: 2 }, extraDig: { cost: 20, collectors: 2 } },
     mining: { collector: { prices: [50, 90, 140] } },
     reveal: {
-        1: ['dmg'],
+        // 第 1 波连同料付设施一起开：与 `src/config.js:1174` 逐字一致
+        // （原注释：「第 1 波就能看见料付设施（当波买不起，第 2 波凑够）」）。
+        1: ['dmg', 'workshop', 'generator'],
         2: ['rate', 'bounce', 'slots', 'turret', 'shieldGen'],
         3: ['crystal', 'items', 'bomb', 'shield', 'mining'],
         boss1: ['branch', 'lightning', 'frost', 'collector', 'timestop', 'extraDig'],
@@ -71,7 +74,19 @@ const buy = (s, action, r) => tryPurchase(s, action, CFG, r);
 // ---------- 逐波解锁 ----------
 {
     const r1 = reveal(1);
-    check(r1.has('dmg') && !r1.has('rate') && !r1.has('turret'), '解锁：第 1 波只开伤害轨');
+    check(r1.has('dmg') && !r1.has('rate') && !r1.has('turret'), '解锁：第 1 波开伤害轨（射速 / 弹道 / 炮台仍锁）');
+    // 第 1 波整备屏（digCount = 1）：`build` 动作只认设施自己的键，不再连带要求 'slots'。
+    // 依据 `src/config.js:1174`：「第 1 波就能看见料付设施（当波买不起，第 2 波凑够）」——
+    // 表里列了 workshop / generator，若 `build` 还要 'slots'（第 2 波才开）这两个键就永远解不开任何东西。
+    check(isActionRevealed({ type: 'build', facility: 'workshop' }, r1) === true,
+        '解锁：第 1 波 build/workshop 已解锁（不再依赖 slots）');
+    check(isActionRevealed({ type: 'build', facility: 'generator' }, r1) === true,
+        '解锁：第 1 波 build/generator 已解锁（不再依赖 slots）');
+    check(isActionRevealed({ type: 'build', facility: 'turret' }, r1) === false,
+        '解锁：第 1 波 build/turret 仍锁（turret 在 reveal[2]，防把闸门拆成全放开）');
+    // 格位级动作仍从第 2 波起：`slots` 管的是「开位 / 升级」，不是「能不能盖某座设施」
+    check(isActionRevealed({ type: 'slot' }, r1) === false, '解锁：第 1 波 slot（开位）仍锁');
+    check(isActionRevealed({ type: 'upgrade', slot: 0 }, r1) === false, '解锁：第 1 波 upgrade 仍锁（升级从第 2 波起）');
     const r2 = reveal(2);
     check(r2.has('dmg') && r2.has('rate') && r2.has('bounce') && r2.has('turret') && r2.has('shieldGen') && !r2.has('items'), '解锁：第 2 波开射速 / 弹道 / 设施位 / 炮台 / 结界发生器（累计）');
     const r3 = reveal(3);

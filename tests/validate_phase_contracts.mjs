@@ -657,8 +657,21 @@ check(
     has(audioSystem, /osc\.frequency\.setValueAtTime\(safeFreq,\s*now\)/),
     'laser shots with isLaser but no laser level normalize finite beam/audio parameters'
 );
-check(has(gamePhase, /const\s+allPegTypes\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'gathering random peg pool only includes pure bounce and damage pegs');
-check(has(read('src/pinboard_modules.js'), /const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/), 'module pinboard random peg pool only includes pure bounce and damage pegs');
+// [REQ-20261022-wave-loop 料闭环] 冻结单 v3 §6.3-3「收敛池」把随机钉取值域收敛为**单一共享常量**
+// ['normal','pyro','cryo','bounce']（原两处本地副本 ['bounce','damage'] 已撤）。断言随之重定基：
+// 判据从「两文件各有一份旧的本地字面量」改成「定义只有一处、两文件都引用它、且无本地副本」。
+const pegPoolSrc = read('src/utils/peg_type_pool.js');
+check(has(pegPoolSrc, /export\s+const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[\s*['"]normal['"]\s*,\s*['"]pyro['"]\s*,\s*['"]cryo['"]\s*,\s*['"]bounce['"]\s*\]/), 'random peg pool is the single shared constant: normal/pyro/cryo/bounce');
+check(
+    has(gamePhase, /import\s*\{\s*RANDOMIZABLE_PEG_TYPES\s*\}\s*from\s*['"]\.\/utils\/peg_type_pool\.js['"][\s\S]*const\s+allPegTypes\s*=\s*RANDOMIZABLE_PEG_TYPES;/) &&
+    !has(gamePhase, /const\s+allPegTypes\s*=\s*\[\s*['"]bounce['"]\s*,\s*['"]damage['"]\s*\]/),
+    'gathering random peg pool references the shared constant without a local copy'
+);
+check(
+    has(read('src/pinboard_modules.js'), /import\s*\{\s*RANDOMIZABLE_PEG_TYPES\s*\}\s*from\s*['"]\.\/utils\/peg_type_pool\.js['"]/) &&
+    !has(read('src/pinboard_modules.js'), /const\s+RANDOMIZABLE_PEG_TYPES\s*=\s*\[/),
+    'module pinboard random peg pool references the shared constant without a local copy'
+);
 check(!has(read('src/pinboard_modules.js'), /const\s+defaultLayout\s*=\s*createDefaultModuleLayout\(count,\s*defaultSlots\)/), 'pinboard normalization does not refill intentionally emptied active slots');
 check(has(read('src/ui_system.js'), /_moduleEditor_describeRuneTargets[\s\S]*槽位[\s\S]*_moduleEditor_buildRunePreviewChainHtml[\s\S]*作用位置/), 'pinboard rune fusion preview names the target module slot');
 check(has(indexHtml, /id=["']rune-pinboard-fusion-summary["']/), 'rune launcher has a pinboard fusion feedback container');

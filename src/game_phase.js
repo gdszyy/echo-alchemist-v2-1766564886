@@ -50,6 +50,27 @@ import {
 import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from './combat/collision_shapes.js';
 import { BOSS_WAVE_IN_PROGRESS } from './utils/boss_schedule_utils.js';
 import { alchemyDamage, capAlchemyCollection } from './utils/dig_loop_utils.js';
+// [REQ-20261022-wave-loop 料闭环] 随机属性钉取值域收敛到**唯一**共享常量（冻结单 v3 §6.3-3）：
+// 与 pinboard_modules.getRandomPegTypeFromWeights 同源，本文件不再持有本地副本。
+import { RANDOMIZABLE_PEG_TYPES } from './utils/peg_type_pool.js';
+// [REQ-20261022-wave-loop 步 6] 预演 / 冻结记录：四条上限与扣料**一律转调**既有纯函数，
+// 本文件不另写发数 / 耗电 / 产能算式（订正件附录 C-3 步 6 的复用法则）。
+//   第 1 步：computeMaterialShots（逐料 `M`）、pickBindingLimit（`N = min(A,U,E,M)`）、computePowerShots（`E` 取整）
+//   第 3 步：computeAvailablePower（发电 + 电池 + 合成器 − 设施耗电）、powerDrawFor（单设施每波耗电）
+//   第 4 步：pickWorkshop / isWorkshopPowered / resolveWorkshopCapacity（工坊产能 `U`）
+//   第 2 步：listRecipes / getRecipeById / pickDefaultRecipe（弹药配方）
+// 扣料与干回合保底走 `src/material_system.js` 的包裹层（`mat_chargeShotMaterials` / `mat_grantFloorOnly`），
+// 那两处分别负责「补写 spent」与「按 round 去重」。
+import { computeMaterialShots, computePowerShots, pickBindingLimit } from './utils/material_loadout_utils.js';
+import { computeAvailablePower, powerDrawFor } from './utils/power_budget_utils.js';
+import {
+    WORKSHOP_DRAW_KEY,
+    isWorkshopPowered,
+    pickWorkshop,
+    resolveWorkshopCapacity,
+} from './utils/workshop_capacity_utils.js';
+import { getRecipeById, listRecipes, pickDefaultRecipe, pickRecipeByYield } from './utils/shot_recipe_utils.js';
+import { normalizeLedger } from './utils/material_economy_utils.js';
 
 function getCombatAimEnemyHit(game, start, dir, maxDist, radius) {
     let closest = null;
@@ -622,6 +643,9 @@ export const game_phase = {
                 shots: this.shotDamageHistory.map(s => ({ total: s.total, byAttr: { ...s.byAttr } }))
             });
         }
+
+        // [REQ-20261022-wave-loop 料闭环] 本波料计数清零（产出 / 销毁按波结算；三类余额跨波累积，不清）。
+        if (typeof this.sys_resetWaveMaterialCounters === 'function') this.sys_resetWaveMaterialCounters();
 
         // [REQ-20261022-wave-loop S1] 混沌契约（跳过研磨）已随遗物下线；每波都要挖（D1）。
         // 队列为空（存档恢复 / 异常路径）时补一套挖掘队列（采集 ×N + 炼成 ×1），而不是旧的随机弹珠。
@@ -1459,7 +1483,10 @@ phase_gathering_getRandomPegType() {
     // 初始随机属性钉只保留纯净弹珠属性；wind 是变异属性，不参与初始化随机刷新。
     // [设计约束] laser 已从钉子类型中移除：激光属性仅能通过弹珠本身或符文提供，不能由钉子给予。
     // 参考先例：lightning 属性同样不拥有对应钉子（见 .cursor/rules/config.md 第5节）。
-    const allPegTypes = ['bounce', 'damage'];
+    // [REQ-20261022-wave-loop 料闭环] 取值域改为唯一共享常量（冻结单 v3 §6.3-3 收敛池）：
+    // ['normal','pyro','cryo','bounce']。pyro / cryo 是两色钉盘料钉，`normal` 走 white 权重、bounce 走同名键；
+    // `damage` 已并入 bounce 之外的 T1 行为轴（本单不改该映射）。下方 filter 会把无权重的类型自然滤掉。
+    const allPegTypes = RANDOMIZABLE_PEG_TYPES;
     const pegTypes = allPegTypes.filter(t => (this.unlockedWeights[t] || 0) > 0);
     // 1. 获取 normal 的基础权重
     // 我们手动从 unlockedWeights 中取 white 作为普通钉子的权重基准（默认 100）
@@ -1490,6 +1517,624 @@ phase_gathering_getRandomPegType() {
     
     return 'normal'; // 兜底返回
 },
+
+/**
+     * @method phase_waveFacilitySlots
+     * @description [步 6] 把 `this.facilities`（形状 `{ type, level, cd }`，`src/utils/build_economy_utils.js:14`
+     *   `Array<null | { type, level, cd }>`）摊成带**槽位号**的列表；空槽（`null`）跳过。
+     *   槽位号就是数组下标（`facilities` 按槽位存放，`build_economy_utils.js:236` `next.facilities[slot] = {...}`）。
+     * @returns {Array<{ slotIndex:number, type:string, level:number }>}
+     */
+    phase_waveFacilitySlots() {
+        const list = Array.isArray(this.facilities) ? this.facilities : [];
+        const out = [];
+        for (let i = 0; i < list.length; i++) {
+            const f = list[i];
+            if (!f || typeof f.type !== 'string') continue;
+            const lv = Number(f.level);
+            out.push({ slotIndex: i, type: f.type, level: Number.isFinite(lv) ? Math.max(1, Math.floor(lv)) : 1 });
+        }
+        return out;
+    },
+
+    /**
+     * @method phase_waveRecipe
+     * @description [步 6] 取本回合生效的**弹药配方**（`_selectedRecipeId`，见附录 C-2；不是单发子弹对象）。
+     *   未选 ⇒ **按这堆料能打几发挑**（`pickRecipeByYield`：`yield` 最大，并列按 id 字典序，确定性）。
+     *   **不是**「`cost` 总量最低」（2026-10-25 前的口径）：料只决定「这波能打几发」（`damageMult` 已删），
+     *   按标价最低挑会系统性压到单料档（`{pyro:3}` 总量 3 < 双料 `{pyro:2,cryo:2}` 总量 4）⇒ 另一桶料全程
+     *   零消耗（真机三波实测 cryo 从 0 单调涨到 32）。按发数挑即自动适配料配比，且不动任何配方数字。
+     *   已解锁集合取 `blueprintRequired !== true`：设计图解锁系统尚未落盘、节奏 `[待标定]`，
+     *   ⇒ 需设计图的配方本轮一律视为未解锁（不猜"已解锁"；「它发数更高」也不构成解锁理由）。
+     *   配置表不可用 / 表内查不到选中 id ⇒ 退回盘上 `materialPerShot` 的单料成本并打 warn：
+     *   宁可少一个配方维度，也不许让 `phase_startCombatPhase` 抛错（一抛就整局卡死）。
+     *   **成本只有一份实现**：挑配方时用的 `costOf` 直接转调 `phase_shotCostByMaterial`（实扣价，未建工坊含
+     *   手工溢价），本方法不重写「该不该乘 `manualMaterialMultiplier`」——因为本方法返回的 `costByMaterial`
+     *   是**原价**（倍率在上层 `phase_shotCostByMaterial` 才乘），在这里按原价排会正好重现上面那个 bug。
+     * @param {object} build - `CONFIG.gameplay.build`
+     * @returns {{ recipeId:(string|null), costByMaterial:object, fallback:boolean }}
+     */
+    phase_waveRecipe(build) {
+        const cfgPower = (build && build.power) || {};
+        const perShotCfg = Number(cfgPower.materials && cfgPower.materials.materialPerShot);
+        // 兜底成本 = 盘上「每发主炮弹耗钉盘料」的单料退化式（`{ pyro: 3 }`，与 planLoadout 单料口径等价）。
+        const fallbackCost = { pyro: Number.isFinite(perShotCfg) && perShotCfg > 0 ? Math.floor(perShotCfg) : 3 };
+        let table = null;
+        try {
+            table = listRecipes(CONFIG);
+        } catch (e) {
+            console.warn(`[phase_waveRecipe] 弹药配方表不可用，退回单料成本 ${JSON.stringify(fallbackCost)}：${(e && e.message) || e}`);
+            return { recipeId: null, costByMaterial: fallbackCost, fallback: true };
+        }
+        const selected = (typeof this._selectedRecipeId === 'string' && this._selectedRecipeId !== '')
+            ? this._selectedRecipeId
+            : null;
+        if (selected) {
+            try {
+                const hit = getRecipeById(CONFIG, selected);
+                return { recipeId: hit.id, costByMaterial: { ...hit.cost }, fallback: false };
+            } catch (e) {
+                console.warn(`[phase_waveRecipe] 选中的弹药配方 "${selected}" 不在表内，改用默认最低档：${(e && e.message) || e}`);
+            }
+        }
+        const unlocked = table
+            .filter(r => r && typeof r.id === 'string' && r.blueprintRequired !== true)
+            .map(r => r.id);
+        // 料况读数与实扣成本：料况来自账本（`normalizeLedger`，缺账本按全 0），成本来自唯一出口。
+        const cfgBuild = build || (CONFIG.gameplay && CONFIG.gameplay.build) || {};
+        const stock = normalizeLedger(this.materialLedger);
+        const costOf = (recipe) => this.phase_shotCostByMaterial(cfgBuild, {
+            recipeId: recipe.id,
+            costByMaterial: recipe.cost,
+        });
+        try {
+            const byYield = pickRecipeByYield(CONFIG, unlocked, stock, costOf);
+            return { recipeId: byYield.id, costByMaterial: { ...byYield.cost }, fallback: false };
+        } catch (e) {
+            console.warn(`[phase_waveRecipe] 按料发数挑默认弹药配方失败，退回成本最低档：${(e && e.message) || e}`);
+        }
+        try {
+            const def = pickDefaultRecipe(CONFIG, unlocked);
+            return { recipeId: def.id, costByMaterial: { ...def.cost }, fallback: false };
+        } catch (e) {
+            console.warn(`[phase_waveRecipe] 取不到默认弹药配方，退回单料成本 ${JSON.stringify(fallbackCost)}：${(e && e.message) || e}`);
+            return { recipeId: null, costByMaterial: fallbackCost, fallback: true };
+        }
+    },
+
+    /**
+     * @method phase_isDryRound
+     * @description [步 6] 干回合判据：**本回合没有挖掘**。唯一产生这种回合的路径是
+     *   `src/game_system.js:2314-2318` 里 `shouldDigThisRound(this)` 为假（Boss 存活的后续回合）⇒ 不挖 ⇒ 无料入。
+     *   判据取 `_digDoneRound`（挖掘落定时写，`src/game_phase.js` 的 `phase_gathering_attemptComplete`；已入档
+     *   `src/game_system.js:3221`），**不另设新标志位**。
+     *   边界：订正 C13 的干回合只指「本回合零收入」。**"料不够"不是干回合**——那由 `M` 轴表达（`N` 变小乃至 0），
+     *   若把料不足也算干回合，就成了「没料也能白拿上一波发数」，与 `M` 闸门直接矛盾。
+     * @returns {boolean}
+     */
+    phase_isDryRound() {
+        return !(Number.isFinite(this._digDoneRound) && this._digDoneRound === this.round);
+    },
+
+    /**
+     * @method phase_waveTieAxes
+     * @description [步 6] `ties` 的对外口径：**只收除绑定轴以外的并列轴**。
+     *   `pickBindingLimit` 返回的 `ties` 是「与最小值相等的全部轴」（含 `bound` 自己），
+     *   直接把这份数组交给 UI 会出现 `bound = 'M'` 同时 `ties = ['M']` —— 「料和自己并列」是误报，
+     *   UI 会打出「多轴并列」的假提示。故在调用层过滤掉 `bound`，纯函数不动。
+     *   例：四轴全 3、`bound = 'A'` ⇒ `ties = ['U','E','M']`；单轴绑定 ⇒ `ties = []`。
+     * @param {{ bound:string, ties:string[] }} limit - `pickBindingLimit` 的返回
+     * @returns {string[]}
+     */
+    phase_waveTieAxes(limit) {
+        if (!limit || !Array.isArray(limit.ties)) return [];
+        return limit.ties.filter((k) => k !== limit.bound);
+    },
+
+    /**
+     * @method phase_batteryReserve
+     * @description [四轴接线] 本波电池容量（喂 `computeAvailablePower` 的 `batteryReserve`）：
+     *   `reserve = power.battery.baseCapacity + Σ(每座电池的 power.battery.capacity[lv-1])`。
+     *   **口径（`src/config.js:1005-1009`）**：`baseCapacity` 是「不建电池就有的」底容量（`[Owner]` D7），**必须计入**；
+     *   `capacity[lv-1]` 是**单座在该等级的增量，不是绝对值**（`[盘上]` 原文）——把 `capacity` 当绝对值读会让
+     *   Lv1 电池反而不增容（`15+15=30` 才对，不是 `15`），全表当场崩。
+     *   电池在 `facilities` 里是 `unique: true`（`src/config.js:975`），但本方法**仍按「遍历每个
+     *   `type === 'battery'` 的槽位、各自取增量、再相加」**写，不假设只有一座：配置哪天放宽 `unique`，
+     *   口径不用改两处。
+     *   **缺键不许静默吞**：`baseCapacity` 缺失/非法 ⇒ 按 0 计 但 `console.warn` 点名缺哪个键；
+     *   某座电池的 `capacity` 缺失 / `capacity[lv-1]` 取不到合法增量 ⇒ 该座贡献按 0 计并 `console.warn`。
+     *   理由：「配置缺键导致电力凭空消失」是最难查的一类缺陷，必须留下痕迹。
+     *   纯函数口径：只读入参（`power` + `slots`），不读不写任何运行时状态 ⇒ 同一波内多次调用同值。
+     * @param {object} power - `CONFIG.gameplay.build.power`（误传 `build` 也行，内部取 `.power`）
+     * @param {Array<{ type:string, level:number }>} [slots] - 设施槽位（`phase_waveFacilitySlots()` 的返回）；
+     *   缺省取 `this.phase_waveFacilitySlots()` —— 显式传入时**不依赖 `this`**，便于直接单测
+     * @returns {number} 电池容量（⚡，≥ 0 的整数）
+     */
+    phase_batteryReserve(power, slots) {
+        const cfg = (power && power.power) ? power.power : (power || {});
+        const batteryCfg = (cfg && cfg.battery) || {};
+        let base = Number(batteryCfg.baseCapacity);
+        if (!Number.isFinite(base) || base < 0) {
+            console.warn(`[phase_batteryReserve] 配置缺键 build.power.battery.baseCapacity（实测 ${JSON.stringify(batteryCfg.baseCapacity)}）：底容量按 0 计（[Owner] D7 的底容量本该计入，本波电池电会凭空少一截）`);
+            base = 0;
+        }
+        const list = Array.isArray(slots)
+            ? slots
+            : ((typeof this.phase_waveFacilitySlots === 'function') ? this.phase_waveFacilitySlots() : []);
+        const table = Array.isArray(batteryCfg.capacity) ? batteryCfg.capacity : null;
+        let added = 0;
+        for (const s of list) {
+            if (!s || s.type !== 'battery') continue;
+            if (!table) {
+                console.warn('[phase_batteryReserve] 配置缺键 build.power.battery.capacity（应为长度 3 的数组，每座每级一个增量）：本座电池贡献按 0 计');
+                continue;
+            }
+            const lv = Number(s.level);
+            const idx = (Number.isFinite(lv) ? Math.max(1, Math.floor(lv)) : 1) - 1;
+            const add = Number(table[idx]);
+            if (!Number.isFinite(add) || add < 0) {
+                console.warn(`[phase_batteryReserve] build.power.battery.capacity[${idx}] 取不到合法增量（实测 ${JSON.stringify(table[idx])}）：本座电池贡献按 0 计`);
+                continue;
+            }
+            added += add;
+        }
+        return Math.floor(base + added);
+    },
+
+    /**
+     * @method phase_shotCostByMaterial
+     * @description [四轴接线] **本波每发逐料成本的唯一出口**。屏上预演（`sys_getWavePreview` 的
+     *   `perShotCost` / `plannedSpent`）与实际扣料（`phase_freezeWaveRecord` → `mat_chargeShotMaterials`）
+     *   必须读同一份，否则会出现「屏上按原价报价、账上按溢价扣钱」——这正是本出口存在的唯一理由。
+     *   口径（`src/config.js:1072`）：`每发成本 = 弹药配方原价 × (建了工坊 ? 1 : manualMaterialMultiplier)`。
+     *   没建工坊只能手工造弹，每发料耗按倍率上浮；建了工坊恢复原价 —— 这是工坊的**正面收益**（省一半料），
+     *   不是削弱；没有这条，建工坊只剩两道新上限，玩家没有任何理由去建。
+     *   返回对象**只含配方里 `> 0` 的料键**（未点名 = 0 需求，与 `computeMaterialShots` 同口径；
+     *   `beast` 只用于建设、不参与造弹，`validateShotCost` 本身也拒绝它）。
+     *   `manualMaterialMultiplier` 缺失 / 非正整数 ⇒ **按 1** 并 `console.warn`：**不许按 2 兜底**
+     *   （缺键时静默加倍会让玩家莫名变穷，且屏上与实扣会一起错，事后无法归因）。
+     *   幂等：只读配置与设施槽位，不读不写任何运行时状态（不设标志位、不记波次）⇒ 同一波内多次调用同值。
+     * @param {object} [build] - `CONFIG.gameplay.build`（缺省取 `CONFIG.gameplay.build`）
+     * @param {{ recipeId:(string|null), costByMaterial:object }} [recipeIn] - 已经取好的弹药配方
+     *   （缺省内部调 `phase_waveRecipe`；`phase_wavePreviewCore` 传进来避免重复取表与重复 warn）
+     * @returns {{ [materialKey:string]: number }} 例如 `{ pyro: 6 }`（无工坊）／`{ pyro: 4, cryo: 4 }`（有工坊）
+     */
+    phase_shotCostByMaterial(build, recipeIn) {
+        const cfg = build || (CONFIG.gameplay && CONFIG.gameplay.build) || {};
+        const recipe = (recipeIn && recipeIn.costByMaterial)
+            ? recipeIn
+            : this.phase_waveRecipe(cfg);
+        const raw = recipe.costByMaterial || {};
+        const slots = (typeof this.phase_waveFacilitySlots === 'function') ? this.phase_waveFacilitySlots() : [];
+        const built = slots.some(s => s && s.type === WORKSHOP_DRAW_KEY);
+        let mult = 1;
+        if (!built) {
+            const rawMult = (cfg.workshop && cfg.workshop.manualMaterialMultiplier !== undefined)
+                ? cfg.workshop.manualMaterialMultiplier
+                : undefined;
+            const n = Number(rawMult);
+            if (Number.isFinite(n) && Number.isInteger(n) && n > 0) {
+                mult = n;
+            } else {
+                console.warn(`[phase_shotCostByMaterial] 配置缺键 build.workshop.manualMaterialMultiplier（实测 ${JSON.stringify(rawMult)}）：手工造弹倍率按 1 计，不按 2 兜底`);
+            }
+        }
+        const out = {};
+        for (const key of Object.keys(raw)) {
+            const n = Number(raw[key]);
+            if (!Number.isFinite(n) || n <= 0) continue;
+            out[key] = n * mult;
+        }
+        return out;
+    },
+
+    /**
+     * @method sys_getShotCostForRecipe
+     * @description [整备屏口径对齐] 单条弹药配方的**实扣**每发逐料成本（只读薄出口，不新增任何算式）。
+     *   屏上四处（配方行成本串 / 缺料点名 / 够打几发 / 默认配方挑选）一律读这里，屏里不许再写第二套倍率。
+     *   **为什么必须经 `phase_shotCostByMaterial`**：那是「本波每发成本」的唯一出口，实际扣料
+     *   （`phase_freezeWaveRecord` → `mat_chargeShotMaterials`）读的也是它；另算一遍就会出现
+     *   「屏上按配方原价报价、账上按手工溢价扣钱」，且两边各自看着自洽，事后无从归因。
+     *   **断电不影响倍率**：倍率只看「设施槽位里有没有工坊」（与本文件 `phase_shotCostByMaterial` 的
+     *   `WORKSHOP_DRAW_KEY` 判定同一份），工坊断电只压产能上限 `U`，不会把手工造弹的溢价带回来；
+     *   断电另有定死文案「弹药工坊断电（本波不造弹）」由预演三态给出，本出口不重复表达。
+     *   倍率来源：`src/config.js:1072` 的 `build.workshop.manualMaterialMultiplier`（缺键时按 1 计并 warn，
+     *   **不按 2 兜底**，见 `phase_shotCostByMaterial` 的说明）。
+     * @param {string} recipeId - `CONFIG.gameplay.build.recipes[].id`
+     * @returns {{ recipeId:string, perShotCost:Object<string, number>, workshopBuilt:boolean }|null}
+     *   找不到该 id（含非字符串 / 配方表缺失）⇒ `null`：不抛错，也**不兜底成别的配方**（屏上的降级由调用方定）
+     */
+    sys_getShotCostForRecipe(recipeId) {
+        const build = (CONFIG.gameplay && CONFIG.gameplay.build) || {};
+        const recipes = Array.isArray(build.recipes) ? build.recipes : [];
+        const id = (typeof recipeId === 'string') ? recipeId : '';
+        const recipe = id ? recipes.find(r => r && r.id === id) : null;
+        if (!recipe) return null;
+        // 唯一出口：倍率只在 phase_shotCostByMaterial 里算一次，本方法不另写一遍。
+        const perShotCost = this.phase_shotCostByMaterial(build, {
+            recipeId: recipe.id,
+            costByMaterial: (recipe.cost && typeof recipe.cost === 'object') ? recipe.cost : {},
+        });
+        // `workshopBuilt` 与 `phase_shotCostByMaterial` 同一条判定（槽位里有 workshop），不另写。
+        const slots = (typeof this.phase_waveFacilitySlots === 'function') ? this.phase_waveFacilitySlots() : [];
+        const workshopBuilt = slots.some(s => s && s.type === WORKSHOP_DRAW_KEY);
+        return { recipeId: recipe.id, perShotCost, workshopBuilt };
+    },
+
+    /**
+     * @method phase_wavePreviewCore
+     * @description [步 6] 四轴上限的核心预演（`sys_getWavePreview` 与 `phase_freezeWaveRecord` 共用这一份，
+     *   保证「屏上预演」与「实际发数」同源）。**本方法不含任何算式**，逐项转调既有纯函数：
+     *   `A` 取 `sys_getCannonStats().shots`（`src/utils/build_economy_utils.js:263` 既有算式）；
+     *   `U` 取第 4 步 `resolveWorkshopCapacity` 的 `effectiveU`；`E` 取第 3 步 `computeAvailablePower` +
+     *   第 1 步 `computePowerShots`；`M` 取第 1 步 `computeMaterialShots`；`N` 取 `pickBindingLimit`。
+     * 电力口径（订正件 C1／本步口径）：**战斗设施先扣、工坊后判**——`computeAvailablePower` 只喂战斗设施
+     *   （工坊与后勤设备不进 `facilities` 实参），剩下的电够不够 `power.draw.workshop` 由 `isWorkshopPowered` 判。
+     *   工坊通电时它的耗电从 `E` 的可用电力里扣掉（同一度电不能既供塔又造弹）；断电时 `E = 0`
+     *   （工坊是把电换成弹的转换器，断电就换不出弹——否则 `E` 与 `U` 两条闸门同时失效）。
+     * 四个取值分支的**现状**（`power.powerPerShot` / `build.workshop.capacityByLevel` 已在
+     *   `src/config.js:1004` / `:1069` 补上 ⇒ 正常配置下 `U` / `E` 走真值分支，不再"未接线"）：
+     *   - 未建工坊 ⇒ `U = Infinity`（**这是契约，不是未接线**：没有工坊就没有产能闸门，维持 `A × M` 口径；
+     *     取 0 会让第 1 波就 0 发并被白补 1 发）；
+     *   - `power.powerPerShot` **缺键** ⇒ `E = Infinity` 并 warn（缺键已属**配置错误**，不再是「尚未标定」的常态）；
+     *   - 已建且通电但 `build.workshop.capacityByLevel` **缺键** ⇒ `U = Infinity` 并 warn（同上，配置错误）。
+     *   料的一侧：`M` 用的不是配方原价，而是 `phase_shotCostByMaterial` 这个**单一出口**（未建工坊时含
+     *   `manualMaterialMultiplier` 手工溢价）；实际扣料读同一份，见该方法的说明。
+     * @param {number} [rateShotsIn] - 射速轨上限 `A`（缺省取 `sys_getCannonStats().shots`）
+     * @returns {{ A:number, U:number, E:number, M:number, limit:object, mat:object, recipe:object,
+     *             shotCost:object, workshop:object, budget:object, restAfterCombat:number,
+     *             shedOptions:Array<{ key:string, draw:number }> }}
+     */
+    phase_wavePreviewCore(rateShotsIn) {
+        const build = (CONFIG.gameplay && CONFIG.gameplay.build) || {};
+        const power = build.power || {};
+        const drawKeys = Object.keys(power.draw || {});
+        const slots = this.phase_waveFacilitySlots();
+        // 后勤设备（发电 / 电池）不耗电（`src/config.js:984-985` 明写 0）；工坊单独后判，不进战斗设施耗电合计。
+        const logistics = ['generator', 'battery', WORKSHOP_DRAW_KEY];
+        const combatSlots = slots.filter(s => drawKeys.includes(s.type) && !logistics.includes(s.type));
+
+        // ---- 电力：战斗设施先扣（多座发电机先各自取值再相加属第 3 步调用方职责，本步按最高等级那座喂入）----
+        // `build.facilities.generator` 为 `unique: true`（`src/config.js:974` [盘上]）⇒ 全局最多一座，
+        //   故下面「取最高等级那座」== 「唯一那座」，不是丢失多座求和。若哪天放宽 `unique`，这里要改成求和。
+        let generatorLv = null;
+        for (const s of slots) {
+            if (s.type !== 'generator') continue;
+            generatorLv = generatorLv === null ? s.level : Math.max(generatorLv, s.level);
+        }
+        // 电池容量：`baseCapacity` + Σ 各座 `capacity[lv-1]`（增量口径），算式与缺键留痕都在 `phase_batteryReserve`。
+        // 接线前这里硬编码 `0` ⇒ 电池建了毫无作用、底容量也凭空消失（`[Owner]` D7 的底容量现在真生效）。
+        const batteryReserve = this.phase_batteryReserve(power, slots);
+        const budget = computeAvailablePower({
+            generatorLv,
+            batteryReserve,
+            synth: null,
+            facilities: combatSlots.map(s => ({ type: s.type, lv: s.level })),
+        }, build);
+        const restAfterCombat = budget.available;
+
+        // 可腾电清单：关掉哪座战斗设施能腾多少电（按可腾电降序；`key` 形如 `turret#0` = 类型#槽位号）。
+        const shedOptions = combatSlots
+            .map(s => ({ key: `${s.type}#${s.slotIndex}`, draw: powerDrawFor(s.type, s.level, build) }))
+            .filter(o => o.draw > 0)
+            .sort((a, b) => (b.draw - a.draw) || (a.key < b.key ? -1 : 1));
+
+        // ---- 产能：工坊后判（多座取最高等级，不求和）----
+        const workshopSlots = slots.filter(s => s.type === WORKSHOP_DRAW_KEY);
+        const capacityByLevel = (build.workshop && Array.isArray(build.workshop.capacityByLevel))
+            ? build.workshop.capacityByLevel
+            : null;
+        let workshop = {
+            exists: workshopSlots.length > 0,
+            calibrated: !!capacityByLevel,
+            powered: false,
+            capacity: 0,
+            effectiveU: 0,
+            draw: 0,
+            source: null,
+        };
+        if (workshopSlots.length > 0) {
+            const picked = capacityByLevel
+                ? pickWorkshop(workshopSlots.map(s => ({ slotIndex: s.slotIndex, lv: s.level })), capacityByLevel)
+                : workshopSlots.reduce((best, s) => (
+                    !best || s.level > best.lv || (s.level === best.lv && s.slotIndex < best.slotIndex)
+                        ? { slotIndex: s.slotIndex, lv: s.level }
+                        : best
+                ), null);
+            const wsDraw = powerDrawFor(WORKSHOP_DRAW_KEY, picked.lv, build);
+            const powered = isWorkshopPowered({ availablePower: restAfterCombat, workshopDraw: wsDraw });
+            let capacity = 0;
+            let effectiveU = 0;
+            if (capacityByLevel) {
+                const resolved = resolveWorkshopCapacity({
+                    workshops: [{ slotIndex: picked.slotIndex, lv: picked.lv, powered }],
+                    capacityByLevel,
+                });
+                capacity = resolved.capacity;
+                effectiveU = resolved.effectiveU;
+            } else {
+                console.warn('[phase_wavePreviewCore] 配置缺键 build.workshop.capacityByLevel（`src/config.js:1058` 本该给长度 3 的数组）：产能闸门按未接线处理（U 不构成上限）');
+            }
+            workshop = {
+                exists: true,
+                calibrated: !!capacityByLevel,
+                powered,
+                capacity,
+                effectiveU,
+                draw: wsDraw,
+                source: picked,
+            };
+        }
+
+        // ---- 四条上限 ----
+        const rateRaw = (rateShotsIn !== undefined && rateShotsIn !== null)
+            ? rateShotsIn
+            : (typeof this.sys_getCannonStats === 'function' ? this.sys_getCannonStats().shots : null);
+        if (!Number.isFinite(Number(rateRaw))) {
+            throw new TypeError('[phase_wavePreviewCore] 取不到射速轨上限 A（sys_getCannonStats().shots）：四条上限必须全部给出');
+        }
+        const A = Math.max(1, Math.floor(Number(rateRaw)));
+        const U = !workshop.exists
+            ? Number.POSITIVE_INFINITY                    // 未建工坊 ⇒ 不构成闸门
+            : (!workshop.powered
+                ? 0                                        // 断电 ⇒ U = 0（本步口径）
+                : (workshop.calibrated ? workshop.effectiveU : Number.POSITIVE_INFINITY));
+
+        // 料：`M` 与「实际扣料」必须读**同一份**每发成本（`phase_shotCostByMaterial`）——
+        // 未建工坊时它含 `manualMaterialMultiplier` 手工溢价，建了工坊恢复配方原价。
+        // 这里一度直读 `recipe.costByMaterial`（原价），会让屏上按原价报价、账上按溢价扣钱，两处各算一套。
+        const recipe = this.phase_waveRecipe(build);
+        const shotCost = this.phase_shotCostByMaterial(build, recipe);
+        const stock = normalizeLedger(this.materialLedger);
+        const mat = computeMaterialShots(stock, shotCost);
+
+        const powerPerShotRaw = Number(power.powerPerShot);
+        const powerCalibrated = Number.isFinite(powerPerShotRaw) && powerPerShotRaw > 0;
+        let E;
+        if (!workshop.exists) {
+            // 未建工坊 ⇒ 根本没有「用电换弹」这件事：E 不参与取最小（与 U 轴同向）。
+            // 若此处按 0 算，第 1 波（无任何设施、剩余电 0）会被判成 0 发 —— 正是订正 C9 点名的伪装。
+            E = Number.POSITIVE_INFINITY;
+        } else if (!workshop.powered) {
+            E = 0;                                         // 工坊已建但断电 ⇒ 一度电也换不出弹
+        } else if (generatorLv === null && batteryReserve <= 0) {
+            // 有工坊却被判成通电、且既无发电机又无电池容量：只可能是耗电键未标定（抽电读成 0 ⇒ `0 >= 0` 也算通电）。
+            // 这种状态下电力不构成上限，E 不参与，交 U 轴表达。
+            // 边界（电池接线后的必读）：**只有电池底容量**（`batteryReserve > 0`）撑着通电时，本分支**不成立**——
+            //   那是有电可用的真实状态，E 要走下面那条真值分支（例：底容量 15 − 工坊 Lv1 耗电 4 = 11 ⇒ E = 5）。
+            E = Number.POSITIVE_INFINITY;
+        } else if (!powerCalibrated) {
+            console.warn('[phase_wavePreviewCore] 配置缺键 power.powerPerShot（`src/config.js:1004` 本该给出每发耗电）：电力闸门按未接线处理（E 不构成上限）');
+            E = Number.POSITIVE_INFINITY;
+        } else {
+            // 通电时工坊自身耗电从可用电力里扣（同一度电不能既供战斗设施又造弹）。
+            E = computePowerShots(restAfterCombat - workshop.draw, powerPerShotRaw);
+        }
+
+        const limit = pickBindingLimit({
+            rate: A,
+            capacity: U,
+            power: E,
+            materials: mat.M,
+            bindingMaterialKeys: mat.bindingMaterialKeys,
+        });
+        return {
+            A,
+            U,
+            E,
+            M: limit.limitValues.M,
+            limit,
+            mat,
+            recipe,
+            shotCost,
+            workshop,
+            budget,
+            restAfterCombat,
+            shedOptions,
+        };
+    },
+
+    /**
+     * @method sys_getWavePreview
+     * @description [步 6] 整备屏 / 战斗侧的**唯一**发数预演读数。第 8 步 UI 按这个形状读，**键名与形状不得改**：
+     *   `{ round, shots, bound, ties, detail:{A,U,E,M}, dry, recipeId, workshopBuilt, powered, shedOptions:[{key,draw}] }`。
+     *   干回合：`shots` / `bound` / `ties` 取**上一波冻结记录**（沿用，不重算）；`detail` 仍给当前四轴实测值，
+     *   两者可能不等——这正是「干回合不重算、沿用 N」的定义，不是读数错误。
+     *   未接线态（`power.powerPerShot` / `build.workshop.capacityByLevel` **缺键**）会让对应轴的 `detail` 为 `Infinity`，
+     *   `JSON.stringify` 下渲染成 `null` ⇒ UI 侧必须把 `null` 读成「该上限不参与取最小」，不要读成 0。
+     *   **现状（`src/config.js:1004` / `:1069` 已补键）**：`detail.E` 只在「未建工坊」时是 `Infinity`；
+     *   `detail.U` 只在「未建工坊」（不构成闸门）或「产能表缺键」（配置错误）时是 `Infinity`。
+     *   即「`null` 读成未接线」这条早已收窄成「未建工坊 ⇒ `U` 不参与」，不再长期成立。
+     *
+     *   **工坊三态（UI 文案必须按这三条分支读，不许把「未建造」当「断电」）**：
+     *   ① `workshopBuilt === false` ⇒ `detail.U === null` ⇒ `U` 不进 `N = min(...)` ⇒ UI 显示「工坊未建造」，
+     *      **不得**显示断电文案；
+     *   ② `workshopBuilt === true && powered === false` ⇒ `detail.U === 0`（参与取最小，`N` 因此可能为 0）
+     *      ⇒ UI 显示既定断电文案「弹药工坊断电（本波不造弹）」；
+     *   ③ `workshopBuilt === true && powered === true` ⇒ `detail.U` 为产能读数（表缺键时为 `null`，即不构成上限）。
+     *   `powered` 的语义收窄为「**工坊已建造时**是否通电」；`workshopBuilt === false` 时该字段恒 `false` 且不参与 UI 判断。
+     *
+     *   `ties` 只含**除 `bound` 以外**的并列轴（无并列 ⇒ `[]`），由 `phase_waveTieAxes` 统一过滤。
+     *
+     *   **`perShotCost` / `plannedSpent` 是追加键**（本波每发逐料成本 / 本波将扣料）：上面那九个键
+     *   **一字未改名、未删**，契约不变；整备屏要显示「本波将扣料」就读这两项，不要再在 UI 里另算一遍。
+     *   `perShotCost` 与实扣料同源（同一出口 `phase_shotCostByMaterial`，未建工坊时含手工溢价）；
+     *   `plannedSpent.beast` 恒 0——`beast` 只用于建设，不参与造弹。
+     * @returns {{ round:number, shots:number, bound:string, ties:string[],
+     *             detail:{ A:number|null, U:number|null, E:number|null, M:number },
+     *             dry:boolean, recipeId:(string|null), workshopBuilt:boolean, powered:boolean,
+     *             shedOptions:Array<{ key:string, draw:number }>,
+     *             perShotCost:Object<string, number>,
+     *             plannedSpent:{ pyro:number, cryo:number, beast:number, total:number } }}
+     */
+    sys_getWavePreview() {
+        const core = this.phase_wavePreviewCore();
+        const dry = typeof this.phase_isDryRound === 'function' ? this.phase_isDryRound() : false;
+        const prev = (this._materialFrozenRecord && Number.isFinite(this._materialFrozenRecord.round))
+            ? this._materialFrozenRecord
+            : null;
+        const carried = (dry && prev && prev.round !== this.round) ? prev : null;
+        const shots = carried ? carried.N : core.limit.N;
+        // 本波将扣料 = 本波发数 × 每发逐料成本（同一出口，未建工坊时按手工溢价算）。
+        // 用 `shots`（干回合沿用值 / 否则实时 N）而不是重算，屏上「几发 × 每发多少」必须自洽。
+        const perShotCost = { ...core.shotCost };
+        const plannedSpent = { pyro: 0, cryo: 0, beast: 0, total: 0 };
+        for (const key of Object.keys(perShotCost)) {
+            const cost = Number(perShotCost[key]);
+            if (!Number.isFinite(cost) || cost <= 0) continue;
+            if (Object.prototype.hasOwnProperty.call(plannedSpent, key) && key !== 'total') {
+                plannedSpent[key] = shots * cost;
+            }
+        }
+        plannedSpent.total = plannedSpent.pyro + plannedSpent.cryo + plannedSpent.beast;
+        return {
+            round: Number.isFinite(this.round) ? Math.floor(this.round) : 1,
+            shots,
+            bound: (carried && typeof carried.bound === 'string') ? carried.bound : core.limit.bound,
+            // 冻结记录里存的 `ties` 已是过滤过 `bound` 的口径（见 phase_freezeWaveRecord）。
+            ties: (carried && Array.isArray(carried.ties)) ? carried.ties.slice() : this.phase_waveTieAxes(core.limit),
+            detail: { A: core.A, U: core.U, E: core.E, M: core.M },
+            dry,
+            recipeId: core.recipe.recipeId,
+            workshopBuilt: !!core.workshop.exists,
+            powered: !!core.workshop.powered,
+            shedOptions: core.shedOptions.map(o => ({ key: o.key, draw: o.draw })),
+            perShotCost,
+            plannedSpent,
+        };
+    },
+
+    /**
+     * @method phase_freezeWaveRecord
+     * @description [步 6] **一波开打前冻结**本回合发数记录 `{ round, recipeId, N, bound, ties, spent }`，
+     *   整回合只用这一份：同一 `round` 再次调用**直接返回已冻结值**、不重算、不二次扣料
+     *   （否则会出现「预演说 3 发、实际打 4 发」）。
+     *   与 `_materialLoadRound` 的关系：本方法落定后把 `_materialLoadRound` 置为当前 round，
+     *   使第 5 步的 `mat_payLoadout`（按 round 去重）在同一回合变成纯读、不会再扣一次料；
+     *   `_materialLoadRound` 仍是「装填扣料已发生」的唯一标记，本步不新增同义标记。
+     *   干回合（`phase_isDryRound()`）：不挖、不扣料、**沿用上一波冻结记录的 `N`**，保底 +3 走
+     *   `mat_grantFloorOnly`（内部转调 `grantFloorOnly` 并按 round 去重）；本回合也写一条 `spent` 全 0 的记录，
+     *   让「整波只用这一份」对干回合同样成立。
+     *   零发（`N = 0`）：登记为异常路径（订正 C9）并计数，**不入料账**（不调扣料、不写 `spent`、不动余额），
+     *   返回 `N = 0` 交 `phase_startCombatPhase` 既有的白补 1 发兜底。
+     * @param {number} [rateShots] - 射速轨上限 `A`（缺省取 `sys_getCannonStats().shots`）
+     * @returns {{ round:number, recipeId:(string|null), N:number, bound:string, ties:string[], spent:object,
+     *             dry:boolean, reused:boolean, charged:boolean, granted:number }}
+     */
+    phase_freezeWaveRecord(rateShots) {
+        const round = Number.isFinite(this.round) ? Math.floor(this.round) : 1;
+        const prev = (this._materialFrozenRecord && Number.isFinite(this._materialFrozenRecord.round))
+            ? this._materialFrozenRecord
+            : null;
+        // 波内重入：已冻结 ⇒ 原样返回，不重算、不二次扣料。
+        if (prev && prev.round === round) {
+            return {
+                round: prev.round,
+                recipeId: prev.recipeId,
+                N: prev.N,
+                bound: prev.bound,
+                ties: Array.isArray(prev.ties) ? prev.ties.slice() : [],
+                spent: { pyro: (prev.spent && prev.spent.pyro) || 0, cryo: (prev.spent && prev.spent.cryo) || 0 },
+                dry: typeof this.phase_isDryRound === 'function' ? this.phase_isDryRound() : false,
+                reused: true,
+                charged: false,
+                granted: 0,
+            };
+        }
+
+        const core = this.phase_wavePreviewCore(rateShots);
+        const dry = typeof this.phase_isDryRound === 'function' ? this.phase_isDryRound() : false;
+
+        if (dry) {
+            // 干回合（订正 C13 / 附录 C-1 路 A）：不挖 ⇒ 无料入 ⇒ 不扣料；N 沿用上一波冻结记录。
+            const granted = typeof this.mat_grantFloorOnly === 'function' ? this.mat_grantFloorOnly() : 0;
+            const carriedN = (prev && Number.isInteger(prev.N) && prev.N >= 0) ? prev.N : null;
+            if (carriedN === null) {
+                console.warn('[phase_freezeWaveRecord] 干回合缺上一波冻结记录：本回合按实时四轴 N 发弹（缺陷路径，绝不放行 0 发）');
+            }
+            const record = {
+                round,
+                recipeId: (prev && typeof prev.recipeId === 'string') ? prev.recipeId : core.recipe.recipeId,
+                N: carriedN === null ? core.limit.N : carriedN,
+                bound: (prev && typeof prev.bound === 'string') ? prev.bound : core.limit.bound,
+                ties: (prev && Array.isArray(prev.ties)) ? prev.ties.slice() : this.phase_waveTieAxes(core.limit),
+                spent: { pyro: 0, cryo: 0 },
+            };
+            this._materialFrozenRecord = record;
+            this._materialLoadRound = round;
+            return {
+                round: record.round,
+                recipeId: record.recipeId,
+                N: record.N,
+                bound: record.bound,
+                ties: record.ties.slice(),
+                spent: { ...record.spent },
+                dry: true,
+                reused: false,
+                charged: false,
+                granted: Number(granted) || 0,
+            };
+        }
+
+        let N = core.limit.N;
+        let spent = { pyro: 0, cryo: 0 };
+        let charged = false;
+        if (N > 0) {
+            if (typeof this.mat_chargeShotMaterials === 'function') {
+                // 扣料读的是**与预演同一份**每发成本（`core.shotCost`，未建工坊时含手工溢价）：
+                // 直读 `core.recipe.costByMaterial` 是原价，会与屏上报价分叉（屏 6 料/发、账扣 3 料/发）。
+                const res = this.mat_chargeShotMaterials(N, core.shotCost);
+                spent = { pyro: res.spent.pyro, cryo: res.spent.cryo };
+                charged = true;
+                if (res.chargedShots !== N) {
+                    console.warn(`[phase_freezeWaveRecord] 扣料发数 ${res.chargedShots} ≠ 预演 N ${N}（四轴与逐料扣减不一致，按扣料结果为准）`);
+                    N = res.chargedShots;
+                }
+            } else {
+                console.warn('[phase_freezeWaveRecord] 缺 mat_chargeShotMaterials：本回合不扣料');
+            }
+        } else {
+            // 订正 C9：零发兜底登记为异常路径、不入料账（不写 spent、不动余额）。
+            this._materialZeroShotCount = (this._materialZeroShotCount || 0) + 1;
+            console.warn(`[phase_freezeWaveRecord] 零发（N = 0，卡 ${core.limit.bound}）：不入料账，交战斗侧白补兜底；累计 ${this._materialZeroShotCount} 次`);
+        }
+        const record = {
+            round,
+            recipeId: core.recipe.recipeId,
+            N,
+            bound: core.limit.bound,
+            ties: this.phase_waveTieAxes(core.limit),
+            spent,
+        };
+        this._materialFrozenRecord = record;
+        this._materialLoadRound = round;
+        return {
+            round: record.round,
+            recipeId: record.recipeId,
+            N: record.N,
+            bound: record.bound,
+            ties: record.ties.slice(),
+            spent: { ...record.spent },
+            dry: false,
+            reused: false,
+            charged,
+            granted: 0,
+        };
+    },
+
+    /**
+     * @method phase_shouldBackfillAmmo
+     * @description [步 6] 判断「本回合弹药队列为空」时该不该走「至少补 1 发」的兜底。
+     *   这条判据单独成方法，是为了让「断电 ⇒ 本波打不出弹」这条口径**可被断言守住**：
+     *   本波是被四轴上限压到 0 发（`_waveZeroShotThisRound === true`）⇒ 返回 `false`，不补发；
+     *   其它原因为空（异常路径）⇒ 返回 `true`，照旧补 1 发防死循环。
+     * @param {number} queueLength - 本回合已构建的 `ammoQueue.length`
+     * @returns {boolean}
+     */
+    phase_shouldBackfillAmmo(queueLength) {
+        if (Number(queueLength) > 0) return false;
+        return this._waveZeroShotThisRound !== true;
+    },
 
 /**
      * 开始战斗阶段
@@ -1525,7 +2170,32 @@ phase_gathering_getRandomPegType() {
             // cannonShotsPerTurn 只是派生镜像（S1 存档兼容）。
             const cannonStats = this.sys_getCannonStats();
             this.cannonShotsPerTurn = cannonStats.shots;
-            this.ammoQueue = this.sys_buildCannonShots(cannonStats.shots);
+            // [REQ-20261022-wave-loop 步 6] 发数改由「预演 + 冻结记录」决定：N = min(A, U, E, M)（订正件 C1，`A` 排第一），
+            // 整回合只用这一份冻结值（波内不重算、不覆盖，否则会「预演说 3 发、实际打 4 发」）。
+            // 干回合沿用上一波 N 且不扣料；零发（N = 0）登记异常路径、不入料账（C9）。
+            // 回滚口径（订正件附录 C-3 步 6「把 `src\game_phase.js:1539-1545` 切回原调用」）：把下面这段换回
+            //   const loadout = this.mat_payLoadout(cannonStats.shots);
+            //   this.ammoQueue = this.sys_buildCannonShots(loadout.loadedShots);
+            // 即回到第 5 步的装填口径（`mat_payLoadout` 一行未改，仍可用）。
+            let loadedShots = cannonStats.shots;
+            // 「本波是被上限压到 0 发」与「异常空弹」是两件事：前者是断电 / 缺料口径生效，
+            // 不许被下面那条「至少补 1 发」的兜底钳回 1；后者才需要兜底。标志只活在本回合。
+            this._waveZeroShotThisRound = false;
+            if (typeof this.phase_freezeWaveRecord === 'function') {
+                const frozen = this.phase_freezeWaveRecord(cannonStats.shots);
+                loadedShots = frozen.N;
+                this._waveZeroShotThisRound = frozen.N === 0;
+                if (frozen.N < cannonStats.shots) {
+                    console.warn(`[phase_startCombatPhase] 本回合发数 ${frozen.N}/${cannonStats.shots} 发（卡 ${frozen.bound}）`);
+                }
+            } else if (typeof this.mat_payLoadout === 'function') {
+                const loadout = this.mat_payLoadout(cannonStats.shots);
+                loadedShots = loadout.loadedShots;
+                if (loadout.shortfall > 0) {
+                    console.warn(`[phase_startCombatPhase] 料不足：装填 ${loadout.loadedShots}/${cannonStats.shots} 发`);
+                }
+            }
+            this.ammoQueue = this.sys_buildCannonShots(loadedShots);
         }
         this._carryOverAmmo = null;
         // [perfect-clear-upgrade] 重置「本回合是否已触发蓄能升级」标志
@@ -1559,9 +2229,13 @@ phase_gathering_getRandomPegType() {
         }
 
         // [REQ-20261022-wave-loop S1] 兜底：主炮弹药不会为空；若异常为空，至少补 1 发主炮，避免「彈藥耗盡」死循环。
-        if (this.ammoQueue.length === 0) {
+        // [REQ-20261022-wave-loop 步 6] 但**有意 0 发**（断电把 U 压到 0、或缺料把 M 压到 0）不补：
+        // 否则「断电 ⇒ 本波打不出弹」会被这条兜底悄悄钳回 1 发，口径当场失效。
+        if (this.phase_shouldBackfillAmmo(this.ammoQueue.length)) {
             console.warn('[phase_startCombatPhase] ammoQueue 为空，补 1 发主炮');
             this.ammoQueue = this.sys_buildCannonShots(1);
+        } else if (this.ammoQueue.length === 0) {
+            console.warn('[phase_startCombatPhase] 本波 0 发（上限压到 0），不补发：断电 / 缺料口径优先于兜底');
         }
 
         // --- [核心修复 2]：UI 渲染 ---
@@ -2383,7 +3057,11 @@ phase_gathering_getRandomPegType() {
         // [tsk-f35c6d10] 移除旧的小 Toast 回合提示，改由 sys_showRoundStartBanner 提供更醒目的大字居中提示
 
         // [爽游模式] 新手教程局：第 5 回合结算后触发胜利
-        if (this._isTutorialRun && this.round > 5) {
+        // [ux-20261025 P0-3] 读的是 _isTutorialBuffRun 而不是 _isTutorialRun：
+        //   前者=「本局有爽游通关窗口」，整局保留（教程收尾不再清它，否则这句永远不可达）；
+        //   后者=「本局套用教程专属排期/刷怪分支」，教程一离开第 1 波战斗就清，
+        //   在这句上用它等于把通关窗口绑死在教程前半段。
+        if (this._isTutorialBuffRun && this.round > 5) {
             this.gameOver = true;
             this._isTutorialRunCleared = true; // 标记为胜利结局
             this._gameover_triggerPhase();
