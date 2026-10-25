@@ -146,7 +146,12 @@ function purchaseOkText(action, state) {
     if (a.type === 'mining') return '采集升级完成';
     if (a.type === 'slot') return `设施位已开放 ${Number(s.facilitySlotsOpen) || 0} 个`;
     // [批次 3] 扩建一行：报出新行数与新总格数（不点名「扩建」，玩家看到的是盘面变大）。
-    if (a.type === 'expand' && s && s.buildGrid) return `工厂扩建：${s.buildGrid.rows} 行 · ${s.buildGrid.rows * s.buildGrid.cols} 格`;
+    // [批次 4] 同时报出新的设施位数——扩建的**产能后果**就是这一条，只报格数等于没说清玩家买到了什么。
+    //   位数直接读归一化后的 `s.facilities.length`（容量由 getFacilitySlotCapacity 派生），不在这里另算。
+    if (a.type === 'expand' && s && s.buildGrid) {
+        const slotCount = Array.isArray(s.facilities) ? s.facilities.length : 0;
+        return `工厂扩建：${s.buildGrid.rows} 行 · ${s.buildGrid.rows * s.buildGrid.cols} 格 · 设施位 ${slotCount}`;
+    }
     return '已建成';
 }
 

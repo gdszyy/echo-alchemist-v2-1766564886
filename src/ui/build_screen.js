@@ -8,7 +8,7 @@
  */
 import { CONFIG } from '../config.js';
 import { getWaveInfo } from '../utils/boss_schedule_utils.js';
-import { createBuildGrid, getFacilityStats, getGridConfig, getPrice, isActionRevealed, FACILITY_IDS, ITEM_IDS } from '../utils/build_economy_utils.js';
+import { createBuildGrid, getFacilitySlotCapacity, getFacilityStats, getGridConfig, getPrice, isActionRevealed, FACILITY_IDS, ITEM_IDS } from '../utils/build_economy_utils.js';
 import { FACILITY_LABELS, ITEM_LABELS, BRANCH_LABELS, uniqueFacilityText } from '../build_system.js';
 import { computeRecipeYield, describeMaterialShortfall, formatMaterialShortfall, materialLabel, pickDefaultRecipe, pickRecipeByYield } from '../utils/shot_recipe_utils.js';
 // 「改善路径」四轴验算：电力 / 产能两条轴一律转调既有纯函数（**不在这里另写一份耗电或产能算式**）。
@@ -661,6 +661,11 @@ export const build_screen_system = {
         const gridChildren = [gridWrap];
 
         // 扩建只走既有通道 `sys_buildPurchase({type:'expand'})`（相位校验 / 料账本 / 应用 / 重绘 / 存档都在那里）。
+        // [批次 4] 扩建的**产能后果**：每多一行 = 多 cols 个设施位（算式只在 getFacilitySlotCapacity 一处）。
+        //   屏上所有「多几个设施位」的数字都从下面这几个派生值取，**不许在文案里写字面量 3**。
+        const slotsNow = getFacilitySlotCapacity(buildGrid.rows, cfg());
+        const slotsPerRow = getFacilitySlotCapacity(buildGrid.rows + 1, cfg()) - slotsNow;
+        const slotsMax = getFacilitySlotCapacity(rowsMax, cfg());
         const expandAction = { type: 'expand' };
         const expandPrice = priceOf(expandAction);
         const atMax = buildGrid.rows >= rowsMax;
@@ -668,12 +673,12 @@ export const build_screen_system = {
         const crystalOk = !!expandPrice && have.crystal >= expandPrice.crystal;
         const canExpand = !atMax && !!expandPrice && crystalOk && matOk;
         const expandTitle = atMax
-            ? `已到上限 ${rowsMax} 行`
+            ? `已到上限 ${rowsMax} 行（设施位 ${slotsNow} 个）`
             : (!expandPrice
                 ? '当前不可扩建'
                 : (!crystalOk
                     ? `缺 💎 ${expandPrice.crystal - have.crystal}（需 ${expandPrice.crystal}💎）`
-                    : (!matOk ? shortfallTitle(expandPrice.materials, stock) : `扩建 +1 行（+${buildGrid.cols} 格，${buildGrid.rows + 1} 行）`)));
+                    : (!matOk ? shortfallTitle(expandPrice.materials, stock) : `扩建 +1 行：+${buildGrid.cols} 格、+${slotsPerRow} 个设施位（${buildGrid.rows + 1} 行 / 设施位 ${slotsNow + slotsPerRow} 个）`)));
         gridChildren.push(createButton({
             label: atMax ? '已到上限' : '扩建 1 行',
             variant: canExpand ? 'primary' : 'ghost',
@@ -687,11 +692,16 @@ export const build_screen_system = {
             onClick: buy(expandAction),
             dataset: { buy: 'expand' },
         }));
-        // 这一批网格只承载「哪一格有什么」：挪设备与「未落格后勤不计产能」在下一批接入。
-        gridChildren.push(el('p', 'build-locked-note', { text: '摆放 / 产能联动（未落格后勤不计产能）在下一批接入；本批网格只读。' }));
+        // [批次 4] 网格承载两件事：①「哪一格有什么」；② 盘面本身是**设施位的来源**——每扩建一行，
+        //   设施数组与可用位各 +cols（算式见 getFacilitySlotCapacity）。所以这里不再写「本批只读」：
+        //   扩建按钮早就能点，写了会与实现矛盾。仍未做的是「把设备搬进/搬出格子」以及「未落格后勤不计产能」，
+        //   文案只提这后半句、不承诺摆放，数字全部取上面的派生值（无字面量）。
+        gridChildren.push(el('p', 'build-locked-note', {
+            text: `扩建连带设施位：每 +1 行 = 盘面 +${buildGrid.cols} 格、设施位 +${slotsPerRow} 个（现 ${slotsNow} 个，上限 ${slotsMax} 个），新位当波即可建造。设备摆放与产能联动尚未接入。`,
+        }));
         const gridPanel = createPanel({
             title: '工厂网格',
-            hint: `${buildGrid.cols} 列 · ${buildGrid.rows}/${rowsMax} 行 · ${buildGrid.cells.length} 格`,
+            hint: `${buildGrid.cols} 列 · ${buildGrid.rows}/${rowsMax} 行 · ${buildGrid.cells.length} 格 · 设施位 ${slotsNow}（可用 ${state.facilitySlotsOpen}）`,
             children: gridChildren,
             id: 'build-grid',
         });

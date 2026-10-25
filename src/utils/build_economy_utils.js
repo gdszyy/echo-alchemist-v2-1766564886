@@ -11,7 +11,7 @@
  *     energy: number, crystal: number,
  *     cannonLevels: { dmg, rate, bounce },
  *     cannonBranch: null | 'pierce' | 'scatter' | 'fire' | 'ice' | 'lightning',
- *     facilities: Array<null | { type, level, cd }>,   // 长度 = cfg.slots.total
+ *     facilities: Array<null | { type, level, cd }>,   // [批次 4] 长度 = getFacilitySlotCapacity(rows)：slots.total ＋ 已扩建行数 × cols
  *     facilitySlotsOpen: number,
  *     items: string[],                                  // 道具 id，长度 ≤ cfg.items.slots
  *     miningLevels: { collector },
@@ -82,6 +82,36 @@ export function getGridConfig(cfg = {}) {
 }
 
 /**
+ * 行数夹取（`rowsStart` .. `rowsMax`）——**只此一处实现**。
+ * `normalizeBuildGrid`（网格几何）与 `normalizeBuildState`（按行数算设施位容量）都调它：
+ * 两处各写一遍夹取口径，迟早在某次改 `rowsMax` 后互相漂开（一个说 5 行、一个说 4 行）。
+ * @param {number|undefined} rows
+ * @param {object} cfg - CONFIG.gameplay.build
+ * @returns {number}
+ */
+export function clampGridRows(rows, cfg = {}) {
+    const g = getGridConfig(cfg);
+    return Math.min(g.rowsMax, Math.max(g.rowsStart, _int(rows, g.rowsStart)));
+}
+
+/**
+ * 设施位容量（= `facilities` 数组长度上限）—— **[批次 4] 扩建连带设施位**的唯一算式：
+ * 起手 `slots.total` 位 ＋ 每扩建一行 `cols` 位（`rows − rowsStart` 即已扩建级数）。
+ * 盘上 `slots.total: 3` 是**起手**位数而不是总上限（`src/config.js:969`，三键本批不动）；
+ * `slots: 3 / grid: cols 3, rowsStart 1, rowsMax 5` ⇒ 3 ＋ 4×3 = 15 位（与 `rowsMax` 的 15 格对齐）。
+ * `rows` 由调用方先经 `clampGridRows` 夹好；本函数只做算术、不再夹（夹两次会让"上界"出现两份真相）。
+ * @param {number} rows - 当前行数（已夹）
+ * @param {object} cfg - CONFIG.gameplay.build
+ * @returns {number}
+ */
+export function getFacilitySlotCapacity(rows, cfg = {}) {
+    const total = Math.max(1, _int(cfg.slots && cfg.slots.total, 3));
+    const g = getGridConfig(cfg);
+    const extraRows = Math.max(0, _int(rows, g.rowsStart) - g.rowsStart);
+    return total + extraRows * g.cols;
+}
+
+/**
  * 新建工厂网格（空盘，起手 `rowsStart` 行）。
  * 形状钉死 `{ cols, rows, cells }`：`cells.length === cols * rows`，元素 = `null` 或 `{ slot }`；
  * `slot` 是 `facilities` 的下标——**设备本体只留在 facilities**，网格只记「谁在哪一格」，不存第二份设备。
@@ -106,7 +136,7 @@ export function createBuildGrid(cfg = {}) {
 export function normalizeBuildGrid(grid = null, cfg = {}, facilitiesLength = 0) {
     const g = getGridConfig(cfg);
     const src = (grid && typeof grid === 'object') ? grid : {};
-    const rows = Math.min(g.rowsMax, Math.max(g.rowsStart, _int(src.rows, g.rowsStart)));
+    const rows = clampGridRows(src.rows, cfg);
     const need = g.cols * rows;
     const srcCells = _list(src.cells);
     const limit = Math.max(0, _int(facilitiesLength, 0));
@@ -136,11 +166,16 @@ export function normalizeBuildGrid(grid = null, cfg = {}, facilitiesLength = 0) 
  * @returns {object} 新的 BuildState
  */
 export function normalizeBuildState(state = {}, cfg = {}) {
-    const total = Math.max(1, _int(cfg.slots && cfg.slots.total, 3));
     const openAtStart = Math.max(1, _int(cfg.slots && cfg.slots.openAtStart, 1));
     const levels = state.cannonLevels || {};
+    // [批次 4] 设施位容量随**行数**派生（不随 `slots.total` 固定）：起手 `slots.total` 位，
+    // 每扩建一行 ＋`cols` 位（算式只此一处，见 getFacilitySlotCapacity）。行数先按与
+    // `normalizeBuildGrid` 同一个 `clampGridRows` 夹，两处口径因此不可能岔开。
+    // 旧档（无 `buildGrid` / `rows = rowsStart`）⇒ 容量仍 = `slots.total`，不因本批变小。
+    const rows = clampGridRows(state.buildGrid && state.buildGrid.rows, cfg);
+    const capacity = getFacilitySlotCapacity(rows, cfg);
     const facilities = [];
-    for (let i = 0; i < total; i++) {
+    for (let i = 0; i < capacity; i++) {
         const f = _list(state.facilities)[i];
         facilities.push(f && f.type ? { type: f.type, level: Math.max(1, _int(f.level, 1)), cd: _int(f.cd, 0) } : null);
     }
@@ -154,7 +189,7 @@ export function normalizeBuildState(state = {}, cfg = {}) {
         },
         cannonBranch: state.cannonBranch || null,
         facilities,
-        facilitySlotsOpen: Math.min(total, Math.max(openAtStart, _int(state.facilitySlotsOpen, openAtStart))),
+        facilitySlotsOpen: Math.min(capacity, Math.max(openAtStart, _int(state.facilitySlotsOpen, openAtStart))),
         items: _list(state.items).filter(id => ITEM_IDS.includes(id)),
         miningLevels: { collector: Math.max(0, _int(state.miningLevels && state.miningLevels.collector, 0)) },
         // [批次 1] 工厂网格：只存「谁在哪一格」（`{ slot }`），设备本体仍只在 facilities。
@@ -387,9 +422,18 @@ export function tryPurchase(state, action, cfg = {}, reveal = null, stockLedger 
         case 'item': next.items = [...next.items, a.item]; break;
         case 'mining': next.miningLevels[a.key] = (next.miningLevels[a.key] || 0) + 1; break;
         // [批次 3] 扩建一行：rows +1，盘面追加一整行的空格（`cells` 长度恒 = cols × rows）。
+        // [批次 4] 扩建**连带设施位**：多一行 ⇒ 设施数组 +cols 个空位，且这些位**立刻可用**
+        //   （`facilitySlotsOpen += cols`，本次扩建的格位因此当波就能建造）。
+        //   数组长度不在这里手写 `+cols`：它在归一化里由「新行数」按 getFacilitySlotCapacity 派生，
+        //   所以这里推完行数再走一次归一化，把 facilities / 容量 / 可用位一起对齐。
         case 'expand': {
+            const cols = next.buildGrid.cols;
             next.buildGrid.rows += 1;
-            for (let i = 0; i < next.buildGrid.cols; i++) next.buildGrid.cells.push(null);
+            for (let i = 0; i < cols; i++) next.buildGrid.cells.push(null);
+            const grown = normalizeBuildState({ ...next, facilitySlotsOpen: next.facilitySlotsOpen + cols }, cfg);
+            next.facilities = grown.facilities;
+            next.facilitySlotsOpen = grown.facilitySlotsOpen;
+            next.buildGrid = grown.buildGrid;
             break;
         }
         default: return fail('invalid');
