@@ -1174,7 +1174,8 @@ export const hud_system = {
     /**
      * @method _hud_waveTick
      * @description 逐帧（由 sys_loop 调用）累积本波读数：存活敌人数 + 越过击破线的敌人（与
-     *   input_checkDefeat 同口径：pos.y + 视角偏移 > defeatLineY）。同时刷新常显读数。
+     *   input_checkDefeat 同口径：pos.y + 视角偏移 > defeatLineY）。护盾在值时越线一律视作被拦停、
+     *   不计入漏过（对齐 input_checkDefeat 的钳停分支）。同时刷新常显读数。
      *   只读状态，不写回任何游戏数据。
      */
     _hud_waveTick() {
@@ -1199,11 +1200,16 @@ export const hud_system = {
         const shiftY = (this.boardTilt && this.boardTilt.current) ? (this.boardTilt.current.y * -20) : 0;
         const lineY = Number.isFinite(this.defeatLineY) ? this.defeatLineY : (this.height - 120);
         const enemies = Array.isArray(this.enemies) ? this.enemies : [];  // [Mixin 正常用法：读取 Game 实例状态]
+        // [验收实测 2026-10-26] 护盾在值时不记漏过：input_checkDefeat 把越线敌人钳回屏障线内侧
+        // （lineY - height/2）并 return false，本局不结束 —— 那不是漏过，是拦停。旧写法不看护盾，
+        // 会在「钳停之前的那一帧」把越线永久记进 leakedRefs：实测两敌同帧越线时 漏過=1，而两只
+        // 都被钳在 648.5（lineY 680）、护盾 3→1、gameOver=false，同一只还记进 未清，属重复计数。
+        const shieldUp = (this.playerShield || 0) > 0;  // [Mixin 正常用法：读取 Game 实例状态]
         let alive = 0;
         enemies.forEach(e => {
             if (!e || !e.active || e.isDead || !(e.hp > 0)) return;
             alive++;
-            if (e.pos && (e.pos.y + shiftY) > lineY) wave.leakedRefs.add(e);
+            if (!shieldUp && e.pos && (e.pos.y + shiftY) > lineY) wave.leakedRefs.add(e);
         });
         wave.alive = alive;
         wave.tick = (wave.tick || 0) + 1;
