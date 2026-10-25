@@ -2449,16 +2449,25 @@ phase_gathering_getRandomPegType() {
         if (this.phase === 'combat') {
              const hitEnemy = this.input_checkEnemyHover(pos);
              if (hitEnemy) return; 
-             if (this.ui.isOpen) {
-                 this.ui.closeDrawer();
-                 return;
-             }
-             if (!this.isEnemyTurn && this.ammoQueue.length > 0 && this.projectiles.length === 0 && this.burstQueue.length === 0) {
+             // [BUGFIX REQ-20261022 输入自锁] 先判「这次按下能不能开始拖拽」，再决定要不要只关抽屉。
+             // 旧顺序是「抽屉开着 → closeDrawer() 并 return」，而抽屉经常是悬停检测自己打开的
+             //（见 input_handleInputMove 的敌人悬浮检测 → showEnemyInfo → isOpen=true）：
+             // 一次被门禁拒掉的按下不会置 isDragging，随后同一条鼠标轨迹落到悬浮检测上又把抽屉打开，
+             // 此后每次按下都只关抽屉、永远走不到开火门禁 —— 弹药在手也发不出弹，且全程没有任何提示。
+             const canStartAim = !this.isEnemyTurn
+                 && this.ammoQueue.length > 0
+                 && this.projectiles.length === 0
+                 && this.burstQueue.length === 0;
+             if (canStartAim) {
                 this.isDragging = true;
                 // [emitter-anchor] 发射锚点固定为炮台旋转圆心，统一由 emitter_geometry 计算。
                 this.dragStart = calcCombatLauncherGeometry(this.width, this.height).muzzle;
                 this.dragCurrent = logicPos;
                 this.ui.closeDrawer();
+            } else {
+                // 发不出去：保留原有的「按下顺手关抽屉」行为，但不再静默丢弃这次按下，给一句原因。
+                if (this.ui.isOpen) this.ui.closeDrawer();
+                this.phase_notifyFireBlocked();
             }
         }
         else if (this.phase === 'gathering') {
@@ -2486,6 +2495,33 @@ phase_gathering_getRandomPegType() {
                 // 这里不显示 toast，等到松开时如果没动才显示
             }
         } 
+    },
+
+    /**
+     * @method phase_notifyFireBlocked
+     * @description 战斗态按下被开火门禁拒掉时，告诉玩家「这一下为什么没打出去」。
+     * 三种可拒原因各给一句话；同一原因 800ms 内只提示一次，连拖/连点不会刷屏。
+     */
+    phase_notifyFireBlocked() {
+        let reason = null;
+        if (this.isEnemyTurn) reason = 'enemy_turn';
+        else if (this.projectiles.length > 0 || this.burstQueue.length > 0) reason = 'in_flight';
+        else if (this.ammoQueue.length === 0) reason = 'no_ammo';
+        if (!reason) return;
+
+        const now = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+            ? performance.now()
+            : Date.now();
+        if (!this._fireBlockNoticeAt) this._fireBlockNoticeAt = {};
+        if (now - (this._fireBlockNoticeAt[reason] || 0) < 800) return;
+        this._fireBlockNoticeAt[reason] = now;
+
+        const text = {
+            in_flight: '弹道未落，稍等再发',
+            no_ammo: '弹药已空：点下方配方装填',
+            enemy_turn: '敌人行动中',
+        }[reason];
+        if (text && typeof showToast === 'function') showToast(text);
     },
 
     phase_calcVenomEffectiveStacks(rawStacks) {
@@ -3700,6 +3736,14 @@ phase_gathering_getRandomPegType() {
                                     this.shotDamageHistory.shift();
                                 }
                                 this.ui_updateDamageStats();
+                                this.shotDamageMap.delete(p.shotId);
+                            } else if (shotStats.projectileCount > 0 && shotStats.destroyedCount >= shotStats.projectileCount) {
+                                // [走查 C-1 落空反馈] 这一发所有子弹都消失了却一点伤害都没造成，
+                                // 在弹丸消失处给一次短促提示，让玩家分得清「没打中」和「打了没效果」。
+                                // 提示后立刻清掉该发统计，同一次发射不会重复弹。
+                                if (typeof this.spawn_createFloatingText === 'function') {
+                                    this.spawn_createFloatingText(p.pos.x, p.pos.y - 18, '未命中', '#94a3b8', 14);
+                                }
                                 this.shotDamageMap.delete(p.shotId);
                             }
                         }
