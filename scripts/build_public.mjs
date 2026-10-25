@@ -74,16 +74,55 @@ function copyEntry(entry) {
   if (!fs.existsSync(src)) {
     if (entry.optional) {
       console.log(`  skip   ${entry.from} (absent, optional)`);
-      return { skipped: true };
+      return { skipped: true, excludedFiles: 0, excludedBytes: 0 };
     }
     throw new Error(`Required publish input is missing: ${entry.from}`);
   }
 
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const isDir = fs.statSync(src).isDirectory();
-  fs.cpSync(src, dest, { recursive: isDir, force: true });
+  const excluded = { excludedFiles: 0, excludedBytes: 0 };
+  const options = { recursive: isDir, force: true };
+  if (isDir) {
+    options.filter = (from) => {
+      const name = path.basename(from);
+      if (!isPublishExcluded(name)) return true;
+      excluded.excludedFiles += 1;
+      try {
+        excluded.excludedBytes += fs.statSync(from).size;
+      } catch {
+        // 统计失败不影响发布：仍然排除该文件
+      }
+      return false;
+    };
+  }
+  fs.cpSync(src, dest, options);
   console.log(`  copy   ${entry.from} -> ${toPosix(entry.to)}`);
-  return { skipped: false };
+  if (excluded.excludedFiles > 0) {
+    console.log(`  drop   ${entry.from}: ${excluded.excludedFiles} files / ${excluded.excludedBytes} bytes (*_raw* source art, not referenced at runtime)`);
+  }
+  return { skipped: false, ...excluded };
+}
+
+/**
+ * Art that is never fetched at runtime and must not be published.
+ *
+ * `assets/**` carries 154 `*_raw.png` (290,248,293 B) + 7 `*_raw_original.png`
+ * (10,944,916 B) of source art. Nothing loads them: the only reference anywhere
+ * in `src/` is the definition of `getBossSpriteRawConceptPath` in
+ * `src/data/boss_sprite_assets.js:86-89`, and that export has zero call sites
+ * (likewise `getBossSpriteLegacySheetPath` / `BaseDraftPath` /
+ * `HpTranslucencyMaskPath`). Dropping them keeps the published site at the
+ * runtime-whitelist intent of this script instead of shipping 300 MB of drafts.
+ *
+ * Matching is on the file name suffix only, so every non-`_raw` asset under
+ * `assets/` (sprites, pixel art, composites, redraw drafts, JSON configs) is
+ * still copied byte-for-byte.
+ */
+const PUBLISH_EXCLUDE = [/_raw\.png$/i, /_raw_original\.png$/i];
+
+function isPublishExcluded(name) {
+  return PUBLISH_EXCLUDE.some((re) => re.test(name));
 }
 
 /** Recursively collect { files, bytes } for a directory. */
@@ -125,8 +164,13 @@ function main() {
   rmrf(PUBLIC_ROOT);
   fs.mkdirSync(PUBLIC_ROOT, { recursive: true });
 
+  const dropped = { files: 0, bytes: 0 };
   for (const entry of COPY_PLAN) {
-    copyEntry(entry);
+    const result = copyEntry(entry);
+    if (result.excludedFiles) {
+      dropped.files += result.excludedFiles;
+      dropped.bytes += result.excludedBytes;
+    }
   }
 
   assertNoLeaks();
@@ -140,6 +184,7 @@ function main() {
   const total = measure(PUBLIC_ROOT);
   console.log('[build_public] done');
   console.log(`  assets  ${assets.files} files / ${assets.bytes} bytes`);
+  console.log(`  dropped ${dropped.files} files / ${dropped.bytes} bytes (excluded by PUBLISH_EXCLUDE)`);
   console.log(`  total   ${total.files} files / ${total.bytes} bytes`);
   console.log(`  output  ${PUBLIC_ROOT}`);
 }
