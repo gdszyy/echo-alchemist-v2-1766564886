@@ -939,6 +939,16 @@ class UIManager {
                 desc: '记录最近承受的属性伤害或状态效果，死亡时掉落该属性家族的符文。'
             }
         };
+
+        // [REQ-20261022-wave-loop 敌人面板空态] 面板显示的那个敌人死了，就必须立刻回到空态。
+        // 背景：PC 布局把 info-drawer 常驻在左侧栏，closeDrawer() 加的 translate-y-full 在 PC 下
+        // 没有任何视觉效果（index.html 的 #pc-left-drawer-mount 规则把 transform 置 none），而
+        // 「收起时隐藏」的规则只作用于 body:not(.pc-mode)。于是敌人死了、战场清空之后，面板会一直
+        // 挂着最后一个敌人的数字。这里只订阅既有事件、不改任何结算链。
+        eventBus.on(EVENT_TYPES.COMBAT_ENEMY_KILLED, (payload) => {
+            const dead = payload && payload.enemy;
+            if (dead && dead === this.hoveredEnemy) this.clearEnemyInfo();
+        });
     }
 
     renderAttributeControls() {
@@ -1158,6 +1168,7 @@ class UIManager {
         this.hoveredEnemy = enemy;
         this.isOpen = true;
         // PC 模式下 drawer 已迁移到左侧边栏常驻展开，无需操作 translate
+        // （pcDrawerMigrated 由 _ui_migrateDrawerToLeftSidebar 按真实迁移结果写入）
         if (!this.drawer.dataset.pcDrawerMigrated) {
             this.drawer.classList.remove('translate-y-full');
         }
@@ -1253,11 +1264,47 @@ class UIManager {
         container.appendChild(div);
     }
 
+    /**
+     * @method clearEnemyInfo
+     * @description 面板空态：没有选中/悬停目标时，不许继续显示上一个敌人的残留数字。
+     *   PC 布局把 info-drawer 常驻在左侧栏，玩家会一直看到这块面板，所以「没有目标」本身
+     *   必须有一个诚实的显示；移动端这条抽屉靠 translate-y-full 收起（收起时 0 占位），
+     *   空态内容看不到，行为不变。
+     */
+    clearEnemyInfo() {
+        this.hoveredEnemy = null;
+        this.isOpen = false;
+        const typeEl = document.getElementById('info-enemy-type');
+        if (typeEl) {
+            typeEl.innerText = '未選中敵人';
+            typeEl.className = 'text-lg font-bold text-slate-500';
+        }
+        const hpEl = document.getElementById('info-hp');
+        if (hpEl) hpEl.innerText = '—';
+        const tempBar = document.getElementById('info-temp-bar');
+        if (tempBar) {
+            tempBar.style.width = '0';
+            tempBar.style.left = '50%';
+            tempBar.style.background = '#475569';
+        }
+        const tempText = document.getElementById('info-temp-text');
+        if (tempText) {
+            tempText.innerText = '點擊或懸停敵人查看詳情';
+            tempText.style.color = '#64748b';
+        }
+        const statusList = document.getElementById('info-status-list');
+        if (statusList) statusList.innerHTML = '';
+        const affixContainer = document.getElementById('info-affix-list');
+        if (affixContainer) affixContainer.innerHTML = '<p class="text-slate-500 text-center italic mt-4">未選中敵人 · 暫無詞條</p>';
+    }
+
     // @section:drawer_state_save - 关闭前状态保存与动画准备
     closeDrawer() {
         this.isOpen = false;
-        this.hoveredEnemy = null;
-        // PC 模式下 drawer 常驻展开，不隐藏
+        // 关闭即清内容：PC 下没有滑入动画兜底（transform 被 CSS 置 none），
+        // 只有这一句才能保证面板不留上一个敌人的数字。
+        this.clearEnemyInfo();
+        // PC 模式下 drawer 常驻展开，不隐藏（pcDrawerMigrated 由 _ui_migrateDrawerToLeftSidebar 真实写入）
         if (!this.drawer.dataset.pcDrawerMigrated) {
             this.drawer.classList.add('translate-y-full');
         }
@@ -4405,6 +4452,10 @@ class TrainingGround {
         // [持续特效残留修复] 清空敌人前先销毁其燃烧/电弧/毒液/风场等持续特效，防止 PixiJS Sprite 残留
         pixiCleanupAllEffects(this.game);
         this.game.enemies = [];
+        // [REQ-20261022-wave-loop 敌人面板空态] 试炼场「清空」同上：面板不留上一个敌人的数字。
+        if (this.game && this.game.ui && typeof this.game.ui.clearEnemyInfo === 'function') {
+            this.game.ui.clearEnemyInfo();
+        }
         this.game.projectiles = [];
         this.game.particles = [];
         if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }
@@ -5361,6 +5412,10 @@ class TrainingGround {
         // [PixiJS 迁移] 销毁所有残留特效的 PixiJS 适配器，防止孤立 Sprite 残留
         pixiCleanupAllEffects(this.game);
         this.game.enemies = [];
+        // [REQ-20261022-wave-loop 敌人面板空态] 战场清空 ⇒ 面板不能还留着上一个敌人的数字。
+        if (this.game && this.game.ui && typeof this.game.ui.clearEnemyInfo === 'function') {
+            this.game.ui.clearEnemyInfo();
+        }
         this.game.projectiles = [];
         this.game.particles = [];
         if (this.game.particleCounts) { for (const k in this.game.particleCounts) this.game.particleCounts[k] = 0; }

@@ -2092,6 +2092,20 @@ export const ui_system = {
 
     _ui_migrateDrawerToLeftSidebar(toSidebar) {
         this._ui_movePanelTo('info-drawer', 'pc-left-drawer-mount', toSidebar);
+        // [REQ-20261022-wave-loop 敌人面板空态] 这个 dataset 以前全仓只读不写，三处判断恒走「未迁移」分支。
+        // 现在按真实迁移结果写：真的搬进左侧栏才置 1（下游据此跳过 translate-y-full 的收起错觉），
+        // 迁回移动端布局就删掉，并把抽屉恢复成收起态。
+        const drawer = document.getElementById('info-drawer');
+        if (!drawer) return;
+        const inSidebar = !!drawer.parentElement && drawer.parentElement.id === 'pc-left-drawer-mount';
+        if (toSidebar && inSidebar) {
+            drawer.dataset.pcDrawerMigrated = '1';
+        } else {
+            delete drawer.dataset.pcDrawerMigrated;
+            // 移动端就靠 translate-y-full 收起（收起时 0 占位，见 bitmap_ui.css 的
+            // body:not(.pc-mode) #info-drawer.translate-y-full 规则），迁回来时必须回到收起态。
+            drawer.classList.add('translate-y-full');
+        }
     },
 
     _ui_migrateHUDToLeftSidebar(toSidebar) {

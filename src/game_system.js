@@ -3862,6 +3862,10 @@ export const game_system = {
         }
          if (hit) {
             this.ui.showEnemyInfo(hit);
+        } else if (this.ui.isOpen) {
+            // [REQ-20261022-wave-loop 敌人面板空态] 这次按下没有落在敌人身上 ⇒ 面板回到空态。
+            // 不这么做的话，PC 侧栏会一直挂着上一个敌人的数字（PC 下 translate-y-full 没有视觉效果）。
+            this.ui.closeDrawer();
         }
         return hit;
     },
