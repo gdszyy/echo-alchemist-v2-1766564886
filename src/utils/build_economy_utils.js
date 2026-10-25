@@ -160,6 +160,70 @@ export function normalizeBuildGrid(grid = null, cfg = {}, facilitiesLength = 0) 
 }
 
 /**
+ * 让网格格子与设施数组对齐（自愈）—— **[批次 5] 修「建了设备、网格仍显示空位」**。
+ *
+ * 为什么需要它：`cells` 只记「谁在哪一格」，设备本体只在 `facilities`；而写 `cells` 的地方只有
+ * `createBuildGrid` / `normalizeBuildGrid` / 扩建时 `push(null)` 三处，**购买路径
+ * （`tryPurchase` 的 `build` 分支）只写 `facilities`、不写 `cells`** ⇒ 玩家建了设备，网格那一格
+ * 取不到 `f`，永远渲染成「空位 格N」（只有上面的「设施」面板能看到设备）。
+ * 购买路径有好几条（build / upgrade / slot / expand），逐条手写双写一定会漏 ⇒ 把对齐收口到归一化：
+ * `sys_getBuildState` / `sys_applyBuildState` / 存读档 / 购买返回全部经过 `normalizeBuildState`，
+ * 任何入口漏写都在这里补上，旧档（`cells` 全 `null` 但有设备）也顺带自愈。
+ *
+ * 规则（三条，顺序固定）：
+ *   ① **悬空引用先释放**：格引用的 slot 在 `facilities` 里已空（设备被拆 / 位被清空）⇒ 该格置 `null`；
+ *      同一 slot 被多格引用的只保留第一处，其余置 `null`（几何去重 `normalizeBuildGrid` 已做过，这里只防非归一输入）。
+ *   ② **有设备但没格 ⇒ 补格**：优先放同下标的格（`cells[slot]` 空着时），否则放第一个空格；
+ *      实在没有空格 ⇒ 计入 `unplaced`（设备还在 `facilities` 里，只是盘面装不下）。
+ *   ③ **已有合法映射原样保留**：不把「格 i 必须放位 i」写死——将来做设备搬家时，
+ *      「设备在 slot 3 却在第 1 格」是合法映射，这里不能把它按回下标去。
+ *
+ * `dropped` 沿用入参网格的几何丢弃计数（`normalizeBuildGrid` 的语义，本函数不重算）；
+ * 本函数自己的计数叫 `unplaced`。两者含义不同（非法格内容 vs 设备无处安放），
+ * 混成一个会让 `build_system.js` 那句「归一化丢弃 N 个非法格子内容（已置空）」的告警文案失真。
+ * @param {{ cols:number, rows:number, cells:Array<null|{slot:number}>, dropped?:number }|null} grid - 已几何归一化的网格
+ * @param {Array<null|{type:string}>} facilities - 归一化后的设施数组（下标 = slot）
+ * @param {object} cfg - CONFIG.gameplay.build
+ * @returns {{ cols:number, rows:number, cells:Array<null|{slot:number}>, dropped:number, unplaced:number }}
+ */
+export function reconcileGridWithFacilities(grid = null, facilities = [], cfg = {}) {
+    const g = getGridConfig(cfg);
+    const src = (grid && typeof grid === 'object') ? grid : {};
+    const rows = clampGridRows(src.rows, cfg);
+    const need = g.cols * rows;              // 格子数恒 = cols × rows（与 normalizeBuildGrid 同一算式）
+    const srcCells = _list(src.cells);
+    const cells = new Array(need).fill(null);
+    for (let i = 0; i < Math.min(need, srcCells.length); i++) {
+        const cell = srcCells[i];
+        // 只认 `{ slot: 整数 }`；其余形状按空格处理（非法形状的丢弃计数仍归 normalizeBuildGrid 的 dropped）。
+        if (cell && Number.isInteger(cell.slot)) cells[i] = { slot: cell.slot };
+    }
+    const facs = _list(facilities);
+    // 「有设备」与 normalizeBuildState 同一口径（`f && f.type`），否则会给空占位补出一个指向空位的格。
+    const hasDevice = slot => slot >= 0 && slot < facs.length && !!(facs[slot] && facs[slot].type);
+
+    // ① 释放悬空 / 重复引用
+    const referenced = new Set();
+    for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        if (!cell) continue;
+        if (!hasDevice(cell.slot) || referenced.has(cell.slot)) { cells[i] = null; continue; }
+        referenced.add(cell.slot);
+    }
+
+    // ② 安放还没有格的设备（新建设备走这里落格）
+    let unplaced = 0;
+    for (let slot = 0; slot < facs.length; slot++) {
+        if (!hasDevice(slot) || referenced.has(slot)) continue;
+        const at = (slot < cells.length && cells[slot] === null) ? slot : cells.indexOf(null);
+        if (at < 0) { unplaced++; continue; }
+        cells[at] = { slot };
+        referenced.add(slot);
+    }
+    return { cols: g.cols, rows, cells, dropped: Math.max(0, _int(src.dropped, 0)), unplaced };
+}
+
+/**
  * 规范化整备状态（补默认值、深拷贝），保证后续函数可以安全地做不可变更新。
  * @param {object} state
  * @param {object} cfg - CONFIG.gameplay.build
@@ -179,6 +243,12 @@ export function normalizeBuildState(state = {}, cfg = {}) {
         const f = _list(state.facilities)[i];
         facilities.push(f && f.type ? { type: f.type, level: Math.max(1, _int(f.level, 1)), cd: _int(f.cd, 0) } : null);
     }
+    // [批次 5] 几何归一（行数 / 格子数 / 非法格置空）**之后**再对齐「格 ↔ 设备」：
+    //   传的是上面刚归一化好的 `facilities`（不是入参 `state.facilities`）——旧档越界设备已被本次归一化裁掉，
+    //   拿旧数组对齐会补出指向「已不存在设备」的格。
+    //   这一层是「建了设备却漏写 cells」的唯一收口点（购买路径不再逐条手写双写）。
+    const buildGrid = reconcileGridWithFacilities(
+        normalizeBuildGrid(state.buildGrid, cfg, facilities.length), facilities, cfg);
     return {
         energy: Math.max(0, Number(state.energy) || 0),
         crystal: Math.max(0, _int(state.crystal, 0)),
@@ -194,7 +264,9 @@ export function normalizeBuildState(state = {}, cfg = {}) {
         miningLevels: { collector: Math.max(0, _int(state.miningLevels && state.miningLevels.collector, 0)) },
         // [批次 1] 工厂网格：只存「谁在哪一格」（`{ slot }`），设备本体仍只在 facilities。
         // 旧档缺 `buildGrid` 键 ⇒ 这里按默认盘建，不抛（读档路径因此不需要额外兜底）。
-        buildGrid: normalizeBuildGrid(state.buildGrid, cfg, facilities.length),
+        // [批次 5] 上面已过 reconcileGridWithFacilities：`cells` 与 `facilities` 恒对齐
+        // （建了设备没写格的地方在这一层补齐，设备被拆掉的格在这一层释放）。
+        buildGrid,
     };
 }
 
@@ -438,6 +510,11 @@ export function tryPurchase(state, action, cfg = {}, reveal = null, stockLedger 
         }
         default: return fail('invalid');
     }
+    // [批次 5] 设备写进 `facilities` 之后统一对齐一次网格（**不**在每个 case 里手写 `cells`）：
+    //   `build` 分支过去只写设备不写格，网格会永远显示「空位」；这一行让 `res.state.buildGrid`
+    //   自带正确盘面，存读档 / 任何直接读 `res.state.buildGrid` 的调用方不必再归一化一次。
+    //   已归一化过的分支（expand）再走一遍是无副作用的（幂等）。
+    next.buildGrid = reconcileGridWithFacilities(next.buildGrid, next.facilities, cfg);
     return { ok: true, reason: null, state: next, price, ledger: nextLedger };
 }
 
