@@ -599,3 +599,57 @@
     border-radius: 6px;
     flex-shrink: 0;
 }
+
+/* ==================== [REQ-20261022-wave-loop 工厂网格] 批次 2 / 批次 3 ====================
+ * 面板 `#build-grid`（section，由 createPanel 生成）里面：
+ *   `.build-grid`       —— cols 列等宽网格容器
+ *   `.build-grid__cell` —— 每格一个 button（build_grid 的 cells 长度 = cols × rows）
+ *   `.build-grid__expand` —— 扩建按钮（走既有 sys_buildPurchase 通道）
+ * 红线（批次 2 验收项，改这里先看这四条）：
+ *   ① 每格热区 ≥ var(--tap-min)（40×40 CSS px）：格子不设 max-width，列宽由 1fr 分配，窄屏也只会变矮不会变窄到 40 以下；
+ *   ② 容器与格内都不许出滚动条：本段不写任何 overflow:auto / scroll；文字靠换行 + 自适应高度，不靠裁切；
+ *   ③ 列数只有一个来源：JS 设在 `#build-grid` 上的 `--build-grid-cols`，子容器继承，不在这里写死；
+ *   ④ 只用 ui_tokens.css 的变量，不写裸色值与裸 z-index。
+ */
+#build-grid .build-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--build-grid-cols, 3), minmax(0, 1fr));
+    gap: var(--s2);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+#build-grid .build-grid__cell {
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+    padding: var(--s1);
+    font-size: var(--fs-xs);
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+/* 格内两行文字（类型 / 等级）必须能换行：.ui-btn__label 与 .ui-btn__sub 的全局 white-space:nowrap 在此收窄 */
+#build-grid .build-grid__cell .ui-btn__label,
+#build-grid .build-grid__cell .ui-btn__sub {
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
+}
+#build-grid .build-grid__cell .ui-btn__label {
+    font-size: var(--fs-sm);
+}
+/* 空位用破折号点出「这里还没东西」，不靠颜色单独表意（文字已在 label 里写明「空位」） */
+#build-grid .build-grid__cell.is-empty .ui-btn__label {
+    color: var(--c-text-dim);
+}
+#build-grid .build-grid__expand {
+    width: 100%;
+    min-height: var(--tap-min);
+    margin-top: var(--s2);
+    flex-wrap: wrap;
+    gap: var(--s1) var(--s2);
+}

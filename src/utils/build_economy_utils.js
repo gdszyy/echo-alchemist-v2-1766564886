@@ -15,6 +15,7 @@
  *     facilitySlotsOpen: number,
  *     items: string[],                                  // 道具 id，长度 ≤ cfg.items.slots
  *     miningLevels: { collector },
+ *     buildGrid: { cols, rows, cells },                  // [批次 1] 工厂网格；cells 长度 = cols×rows，元素 null 或 { slot }
  *   }
  *
  * 购买动作（action）：
@@ -25,6 +26,7 @@
  *   { type: 'upgrade', slot }                           // 升级该位设施（Lv3 另需 💎）
  *   { type: 'item', item }                              // 买一次性道具
  *   { type: 'mining', key: 'collector' }                // 挖矿升级
+ *   { type: 'expand' }                                  // [批次 3] 工厂网格扩建一行（rows +1，盘面 +cols 格）
  *
  * 价格（getPrice 的返回，恒三字段）：`{ energy, crystal, materials }`。
  *   `materials` 是**逐料需求**（键只认 pyro / cryo / beast，且**只含正数键**；无料价时为 `{}`，不是 undefined / null）。
@@ -65,6 +67,69 @@ function _list(v) {
 }
 
 /**
+ * 工厂网格几何（唯一来源：盘上是 `CONFIG.gameplay.build.power.grid`）。
+ * **盘上事实（2026-10-25 读 `src/config.js:1003` 的 `power: {` 与 `:1083` 的收尾）**：`grid` 挂在 `power` 下面，
+ * 不是 `build.grid`；`src/utils/build_grid_utils.js:76-89` 的 `_gridCfg` / `getGridShape` 用的是同一条路径、
+ * 同一套取整口径。本文件不 import 那个文件（它的 cells 存**设备对象**，与本文「cells 只存 `{ slot }`」不同形）。
+ */
+export function getGridConfig(cfg = {}) {
+    const power = (cfg && cfg.power && typeof cfg.power === 'object') ? cfg.power : {};
+    const g = (power.grid && typeof power.grid === 'object') ? power.grid : ((cfg && cfg.grid) || {});
+    const cols = Math.max(1, _int(g.cols, 3));
+    const rowsStart = Math.max(1, _int(g.rowsStart, 1));
+    const rowsMax = Math.max(rowsStart, _int(g.rowsMax, rowsStart));
+    return { cols, rowsStart, rowsMax, expandCost: _list(g.expandCost) };
+}
+
+/**
+ * 新建工厂网格（空盘，起手 `rowsStart` 行）。
+ * 形状钉死 `{ cols, rows, cells }`：`cells.length === cols * rows`，元素 = `null` 或 `{ slot }`；
+ * `slot` 是 `facilities` 的下标——**设备本体只留在 facilities**，网格只记「谁在哪一格」，不存第二份设备。
+ * @param {object} cfg - CONFIG.gameplay.build
+ * @returns {{ cols:number, rows:number, cells:Array<null|{slot:number}> }}
+ */
+export function createBuildGrid(cfg = {}) {
+    const g = getGridConfig(cfg);
+    return { cols: g.cols, rows: g.rowsStart, cells: new Array(g.cols * g.rowsStart).fill(null) };
+}
+
+/**
+ * 归一化工厂网格（旧档缺 `buildGrid` 键 / 形状坏掉都**不抛**，按默认盘建）。
+ * 规则：`cols` 恒取 config；`rows` 夹在 `[rowsStart, rowsMax]`；`cells` 长度强制 = `cols * rows`
+ * （多的截掉、少的补 `null`）；每格的 `slot` 必须是不重复的合法整数且 `< facilitiesLength`，
+ * 否则该格置 `null` 并计入 `dropped`（供调用方记日志，不在这里打日志）。
+ * @param {object|null|undefined} grid
+ * @param {object} cfg - CONFIG.gameplay.build（几何从 `cfg.power.grid` 读，见 getGridConfig）
+ * @param {number} facilitiesLength - 当前 `facilities.length`（slot 的合法上界）
+ * @returns {{ cols:number, rows:number, cells:Array<null|{slot:number}>, dropped:number }}
+ */
+export function normalizeBuildGrid(grid = null, cfg = {}, facilitiesLength = 0) {
+    const g = getGridConfig(cfg);
+    const src = (grid && typeof grid === 'object') ? grid : {};
+    const rows = Math.min(g.rowsMax, Math.max(g.rowsStart, _int(src.rows, g.rowsStart)));
+    const need = g.cols * rows;
+    const srcCells = _list(src.cells);
+    const limit = Math.max(0, _int(facilitiesLength, 0));
+    const cells = new Array(need).fill(null);
+    const used = new Set();
+    let dropped = 0;
+    for (let i = 0; i < need; i++) {
+        const cell = srcCells[i];
+        if (!cell || typeof cell !== 'object') continue;   // 空格 / 非法形状一律按空盘处理，不算「丢弃」
+        const slot = cell.slot;
+        if (!Number.isInteger(slot) || slot < 0 || slot >= limit || used.has(slot)) { dropped++; continue; }
+        used.add(slot);
+        cells[i] = { slot };
+    }
+    // 超出 `cols * rows` 的部分：带内容的算「被截断丢弃」，空格不算。
+    for (let i = need; i < srcCells.length; i++) {
+        const cell = srcCells[i];
+        if (cell && typeof cell === 'object' && Number.isInteger(cell.slot)) dropped++;
+    }
+    return { cols: g.cols, rows, cells, dropped };
+}
+
+/**
  * 规范化整备状态（补默认值、深拷贝），保证后续函数可以安全地做不可变更新。
  * @param {object} state
  * @param {object} cfg - CONFIG.gameplay.build
@@ -92,6 +157,9 @@ export function normalizeBuildState(state = {}, cfg = {}) {
         facilitySlotsOpen: Math.min(total, Math.max(openAtStart, _int(state.facilitySlotsOpen, openAtStart))),
         items: _list(state.items).filter(id => ITEM_IDS.includes(id)),
         miningLevels: { collector: Math.max(0, _int(state.miningLevels && state.miningLevels.collector, 0)) },
+        // [批次 1] 工厂网格：只存「谁在哪一格」（`{ slot }`），设备本体仍只在 facilities。
+        // 旧档缺 `buildGrid` 键 ⇒ 这里按默认盘建，不抛（读档路径因此不需要额外兜底）。
+        buildGrid: normalizeBuildGrid(state.buildGrid, cfg, facilities.length),
     };
 }
 
@@ -186,6 +254,17 @@ export function getPrice(state, action, cfg = {}) {
         if (s.facilitySlotsOpen >= s.facilities.length) return null;
         return { energy: 0, crystal: Math.max(0, _int(cfg.slots && cfg.slots.openCrystal, 2)), materials: {} };
     }
+    // [批次 3] 扩建一行：按「已扩建级数」取一档价格（level = rows − rowsStart，0..expandCost.length−1）。
+    // 料键照盘上 `expandCost` 的 `{ crystal, pyro, cryo }` 取，不另立键位。
+    if (a.type === 'expand') {
+        const g = getGridConfig(cfg);
+        const costs = g.expandCost;
+        if (s.buildGrid.rows >= g.rowsMax) return null;
+        const level = Math.max(0, s.buildGrid.rows - g.rowsStart);
+        if (level >= costs.length) return null;
+        const cost = costs[level] || {};
+        return { energy: 0, crystal: Math.max(0, _int(cost.crystal, 0)), materials: _materialsOf(cost) };
+    }
     const facCfg = (cfg.facilities || {});
     if (a.type === 'build') {
         const f = facCfg[a.facility];
@@ -250,6 +329,8 @@ export function tryPurchase(state, action, cfg = {}, reveal = null, stockLedger 
         if (!allowed.includes(a.branch)) return fail('invalid');
     }
     if (a.type === 'slot' && s.facilitySlotsOpen >= total) return fail('maxed');
+    // [批次 3] 扩建到上限行数 ⇒ 先给 `maxed`（否则会落到 getPrice 的 null 上变成 `invalid`）。
+    if (a.type === 'expand' && s.buildGrid.rows >= getGridConfig(cfg).rowsMax) return fail('maxed');
     if (a.type === 'build') {
         const slot = _int(a.slot, -1);
         if (slot < 0 || slot >= total) return fail('invalid');
@@ -305,6 +386,12 @@ export function tryPurchase(state, action, cfg = {}, reveal = null, stockLedger 
         }
         case 'item': next.items = [...next.items, a.item]; break;
         case 'mining': next.miningLevels[a.key] = (next.miningLevels[a.key] || 0) + 1; break;
+        // [批次 3] 扩建一行：rows +1，盘面追加一整行的空格（`cells` 长度恒 = cols × rows）。
+        case 'expand': {
+            next.buildGrid.rows += 1;
+            for (let i = 0; i < next.buildGrid.cols; i++) next.buildGrid.cells.push(null);
+            break;
+        }
         default: return fail('invalid');
     }
     return { ok: true, reason: null, state: next, price, ledger: nextLedger };

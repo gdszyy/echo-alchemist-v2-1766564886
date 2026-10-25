@@ -17,6 +17,7 @@ import { formatMaterialShortfall } from './utils/shot_recipe_utils.js';
 import {
     BRANCH_SHOT_PROPS,
     computeCannonStats,
+    createBuildGrid,
     getCollectorPayout,
     getReveal,
     normalizeBuildState,
@@ -144,6 +145,8 @@ function purchaseOkText(action, state) {
     }
     if (a.type === 'mining') return '采集升级完成';
     if (a.type === 'slot') return `设施位已开放 ${Number(s.facilitySlotsOpen) || 0} 个`;
+    // [批次 3] 扩建一行：报出新行数与新总格数（不点名「扩建」，玩家看到的是盘面变大）。
+    if (a.type === 'expand' && s && s.buildGrid) return `工厂扩建：${s.buildGrid.rows} 行 · ${s.buildGrid.rows * s.buildGrid.cols} 格`;
     return '已建成';
 }
 
@@ -160,6 +163,8 @@ export const build_system = {
         this.cannonBranch = null;
         this.facilities = s.facilities;
         this.facilitySlotsOpen = s.facilitySlotsOpen;
+        // [批次 1] 工厂网格：新局按 config 起手（cols 列 × rowsStart 行），设备本体仍只在 this.facilities。
+        this.buildGrid = createBuildGrid(cfg);
         this.items = [];
         this.miningLevels = s.miningLevels;
         this._extraDigPending = 0;
@@ -182,6 +187,8 @@ export const build_system = {
             facilitySlotsOpen: this.facilitySlotsOpen,
             items: this.items,
             miningLevels: this.miningLevels,
+            // [批次 1] 网格随状态进出纯函数层：扩建（rows +1 / cells +cols）就在这一层落地。
+            buildGrid: this.buildGrid,
         }, buildCfg());
     },
 
@@ -193,6 +200,16 @@ export const build_system = {
         this.cannonBranch = s.cannonBranch;
         this.facilities = s.facilities.map(f => (f ? { ...f } : null));
         this.facilitySlotsOpen = s.facilitySlotsOpen;
+        // [批次 1] 网格写回：只拷 `{ cols, rows, cells }` 三键（纯函数层归一后的 `dropped` 计数不入运行时状态）。
+        this.buildGrid = {
+            cols: s.buildGrid.cols,
+            rows: s.buildGrid.rows,
+            cells: s.buildGrid.cells.map(c => (c ? { ...c } : null)),
+        };
+        // 归一化丢弃计数只用于日志（旧档 / 坏档的非法 slot 会被置空，这里留一条可追的痕）。
+        if (s.buildGrid.dropped > 0) {
+            console.warn(`[build_system] 工厂网格归一化丢弃 ${s.buildGrid.dropped} 个非法格子内容（已置空）`);
+        }
         this.items = s.items.slice();
         this.miningLevels = { ...s.miningLevels };
         // S1 存档兼容：cannonShotsPerTurn 只是 sys_getCannonStats().shots 的派生镜像

@@ -3266,6 +3266,12 @@ export const game_system = {
                 cannonLevels: { ...(this.cannonLevels || {}) },
                 cannonBranch: this.cannonBranch || null,
                 facilities: (this.facilities || []).map(f => (f ? { ...f } : null)),
+                // [批次 1] 工厂网格只存「谁在哪一格」（浅拷贝 cells），设备本体仍在 facilities。
+                buildGrid: this.buildGrid ? {
+                    cols: this.buildGrid.cols,
+                    rows: this.buildGrid.rows,
+                    cells: (this.buildGrid.cells || []).map(c => (c ? { ...c } : null)),
+                } : null,
                 // [旧档迁移] 兜底值从 CONFIG 读（`build.slots.openAtStart`），不再写死 1：写死会在下次改配置时再漂一次。
                 // 语义是**迁移不是重置**——旧档里存着 `facilitySlotsOpen = 1` 时抬到 openAtStart（与新开局同一起点）；
                 // **只抬不压**：合法更大值（未来晶核开出的第 3 格）原样保留，压下去等于收走已付费的格子。
@@ -3523,6 +3529,8 @@ export const game_system = {
                 cannonLevels: state.cannonLevels,
                 cannonBranch: state.cannonBranch,
                 facilities: state.facilities,
+                // [批次 1] 旧档没有 buildGrid 键 ⇒ normalizeBuildState 按 config 默认盘建，不抛。
+                buildGrid: state.buildGrid,
                 facilitySlotsOpen: state.facilitySlotsOpen,
                 items: state.items,
                 miningLevels: state.miningLevels,

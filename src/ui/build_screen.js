@@ -8,7 +8,7 @@
  */
 import { CONFIG } from '../config.js';
 import { getWaveInfo } from '../utils/boss_schedule_utils.js';
-import { getFacilityStats, getPrice, isActionRevealed, FACILITY_IDS, ITEM_IDS } from '../utils/build_economy_utils.js';
+import { createBuildGrid, getFacilityStats, getGridConfig, getPrice, isActionRevealed, FACILITY_IDS, ITEM_IDS } from '../utils/build_economy_utils.js';
 import { FACILITY_LABELS, ITEM_LABELS, BRANCH_LABELS, uniqueFacilityText } from '../build_system.js';
 import { computeRecipeYield, describeMaterialShortfall, formatMaterialShortfall, materialLabel, pickDefaultRecipe, pickRecipeByYield } from '../utils/shot_recipe_utils.js';
 // 「改善路径」四轴验算：电力 / 产能两条轴一律转调既有纯函数（**不在这里另写一份耗电或产能算式**）。
@@ -632,6 +632,73 @@ export const build_screen_system = {
             facPanelChildren.push(grid);
         }
         scroll.appendChild(createPanel({ title: '设施', hint: '敌人回合前按冷却自动触发', children: facPanelChildren, id: 'build-facilities' }));
+
+        // ---------- 工厂网格（[批次 2] 只读盘面 ＋ [批次 3] 扩建一行） ----------
+        // 每一格只看「谁在哪一格」：`buildGrid.cells[i].slot` → `state.facilities[slot]`。
+        // 设备本体只存在 `facilities`，网格不存第二份（形状见 `build_economy_utils.js` 的 createBuildGrid 注释）。
+        // 每格一个 button（热区 ≥ `--tap-min`），类型 / 等级一律用文字给出，不靠颜色单独承载信息。
+        const gridCfg = getGridConfig(cfg());
+        // `sys_getBuildState()` 正常都会带 buildGrid（归一化里补的）；这里的兜底只防「喂进来的状态缺键」
+        // 这类降级输入（例如注入式夹具），按 config 建一张空盘继续渲染，不因为一块网格把整屏打掉。
+        const buildGrid = state.buildGrid || createBuildGrid(cfg());
+        const rowsMax = gridCfg.rowsMax;
+        const gridWrap = el('div', 'build-grid');
+        buildGrid.cells.forEach((cell, i) => {
+            const slot = (cell && Number.isInteger(cell.slot)) ? cell.slot : null;
+            const f = slot === null ? null : state.facilities[slot];
+            const dataset = { cell: String(i) };
+            if (f && slot !== null) dataset.slot = String(slot);
+            const label = f ? (FACILITY_LABELS[f.type] || f.type) : '空位';
+            const sub = f ? `Lv${f.level} · 位${slot + 1}` : `格 ${i + 1}`;
+            gridWrap.appendChild(createButton({
+                label, sub,
+                variant: f ? 'default' : 'ghost',
+                className: `build-grid__cell${f ? ' is-built' : ' is-empty'}`,
+                title: f ? `${label} Lv${f.level}（设施位 ${slot + 1}）` : `第 ${i + 1} 格：空位`,
+                dataset,
+            }));
+        });
+        const gridChildren = [gridWrap];
+
+        // 扩建只走既有通道 `sys_buildPurchase({type:'expand'})`（相位校验 / 料账本 / 应用 / 重绘 / 存档都在那里）。
+        const expandAction = { type: 'expand' };
+        const expandPrice = priceOf(expandAction);
+        const atMax = buildGrid.rows >= rowsMax;
+        const matOk = hasMaterialsFor(expandPrice && expandPrice.materials, stock);
+        const crystalOk = !!expandPrice && have.crystal >= expandPrice.crystal;
+        const canExpand = !atMax && !!expandPrice && crystalOk && matOk;
+        const expandTitle = atMax
+            ? `已到上限 ${rowsMax} 行`
+            : (!expandPrice
+                ? '当前不可扩建'
+                : (!crystalOk
+                    ? `缺 💎 ${expandPrice.crystal - have.crystal}（需 ${expandPrice.crystal}💎）`
+                    : (!matOk ? shortfallTitle(expandPrice.materials, stock) : `扩建 +1 行（+${buildGrid.cols} 格，${buildGrid.rows + 1} 行）`)));
+        gridChildren.push(createButton({
+            label: atMax ? '已到上限' : '扩建 1 行',
+            variant: canExpand ? 'primary' : 'ghost',
+            className: 'build-grid__expand',
+            disabled: !canExpand,
+            title: expandTitle,
+            children: expandPrice ? [
+                createPriceTag({ crystal: expandPrice.crystal, haveCrystal: have.crystal }),
+                materialPriceTag(expandPrice.materials, stock),
+            ] : [],
+            onClick: buy(expandAction),
+            dataset: { buy: 'expand' },
+        }));
+        // 这一批网格只承载「哪一格有什么」：挪设备与「未落格后勤不计产能」在下一批接入。
+        gridChildren.push(el('p', 'build-locked-note', { text: '摆放 / 产能联动（未落格后勤不计产能）在下一批接入；本批网格只读。' }));
+        const gridPanel = createPanel({
+            title: '工厂网格',
+            hint: `${buildGrid.cols} 列 · ${buildGrid.rows}/${rowsMax} 行 · ${buildGrid.cells.length} 格`,
+            children: gridChildren,
+            id: 'build-grid',
+        });
+        // `--build-grid-cols` 设在 `#build-grid` 上，`.build-grid` 子容器继承（列数只此一处来源）。
+        // 用 setAttribute 写内联自定义属性：真实 DOM 与测试夹具（只有 setAttribute，没有 style 对象）都能落地。
+        gridPanel.setAttribute('style', `--build-grid-cols: ${buildGrid.cols};`);
+        scroll.appendChild(gridPanel);
 
         // ---------- 道具 ----------
         const itemsCfg = cfg().items || {};
