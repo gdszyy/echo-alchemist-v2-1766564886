@@ -117,11 +117,10 @@ const TUTORIAL_STEPS = [
         phase: 'gathering',
         targetId: null,
         highlightSelector: null,
-        title: '挖掘阶段 — 两批弹珠',
+        title: '挖掘阶段 — 采集弹珠',
         content: `
-            <p>每一波先挖一次，共<strong>两次发射</strong>，先发哪批由你决定。</p>
+            <p>每一波先挖一次，<strong>发射一次</strong>。</p>
             <p class="mt-2">⚡ <strong>采集 ×5</strong>：5 颗弹珠从同一位置落下，每碰一次钉子得<strong>能量</strong>。</p>
-            <p class="mt-2">🧪 <strong>炼成弹珠</strong>：只有它拾取钉子属性（最多 3 种 × 3 级），落地炼成 1 发<strong>炼成弹</strong>。</p>
         `,
         position: 'narrow-safe',    // 窄屏：贴在批次按钮上方，不压按钮
         narrowAnchor: 'above-dock',
@@ -141,9 +140,8 @@ const TUTORIAL_STEPS = [
         highlightSelector: null,
         title: '挖掘阶段 — 怎么发射',
         content: `
-            <p>先点<strong>右下角</strong>的按钮选好要发的那一批，再点<strong>钉板上方区域</strong>发射。</p>
-            <p class="mt-2">两批都落定后进入<strong>整备</strong>。</p>
-            <p class="mt-2 text-amber-300/80 text-xs">💡 战斗中点弹匣里的炼成弹，可把下一发主炮换成它。</p>
+            <p>点<strong>钉板上方区域</strong>发射采集弹珠。</p>
+            <p class="mt-2">弹珠全部落定后进入<strong>整备</strong>。</p>
         `,
         position: 'narrow-safe',    // 窄屏：贴在投放区下沿，不压批次按钮
         narrowAnchor: 'below-launch',

@@ -380,7 +380,6 @@ class Game {
         // [REQ-20261022-wave-loop S1] 局内碎片并入「能量」：runFragments 是 energy 的别名（见文件末尾访问器）。
         this.runFragments = 0;
         this.crystal = 0;                 // 晶核（稀有资源，S1 仅 Boss 击杀 +3）
-        this.alchemyMagazine = [];        // 炼成弹匣（上限 CONFIG.gameplay.alchemy.magazineCap）
         this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
         this._digDoneRound = null;        // 本回合是否已完成挖掘（§3：每波只挖一次）
         this.sys_initBuildState();        // [S2] 主炮三轨 / 设施 / 道具 / 挖矿升级 / digCount

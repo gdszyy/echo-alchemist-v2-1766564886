@@ -2,7 +2,7 @@
  * defend_hud.js - [REQ-20261022-wave-loop S2 / R2] 守卫 HUD（#defend-hud，挂在 #phase-combat 内）mixin。
  *
  * 位置：底部发射台上方，左侧设施条（每座设施：占位图标 + 冷却格，触发时脉冲），右侧 2 个道具按钮。
- * 中间列留空，不遮挡发射器与瞄准（art §6.2「守卫」）。弹匣沿用 S1 的 .alchemy-magazine-row（左下弹药舱）。
+ * 中间列留空，不遮挡发射器与瞄准（art §6.2「守卫」）。弹药/道具读数走左下弹药舱（原 S1 的「炼成弹匣按钮行」`.alchemy-magazine-row` 已于 2026-10-26 随炼成弹珠机制下线，本 HUD 不再渲染它）。
  * 触发反馈只用 CSS 步进动画（无 shadowBlur、不画在敌人身上）。
  */
 import { CONFIG } from '../config.js';

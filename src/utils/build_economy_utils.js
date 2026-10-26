@@ -592,19 +592,3 @@ export function getCollectorPayout(facilities, cfg = {}) {
     }
     return total;
 }
-
-/**
- * 满匣处理（§5.3）：在整备阶段二选一——替换第 i 发，或丢弃新弹。
- * @param {object[]} mag - 当前弹匣（已满）
- * @param {object} shot - 新炼成弹
- * @param {{ replace:number } | 'discard'} choice
- * @returns {object[] | null} 新弹匣；choice 非法时返回 null
- */
-export function resolveMagazineOverflow(mag, shot, choice) {
-    const list = _list(mag).slice();
-    if (choice === 'discard' || (choice && choice.discard)) return list;
-    const i = choice && Number.isInteger(choice.replace) ? choice.replace : -1;
-    if (i < 0 || i >= list.length || !shot) return null;
-    list[i] = shot;
-    return list;
-}

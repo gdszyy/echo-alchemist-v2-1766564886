@@ -287,6 +287,12 @@
 .build-item-btn { justify-content: flex-start; }
 .build-item-btn .ui-price { margin-left: auto; }
 
+/* [2026-10-26] 「炼成弹匣」面板与「满匣单选卡」随炼成弹珠机制下线（Owner 裁定）：
+   `.build-mag__resolve`（满匣处理按钮）与 `.build-overflow__btn`（满匣单选卡按钮）已无任何使用者，删除。
+   但 `.build-mag` / `.build-mag__slot` / `.build-mag__slot.is-full` **不是弹匣专用**：`src/ui/components/wave_ammo.js`
+   的「本波弹药」面板一直在复用它们（`createMaterialCard` 注释明写「复用 .build-mag__slot.is-full 的实心卡形态」，
+   `createLimitChip` / `createWaveAmmoPanel` 也直接挂这两个类名）。这两组样式先随弹匣被删过一次，
+   会让「现有料」格子失去三列栅格与实心卡形态 ⇒ 已恢复为下线前的原始定义（内容与 HEAD 版本一致，未改数值）。 */
 .build-mag { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
 .build-mag__slot {
     min-height: 32px;
@@ -300,13 +306,11 @@
     overflow: hidden;
 }
 .build-mag__slot.is-full { border-style: solid; color: var(--c-text); background: var(--c-bg-2); }
-.build-mag__resolve { width: 100%; }
 
 .build-picker__btn { justify-content: flex-start; width: 100%; text-align: left; }
 .build-picker__btn .ui-price { margin-left: auto; }
 .build-picker__text { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
 .build-picker__text small { color: var(--c-text-dim); font-size: var(--fs-xs); white-space: normal; }
-.build-overflow__btn { width: 100%; justify-content: space-between; }
 
 /* 容器断点：≤375 收紧；≥430 放宽；480（PC 竖屏上限）道具与分支 4 列 */
 @container build (max-width: 375px) {
@@ -372,6 +376,70 @@
     color: var(--c-energy);
     pointer-events: none;
 }
+
+/* ============== 挖掘/整备页：本次采集的元素素材读数 #element-collect-readout ==============
+   [2026-10-26] Owner 要求「收集完后在底部标明本次收集的素材里哪些跟元素挂钩」。
+   移动端红线：不得出现横向滚动 —— 本容器只用 flex-wrap 折行，不写 overflow-x:auto/scroll，
+   也不设固定宽度；`max-width` 用百分比，窄屏（360/375）自动换行而不是溢出。
+   `pointer-events:none` ⇒ 底部弹药 / 操作条照常可读可点；`bottom` 由 JS 按锚点高度量出，
+   CSS 只给兜底值，不改锚点几何。 */
+#element-collect-readout.element-collect-readout {
+    position: absolute;
+    bottom: calc(var(--px) * 4);          /* 兜底；JS 拿到锚点高度后会覆盖成 锚点高 + 6px */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-hud);
+    display: none;
+    box-sizing: border-box;
+    max-width: calc(100% - var(--s6) * 2);
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s1) var(--s2);
+    padding: var(--s1) var(--s2);
+    border: var(--px) solid var(--c-outline);
+    background: var(--c-bg-1);
+    font-family: var(--font-pixel);
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    color: var(--c-text);
+    text-align: center;
+    pointer-events: none;
+}
+#element-collect-readout.element-collect-readout.is-visible { display: flex; }
+.element-collect-readout__label {
+    color: var(--c-text-dim);
+    white-space: nowrap;
+}
+.element-collect-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--px);
+    padding: 0 var(--s1);
+    border: var(--px) solid currentColor;
+    background: var(--c-bg-0);
+    white-space: nowrap;                  /* 单个角标不拆字；角标之间靠父级 flex-wrap 折行 */
+}
+
+/* [2026-10-27 修] 整备屏的读数改为「流内一行」，不再绝对定位。
+   原绝对定位版把 `bottom` 按 footer 高度上抬，落点正好在 `.build-scroll` 的可视下沿，
+   `z-index:var(--z-hud)` 又高于面板 ⇒ 实测 360 / 375 两档会盖住滚动区最后一行文字（视觉回退）。
+   改成流内后：父级 `#build-screen-root` 是 flex 列、`.build-scroll` 是 `flex:1 1 auto`，
+   读数占掉自己那一行，滚动区自动让位，内容不再被遮；读数本身照常显示。
+   `max-width:100%` + 已有 `flex-wrap:wrap` ⇒ 窄屏折行而不是撑出横向滚动（Owner 红线）。
+   左右边框去掉，让它读作一条贴边的窄条，而不是浮在面板上的卡片。 */
+#element-collect-readout.element-collect-readout.is-flow {
+    position: static;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    align-self: stretch;
+    max-width: 100%;
+    margin: 0;
+    border-left: 0;
+    border-right: 0;
+}
+
 
 /* =====================================================================================
    炼金工坊（#phase-shop）窄屏整改 —— 375 / 360 档三条移动端红线

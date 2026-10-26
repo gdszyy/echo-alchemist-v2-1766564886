@@ -49,7 +49,7 @@ import {
 } from './pinboard_modules.js';
 import { calc_getCirclePolygonCollision, calc_getCircleArcCollision } from './combat/collision_shapes.js';
 import { BOSS_WAVE_IN_PROGRESS } from './utils/boss_schedule_utils.js';
-import { alchemyDamage, capAlchemyCollection } from './utils/dig_loop_utils.js';
+// [2026-10-26] 「炼成弹珠」机制下线（Owner 裁定）后本文件不再需要 dig_loop_utils 的炼成辅助函数。
 // [REQ-20261022-wave-loop 料闭环] 随机属性钉取值域收敛到**唯一**共享常量（冻结单 v3 §6.3-3）：
 // 与 pinboard_modules.getRandomPegTypeFromWeights 同源，本文件不再持有本地副本。
 import { RANDOMIZABLE_PEG_TYPES } from './utils/peg_type_pool.js';
@@ -547,8 +547,10 @@ function drawBottomRewardZones(ctx, zones) {
 }
 
 /**
- * [REQ-20261022-wave-loop S1] 每次挖掘的弹珠队列（§6）：collectorCount 颗采集弹珠 + 1 颗炼成弹珠。
- * 所有弹珠类型相同（'white'），只用 role 区分「采集」与「炼成」；切片取消弹珠类型权重（§5.3）。
+ * [REQ-20261022-wave-loop S1] 每次挖掘的弹珠队列（§6）：collectorCount 颗采集弹珠。
+ * 所有弹珠类型相同（'white'）；切片取消弹珠类型权重（§5.3）。
+ * [2026-10-26] 「炼成弹珠」机制下线（Owner 裁定：研磨阶段已改成采集阶段，不存在专门做子弹的弹珠），
+ *   队列不再追加炼成弹珠，一次挖掘只发一批；role 仍留 'collector'，供读者判断是否为挖掘队列。
  */
 function buildDigMarbleQueue() {
     const digCfg = (CONFIG.gameplay && CONFIG.gameplay.dig) || {};
@@ -559,14 +561,11 @@ function buildDigMarbleQueue() {
         def.role = 'collector';
         queue.push(def);
     }
-    const alchemyDef = new MarbleDefinition('white');
-    alchemyDef.role = 'alchemy';
-    queue.push(alchemyDef);
     return queue;
 }
 
 function isDigMarbleQueue(queue) {
-    return Array.isArray(queue) && queue.some(def => def && (def.role === 'collector' || def.role === 'alchemy'));
+    return Array.isArray(queue) && queue.some(def => def && def.role === 'collector');
 }
 
 export const game_phase = {
@@ -648,15 +647,15 @@ export const game_phase = {
         if (typeof this.sys_resetWaveMaterialCounters === 'function') this.sys_resetWaveMaterialCounters();
 
         // [REQ-20261022-wave-loop S1] 混沌契约（跳过研磨）已随遗物下线；每波都要挖（D1）。
-        // 队列为空（存档恢复 / 异常路径）时补一套挖掘队列（采集 ×N + 炼成 ×1），而不是旧的随机弹珠。
+        // 队列为空（存档恢复 / 异常路径）时补一套挖掘队列（采集 ×N），而不是旧的随机弹珠。
         if (!Array.isArray(this.marbleQueue) || this.marbleQueue.length === 0) {
             this.marbleQueue = buildDigMarbleQueue();
             this.marblesPool = this.marbleQueue.slice();
             this.selectedMarbles = this.marbleQueue.map((_, idx) => idx);
         }
-        // 挖掘状态：两批（采集 / 炼成）各发射一次，先发哪批由玩家决定（§6）。
+        // 挖掘状态：只一批（采集），发过一次即等落定。[2026-10-26] 「炼成弹珠」下线后不再是两批。
         this._digState = isDigMarbleQueue(this.marbleQueue)
-            ? { launched: { collector: false, alchemy: false }, selectedKind: 'collector', completed: false }
+            ? { launched: false, completed: false }
             : null;
 
         this.phase_switchPhase('gathering');
@@ -2164,7 +2163,6 @@ phase_gathering_getRandomPegType() {
         }
 
         // [REQ-20261022-wave-loop S1] 主炮：每回合固定 N 发无限弹药（§5.1），不再从弹珠队列编译子弹。
-        // 炼成弹不进 ammoQueue，存放在 alchemyMagazine，战斗中由 sys_swapNextShotWithAlchemy 替换下一发主炮。
         {
             // [REQ-20261022-wave-loop S2] 射击次数 / 伤害 / 反弹 / 分支统一取 sys_getCannonStats（主炮三轨 + 分支）；
             // cannonShotsPerTurn 只是派生镜像（S1 存档兼容）。
@@ -2341,7 +2339,7 @@ phase_gathering_getRandomPegType() {
             game: this,
             marbleIndex,
             marbleDef,
-            // [REQ-20261022-wave-loop S1] 'collector'：只挖能量、不拾取属性；'alchemy'：拾取属性炼成 1 发炼成弹
+            // [REQ-20261022-wave-loop S1] 'collector'：只挖能量、不拾取属性（[2026-10-26] 炼成弹珠下线，role 只剩这一档）
             role: marbleDef.role || null,
             collected: [...inheritedCollected, ...runeSlotCollected],
             multicast: 0, // 多重施法已删除（§5.1）
@@ -2360,23 +2358,20 @@ phase_gathering_getRandomPegType() {
         return session;
     },
 
-    phase_gathering_launchMarbleBatch(pos, kind = null) {
+    phase_gathering_launchMarbleBatch(pos) {
         const allQueue = Array.isArray(this.marbleQueue) ? this.marbleQueue : [];
         if (allQueue.length === 0) return false;
 
-        // [REQ-20261022-wave-loop S1] 挖掘：采集批（同一 x 一批）与炼成弹珠各发射一次，会话追加而不是重置。
+        // [REQ-20261022-wave-loop S1] 挖掘：整个采集批（同一 x 一批）一次发射，会话追加而不是重置。
+        // [2026-10-26] 「炼成弹珠」下线后只剩一批，不再有批次选择，也不再记「下一批发哪一档」。
         const digState = this._digState;
         if (digState && isDigMarbleQueue(allQueue)) {
-            const launchKind = kind || digState.selectedKind
-                || (!digState.launched.collector ? 'collector' : 'alchemy');
-            if (!['collector', 'alchemy'].includes(launchKind) || digState.launched[launchKind]) return false;
+            if (digState.launched) return false;
             const batch = allQueue
                 .map((marbleDef, marbleIndex) => ({ marbleDef, marbleIndex }))
-                .filter(entry => entry.marbleDef && entry.marbleDef.role === launchKind);
+                .filter(entry => entry.marbleDef && entry.marbleDef.role === 'collector');
             if (batch.length === 0) return false;
-            digState.launched[launchKind] = true;
-            const nextKind = launchKind === 'collector' ? 'alchemy' : 'collector';
-            digState.selectedKind = digState.launched[nextKind] ? null : nextKind;
+            digState.launched = true;
             if (!Array.isArray(this.gatheringSessions)) this.gatheringSessions = [];
 
             const spread = Math.min(30, Math.max(16, this.width / 18));
@@ -2393,9 +2388,6 @@ phase_gathering_getRandomPegType() {
                 this._updateDropDistribution(spawnX);
             });
             this.currentSession = this.gatheringSessions[this.gatheringSessions.length - 1] || null;
-            if (launchKind === 'alchemy') {
-                this.activeMarbleIndex = batch[0].marbleIndex;
-            }
             this.ui_updateGatheringQueueUI();
             this.ui_renderRecipeHUD();
             if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
@@ -2485,9 +2477,8 @@ phase_gathering_getRandomPegType() {
             // 原阈值 0.4 仅覆盖屏幕上方 40%，导致点击钉盘中下部区域时被错误路由到倾斜模式。
             // 底部手柄区域（height - 40 ± 40px）已在 input_handleInputStart 中提前拦截，无需在此重复判断。
             if (pos.y < this.height * 0.85) {
-                // [REQ-20261022-wave-loop S1] 上方区域：发射当前选中的一批（采集 ×N / 炼成弹珠），每批每次挖掘只能发一次。
-                const digKind = this._digState ? this._digState.selectedKind : null;
-                this.phase_gathering_launchMarbleBatch(pos, digKind);
+                // [REQ-20261022-wave-loop S1] 上方区域：发射采集批（[2026-10-26] 炼成弹珠下线后只剩这一批，每次挖掘只能发一次）。
+                this.phase_gathering_launchMarbleBatch(pos);
             } else {
                 // ---  下方区域：进入“抓取倾斜”模式，暂不报错 ---
                 this.isTiltingGrip = true;
@@ -2847,14 +2838,8 @@ phase_gathering_getRandomPegType() {
         this._chargeUpgradeApplied = true;
 
         // [REQ-20261022-wave-loop S1 · D7] 围墙清空不再抽奖、不再刷精英援军（不惩罚打得好）。
-        // 未发射的炼成弹回到弹匣；剩余主炮射击作废（主炮无限弹药，下回合重新装填）。
-        const remaining = Array.isArray(this.ammoQueue) ? this.ammoQueue : [];
-        const returnedAlchemy = remaining.filter(r => r && r._shotKind === 'alchemy');
-        if (returnedAlchemy.length > 0) {
-            if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
-            this.alchemyMagazine.push(...returnedAlchemy);
-        }
-
+        // 剩余主炮射击作废（主炮无限弹药，下回合重新装填）。
+        // [2026-10-26] 「炼成弹珠」下线后不再有「未发射的炼成弹退回弹匣」这一支。
         if (typeof this.data_clearProjectiles === 'function') {
             this.data_clearProjectiles();
         }
@@ -2862,9 +2847,7 @@ phase_gathering_getRandomPegType() {
         this._inWallClearLotteryActive = false;
         if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
         if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
-        showToast(returnedAlchemy.length > 0
-            ? `围墙清空！${returnedAlchemy.length} 发炼成弹已退回弹匣`
-            : '围墙清空！');
+        showToast('围墙清空！');
     },
 
 /**
@@ -4367,7 +4350,6 @@ phase_gathering_getRandomPegType() {
 
         const digState = this._digState;
         const isDigRound = !!digState && isDigMarbleQueue(this.marbleQueue);
-        const alchemyCfg = (CONFIG.gameplay && CONFIG.gameplay.alchemy) || {};
 
         pendingSessions.forEach(session => {
             session.isFinished = true;
@@ -4376,43 +4358,9 @@ phase_gathering_getRandomPegType() {
             if (!marbleDef) return;
 
             // [REQ-20261022-wave-loop S1] 采集弹珠只挖能量（能量在能量球到达时已入账），不产出子弹。
+            // 拾取到的素材已由拾取处直接写进 `marbleDef.collected`（见本文件 `session.collected.push` 的同一分支），
+            // 底部「本次采集的元素素材」读数只读这份数据，这里不覆盖、不重算。
             if (session.role === 'collector') return;
-
-            // [REQ-20261022-wave-loop S1] 炼成弹珠：封顶 3 种 × 3 级 → 1 发炼成弹，伤害炼成时锁定（§5.3）。
-            if (session.role === 'alchemy') {
-                const rawCollected = [...session.collected]
-                    .filter(item => !(item && typeof item === 'object' && item.source === 'rune_slot'));
-                marbleDef.collected = rawCollected;
-                const capped = capAlchemyCollection(rawCollected, alchemyCfg.maxTypes ?? 3, alchemyCfg.maxLevel ?? 3);
-                if (capped.totalLevels <= 0) {
-                    showToast('空瓶：炼成弹珠没有拾取到属性，本次不入匣');
-                    return;
-                }
-                const recipe = this.calc_compileCollectionToRecipe(marbleDef, capped.items, false);
-                recipe.damage = alchemyDamage(capped.totalLevels, alchemyCfg.base ?? 15);
-                recipe.multicast = 0;
-                recipe.finalHits = 0;
-                recipe._shotKind = 'alchemy';
-                recipe._alchemyLevels = capped.totalLevels;
-                recipe._alchemyGroups = capped.groups.map(g => ({ ...g }));
-                if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
-                const cap = Math.max(1, Math.floor(alchemyCfg.magazineCap || 3));
-                // [REQ-20261022-wave-loop S2 · §5.3] 满匣不再丢最旧一发：暂存新弹，整备阶段弹出「替换哪一发 / 丢弃新弹」单选卡，
-                // 未处理前 sys_commitBuild 不放行。
-                if (this.alchemyMagazine.length >= cap) {
-                    this._pendingAlchemyOverflow = recipe;
-                } else {
-                    this.alchemyMagazine.push(recipe);
-                }
-                const label = capped.groups.map(g => {
-                    const display = CONFIG.ui.attributeDisplay[g.type];
-                    return `${(display && display.name) || g.type}${g.level}`;
-                }).join(' + ');
-                showToast(this._pendingAlchemyOverflow === recipe
-                    ? `弹匣已满：${label} · 伤害 ${recipe.damage}，整备时选择替换或丢弃`
-                    : `炼成弹入匣：${label} · 伤害 ${recipe.damage}`);
-                return;
-            }
 
             marbleDef.collected = [...session.collected]
                 .filter(item => !(item && typeof item === 'object' && item.source === 'rune_slot'));
@@ -4433,8 +4381,9 @@ phase_gathering_getRandomPegType() {
         if (isDigRound) {
             this.ui_updateGatheringQueueUI();
             this.ui_renderRecipeHUD();
-            // 两批都发射完、且全部落定后才进入战斗；否则等待玩家发射另一批。
-            if (!digState.launched.collector || !digState.launched.alchemy) {
+            // 采集批发射过、且全部落定后才进入整备；没发射过就等玩家点钉板。
+            // [2026-10-26] 「炼成弹珠」下线后只有一批，原来的「两批都发完」判据会让流程永远等不到第二批发 ⇒ 改单批判据。
+            if (!digState.launched) {
                 if (typeof this.ui_renderDigLaunchToggle === 'function') this.ui_renderDigLaunchToggle();
                 return;
             }

@@ -1007,8 +1007,6 @@ const readoutFull = { pyro: 9, cryo: 9, beast: 4, spent: { pyro: 3, cryo: 0 }, s
         digCount: 3,
         round: 3,
         enemies: [],
-        alchemyMagazine: [],
-        _pendingAlchemyOverflow: null,
         _pendingBossSpawn: false,
         _facilityPulse: null,
         sys_getBuildState: () => ({
@@ -1045,8 +1043,8 @@ const readoutFull = { pyro: 9, cryo: 9, beast: 4, spent: { pyro: 3, cryo: 0 }, s
     //   改为断言**精确 id 全序**：同守「弹药块紧随两处建造面、不落到主炮之下」，且更严 ——
     //   任意两块互换、或中间插进 / 少掉任何一块都会红；下面再单独留一条相对序断言把意图写死。
     const panelIds = panels.map(n => n.id).join(',');
-    check(panelIds === 'build-facilities,build-grid,build-ammo,build-cannon,build-items,build-mining,build-magazine',
-        `冒烟：滚动区面板全序为「设施→工厂网格→本波弹药→主炮→道具→挖矿→弹匣」（实测：${panelIds}）`);
+    check(panelIds === 'build-facilities,build-grid,build-ammo,build-cannon,build-items,build-mining',
+        `冒烟：滚动区面板全序为「设施→工厂网格→本波弹药→主炮→道具→挖矿」（实测：${panelIds}）`);
     const ammoAt = panels.findIndex(n => n.id === 'build-ammo');
     const cannonAt = panels.findIndex(n => n.id === 'build-cannon');
     check(ammoAt >= 0 && cannonAt >= 0 && ammoAt < cannonAt,
@@ -1063,8 +1061,6 @@ const readoutFull = { pyro: 9, cryo: 9, beast: 4, spent: { pyro: 3, cryo: 0 }, s
         digCount: 1,
         round: 1,
         enemies: [],
-        alchemyMagazine: [],
-        _pendingAlchemyOverflow: null,
         _pendingBossSpawn: false,
         _facilityPulse: null,
         sys_getBuildState: () => ({
@@ -1117,8 +1113,6 @@ const readoutFull = { pyro: 9, cryo: 9, beast: 4, spent: { pyro: 3, cryo: 0 }, s
             digCount: wave,
             round: wave,
             enemies: [],
-            alchemyMagazine: [],
-            _pendingAlchemyOverflow: null,
             _pendingBossSpawn: false,
             _facilityPulse: null,
             sys_getBuildState: () => ({

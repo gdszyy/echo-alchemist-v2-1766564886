@@ -14,7 +14,7 @@
  *    · peakAvg 血量混合（`spawn_system.js:464-473`，只在有历史伤害时生效）
  *    · 战后高压因子 postBossMultiplier、nextRoundHpMultiplier
  *    · 护盾层数（`spawn_system.js:788` shieldCharges = 1 + round，未计入所需血量）
- *    · 炼成弹（alchemyMagazine 替换主炮）、遗物、词条、分支弹
+ *    · 遗物、词条、分支弹
  *    ⇒ 所以「所需」是**下界偏乐观**的估计（未算护盾与自适应上调），
  *      「可用」是**参考建设剖面**（见 PROFILES），不是实测可达路径。
  *

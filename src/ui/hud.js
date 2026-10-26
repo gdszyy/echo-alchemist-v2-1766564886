@@ -718,9 +718,6 @@ export const hud_system = {
                 const inheritCard = this._buildInheritanceCard();
                 if (inheritCard) combatHud.appendChild(inheritCard);
 
-                // [REQ-20261022-wave-loop S1] 炼成弹匣按钮行
-                this.ui_renderAlchemyMagazine(combatHud);
-
                 // [REQ-20261022-wave-loop S3] 本波弹药读数（常显：剩 N 发 · 打空即换波）
                 this._hud_renderWaveReadout();
             }
@@ -739,7 +736,9 @@ export const hud_system = {
             if (gatheringHud && this.phase === 'gathering') {  // [Mixin 正常用法：读取 Game 实例状态]
                 gatheringHud.innerHTML = ''; 
                 this.marbleQueue.forEach((item, idx) => {  // [Mixin 正常用法：读取 Game 实例状态]
-                    // [REQ-20261022-wave-loop S1] 采集弹珠不拾取属性，只展示炼成弹珠的配方卡
+                    // [REQ-20261022-wave-loop S1] 采集弹珠不拾取属性，也不产出配方卡 ⇒ 本容器在本轮挖掘里保持空。
+                    // [2026-10-26] 「炼成弹珠」下线后队列里只剩采集弹珠，下面这行对每条都成立（容器不再有内容，
+                    //   也不会出现横向滚动）；判定保留是为了旧存档里的非采集弹珠仍能照常出卡。
                     if (item && item.role === 'collector') return;
                     const isActive = idx === this.activeMarbleIndex;  // [Mixin 正常用法：读取 Game 实例状态]
                     this.ui_renderRecipeCard(gatheringHud, item, isActive, isActive ? 'current' : 'queue'); 
@@ -920,71 +919,6 @@ export const hud_system = {
             const start = Number.isFinite(this._digEnergyStart) ? this._digEnergyStart : energy;
             digValue.textContent = `+${Math.max(0, energy - Math.floor(start))}`;
         }
-    },
-
-    /**
-     * @method _hud_formatAlchemyLabel
-     * @description 炼成弹按钮文案：属性图标 + 级数，后跟伤害（例：🔥2❄️1 · 75）。
-     */
-    _hud_formatAlchemyLabel(recipe) {
-        if (!recipe) return '';
-        const groups = Array.isArray(recipe._alchemyGroups) ? recipe._alchemyGroups : [];
-        const display = (CONFIG.ui && CONFIG.ui.attributeDisplay) || {};
-        const parts = groups.map(g => `${(display[g.type] && display[g.type].icon) || g.type}${g.level}`);
-        return `${parts.join('') || '炼成'} · ${Math.floor(recipe.damage || 0)}`;
-    },
-
-    /**
-     * @method ui_renderAlchemyMagazine
-     * @description [REQ-20261022-wave-loop S1] 战斗中在弹药 HUD 内渲染炼成弹匣按钮行：
-     *   每发炼成弹一个按钮，点击把下一发主炮换成该炼成弹（不额外占射击次数）；
-     *   若下一发已是炼成弹，显示「换回主炮」按钮。
-     */
-    ui_renderAlchemyMagazine(container = null) {
-        if (typeof document === 'undefined') return;
-        const host = container || document.getElementById('recipe-hud-container');
-        if (!host) return;
-        const old = host.querySelector('.alchemy-magazine-row');
-        if (old) old.remove();
-        if (this.phase !== 'combat') return;
-        // [REQ-20261022-wave-loop S2] 道具按钮的可用条件与换弹一致，随弹药 HUD 一起刷新
-        if (typeof this.ui_renderDefendHud === 'function') this.ui_renderDefendHud();
-        const magazine = Array.isArray(this.alchemyMagazine) ? this.alchemyMagazine : [];
-        const head = Array.isArray(this.ammoQueue) ? this.ammoQueue[0] : null;
-        const headIsAlchemy = !!(head && head._shotKind === 'alchemy');
-        if (magazine.length === 0 && !headIsAlchemy) return;
-
-        const canSwap = typeof this.sys_canSwapAlchemyShot === 'function' ? this.sys_canSwapAlchemyShot() : false;
-        const row = document.createElement('div');
-        row.className = 'alchemy-magazine-row';
-        if (headIsAlchemy) {
-            const back = document.createElement('button');
-            back.type = 'button';
-            back.className = 'alchemy-magazine-btn is-loaded';
-            back.textContent = `已装填 ${this._hud_formatAlchemyLabel(head)} ↩`;
-            back.title = '把下一发换回主炮，炼成弹放回弹匣';
-            back.disabled = !canSwap;
-            back.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.sys_swapNextShotWithAlchemy(-1);
-            });
-            row.appendChild(back);
-        }
-        magazine.forEach((recipe, idx) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'alchemy-magazine-btn';
-            btn.dataset.magazineIndex = String(idx);
-            btn.textContent = this._hud_formatAlchemyLabel(recipe);
-            btn.title = headIsAlchemy ? '先换回主炮再选择其他炼成弹' : '把下一发主炮换成这发炼成弹';
-            btn.disabled = !canSwap || headIsAlchemy;
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.sys_swapNextShotWithAlchemy(idx);
-            });
-            row.appendChild(btn);
-        });
-        host.appendChild(row);
     },
 
     // ==================== [REQ-20261022-wave-loop S3] 本波弹药读数 + 换波结论 ====================
@@ -1243,8 +1177,12 @@ export const hud_system = {
 
     /**
      * @method ui_renderDigLaunchToggle
-     * @description [REQ-20261022-wave-loop S1] 挖掘阶段发射选择：「采集 ×5」/「炼成弹珠」。
-     *   按钮只切换「下一次点击钉板发射哪一批」，已发射的一批显示为划线且不可再选。
+     * @description [REQ-20261022-wave-loop S1] 挖掘阶段发射按钮：「采集 ×N」。
+     *   [2026-10-26] 「炼成弹珠」机制下线（Owner 裁定：研磨阶段已改成采集阶段，不存在专门做子弹的弹珠），
+     *   每次挖掘只剩一批 ⇒ 不再有「选哪一批」的切换，按钮直接从「点击发射」退化为「一键发射」：
+     *   点它等同于点钉板上方区域；已发射后置 `.is-launched` 并禁用。
+     *   容器 id/类 `dig-launch-toggle` 保持不变——教程窄屏卡片以它为锚点（tutorial_system narrowDock），
+     *   且 `index.html` 里 `.dig-launch-btn.is-launched` 那条「全发完就收起引导语」的规则也依赖这个类名。
      */
     ui_renderDigLaunchToggle() {
         if (typeof document === 'undefined') return;
@@ -1266,26 +1204,176 @@ export const hud_system = {
         bar.style.display = 'flex';
         bar.innerHTML = '';
         const collectorCount = Math.max(1, (CONFIG.gameplay.dig && CONFIG.gameplay.dig.collectorCount) || 5);
-        const kinds = [
-            { kind: 'collector', label: `采集 ×${collectorCount}` },
-            { kind: 'alchemy', label: '炼成弹珠' },
-        ];
-        kinds.forEach(({ kind, label }) => {
-            const launched = !!(dig.launched && dig.launched[kind]);
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = `dig-launch-btn${dig.selectedKind === kind && !launched ? ' is-selected' : ''}${launched ? ' is-launched' : ''}`;
-            btn.textContent = launched ? `${label} ✓` : label;
-            btn.disabled = launched;
-            btn.title = launched ? '本次挖掘已发射' : '选择后点击钉板上方区域发射';
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (launched || !this._digState) return;
-                this._digState.selectedKind = kind;
-                this.ui_renderDigLaunchToggle();
-            });
-            bar.appendChild(btn);
+        const launched = !!(dig && dig.launched);
+        const label = `采集 ×${collectorCount}`;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `dig-launch-btn${launched ? ' is-launched' : ''}`;
+        btn.textContent = launched ? `${label} ✓` : label;
+        btn.disabled = launched;
+        btn.title = launched ? '本次挖掘已发射' : '点击发射本次采集';
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!this._digState || this._digState.launched) return;
+            // 与「点钉板上方区域」同一条路径，只是落点取屏幕中线（按钮本身不带坐标）。
+            if (typeof this.phase_gathering_launchMarbleBatch === 'function') {
+                this.phase_gathering_launchMarbleBatch({ x: (this.width || 400) / 2 });
+            }
         });
+        bar.appendChild(btn);
+    },
+
+    // ==================== [2026-10-26] 本次采集的元素素材读数 ====================
+    // 依据（Owner 2026-10-26 原话）：「素材的收集是跟元素有关系的，所以收集完后，最好在底部标明一下
+    //   本次收集的素材中，有哪些是跟元素挂钩的。」
+    // 元素口径取与弹药配方 `elements` 完全同一组键：pyro / cryo / lightning
+    //   （`src/config.js:1159` 写的是 `elements: { pyro: 1, cryo: 0, lightning: 0 }`），不另起别名。
+    // 只读既有数据：挖掘时 DropBall 已把拾取项追加到 `this.marbleQueue[].def.collected`
+    //   （`src/entities.js:2632-2633`、`src/game_phase.js:4750`），本读数不写 elements、
+    //   不改素材字段语义、不参与任何结算。
+
+    /** @returns {string[]} 元素素材键（与弹药配方 `elements` 同键）。 */
+    _hud_elementMaterialKeys() {
+        return ['pyro', 'cryo', 'lightning'];
+    },
+
+    /**
+     * @method _hud_collectElementTally
+     * @description 汇总本次挖掘（本波 `marbleQueue`）里与元素挂钩的拾取项，按元素计数。
+     *   每波进入采集阶段时 `sys_startDigPhase` 重建 `marbleQueue`，因此这个汇总额天然就是「本次」。
+     *   条目形态既可能是字符串，也可能是 `{ type, level, source }`，两种都读。
+     * @returns {{pyro:number, cryo:number, lightning:number, total:number}}
+     */
+    _hud_collectElementTally() {
+        const tally = { pyro: 0, cryo: 0, lightning: 0 };
+        const queue = Array.isArray(this.marbleQueue) ? this.marbleQueue : [];  // [Mixin 正常用法：读取 Game 实例状态]
+        for (const def of queue) {
+            const collected = def && Array.isArray(def.collected) ? def.collected : [];
+            for (const item of collected) {
+                const type = typeof item === 'string'
+                    ? item
+                    : (item && typeof item.type === 'string' ? item.type : null);
+                if (type && Object.prototype.hasOwnProperty.call(tally, type)) tally[type] += 1;
+            }
+        }
+        tally.total = tally.pyro + tally.cryo + tally.lightning;
+        return tally;
+    },
+
+    /**
+     * @method _hud_ensureElementReadout
+     * @description 惰性创建读数宿主，并按阶段选择落位方式。`pointer-events:none` 两屏都保留
+     *   ⇒ 底部弹药 / 操作条照常可点。
+     *   · 整备屏（`phase-build`）：落成**流内一行**，插在滚动区（`.build-scroll`）与
+     *     `footer.build-foot` 之间。原因见下方行内说明——原来的绝对定位会把读数压在滚动区
+     *     最后一行文字上（实测 360 / 375 两档都遮字），属视觉回退。
+     *   · 采集屏（`phase-gathering`）：沿用绝对定位。采集页是画布 + 覆盖层，底部面板只在
+     *     左右两侧放按钮，实测三档视口都不压文字、也不产生横向滚动，不改动它。
+     * @param {string} phaseId - 'phase-gathering' | 'phase-build'
+     */
+    _hud_ensureElementReadout(phaseId) {
+        if (typeof document === 'undefined') return null;
+        const phaseEl = document.getElementById(phaseId);
+        if (!phaseEl) return null;
+        let host = document.getElementById('element-collect-readout');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'element-collect-readout';
+            host.className = 'element-collect-readout';
+            host.setAttribute('role', 'status');
+            host.setAttribute('aria-live', 'polite');
+            host.setAttribute('aria-label', '本次采集的元素素材');
+        }
+        if (phaseId === 'phase-build') {
+            // [2026-10-27 修] 绝对定位版在整备屏会盖住滚动区内容（`z-index:var(--z-hud)` 高于面板，
+            //   而 `bottom` 只按 footer 高度上抬，正好落在 `.build-scroll` 的可视下沿）。
+            //   改成流内一行后：`#build-screen-root` 是 flex 列、`.build-scroll` 是 `flex:1 1 auto`，
+            //   读数占掉自己那一行的高度，滚动区自动变矮 ⇒ 内容不再被遮，也不需要任何 overflow 处理，
+            //   读数本身照常可见（不是靠隐藏/移出视口来「修」）。
+            const foot = document.querySelector('#build-screen-root > .build-foot');
+            const mount = (foot && foot.parentNode) ? foot.parentNode : phaseEl;
+            if (foot && foot.parentNode === mount) {
+                if (host.parentNode !== mount || host.nextElementSibling !== foot) mount.insertBefore(host, foot);
+            } else if (host.parentNode !== phaseEl) {
+                phaseEl.appendChild(host);
+            }
+            host.classList.add('is-flow');
+        } else {
+            // 阶段切换时换挂到当前 overlay（appendChild 会从旧父级摘走）。
+            if (host.parentNode !== phaseEl) phaseEl.appendChild(host);
+            host.classList.remove('is-flow');
+        }
+        host.dataset.phase = phaseId;
+        return host;
+    },
+
+    /**
+     * @method ui_renderElementCollectReadout
+     * @description 底部常驻：本次已收集的、与元素挂钩的素材（火 / 冰 / 雷），卡片式角标。
+     *   · 只在 gathering / build 两个阶段显示，其它阶段隐藏。
+     *   · 素材多时靠 CSS `flex-wrap` 折行，容器不设横向滚动（Owner 移动端红线）。
+     *   · 定位按既有锚点量一次高度（沿用 `_hud_renderWaveReadout` 的 `offsetHeight + 4` 做法），
+     *     锚点缺失时退回静态 bottom，绝不改锚点几何。
+     */
+    ui_renderElementCollectReadout() {
+        if (typeof document === 'undefined') return null;
+        const phase = this.phase;  // [Mixin 正常用法：读取 Game 实例状态]
+        const inGather = phase === 'gathering';
+        const inBuild = phase === 'build';
+        const existing = document.getElementById('element-collect-readout');
+        if (!inGather && !inBuild) {
+            if (existing) {
+                existing.classList.remove('is-visible');
+                existing.textContent = '';
+            }
+            return null;
+        }
+        const host = this._hud_ensureElementReadout(inGather ? 'phase-gathering' : 'phase-build');
+        if (!host) return null;
+
+        const tally = this._hud_collectElementTally();
+        if (tally.total <= 0) {
+            // 本次没有与元素挂钩的拾取：不占位、不写空壳。
+            host.classList.remove('is-visible');
+            host.textContent = '';
+            return host;
+        }
+
+        // 定位：
+        //   · 整备屏走流内一行（落位逻辑在 `_hud_ensureElementReadout`）⇒ 清掉绝对定位用的 bottom，
+        //     高度由内容自己撑开，不再盖住滚动区。
+        //   · 采集屏按底部面板实高把读数顶到它上面（沿用 `_hud_renderWaveReadout` 的实高做法，
+        //     锚点缺失时退回 CSS 兜底值，绝不改锚点几何）。
+        if (host.classList.contains('is-flow')) {
+            host.style.removeProperty('bottom');
+        } else {
+            const anchor = document.querySelector('#phase-gathering .bottom-panel');
+            const anchorH = anchor && anchor.offsetHeight > 0 ? anchor.offsetHeight : 0;
+            host.style.bottom = `${anchorH + 6}px`;
+        }
+
+        host.textContent = '';
+        const label = document.createElement('span');
+        label.className = 'element-collect-readout__label';
+        label.textContent = '本次元素素材';
+        host.appendChild(label);
+
+        const display = (CONFIG.ui && CONFIG.ui.attributeDisplay) || {};
+        const accent = { pyro: 'var(--c-fire-3)', cryo: 'var(--c-ice-3)', lightning: 'var(--c-bolt-3)' };
+        for (const key of this._hud_elementMaterialKeys()) {
+            const count = tally[key] || 0;
+            if (count <= 0) continue;
+            const meta = display[key] || { name: key, icon: '' };
+            const chip = document.createElement('span');
+            chip.className = 'element-collect-chip';
+            chip.dataset.element = key;
+            if (accent[key]) chip.style.color = accent[key];
+            chip.title = `${meta.name}：本次采集 ${count} 项`;
+            chip.textContent = `${meta.icon}${meta.name}×${count}`;
+            host.appendChild(chip);
+        }
+        host.classList.add('is-visible');
+        return host;
     },
 
     _hud_updateLegacyHitProgress(val, target) {
@@ -1372,6 +1460,8 @@ export const hud_system = {
      * @description 更新收集阶段的弹珠队列UI。
      */
     ui_updateGatheringQueueUI() { 
+        // [2026-10-26] 本次元素素材读数随队列刷新一起更新：本函数有多处提前 return，故放在最前。
+        if (typeof this.ui_renderElementCollectReadout === 'function') this.ui_renderElementCollectReadout();
         const q = document.getElementById('gathering-queue'); 
         const renderedPanels = typeof this._hud_renderSessionChargeStack === 'function'
             ? this._hud_renderSessionChargeStack()

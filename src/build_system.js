@@ -21,7 +21,6 @@ import {
     getCollectorPayout,
     getReveal,
     normalizeBuildState,
-    resolveMagazineOverflow,
     tickFacilities,
     tryPurchase,
 } from './utils/build_economy_utils.js';
@@ -175,7 +174,6 @@ export const build_system = {
         this._extraDigPending = 0;
         this._timeStopPending = false;
         this._enemyDescentSuppressed = false;
-        this._pendingAlchemyOverflow = null;
         this._buildCommittedRound = null;
         this._facilityPulse = null;
         this.cannonShotsPerTurn = this.sys_getCannonStats().shots;
@@ -330,33 +328,11 @@ export const build_system = {
     },
 
     /**
-     * @method sys_resolveAlchemyOverflow
-     * @param {{replace:number}|'discard'} choice
-     */
-    sys_resolveAlchemyOverflow(choice) {
-        const pending = this._pendingAlchemyOverflow;
-        if (!pending) return false;
-        const next = resolveMagazineOverflow(this.alchemyMagazine || [], pending, choice);
-        if (!next) return false;
-        this.alchemyMagazine = next;
-        this._pendingAlchemyOverflow = null;
-        showToast(choice === 'discard' ? '已丢弃新炼成弹' : '已替换弹匣中的炼成弹');
-        if (typeof this.ui_renderBuildScreen === 'function') this.ui_renderBuildScreen();
-        if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
-        return true;
-    },
-
-    /**
      * @method sys_commitBuild
-     * @description 「开战」：满匣未处理时阻止；记 _buildCommittedRound 后进入战斗。
+     * @description 「开战」：记 _buildCommittedRound 后进入战斗。
      */
     sys_commitBuild() {
         if (this.phase !== 'build') return false;
-        if (this._pendingAlchemyOverflow) {
-            showToast('弹匣已满：先选择替换哪一发或丢弃新弹');
-            if (typeof this.ui_renderBuildScreen === 'function') this.ui_renderBuildScreen();
-            return false;
-        }
         this._buildCommittedRound = this.round;
         this.cannonShotsPerTurn = this.sys_getCannonStats().shots;
         if (typeof this.sys_saveRunState === 'function') this.sys_saveRunState();
@@ -461,9 +437,15 @@ export const build_system = {
 
     // ==================== 守卫：道具 ====================
 
-    /** 道具使用条件与「换炼成弹」一致：玩家回合、非横幅、无飞行子弹、还有射击次数。 */
+    /**
+     * 道具使用条件（原转调「换炼成弹」守卫；该机制已下线，规则本身保留、语义逐条不变）：
+     *   玩家回合、非回合开始横幅、场上无飞行子弹 / 无待发连射、且本回合还有可打的射击次数。
+     */
     sys_canUseItem() {
-        return typeof this.sys_canSwapAlchemyShot === 'function' ? this.sys_canSwapAlchemyShot() : false;
+        if (this.phase !== 'combat' || this.gameOver || this.isPaused) return false;
+        if (this.isEnemyTurn || this._roundStartBannerActive) return false;
+        if ((this.projectiles || []).length > 0 || (this.burstQueue || []).length > 0) return false;
+        return Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0;
     },
 
     /**

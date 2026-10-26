@@ -1253,11 +1253,11 @@
             white-space: nowrap;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
         }
-        /* 两批都发射过（没有「待发射」的批次）⇒ 这句提示已经没有意义，自动收起 */
+        /* 唯一一批（采集）发射完（没有「待发射」的按钮）⇒ 这句提示已经没有意义，自动收起 */
         #phase-gathering:not(:has(.dig-launch-btn:not(.is-launched))) .gathering-launch-hint {
             display: none;
         }
-        /* [REQ-20261022-wave-loop S1] 挖掘发射选择：采集 ×5 / 炼成弹珠 */
+        /* [REQ-20261022-wave-loop S1] 挖掘发射按钮容器：只剩「采集 ×N」一批（「炼成弹珠」已于 2026-10-26 下线，此容器不再承载批次选择） */
         .dig-launch-toggle {
             position: absolute;
             right: 0.5rem;
@@ -1288,31 +1288,6 @@
             cursor: default;
             text-decoration: line-through;
         }
-        /* [REQ-20261022-wave-loop S1] 战斗：炼成弹匣（点击把下一发主炮换成炼成弹） */
-        .alchemy-magazine-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-top: 4px;
-            pointer-events: auto;
-        }
-        .alchemy-magazine-btn {
-            padding: 2px 7px;
-            border-radius: 6px;
-            border: 1px solid rgba(192, 132, 252, 0.6);
-            background: rgba(59, 7, 100, 0.72);
-            color: #f5d0fe;
-            font-size: 0.68rem;
-            font-weight: 700;
-            white-space: nowrap;
-            cursor: pointer;
-            pointer-events: auto;
-        }
-        .alchemy-magazine-btn.is-loaded {
-            border-color: #facc15;
-            color: #fef08a;
-        }
-        .alchemy-magazine-btn:disabled { opacity: 0.5; cursor: default; }
         .combat-status-panel {
             position: static;
             transform: none;

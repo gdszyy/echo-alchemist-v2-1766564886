@@ -640,10 +640,20 @@ check(has(gameSystem, /sys_rollNextRunShopRound[\s\S]*runShopRandomWaitMin[\s\S]
 check(has(gameSystem, /sys_maybeOfferRunShopBeforeRoundStart\s*\(\)\s*\{[\s\S]*sys_updateRunShopScheduleForRound\(\)[\s\S]*return\s+false/), 'round-start merchant schedule updates without blocking the banner');
 check(has(gameSystem, /_runShopInventoryGeneratedForRound/), 'run shop inventory generation marker is persisted with run state');
 check(has(gameSystem, /runShopStarterBoostDamageRounds/), 'starter merchant boost damage duration is persisted with run state');
-// [REQ-20261022-wave-loop S1] 挖掘队列契约：采集弹珠 ×collectorCount + 炼成弹珠 ×1（同为 white，用 role 区分）。
-check(has(gamePhase, /function\s+buildDigMarbleQueue\s*\(\)\s*\{[\s\S]{0,400}collectorCount[\s\S]{0,300}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'gathering has a dig marble queue builder (collector x N + alchemy x 1)');
+// [REQ-20261022-wave-loop S1 · 2026-10-26 契约修订] 挖掘队列只出采集弹珠 ×collectorCount（role='collector'）。
+//   原契约「采集 ×N + 炼成弹珠 ×1（同为 white，用 role 区分）」随「炼成弹珠」机制整体下线（Owner 裁定）作废，
+//   本处断言换成新契约，**强度不降**：仍钉住 collect 循环里的 `def.role='collector'` 结构，
+//   并补两条**显式否定**——源文件里任何地方都不许再出现 `alchemyDef` 或 `role='alchemy'`。
+//   任何一半不成立都会红（既挡住「把炼成弹珠加回来」，也挡住「把采集队列整段删掉」）。两条断言数量不变。
+check(has(gamePhase, /function\s+buildDigMarbleQueue\s*\(\)\s*\{[\s\S]{0,400}collectorCount[\s\S]{0,300}def\.role\s*=\s*['"]collector['"]/)
+    && !has(gamePhase, /alchemyDef/)
+    && !has(gamePhase, /\.role\s*=\s*['"]alchemy['"]/),
+    'gathering dig marble queue builder queues collectors only (alchemy marble removed)');
 check(has(gamePhase, /phase_startGatheringPhase\s*\(\)\s*\{[\s\S]*this\.marbleQueue\s*=\s*buildDigMarbleQueue\(\)/), 'gathering phase rebuilds a missing marbleQueue as a dig queue');
-check(has(gameSystem, /sys_startDigPhase\s*\(\)\s*\{[\s\S]{0,1400}def\.role\s*=\s*['"]collector['"][\s\S]{0,200}alchemyDef\.role\s*=\s*['"]alchemy['"]/), 'dig phase queues collectors plus one alchemy marble');
+check(has(gameSystem, /sys_startDigPhase\s*\(\)\s*\{[\s\S]{0,1400}def\.role\s*=\s*['"]collector['"]/)
+    && !has(gameSystem, /alchemyDef/)
+    && !has(gameSystem, /\.role\s*=\s*['"]alchemy['"]/),
+    'dig phase queues collectors only (alchemy marble removed)');
 check(!has(gamePhase, /ownedRelics\.includes\(['"]chaos_pact['"]\)[\s\S]{0,400}跳过研磨/), 'chaos pact no longer skips digging');
 check(has(gamePhase, /runShopStarterBoostDamageRounds[\s\S]*flatDamageBonus[\s\S]*runShopStarterBoostDamageAmount/), 'starter merchant damage boost expires during round finalization');
 check(has(gamePhase, /import\s*\{\s*calc_getCirclePolygonCollision,\s*calc_getCircleArcCollision\s*\}\s*from\s*['"]\.\/combat\/collision_shapes\.js['"]/), 'combat aim guide imports shared collision shape helpers');

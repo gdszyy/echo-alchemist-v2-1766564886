@@ -1,8 +1,11 @@
 /**
  * validate_build_loop_s2.mjs - [REQ-20261022-wave-loop S2] 整备阶段：纯函数 + §9 确定性推演 + 静态契约。
  *
- * 覆盖：价格 / 购买（不可变更新与拒绝原因）、逐波解锁、主炮数值、设施冷却节奏、收集器、满匣处理；
+ * 覆盖：价格 / 购买（不可变更新与拒绝原因）、逐波解锁、主炮数值、设施冷却节奏、收集器；
  *       §9 纸面推演玩家 A / B（测试夹具数值，不是平衡）；挖 → 整备 → 开战接线、设施 / 道具 / 存档字段的静态检查。
+ * [2026-10-26] 「炼成弹珠 / 炼成弹匣 / 满匣单选卡」机制下线（Owner 裁定），本文件原「满匣处理」4 条断言一并删除：
+ *   其中 3 条测的是已删除的纯函数 `resolveMagazineOverflow`；另 1 条测的是已删除的换炼成弹入口。
+ *   开战不能再被满匣阻塞 ⇒ 原「满匣未处理时阻止开战」那条改为只断言「记 `_buildCommittedRound` 后进入战斗」。
  *
  * Usage:
  *   node tests/validate_build_loop_s2.mjs
@@ -18,7 +21,6 @@ import {
     getReveal,
     isActionRevealed,
     normalizeBuildState,
-    resolveMagazineOverflow,
     tickFacilities,
     tryPurchase,
 } from '../src/utils/build_economy_utils.js';
@@ -230,17 +232,6 @@ const buy = (s, action, r) => tryPurchase(s, action, CFG, r);
     check(3 * CFG.items.shield.cost > CFG.facilities.shieldGen.cost, '§5.4：连续买 3 次急救结界比建一座结界发生器贵');
 }
 
-// ---------- 满匣处理 ----------
-{
-    const mag = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
-    const shot = { id: 'new' };
-    const rep = resolveMagazineOverflow(mag, shot, { replace: 1 });
-    check(rep && rep.map(x => x.id).join(',') === 'a,new,c' && mag[1].id === 'b', '满匣：替换第 2 发（不改原数组）');
-    const dis = resolveMagazineOverflow(mag, shot, 'discard');
-    check(dis && dis.map(x => x.id).join(',') === 'a,b,c', '满匣：丢弃新弹');
-    check(resolveMagazineOverflow(mag, shot, { replace: 5 }) === null, '满匣：非法下标 → null');
-}
-
 // ---------- 静态契约 ----------
 const config = read('src/config.js');
 const gamePhase = read('src/game_phase.js');
@@ -260,20 +251,18 @@ check(/build_screen_system/.test(core) && /defend_hud_system/.test(core), 'core�
 check(/digCount\s*=\s*\(this\.digCount\s*\|\|\s*0\)\s*\+\s*1[\s\S]{0,400}sys_startBuildPhase\(\)/.test(buildSystem), '挖掘结束：digCount++ → 收集器付款 → 进入整备');
 check(/digState\.completed\s*=\s*true[\s\S]{0,600}sys_onDigComplete\(\)/.test(gamePhase) && !/digState\.completed\s*=\s*true[\s\S]{0,500}setTimeout\(\(\)\s*=>\s*this\.phase_startCombatPhase\(\),\s*500\)/.test(gamePhase), '挖掘结束不再直接开战，改进整备');
 check(/sys_startBuildPhase\s*\(\)\s*\{[\s\S]{0,800}phase_switchPhase\(['"]build['"]\)/.test(buildSystem), '整备：切到 build 阶段');
-check(/sys_commitBuild\s*\(\)\s*\{[\s\S]{0,400}_pendingAlchemyOverflow[\s\S]{0,200}return\s+false[\s\S]{0,600}_buildCommittedRound\s*=\s*this\.round[\s\S]{0,600}phase_startCombatPhase\(\)/.test(buildSystem), '开战：满匣未处理时阻止；记 _buildCommittedRound 后进入战斗');
+check(/sys_commitBuild\s*\(\)\s*\{[\s\S]{0,600}_buildCommittedRound\s*=\s*this\.round[\s\S]{0,600}phase_startCombatPhase\(\)/.test(buildSystem), '开战：记 _buildCommittedRound 后进入战斗（满匣前置阻塞已随炼成弹匣下线）');
 check(/needsAuto\s*=\s*\[[^\]]*['"]build['"]/.test(uiSystem), 'ui_updateUI：build 阶段面板可交互');
 check(/id=["']phase-build["'][^>]*class=["'][^"']*ui-overlay/.test(indexHtml) && /id=["']build-fight-btn["']/.test(indexHtml), 'index：#phase-build 覆盖层与开战按钮');
 check(/src\/styles\/ui_tokens\.css/.test(indexHtml) && /src\/styles\/ui_components\.css/.test(indexHtml), 'index：链接 UI 令牌与组件样式');
-check(!/this\.alchemyMagazine\.shift\(\)/.test(gamePhase) && /_pendingAlchemyOverflow\s*=/.test(gamePhase), '满匣：不再丢最旧一发，改为整备单选卡');
 check(/phase_startCombatPhase\s*\(\)\s*\{[\s\S]{0,2600}sys_getCannonStats\(\)/.test(gamePhase), '开战：主炮弹药按 sys_getCannonStats 生成');
-check(/sys_swapNextShotWithAlchemy\s*\(i\)\s*\{[\s\S]{0,800}sys_buildCannonShots\(1\)/.test(gameSystem), '换回主炮：按当前主炮数值生成');
 check(/phase_enemy_startLogic\s*\(\)\s*\{[\s\S]{0,1200}sys_triggerFacilities\(\)[\s\S]{0,500}this\.isEnemyTurn\s*=\s*true/.test(gamePhase), '设施在敌人回合开始前触发（isEnemyTurn 之前）');
 check(/_timeStopPending[\s\S]{0,200}_enemyDescentSuppressed\s*=\s*true/.test(gamePhase) && /e\.active\s*&&\s*!this\._enemyDescentSuppressed/.test(gamePhase), '时停：本回合敌人不行动');
 check(/_enemyDescentSuppressed[\s\S]{0,300}spawn_checkBossRoundFor|else\s+if\s*\(this\._enemyDescentSuppressed\)/.test(gamePhase) && /this\._enemyDescentSuppressed\s*=\s*false/.test(gamePhase), '时停：回合结算跳过补行并清除');
 check(/!config\._facility[\s\S]{0,80}hunter_instinct|hunter_instinct[\s\S]{0,40}!config\._facility/.test(combatSystem), '设施伤害不吃主炮类遗物（猎人本能）');
 check(/_extraDigPending/.test(gameSystem) && /miningLevels/.test(gameSystem.slice(gameSystem.indexOf('sys_startDigPhase() {'), gameSystem.indexOf('sys_startDigPhase() {') + 1500)), '挖掘：采集弹珠数 = 基础 + 挖矿升级 + 加挖');
 check(/loopVersion:\s*3/.test(gameSystem), '存档：loopVersion 3');
-for (const field of ['digCount', 'cannonLevels', 'cannonBranch', 'facilities', 'facilitySlotsOpen', 'items', 'miningLevels', '_extraDigPending', '_timeStopPending', '_pendingAlchemyOverflow', '_buildCommittedRound']) {
+for (const field of ['digCount', 'cannonLevels', 'cannonBranch', 'facilities', 'facilitySlotsOpen', 'items', 'miningLevels', '_extraDigPending', '_timeStopPending', '_buildCommittedRound']) {
     check(new RegExp(`${field}:`).test(gameSystem), `存档：保存 ${field}`);
 }
 check(/sys_shouldResumeBuild\(\)[\s\S]{0,120}sys_startBuildPhase\(\)/.test(gameSystem), '读档：挖完未开战 → 回到整备');

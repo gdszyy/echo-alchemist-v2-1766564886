@@ -2,7 +2,7 @@
  * build_screen.js - [REQ-20261022-wave-loop S2 / R2] 整备界面（#phase-build）mixin。
  *
  * 一屏可见（§2 P3 / art §6.2）：⚡/💎 余额、主炮 3 轨（等级 / 价格 / 锁定）、设施位与冷却、道具位、
- * 挖矿升级（S2 只开「采集弹珠 +1」，其余显示锁定 S3）、弹匣与满匣单选卡、下一波预告、「开战」。
+ * 挖矿升级（S2 只开「采集弹珠 +1」，其余显示锁定 S3）、下一波预告、「开战」。
  * 只用 src/ui/components/* 组件 + src/styles/ui_components.css；同一份 DOM，不在侧栏间搬 DOM。
  * 图标全部是占位字形块（.ui-glyph--placeholder），等正式 24×24 像素图标替换。
  */
@@ -714,7 +714,8 @@ export const build_screen_system = {
         // 用 setAttribute 写内联自定义属性：真实 DOM 与测试夹具（只有 setAttribute，没有 style 对象）都能落地。
         gridPanel.setAttribute('style', `--build-grid-cols: ${buildGrid.cols};`);
         // ---------- 面板落位顺序（首屏优先放建造面） ----------
-        // 2026-10-26 修：改造前面板按「本波弹药 → 主炮 → 设施 → 工厂网格 → 道具 → 挖矿 → 弹匣」落位，
+        // 2026-10-26 修：改造前面板按「本波弹药 → 主炮 → 设施 → 工厂网格 → 道具 → 挖矿 → 弹匣」落位
+        //   （末位那个「炼成弹匣」面板已于 2026-10-26 随炼成弹珠机制一并下线，顺序描述保留作历史对照），
         //   而教程第 9 步（`build_facility`）要求的动作是「建造一座设施」⇒ 玩家首屏看不到任何建造入口，
         //   得先自己想到往下滚（实测 1280×800 首屏可视 646px，`#build-facilities` 在 885、`#build-grid` 在 1155）。
         //   另一条路（把设施提成滚动区之上的常驻块）已实测否决：375×812 下滚动区被压到 225px、滚动比 3:1 → 5.84:1，
@@ -778,55 +779,23 @@ export const build_screen_system = {
         miningRows.push(el('p', 'build-locked-note', { text: '宽口能量桶 · 磁力钉 · 咽喉加宽：S3 开放' }));
         scroll.appendChild(createPanel({ title: '挖矿', hint: '投资后期', children: miningRows, id: 'build-mining' }));
 
-        // ---------- 弹匣 ----------
-        const magCap = (CONFIG.gameplay.alchemy && CONFIG.gameplay.alchemy.magazineCap) || 3;
-        const mag = Array.isArray(this.alchemyMagazine) ? this.alchemyMagazine : [];
-        const magRow = el('div', 'build-mag');
-        for (let i = 0; i < magCap; i++) {
-            const r = mag[i];
-            magRow.appendChild(el('span', `build-mag__slot${r ? ' is-full' : ''}`, {
-                text: r && typeof this._hud_formatAlchemyLabel === 'function' ? this._hud_formatAlchemyLabel(r) : '空',
-            }));
-        }
-        const magChildren = [magRow];
-        if (this._pendingAlchemyOverflow) {
-            magChildren.push(createButton({
-                label: '弹匣已满：处理新炼成弹', variant: 'danger', className: 'build-mag__resolve',
-                onClick: () => this.ui_renderBuildScreen(),
-            }));
-        }
-        scroll.appendChild(createPanel({ title: '炼成弹匣', hint: `上限 ${magCap} · 战斗中可替换下一发主炮`, children: magChildren, id: 'build-magazine' }));
-
         // ---------- 底部：开战 ----------
+        // [2026-10-26] 「炼成弹珠 / 炼成弹匣」机制下线（Owner 裁定）后不再有「满匣未处理」的前置阻塞，
+        //   开战按钮恒可点；原 `_pendingAlchemyOverflow` 的禁用与「先处理满匣」提示一并删除。
         const foot = el('footer', 'build-foot');
         foot.appendChild(createButton({
             id: 'build-fight-btn', label: '开战', variant: 'primary', className: 'build-fight',
-            disabled: !!this._pendingAlchemyOverflow,
-            title: this._pendingAlchemyOverflow ? '先处理满匣' : '提交整备，进入战斗',
+            title: '提交整备，进入战斗',
             onClick: () => this.sys_commitBuild(),
         }));
         root.appendChild(foot);
 
-        // ---------- 满匣单选卡（§5.3） ----------
-        if (this._pendingAlchemyOverflow) {
-            const fmt = r => (typeof this._hud_formatAlchemyLabel === 'function' ? this._hud_formatAlchemyLabel(r) : String(r.damage || ''));
-            const actions = mag.map((r, i) => createButton({
-                label: `替换第 ${i + 1} 发`, sub: fmt(r), variant: 'default', className: 'build-overflow__btn',
-                onClick: () => this.sys_resolveAlchemyOverflow({ replace: i }), dataset: { overflow: String(i) },
-            }));
-            actions.push(createButton({
-                label: '丢弃新弹', variant: 'ghost', className: 'build-overflow__btn',
-                onClick: () => this.sys_resolveAlchemyOverflow('discard'), dataset: { overflow: 'discard' },
-            }));
-            root.appendChild(createModal({
-                id: 'build-overflow-modal', title: '弹匣已满',
-                body: [el('p', '', { text: `新炼成弹：${fmt(this._pendingAlchemyOverflow)}。替换哪一发，或丢弃新弹？` })],
-                actions,
-            }));
-        }
-
         const newScroll = root.querySelector('.build-scroll');
         if (newScroll) newScroll.scrollTop = scrollTop;
+
+        // [2026-10-26] 本次采集的元素素材读数：整备屏重绘时一并刷新（实现在 src/ui/hud.js）。
+        // 定义在 hud mixin 上，单测里只挂 build_screen_system 时不存在 ⇒ 必须先判类型再调。
+        if (typeof this.ui_renderElementCollectReadout === 'function') this.ui_renderElementCollectReadout();
     },
 
     /**

@@ -741,7 +741,6 @@ export const game_system = {
         // [REQ-20261022-wave-loop S1] runFragments 是 energy 的别名（core.js 访问器）
         this.runFragments = 0;          // 局内能量（原符文碎片）
         this.crystal = 0;               // 晶核
-        this.alchemyMagazine = [];      // 炼成弹匣
         this.cannonShotsPerTurn = (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2;
         this._digDoneRound = null;
         this._digState = null;
@@ -1615,8 +1614,9 @@ export const game_system = {
 
     /**
      * @method sys_startDigPhase
-     * @description [REQ-20261022-wave-loop S1] 每波挖掘入口（§3 / §6）：采集弹珠 ×N（只挖能量）+ 炼成弹珠 ×1。
-     *   两批各发射一次，全部落定后由 phase_gathering_attemptComplete 进入战斗并记 _digDoneRound。
+     * @description [REQ-20261022-wave-loop S1] 每波挖掘入口（§3 / §6）：只出采集弹珠 ×N（只挖能量）。
+     *   [2026-10-26] 「炼成弹珠」机制下线（Owner 裁定：研磨阶段已改成采集阶段，不存在专门做子弹的弹珠），
+     *   队列不再追加炼成弹珠，发射只剩一批；落定后由 phase_gathering_attemptComplete 进入整备并记 _digDoneRound。
      */
     sys_startDigPhase() {
         const digCfg = (CONFIG.gameplay && CONFIG.gameplay.dig) || {};
@@ -1633,9 +1633,6 @@ export const game_system = {
             def.role = 'collector';
             queue.push(def);
         }
-        const alchemyDef = new MarbleDefinition('white');
-        alchemyDef.role = 'alchemy';
-        queue.push(alchemyDef);
 
         this.selectionMode = 'standard';
         this.pendingSelectionMode = null;
@@ -1654,44 +1651,6 @@ export const game_system = {
         if (typeof this.sys_showRoundStartBanner === 'function') {
             this.sys_showRoundStartBanner({ enterCombat: false, protectCombat: false });
         }
-    },
-
-    /**
-     * @method sys_canSwapAlchemyShot
-     * @description [REQ-20261022-wave-loop S1] 能否在当前时刻把下一发主炮换成炼成弹：
-     *   仅玩家战斗回合、非回合开始横幅期间、场上没有飞行中的子弹。
-     */
-    sys_canSwapAlchemyShot() {
-        if (this.phase !== 'combat' || this.gameOver || this.isPaused) return false;
-        if (this.isEnemyTurn || this._roundStartBannerActive) return false;
-        if ((this.projectiles || []).length > 0 || (this.burstQueue || []).length > 0) return false;
-        return Array.isArray(this.ammoQueue) && this.ammoQueue.length > 0;
-    },
-
-    /**
-     * @method sys_swapNextShotWithAlchemy
-     * @description [REQ-20261022-wave-loop S1] 把下一发主炮替换为弹匣中第 i 发炼成弹（不额外占射击次数，§5.3）。
-     *   若下一发已经是炼成弹，则把它退回弹匣并恢复一发主炮（i 被忽略）。
-     * @param {number} i - alchemyMagazine 下标
-     * @returns {boolean} 是否发生替换
-     */
-    sys_swapNextShotWithAlchemy(i) {
-        if (!this.sys_canSwapAlchemyShot()) return false;
-        if (!Array.isArray(this.alchemyMagazine)) this.alchemyMagazine = [];
-        const head = this.ammoQueue[0];
-        if (head && head._shotKind === 'alchemy') {
-            this.alchemyMagazine.push(head);
-            // [S2] 换回的主炮按当前主炮三轨 + 分支生成
-            this.ammoQueue[0] = this.sys_buildCannonShots(1)[0];
-        } else {
-            if (!Number.isInteger(i) || i < 0 || i >= this.alchemyMagazine.length) return false;
-            if (head && head._shotKind !== 'cannon') return false;
-            const [shot] = this.alchemyMagazine.splice(i, 1);
-            this.ammoQueue[0] = shot;
-        }
-        if (typeof this.ui_updateAmmoUI === 'function') this.ui_updateAmmoUI();
-        if (typeof this.ui_renderRecipeHUD === 'function') this.ui_renderRecipeHUD();
-        return true;
     },
 
     sys_grantRunResourcePack(reward = {}) {
@@ -3264,7 +3223,6 @@ export const game_system = {
                 loopVersion: 3,
                 energy: this.energy || 0,
                 crystal: this.crystal || 0,
-                alchemyMagazine: (this.alchemyMagazine || []).map(r => JSON.parse(JSON.stringify(r))),
                 cannonShotsPerTurn: this.cannonShotsPerTurn || 0,
                 _digDoneRound: Number.isFinite(this._digDoneRound) ? this._digDoneRound : null,
                 // [REQ-20261022-wave-loop S2] 整备状态
@@ -3286,7 +3244,6 @@ export const game_system = {
                 miningLevels: { ...(this.miningLevels || {}) },
                 _extraDigPending: this._extraDigPending || 0,
                 _timeStopPending: !!this._timeStopPending,
-                _pendingAlchemyOverflow: this._pendingAlchemyOverflow ? JSON.parse(JSON.stringify(this._pendingAlchemyOverflow)) : null,
                 _buildCommittedRound: Number.isFinite(this._buildCommittedRound) ? this._buildCommittedRound : null,
                 runShopInventory: this.runShopInventory ? JSON.parse(JSON.stringify(this.runShopInventory)) : [],
                 runShopRefreshes: this.runShopRefreshes || 0,
@@ -3520,9 +3477,6 @@ export const game_system = {
             // [REQ-20261022-wave-loop S1] 能量（旧存档的局内碎片直接并入能量）
             this.energy = Math.max(0, Number(state.energy ?? state.runFragments ?? 0) || 0);
             this.crystal = Math.max(0, Math.floor(Number(state.crystal) || 0));
-            this.alchemyMagazine = Array.isArray(state.alchemyMagazine)
-                ? state.alchemyMagazine.filter(Boolean).map(r => ({ ...r }))
-                : [];
             this.cannonShotsPerTurn = Math.max(1, Math.floor(Number(state.cannonShotsPerTurn)
                 || (CONFIG.gameplay.cannon && CONFIG.gameplay.cannon.shotsPerTurn) || 2));
             this._digDoneRound = Number.isFinite(state._digDoneRound) ? state._digDoneRound : null;
@@ -3543,7 +3497,6 @@ export const game_system = {
             }, (CONFIG.gameplay && CONFIG.gameplay.build) || {}));
             this._extraDigPending = Math.max(0, Math.floor(Number(state._extraDigPending) || 0));
             this._timeStopPending = !!state._timeStopPending;
-            this._pendingAlchemyOverflow = state._pendingAlchemyOverflow ? { ...state._pendingAlchemyOverflow } : null;
             this._buildCommittedRound = Number.isFinite(state._buildCommittedRound) ? state._buildCommittedRound : null;
             this.runShopInventory = state.runShopInventory ? JSON.parse(JSON.stringify(state.runShopInventory)) : [];
             this.runShopRefreshes = state.runShopRefreshes || 0;

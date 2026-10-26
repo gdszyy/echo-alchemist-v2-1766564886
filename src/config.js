@@ -943,15 +943,12 @@ const CONFIG = {
             damage: 10,             // 主炮单发基础伤害
             bounce: 2,              // 主炮基础反弹次数
         },
-        alchemy: {
-            base: 15,               // 炼成弹伤害 = base × (2 + 属性总级数)，炼成时锁定
-            maxTypes: 3,            // 炼成弹最多 3 种属性
-            maxLevel: 3,            // 每种属性最多 3 级
-            magazineCap: 3,         // 炼成弹匣上限（S2：满匣在整备阶段弹出「替换哪一发 / 丢弃新弹」单选卡）
-        },
+        // [2026-10-26] 原 `gameplay.alchemy`（炼成弹伤害/属性封顶/弹匣上限）随「炼成弹珠」机制整体下线删除：
+        //   Owner 裁定「研磨阶段其实已经改成了采集阶段，不存在专门的弹珠去做子弹了」。
+        //   挖掘队列现只出采集弹珠，弹珠的 element 属性字段保留（后续在工厂里呈现），此处不再有读者。
         // ==================== [REQ-20261022-wave-loop S2] 整备：主炮三轨 / 设施 / 道具 / 挖矿升级 ====================
         // 全部是测试夹具数值（docs/design/dig_build_defend_loop_v1.md §5 / §8 / §9），不是平衡；调参交资源与战斗调参专家。
-        // 纯函数见 src/utils/build_economy_utils.js（价格 / 购买 / 逐波解锁 / 设施冷却 / 满匣处理）。
+        // 纯函数见 src/utils/build_economy_utils.js（价格 / 购买 / 逐波解锁 / 设施冷却）。
         build: {
             cannon: {
                 damagePerLv: 4,                     // 伤害轨每级 +4（主炮单发 = cannon.damage + (baseDamage-1) + 4×级）

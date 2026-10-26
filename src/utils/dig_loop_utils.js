@@ -1,66 +1,13 @@
 /**
  * dig_loop_utils.js - [REQ-20261022-wave-loop · S1] 挖 → 守 循环的纯函数工具。
  *
- * 设计依据：docs/design/dig_build_defend_loop_v1.md §3（时间口径）、§5.1（主炮）、§5.3（炼成弹）、§6（挖掘）。
+ * 设计依据：docs/design/dig_build_defend_loop_v1.md §3（时间口径）、§5.1（主炮）、§6（挖掘）。
+ *   [2026-10-26] §5.3（炼成弹）相关纯函数已随「炼成弹珠」机制整体下线（Owner 裁定），本文件只剩主炮与时间口径。
  * 约束：本文件不得 import 任何大文件（config.js / game_*.js 等），保证 node 可直接导入做单测；
  *       调用方负责把 CONFIG 中的数值作为参数传入。
  */
 
 import { findActiveBoss } from './boss_schedule_utils.js';
-
-/** calc_compileCollectionToRecipe 对这三类属性按「条目数」+1，而不是按 level 累加。 */
-const COUNT_STACKED_TYPES = new Set(['bounce', 'pierce', 'scatter']);
-
-function _itemType(item) {
-    if (typeof item === 'string') return item;
-    return item && typeof item.type === 'string' ? item.type : null;
-}
-
-function _itemLevel(item) {
-    if (typeof item === 'string') return 1;
-    const level = Math.floor(Number(item && item.level) || 1);
-    return Math.max(1, level);
-}
-
-/**
- * 炼成弹封顶：最多 maxTypes 种属性（按首次拾取顺序），每种最多 maxLevel 级。
- * 输出的 items 可直接喂给 calc_compileCollectionToRecipe：
- *   - bounce / pierce / scatter：编译器按条目 +1，所以输出 level 份 { type, level: 1 }；
- *   - 其他属性：输出 1 条 { type, level }。
- * @param {Array<string|{type:string, level?:number}>} list - 炼成弹珠的拾取列表
- * @param {number} [maxTypes=3]
- * @param {number} [maxLevel=3]
- * @returns {{ items: Array<{type:string, level:number}>, groups: Array<{type:string, level:number}>, totalLevels: number }}
- */
-export function capAlchemyCollection(list, maxTypes = 3, maxLevel = 3) {
-    const typeCap = Math.max(0, Math.floor(Number(maxTypes) || 0));
-    const levelCap = Math.max(1, Math.floor(Number(maxLevel) || 1));
-    const order = [];
-    const levels = new Map();
-    for (const item of Array.isArray(list) ? list : []) {
-        if (item && typeof item === 'object' && item.source === 'rune_slot') continue;
-        const type = _itemType(item);
-        if (!type) continue;
-        if (!levels.has(type)) {
-            if (order.length >= typeCap) continue;
-            order.push(type);
-            levels.set(type, 0);
-        }
-        levels.set(type, Math.min(levelCap, levels.get(type) + _itemLevel(item)));
-    }
-
-    const groups = order.map(type => ({ type, level: levels.get(type) }));
-    const items = [];
-    for (const group of groups) {
-        if (COUNT_STACKED_TYPES.has(group.type)) {
-            for (let i = 0; i < group.level; i++) items.push({ type: group.type, level: 1 });
-        } else {
-            items.push({ type: group.type, level: group.level });
-        }
-    }
-    const totalLevels = groups.reduce((sum, g) => sum + g.level, 0);
-    return { items, groups, totalLevels };
-}
 
 /**
  * 主炮射击：每回合 n 发无限弹药（限射速），配方形状与 calc_compileCollectionToRecipe 一致。
@@ -94,17 +41,6 @@ export function buildCannonShots(n, damage, bounce = 0) {
         });
     }
     return shots;
-}
-
-/**
- * 炼成弹伤害（夹具公式，§5.3）：base × (2 + 属性总级数)，炼成时锁定。
- * @param {number} totalLevels
- * @param {number} [base=15]
- */
-export function alchemyDamage(totalLevels, base = 15) {
-    const levels = Math.max(0, Math.floor(Number(totalLevels) || 0));
-    const b = Number.isFinite(Number(base)) ? Number(base) : 15;
-    return b * (2 + levels);
 }
 
 /**
